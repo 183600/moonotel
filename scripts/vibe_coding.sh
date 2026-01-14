@@ -10,7 +10,6 @@ exec >>"$LOG_FILE" 2>&1
 # iflow-cabal-autoloop.sh (Gitee优先版)
 # - 单文件融合版：等价于 iflow-cabal-loop.yml + scripts/typus_cabal_loop.sh
 # - 非 GitHub Actions 环境运行
-# - iFlow CLI 走 NVIDIA Integrate OpenAI-compatible 接口
 #
 # 本次变更点：
 # 1. 初始化：优先从 GITEE_REPO_URL 克隆代码，origin 指向 Gitee。
@@ -51,7 +50,7 @@ ENABLE_RELEASE="${ENABLE_RELEASE:-0}"
 AUTO_COMMIT_ON_TIMEOUT="${AUTO_COMMIT_ON_TIMEOUT:-1}"
 
 ############################
-# 1) iFlow -> NVIDIA Integrate 配置
+# 1) iFlow -> Integrate 配置
 ############################
 export IFLOW_selectedAuthType="${IFLOW_selectedAuthType:-openai-compatible}"
 export IFLOW_BASE_URL="${IFLOW_BASE_URL:-https://integrate.api.nvidia.com/v1}"
