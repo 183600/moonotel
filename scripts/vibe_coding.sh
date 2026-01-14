@@ -2,42 +2,20 @@
 set -euo pipefail
 
 # 静默运行：不打印到终端，但默认写入日志文件，便于排查 5 小时后的提交/推送是否成功
-# 修复：默认日志路径改为 $HOME 目录，避免 /tmp 权限冲突
 # 如仍想彻底丢弃日志：export LOG_FILE=/dev/null
-LOG_FILE="${LOG_FILE:-${HOME}/.claude-cabal-autoloop.log}"
-
-# 尝试创建/触碰日志文件，检查写入权限。如果失败，则回退到 /dev/null
-if ! touch "$LOG_FILE" 2>/dev/null || [[ ! -w "$LOG_FILE" ]]; then
-  echo "Warning: Cannot write to log file '$LOG_FILE'. Falling back to /dev/null." >&2
-  LOG_FILE="/dev/null"
-fi
-
+LOG_FILE="${LOG_FILE:-/tmp/iflow-cabal-autoloop.log}"
 exec >>"$LOG_FILE" 2>&1
 
 ###############################################################################
-# claude-cabal-autoloop.sh (Direct Push Mode)
-# - 单文件融合版：等价于 claude-cabal-loop.yml + scripts/typus_cabal_loop.sh
+# iflow-cabal-autoloop.sh (Gitee优先版)
+# - 单文件融合版：等价于 iflow-cabal-loop.yml + scripts/typus_cabal_loop.sh
 # - 非 GitHub Actions 环境运行
-# - 使用 Claude Code CLI (@anthropic-ai/claude-code)
-# - 已移除 watchdog/heartbeat 机制
+# - iFlow CLI 走 NVIDIA Integrate OpenAI-compatible 接口
 #
-# 工作模式变更：
-# - 移除了 Pull Request (PR) 创建逻辑。
-# - 直接在 WORK_BRANCH (默认 master) 上进行提交和推送。
-# - 下一轮循环开始前会自动拉取最新代码，确保基于最新的代码继续工作。
-#
-# 修复点（继承自原 iflow 版本）：
-# A) derive_github_repo：修复 GitHub remote URL 正则，兼容 https/ssh/scp 风格
-# B) ps_children_of：移除不可靠的 `ps ... -ppid` 分支，改为失败即回退到通用枚举过滤
-# C) set -e 模式下的 git 操作保护：关键 git 失败 return 而非 exit，保护外层重试
-#
-# 新增/修改（Claude 版本）：
-# - 移除 NVIDIA OpenAI 接口配置，改用 Anthropic 原生 API Key (ANTHROPIC_API_KEY)
-# - 移除 IFLOW 相关逻辑，替换为 `claude -p` 命令调用
-# - 支持通过 CLAUDE_CMD 变量切换命令（默认为 claude，若使用 ccr 包装器可修改为 ccr）
-# - ✅ 新增：支持 Claude Code Router (ccr)，自动管理服务和配置
-# - ✅ 新增：修复日志文件默认路径，避免 /tmp 权限错误
-# - ✅ 修改：将无头模式从 --non-interactive 改为 -p 参数触发
+# 本次变更点：
+# 1. 初始化：优先从 GITEE_REPO_URL 克隆代码，origin 指向 Gitee。
+# 2. 推送：默认同时强制推送到 Gitee (origin) 和 GitHub (github)。
+# 3. 容错：GitHub 推送失败不影响脚本运行（仅报错），Gitee 推送失败会重试。
 ###############################################################################
 
 ############################
@@ -45,71 +23,44 @@ exec >>"$LOG_FILE" 2>&1
 ############################
 RUN_HOURS="${RUN_HOURS:-5}"
 WORK_BRANCH="${WORK_BRANCH:-master}"
-GIT_REMOTE="${GIT_REMOTE:-origin}"
 
-# Claude Code 配置
-# - CLAUDE_CMD: 默认使用官方 claude 命令。
-# - 如果你使用 ccr (Claude Code Router) 等工具，可设置为 "ccr"
-CLAUDE_CMD="${CLAUDE_CMD:-claude}"
+# 远端命名与配置
+GIT_REMOTE="${GIT_REMOTE:-origin}"                 # 主远端（Gitee）
+GITHUB_REMOTE_NAME="${GITHUB_REMOTE_NAME:-github}" # 镜像远端（GitHub）
 
-############################
-# 0.5) Claude Code Router 配置
-############################
-# 是否启用 Router 模式（0=禁用，1=启用）
-# 如果 CLAUDE_CMD=ccr，则自动启用
-USE_CLAUDE_CODE_ROUTER="${USE_CLAUDE_CODE_ROUTER:-0}"
-
-# Router 监听地址
-CCR_HOST="${CCR_HOST:-127.0.0.1}"
-CCR_PORT="${CCR_PORT:-3456}"
-
-# Router 配置目录
-CCR_CONFIG_DIR="${HOME}/.claude-code-router"
-CCR_CONFIG_FILE="${CCR_CONFIG_DIR}/config.json"
-
-# Router 日志文件
-CCR_LOG_FILE="${CCR_LOG_FILE:-${HOME}/.claude-code-router.log}"
-
-# Router 所需的 OpenAI 兼容 API 配置
-# 可以从 ANTHROPIC_API_KEY 继承，也可以单独设置
-OPENAI_API_KEY="${OPENAI_API_KEY:-${ANTHROPIC_API_KEY:-}}"
-OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.deepseek.com}"
-OPENAI_MODEL="${OPENAI_MODEL:-deepseek-chat}"
-
-# GitHub 远端 URL 配置
+# 必填配置：Gitee 用于克隆/拉取，GitHub 用于镜像推送
+# 示例：GITEE_REPO_URL="https://gitee.com/user/repo.git"
+GITEE_REPO_URL="${GITEE_REPO_URL:-}"
+# 示例：GITHUB_REMOTE_URL="git@github.com:user/repo.git"
 GITHUB_REMOTE_URL="${GITHUB_REMOTE_URL:-}"
 
-# Gitee 推送支持
-GITEE_REMOTE="${GITEE_REMOTE:-gitee}"
-GITEE_REMOTE_URL="${GITEE_REMOTE_URL:-}"
+# 推送的远端列表（空格分隔）。默认：Gitee(origin) + GitHub(github)
+PUSH_REMOTES="${PUSH_REMOTES:-$GIT_REMOTE $GITHUB_REMOTE_NAME}"
 
-# 推送的远端列表（空格分隔）。默认：GitHub + Gitee
-PUSH_REMOTES="${PUSH_REMOTES:-$GIT_REMOTE $GITEE_REMOTE}"
-
-# 推送失败重试策略
+# 推送失败重试策略（针对主远端 Gitee）
 PUSH_RETRY_INTERVAL="${PUSH_RETRY_INTERVAL:-60}"  # 秒
 PUSH_RETRY_FOREVER="${PUSH_RETRY_FOREVER:-1}"     # 1=一直重试；0=失败就放过
 
-GIT_USER_NAME="${GIT_USER_NAME:-claude-bot}"
-GIT_USER_EMAIL="${GIT_USER_EMAIL:-claude-bot@users.noreply.github.com}"
+GIT_USER_NAME="${GIT_USER_NAME:-iflow-bot}"
+GIT_USER_EMAIL="${GIT_USER_EMAIL:-iflow-bot@users.noreply.github.com}"
 
-# 是否启用"自动 bump + GitHub Release"
-ENABLE_RELEASE="${ENABLE_RELEASE:-0}"   # 0/1
+# 是否启用“自动 bump + GitHub Release”
+ENABLE_RELEASE="${ENABLE_RELEASE:-0}"
 
-# timeout 结束时是否把未提交变更自动提交（WIP autosave）
-AUTO_COMMIT_ON_TIMEOUT="${AUTO_COMMIT_ON_TIMEOUT:-1}"  # 0/1
-
-############################
-# 1) Claude Code 配置
-############################
-# Claude CLI 默认读取 ANTHROPIC_API_KEY
-: "${ANTHROPIC_API_KEY:?Missing ANTHROPIC_API_KEY. Please export ANTHROPIC_API_KEY before running.}"
-
-# 如果使用 Router，ANTHROPIC_API_KEY 可以是任意值（dummy key）
-# 实际的 API key 在 Router 配置中
+# timeout 结束时是否把未提交变更自动提交
+AUTO_COMMIT_ON_TIMEOUT="${AUTO_COMMIT_ON_TIMEOUT:-1}"
 
 ############################
-# 2) 工具函数：日志/依赖/timeout 兼容
+# 1) iFlow -> NVIDIA Integrate 配置
+############################
+export IFLOW_selectedAuthType="${IFLOW_selectedAuthType:-openai-compatible}"
+export IFLOW_BASE_URL="${IFLOW_BASE_URL:-https://integrate.api.nvidia.com/v1}"
+export IFLOW_MODEL_NAME="${IFLOW_MODEL_NAME:-moonshotai/kimi-k2-thinking}"
+
+: "${IFLOW_API_KEY:?Missing IFLOW_API_KEY. Please export IFLOW_API_KEY before running.}"
+
+############################
+# 2) 工具函数：日志/依赖/timeout
 ############################
 log() { printf '[%s] %s\n' "$(date '+%F %T')" "$*"; }
 
@@ -121,7 +72,7 @@ timeout_bin() {
   if command -v timeout >/dev/null 2>&1; then
     echo "timeout"
   elif command -v gtimeout >/dev/null 2>&1; then
-    echo "gtimeout"   # macOS coreutils
+    echo "gtimeout"
   else
     log "ERROR: need GNU timeout (timeout/gtimeout)."
     exit 1
@@ -129,7 +80,6 @@ timeout_bin() {
 }
 
 run_cmd() {
-  # 让输出尽量行缓冲
   local had_errexit=0
   [[ $- == *e* ]] && had_errexit=1
   set +e
@@ -177,9 +127,9 @@ kill_descendants() {
 try_kill_process_group_if_safe() {
   local pid pgid
   pid="$$"
-  pgid="$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ' || true)"
+  pgid="$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' || true)"
   if [[ -z "${pgid:-}" ]]; then
-    pgid="$(ps -o pgid= "$pid" 2>/dev/null | tr -d ' ' || true)"
+    pgid="$(ps -o pgid= "$pid" 2>/dev/null | tr -d ' || true)"
   fi
   if [[ -n "${pgid:-}" && "$pgid" =~ ^[0-9]+$ && "$pgid" == "$pid" ]]; then
     kill -- "-$pgid" 2>/dev/null || true
@@ -187,160 +137,7 @@ try_kill_process_group_if_safe() {
 }
 
 ############################
-# 2.6) Claude Code Router 管理函数
-############################
-ensure_claude_code_router_config() {
-  [[ "$USE_CLAUDE_CODE_ROUTER" == "1" ]] || return 0
-
-  # 确保 API key 已设置
-  if [[ -z "${OPENAI_API_KEY:-}" ]]; then
-    log "ERROR: OPENAI_API_KEY (or ANTHROPIC_API_KEY) is required for Claude Code Router"
-    log "Please set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable"
-    exit 1
-  fi
-
-  # 创建配置目录
-  if [[ ! -d "$CCR_CONFIG_DIR" ]]; then
-    log "Creating Claude Code Router config directory: $CCR_CONFIG_DIR"
-    mkdir -p "$CCR_CONFIG_DIR"
-  fi
-
-  # 如果配置文件不存在或强制重新生成，创建配置
-  if [[ ! -f "$CCR_CONFIG_FILE" ]] || [[ "${CCR_FORCE_RECONFIG:-0}" == "1" ]]; then
-    log "Creating Claude Code Router config: $CCR_CONFIG_FILE"
-
-    # 解析提供商名称和模型
-    local provider_name="default"
-    local model_name="${OPENAI_MODEL}"
-
-    # 检查是否为 openrouter
-    if [[ "$OPENAI_BASE_URL" == *"openrouter"* ]]; then
-      provider_name="openrouter"
-      # 从 URL 中提取模型
-      if [[ "$OPENAI_MODEL" == */* ]]; then
-        model_name="${OPENAI_MODEL}"
-      else
-        model_name="anthropic/${OPENAI_MODEL}"
-      fi
-    fi
-
-    # 处理 transformer 配置
-    local transformer="[\"${provider_name}\"]"
-    if [[ "$provider_name" == "openrouter" ]]; then
-      transformer="[\"openrouter\"]"
-    fi
-
-    # 创建配置
-    cat > "$CCR_CONFIG_FILE" <<EOF
-{
-  "Providers": [
-    {
-      "name": "${provider_name}",
-      "api_base_url": "${OPENAI_BASE_URL}/chat/completions",
-      "api_key": "${OPENAI_API_KEY}",
-      "models": ["${model_name}"],
-      "transformer": {
-        "use": ${transformer}
-      }
-    }
-  ],
-  "Router": {
-    "default": "${provider_name},${model_name}"
-  },
-  "LOG": true,
-  "HOST": "${CCR_HOST}",
-  "PORT": ${CCR_PORT}
-}
-EOF
-
-    log "Config created with provider: ${provider_name}, model: ${model_name}"
-  else
-    log "Using existing Claude Code Router config: $CCR_CONFIG_FILE"
-  fi
-}
-
-start_claude_code_router() {
-  [[ "$USE_CLAUDE_CODE_ROUTER" == "1" ]] || return 0
-
-  # 检查服务是否已在运行
-  if curl -s "http://${CCR_HOST}:${CCR_PORT}/health" >/dev/null 2>&1; then
-    log "Claude Code Router is already running on ${CCR_HOST}:${CCR_PORT}"
-    return 0
-  fi
-
-  # 检查端口是否被其他进程占用
-  if command -v lsof >/dev/null 2>&1 && lsof -i :${CCR_PORT} >/dev/null 2>&1; then
-    log "WARN: Port ${CCR_PORT} is in use by another process"
-    return 1
-  fi
-
-  log "Starting Claude Code Router on ${CCR_HOST}:${CCR_PORT}..."
-
-  # 确保配置存在
-  ensure_claude_code_router_config
-
-  # 启动服务
-  nohup ccr start >> "$CCR_LOG_FILE" 2>&1 &
-  local router_pid=$!
-
-  # 等待服务启动
-  local wait_time=0
-  local max_wait=30
-
-  while [[ $wait_time -lt $max_wait ]]; do
-    if curl -s "http://${CCR_HOST}:${CCR_PORT}/health" >/dev/null 2>&1; then
-      log "Claude Code Router started successfully (PID: $router_pid)"
-      return 0
-    fi
-
-    # 检查进程是否还在运行
-    if ! kill -0 $router_pid 2>/dev/null; then
-      log "ERROR: Claude Code Router process died unexpectedly"
-      log "Last 50 lines of router log:"
-      tail -n 50 "$CCR_LOG_FILE" 2>/dev/null || log "No log file found"
-      return 1
-    fi
-
-    sleep 1
-    wait_time=$((wait_time + 1))
-  done
-
-  log "ERROR: Claude Code Router failed to start after ${max_wait} seconds"
-  kill $router_pid 2>/dev/null || true
-  log "Last 50 lines of router log:"
-  tail -n 50 "$CCR_LOG_FILE" 2>/dev/null || log "No log file found"
-  return 1
-}
-
-stop_claude_code_router() {
-  local pid="${1:-}"
-
-  log "Stopping Claude Code Router..."
-
-  # 尝试使用 ccr stop 命令
-  ccr stop >/dev/null 2>&1 || true
-
-  # 如果提供了 PID，尝试杀死进程
-  if [[ -n "$pid" ]]; then
-    if kill -0 "$pid" 2>/dev/null; then
-      kill "$pid" 2>/dev/null || true
-      sleep 1
-
-      # 强制杀死
-      if kill -0 "$pid" 2>/dev/null; then
-        kill -9 "$pid" 2>/dev/null || true
-      fi
-    fi
-  fi
-
-  # 清理可能残留的进程
-  pkill -f "claude-code-router" 2>/dev/null || true
-
-  log "Claude Code Router stopped"
-}
-
-############################
-# 3) 依赖准备：git / node / claude / moon
+# 3) 依赖准备
 ############################
 ensure_git() {
   need_cmd git
@@ -349,43 +146,13 @@ ensure_git() {
   git config user.email "$GIT_USER_EMAIL"
 }
 
-ensure_claude() {
-  # 如果使用 ccr，确保 router 已安装并配置
-  if [[ "$CLAUDE_CMD" == "ccr" ]]; then
-    # 检查 ccr 命令
-    if ! command -v ccr >/dev/null 2>&1; then
-      log "Installing Claude Code Router..."
-      npm i -g @musistudio/claude-code-router@latest
-    fi
-
-    # 启用 router 模式
-    USE_CLAUDE_CODE_ROUTER=1
-
-    # 确保 API key 可用
-    if [[ -z "${OPENAI_API_KEY:-}" ]]; then
-      if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
-        OPENAI_API_KEY="${ANTHROPIC_API_KEY}"
-        log "Using ANTHROPIC_API_KEY as OPENAI_API_KEY for router"
-      else
-        log "ERROR: OPENAI_API_KEY is required for Claude Code Router"
-        exit 1
-      fi
-    fi
-
-    # 生成配置并启动服务
-    ensure_claude_code_router_config
-    start_claude_code_router || exit 1
-
-    return 0
-  fi
-
-  # 默认安装官方 claude CLI
+ensure_node_and_iflow() {
   need_cmd npm
-  if ! command -v claude >/dev/null 2>&1; then
-    log "Installing Claude Code CLI..."
-    npm i -g @anthropic-ai/claude-code@latest
+  if ! command -v iflow >/dev/null 2>&1; then
+    log "Installing iFlow CLI..."
+    npm i -g @iflow-ai/iflow-cli@latest
   fi
-  claude --version >/dev/null 2>&1 || true
+  iflow --version >/dev/null 2>&1 || true
 }
 
 ensure_moon() {
@@ -393,7 +160,6 @@ ensure_moon() {
     moon version || true
     return 0
   fi
-
   need_cmd curl
   log "Installing MoonBit toolchain..."
   curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
@@ -403,84 +169,84 @@ ensure_moon() {
 }
 
 ############################
-# 4) git 分支就位 & 同步 (直接推送模式)
+# 4) 仓库初始化与远端配置 (修改核心)
 ############################
-ensure_github_remote() {
-  local url="${GITHUB_REMOTE_URL:-}"
-  if [[ -z "${url:-}" ]]; then
-    remote_exists "$GIT_REMOTE" || { log "ERROR: $GIT_REMOTE remote missing and GITHUB_REMOTE_URL not set."; return 1; }
+
+# 初始化仓库：从 Gitee 克隆，或确保 origin 指向 Gitee
+ensure_repo_initialized() {
+  # 检查是否为 git 仓库
+  if ! git rev-parse --git-dir >/dev/null 2>&1; then
+    # 不是仓库：从 Gitee 克隆
+    if [[ -z "${GITEE_REPO_URL:-}" ]]; then
+      log "ERROR: Current directory is not a git repo, and GITEE_REPO_URL is not set."
+      log "Please set GITEE_REPO_URL to clone the repository."
+      exit 1
+    fi
+    log "Cloning from Gitee: ${GITEE_REPO_URL}"
+    git clone "${GITEE_REPO_URL}" .
     return 0
   fi
-  if remote_exists "$GIT_REMOTE"; then
+
+  # 已是仓库：检查是否需要更新 origin 指向 Gitee
+  if [[ -n "${GITEE_REPO_URL:-}" ]]; then
     local current_url
-    current_url="$(git remote get-url "$GIT_REMOTE" 2>/dev/null || true)"
-    if [[ "$current_url" != "$url" ]]; then
-      log "Updating GitHub remote URL: ${GIT_REMOTE} -> ${url}"
-      git remote set-url "$GIT_REMOTE" "$url" || { log "WARN: failed to update GitHub remote."; return 1; }
+    current_url="$(git remote get-url "${GIT_REMOTE}" 2>/dev/null || true)"
+    # 简单判断：如果配置不一致则更新
+    if [[ "$current_url" != "${GITEE_REPO_URL}" ]]; then
+      log "Updating remote '${GIT_REMOTE}' (Gitee) URL to: ${GITEE_REPO_URL}"
+      git remote set-url "${GIT_REMOTE}" "${GITEE_REPO_URL}" || {
+        log "WARN: Failed to update ${GIT_REMOTE} URL."
+      }
     fi
   else
-    log "Adding GitHub remote: ${GIT_REMOTE} -> ${url}"
-    git remote add "$GIT_REMOTE" "$url" || { log "WARN: failed to add GitHub remote."; return 1; }
+    log "WARN: GITEE_REPO_URL not set. Assuming current origin is correctly configured."
   fi
 }
 
-ensure_gitee_remote() {
-  local url="${GITEE_REMOTE_URL:-}"
-  if [[ -z "${url:-}" ]]; then
-    if remote_exists "$GITEE_REMOTE"; then
-      return 0
-    fi
-    url="$(infer_gitee_url_from_github || true)"
+# 配置 GitHub 镜像远端
+ensure_github_mirror() {
+  if [[ -z "${GITHUB_REMOTE_URL:-}" ]]; then
+    log "INFO: GITHUB_REMOTE_URL not set. Skipping GitHub mirror setup."
+    # 移除可能存在的旧 github 远端以避免混淆？或者保留。这里选择静默跳过。
+    return 0
   fi
-  if [[ -z "${url:-}" ]]; then
-    log "WARN: ${GITEE_REMOTE} remote missing and cannot infer url. Skip Gitee push."
-    return 1
-  fi
-  if remote_exists "$GITEE_REMOTE"; then
+
+  if git remote get-url "${GITHUB_REMOTE_NAME}" >/dev/null 2>&1; then
     local current_url
-    current_url="$(git remote get-url "$GITEE_REMOTE" 2>/dev/null || true)"
-    if [[ "$current_url" != "$url" ]]; then
-      log "Updating Gitee remote URL: ${GITEE_REMOTE} -> ${url}"
-      git remote set-url "$GITEE_REMOTE" "$url" || { log "WARN: failed to update Gitee remote."; return 1; }
+    current_url="$(git remote get-url "${GITHUB_REMOTE_NAME}" 2>/dev/null || true)"
+    if [[ "$current_url" != "${GITHUB_REMOTE_URL}" ]]; then
+      log "Updating GitHub mirror remote '${GITHUB_REMOTE_NAME}' URL."
+      git remote set-url "${GITHUB_REMOTE_NAME}" "${GITHUB_REMOTE_URL}"
     fi
   else
-    log "Adding Gitee remote: ${GITEE_REMOTE} -> ${url}"
-    git remote add "$GITEE_REMOTE" "$url" || { log "WARN: failed to add Gitee remote."; return 1; }
+    log "Adding GitHub mirror remote '${GITHUB_REMOTE_NAME}'."
+    git remote add "${GITHUB_REMOTE_NAME}" "${GITHUB_REMOTE_URL}"
   fi
 }
 
 ensure_branch() {
-  log "Ensuring branch: $WORK_BRANCH (Direct Push Mode)"
-  git fetch "$GIT_REMOTE" --prune >/dev/null 2>&1 || true
+  log "Ensuring branch: $WORK_BRANCH"
+  # 从 origin (Gitee) 拉取
+  git fetch "${GIT_REMOTE}" --prune >/dev/null 2>&1 || true
 
   if git show-ref --verify --quiet "refs/remotes/${GIT_REMOTE}/${WORK_BRANCH}"; then
     if git show-ref --verify --quiet "refs/heads/${WORK_BRANCH}"; then
-      git checkout "$WORK_BRANCH" || { log "WARN: git checkout ${WORK_BRANCH} failed."; return 1; }
-
-      # 在直接推送模式下，如果远程有更新，我们需要将本地修改 rebase 到远程之上
-      # 这样可以确保我们的提交是线性的，并且基于最新的代码
-      log "Syncing with ${GIT_REMOTE}/${WORK_BRANCH}..."
-      if ! git pull --rebase "${GIT_REMOTE}" "${WORK_BRANCH}" 2>/dev/null; then
-         log "WARN: Rebase failed. Trying merge..."
-         if ! git merge "${GIT_REMOTE}/${WORK_BRANCH}" 2>/dev/null; then
-            log "ERROR: Cannot fast-forward or merge ${WORK_BRANCH}. Manual intervention needed."
-            # 尝试放弃本地更改以恢复自动运行（可选，视需求而定，这里选择保守策略：中断）
-            # git reset --hard "${GIT_REMOTE}/${WORK_BRANCH}" || true
-            return 1
-         fi
-      fi
+      git checkout "$WORK_BRANCH" || { log "WARN: checkout ${WORK_BRANCH} failed."; return 1; }
+      # 注意：本地 checkout 后，若远端有更新且本地无分歧，ff-only 是安全的。
+      # 如果远端领先本地且本地也有新提交，ff-only 会失败，随后的 force push 将用本地覆盖远端。
+      git merge --ff-only "${GIT_REMOTE}/${WORK_BRANCH}" || {
+        log "WARN: cannot fast-forward ${WORK_BRANCH} to ${GIT_REMOTE}/${WORK_BRANCH}. Local history differs, will force push later."
+      }
     else
       git checkout -b "$WORK_BRANCH" "${GIT_REMOTE}/${WORK_BRANCH}" || {
-        log "WARN: git checkout -b ${WORK_BRANCH} from ${GIT_REMOTE}/${WORK_BRANCH} failed."
-        return 1
-      }
+        log "WARN: checkout -b ${WORK_BRANCH} failed."; return 1; }
     fi
     git branch --set-upstream-to="${GIT_REMOTE}/${WORK_BRANCH}" "$WORK_BRANCH" >/dev/null 2>&1 || true
   else
     if git show-ref --verify --quiet "refs/heads/${WORK_BRANCH}"; then
-      git checkout "$WORK_BRANCH" || { log "WARN: git checkout ${WORK_BRANCH} failed."; return 1; }
+      git checkout "$WORK_BRANCH" || { log "WARN: checkout ${WORK_BRANCH} failed."; return 1; }
     else
-      git checkout -b "$WORK_BRANCH" || { log "WARN: git checkout -b ${WORK_BRANCH} failed."; return 1; }
+      git checkout -b "$WORK_BRANCH" || { log "WARN: checkout -b ${WORK_BRANCH} failed."; return 1; }
     fi
   fi
 }
@@ -488,62 +254,67 @@ ensure_branch() {
 push_if_ahead() {
   local remote="${1:-$GIT_REMOTE}"
   git fetch "$remote" --prune >/dev/null 2>&1 || true
+
   if ! git show-ref --verify --quiet "refs/remotes/${remote}/${WORK_BRANCH}"; then
-    log "Remote branch ${remote}/${WORK_BRANCH} missing; pushing HEAD:${WORK_BRANCH}..."
-    git push "$remote" "HEAD:${WORK_BRANCH}" || return 1
+    log "Remote branch ${remote}/${WORK_BRANCH} missing; force pushing HEAD:${WORK_BRANCH}..."
+    # 修改：添加 --force 参数
+    git push --force "$remote" "HEAD:${WORK_BRANCH}" || return 1
     return 0
   fi
+
   local ahead
   ahead="$(git rev-list --count "${remote}/${WORK_BRANCH}..HEAD" 2>/dev/null || echo 0)"
-  if [[ ! "$ahead" =~ ^[0-9]+$ ]]; then
-    ahead="0"
-  fi
+  if [[ ! "$ahead" =~ ^[0-9]+$ ]]; then ahead="0"; fi
+
   if [[ "$ahead" -gt 0 ]]; then
-    log "Pushing ${ahead} commit(s) to ${remote}/${WORK_BRANCH} (Direct Push)..."
-    git push "$remote" "HEAD:${WORK_BRANCH}" || return 1
+    log "Force pushing ${ahead} commit(s) to ${remote}/${WORK_BRANCH}..."
+    # 修改：添加 --force 参数
+    git push --force "$remote" "HEAD:${WORK_BRANCH}" || return 1
   else
     log "No commits ahead of ${remote}/${WORK_BRANCH}. Skip push."
   fi
 }
 
-remote_exists() {
-  local r="$1"
-  git remote get-url "$r" >/dev/null 2>&1
-}
-
-infer_gitee_url_from_github() {
-  local gh_repo
-  gh_repo="$(derive_github_repo 2>/dev/null || true)"
-  [[ -n "${gh_repo:-}" ]] || return 1
-  printf 'https://gitee.com/%s.git\n' "$gh_repo"
-}
-
 commit_worktree_if_dirty() {
   local msg="$1"
-  if git diff --quiet && git diff --cached --quiet; then
-    return 0
-  fi
+  if git diff --quiet && git diff --cached --quiet; then return 0; fi
   git add -A
-  if git diff --cached --quiet; then
-    return 0
-  fi
+  if git diff --cached --quiet; then return 0; fi
   git commit -m "$msg" || true
 }
 
 push_all_remotes() {
+  # 返回值：仅当主远端（Gitee/origin）失败才返回非 0
+  # 镜像远端（GitHub/github）失败仅记录日志，不影响返回值
   local primary_status=0
-  ensure_gitee_remote || true
+
+  # 确保 github 远端配置存在（如果配置了 URL）
+  ensure_github_mirror || true
+
   local r
   for r in $PUSH_REMOTES; do
-    remote_exists "$r" || { log "WARN: remote not found: $r, skip."; continue; }
+    # 检查远端是否存在
+    if ! git remote get-url "$r" >/dev/null 2>&1; then
+      log "WARN: remote not found: $r, skip."
+      continue
+    fi
+
     if [[ "$r" == "$GIT_REMOTE" ]]; then
+      # 主远端（Gitee）：失败会影响 primary_status，触发重试
       push_if_ahead "$r" || primary_status=1
-      git push "$r" --tags >/dev/null 2>&1 || true
+      # 修改：添加 --force 参数以强制覆盖远端标签
+      git push --force "$r" --tags >/dev/null 2>&1 || true
     else
-      push_if_ahead "$r" || true
-      git push "$r" --tags >/dev/null 2>&1 || true
+      # 镜像远端（GitHub）：失败不影响 primary_status，仅打印警告
+      if push_if_ahead "$r"; then
+        # 修改：添加 --force 参数以强制覆盖远端标签
+        git push --force "$r" --tags >/dev/null 2>&1 || true
+      else
+        log "WARN: Push to mirror remote $r failed (ignored)."
+      fi
     fi
   done
+
   return "$primary_status"
 }
 
@@ -555,11 +326,14 @@ push_all_remotes_with_retry() {
       log "Push ok."
       return 0
     fi
-    log "WARN: push to primary remote failed (attempt=${attempt})."
+
+    log "WARN: push to primary remote (Gitee) failed (attempt=${attempt})."
+
     if [[ "$PUSH_RETRY_FOREVER" != "1" ]]; then
       log "WARN: PUSH_RETRY_FOREVER!=1, giving up retry."
       return 1
     fi
+
     sleep "$PUSH_RETRY_INTERVAL"
   done
 }
@@ -587,12 +361,17 @@ has_error_in_log() {
 }
 
 derive_github_repo() {
-  local url owner repo
-  url="$(git config --get "remote.${GIT_REMOTE}.url" || true)"
+  # 尝试从 GITHUB_REMOTE_URL 推断，或者从名为 github 的远端推断
+  local url
+  url="${GITHUB_REMOTE_URL:-}"
+  if [[ -z "$url" ]]; then
+    url="$(git remote get-url "${GITHUB_REMOTE_NAME}" 2>/dev/null || true)"
+  fi
   [[ -n "$url" ]] || return 1
+
   if [[ "$url" =~ github\.com[/:]+([^/]+)/([^/]+)$ ]]; then
-    owner="${BASH_REMATCH[1]}"
-    repo="${BASH_REMATCH[2]}"
+    local owner="${BASH_REMATCH[1]}"
+    local repo="${BASH_REMATCH[2]}"
     repo="${repo%.git}"
     echo "${owner}/${repo}"
     return 0
@@ -645,42 +424,46 @@ latest_release_age_ok() {
     repo="$(derive_github_repo || true)"
   fi
   [[ -n "$repo" ]] || return 1
+
   if [[ -z "${GH_TOKEN:-}" && -z "${GITHUB_TOKEN:-}" ]]; then
     return 1
   fi
+
   local published_at pub_ts now_ts delta
   published_at="$(gh api "/repos/${repo}/releases/latest" --jq '.published_at' 2>/dev/null || true)"
   if [[ -z "$published_at" || "$published_at" == "null" ]]; then
     return 0
   fi
+
   pub_ts="$(iso_to_epoch "$published_at" 2>/dev/null || echo 0)"
   now_ts="$(date +%s)"
   [[ "$pub_ts" -gt 0 ]] || return 1
+
   delta=$(( now_ts - pub_ts ))
   local release_window_seconds=604800
   (( delta >= release_window_seconds )) && return 0 || return 1
 }
 
 ############################
-# 6) bump + release (直接推送模式)
+# 6) bump + release
 ############################
 attempt_bump_and_release() {
   if [[ "$ENABLE_RELEASE" != "1" ]]; then
     log "INFO: ENABLE_RELEASE=0, skip bump+release."
     return 0
   fi
+
   if ! latest_release_age_ok; then
     log "INFO: release in last 7 days (or cannot check). skip release."
     return 0
   fi
-  local old_ver new_ver tag repo
+
+  local old_ver new_ver tag
   old_ver="$(extract_moon_version || true)"
   log "INFO: current version: ${old_ver:-<unknown>}"
 
-  # 使用 claude 替代 iflow，使用 -p 参数触发无头模式
-  # 提示词：修改 moon.mod.json 版本号
-  log "INFO: bump patch version in moon.mod.json via ${CLAUDE_CMD}..."
-  run_cmd "$CLAUDE_CMD" -p "把moon.mod.json里的version增加一个patch版本(例如0.9.1变成0.9.2)，只改版本号本身" || {
+  log "INFO: bump patch version in moon.mod.json via iflow..."
+  run_cmd iflow "把moon.mod.json里的version增加一个patch版本(例如0.9.1变成0.9.2)，只改版本号本身 think:high" --yolo || {
     log "WARN: bump failed, skip release."
     return 0
   }
@@ -698,40 +481,35 @@ attempt_bump_and_release() {
   fi
 
   git commit -m "chore(release): v${new_ver}" || { log "WARN: commit failed, skip."; return 0; }
-  # 直接推送到当前分支，而不是 PR
-  push_if_ahead "$GIT_REMOTE" || { log "WARN: push failed, skip release creation."; return 0; }
-  push_all_remotes || true
+  
+  # Release 时先推送到 Gitee，并尝试推送到 GitHub (均为 force push)
+  push_all_remotes_with_retry || { log "WARN: push failed, skip release creation."; return 0; }
 
   tag="v${new_ver}"
   command -v gh >/dev/null 2>&1 || { log "WARN: gh missing, cannot create release."; return 0; }
+
   repo="${GITHUB_REPOSITORY:-}"
   [[ -n "$repo" ]] || repo="$(derive_github_repo || true)"
   [[ -n "$repo" ]] || { log "WARN: cannot derive repo, skip release."; return 0; }
+
   if gh release view "${tag}" >/dev/null 2>&1; then
     log "INFO: release ${tag} already exists, skip create."
     return 0
   fi
+
   log "INFO: creating GitHub Release ${tag}..."
   gh release create "${tag}" --target "$WORK_BRANCH" --generate-notes || {
     log "WARN: release create failed."
     return 0
   }
+
   log "INFO: released ${tag}"
 }
 
 ############################
-# 7) 内层循环（Claude Code）
+# 7) 内层循环
 ############################
 run_inner_loop_forever() {
-  # 设置指向 router 的环境变量
-  if [[ "$USE_CLAUDE_CODE_ROUTER" == "1" ]]; then
-    export ANTHROPIC_BASE_URL="http://${CCR_HOST}:${CCR_PORT}"
-    # API key 可以是任意值，因为实际 key 在 router 配置中
-    export ANTHROPIC_API_KEY="claude-code-router"
-    export ANTHROPIC_AUTH_TOKEN="claude-code-router"
-    log "Using Claude Code Router at ${ANTHROPIC_BASE_URL}"
-  fi
-
   terminate_inner() {
     echo
     log "terminated."
@@ -742,13 +520,6 @@ run_inner_loop_forever() {
   trap terminate_inner INT TERM
 
   while true; do
-    # 检查 MoonBit 必要配置文件
-    if [[ ! -f "moon.mod.json" ]]; then
-      log "MoonBit config missing. Fixing via ${CLAUDE_CMD}..."
-      # 使用 claude 替代 iflow，使用 -p 参数触发无头模式
-      run_cmd "$CLAUDE_CMD" -p "如果PLAN.md里的特性都实现了(如果没有没有都实现就实现这些特性，给项目命名为moonotel)就解决moon test显示的所有问题（除了warning），除非测试用例本身有编译错误，否则只修改测试用例以外的代码，debug时可通过加日志和打断点，尽量不要消耗大量CPU/内存资源" || true
-    fi
-
     log "Running: moon test"
     : > "$MOON_TEST_LOG"
 
@@ -777,8 +548,7 @@ run_inner_loop_forever() {
     fi
 
     if [[ "$moon_status" -eq 0 ]]; then
-      # 测试通过：增加测试用例，使用 -p 参数触发无头模式
-      run_cmd "$CLAUDE_CMD" -p "给这个项目增加一些moon test测试用例，不要超过10个" || true
+      run_cmd iflow "给这个项目增加一些moon test测试用例，不要超过10个 think:high" --yolo || true
 
       git add -A
       if git diff --cached --quiet; then
@@ -797,9 +567,8 @@ run_inner_loop_forever() {
         log "INFO: warnings detected."
       fi
     else
-      # 测试失败：修复代码，使用 -p 参数触发无头模式
-      log "Fixing via ${CLAUDE_CMD}..."
-      run_cmd "$CLAUDE_CMD" -p "如果PLAN.md里的特性都实现了(如果没有没有都实现就实现这些特性，给项目命名为Feather)就解决moon test显示的所有问题（除了warning），除非测试用例本身有编译错误，否则只修改测试用例以外的代码，debug时可通过加日志和打断点，尽量不要消耗大量CPU/内存资源" || true
+      log "Fixing via iflow..."
+      run_cmd iflow "如果PLAN.md里的特性都实现了(如果没有没有都实现就实现这些特性，给项目命名为Feather)就解决moon test显示的所有问题（除了warning），除非测试用例本身有编译错误，否则只修改测试用例以外的代码，debug时可通过加日志和打断点，尽量不要消耗大量CPU/内存资源 think:high" --yolo || true
     fi
 
     log "Looping..."
@@ -811,8 +580,7 @@ run_inner_loop_forever() {
 # 8) inner / outer main
 ############################
 inner_main() {
-  # 修复：将临时测试日志放在 $HOME 下，避免 /tmp 权限问题
-  MOON_TEST_LOG="${HOME}/.typus_moon_test_last_$$.log"
+  MOON_TEST_LOG="/tmp/typus_moon_test_last_$$.log"
   run_inner_loop_forever
 }
 
@@ -821,50 +589,28 @@ outer_main() {
 
   [[ "$RUN_HOURS" =~ ^[0-9]+$ ]] || { log "ERROR: RUN_HOURS must be an integer (got: $RUN_HOURS)"; exit 1; }
 
+  # 1. 初始化/克隆仓库 (优先 Gitee)
+  ensure_repo_initialized
+  
+  # 2. 确保 Git 配置正确
   ensure_git
-
-  ensure_github_remote || log "WARN: Failed to ensure GitHub remote config."
-  ensure_gitee_remote || log "WARN: Failed to ensure Gitee remote config."
-
-  # 初始确保分支
+  
+  # 3. 确保 GitHub 镜像配置 (如果提供了 URL)
+  ensure_github_mirror
+  
+  # 4. 检出并拉取分支 (从 origin/Gitee)
   ensure_branch
 
-  # 如果使用 ccr 命令，自动启用 router 模式
-  if [[ "$CLAUDE_CMD" == "ccr" ]]; then
-    USE_CLAUDE_CODE_ROUTER=1
-  fi
-
-  # 如果使用 router，确保配置并启动
-  if [[ "$USE_CLAUDE_CODE_ROUTER" == "1" ]]; then
-    # 确保 API key 可用
-    if [[ -z "${OPENAI_API_KEY:-}" ]]; then
-      if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
-        OPENAI_API_KEY="${ANTHROPIC_API_KEY}"
-        log "Using ANTHROPIC_API_KEY as OPENAI_API_KEY for router"
-      else
-        log "ERROR: OPENAI_API_KEY (or ANTHROPIC_API_KEY) is required for Claude Code Router"
-        exit 1
-      fi
-    fi
-
-    # 安装和启动 router
-    ensure_claude
-  else
-    # 原始逻辑
-    ensure_claude
-    # 检查 ANTHROPIC_API_KEY
-    : "${ANTHROPIC_API_KEY:?Missing ANTHROPIC_API_KEY. Please export ANTHROPIC_API_KEY before running.}"
-  fi
-
+  ensure_node_and_iflow
   ensure_moon
 
-  log "CLAUDE_CMD=$CLAUDE_CMD"
+  log "IFLOW_BASE_URL=$IFLOW_BASE_URL"
+  log "IFLOW_MODEL_NAME=$IFLOW_MODEL_NAME"
+  log "IFLOW_selectedAuthType=$IFLOW_selectedAuthType"
   log "LOG_FILE=$LOG_FILE"
-
-  if [[ "$USE_CLAUDE_CODE_ROUTER" == "1" ]]; then
-    log "Claude Code Router enabled: http://${CCR_HOST}:${CCR_PORT}"
-    log "Router config: $CCR_CONFIG_FILE"
-    log "Router log: $CCR_LOG_FILE"
+  log "Primary Remote (Gitee): $GIT_REMOTE -> $(git remote get-url $GIT_REMOTE)"
+  if git remote get-url "$GITHUB_REMOTE_NAME" >/dev/null 2>&1; then
+      log "Mirror Remote (GitHub): $GITHUB_REMOTE_NAME -> $(git remote get-url $GITHUB_REMOTE_NAME)"
   fi
 
   local tbin
@@ -873,21 +619,6 @@ outer_main() {
   local script
   script="${BASH_SOURCE[0]}"
   script="$(cd -- "$(dirname -- "$script")" && pwd)/$(basename -- "$script")"
-
-  # 设置退出时的清理
-  cleanup_on_exit() {
-    log "Cleaning up..."
-
-    # 停止 router 服务
-    if [[ "$USE_CLAUDE_CODE_ROUTER" == "1" ]]; then
-      stop_claude_code_router
-    fi
-
-    # 清理临时文件
-    kill_descendants "$$" || true
-    try_kill_process_group_if_safe || true
-  }
-  trap cleanup_on_exit EXIT INT TERM
 
   while true; do
     log "Run loop for ${RUN_HOURS} hour(s)..."
@@ -898,24 +629,20 @@ outer_main() {
       "$tbin" --signal=TERM --kill-after=60s $(( RUN_HOURS * 3600 )) bash "$script" __inner__ || true
     fi
 
-    # 每轮结束后，先同步最新代码，再提交剩余工作，再推送
-    # 这样确保下一轮是从最新的代码开始
     ensure_branch || true
 
     if [[ "$AUTO_COMMIT_ON_TIMEOUT" == "1" ]]; then
       commit_worktree_if_dirty "chore: autosave after ${RUN_HOURS}h ($(date '+%F %T'))"
     fi
 
+    # 推送到 Gitee 和 GitHub (Gitee 失败会重试，GitHub 失败跳过)
+    # 注意：当前脚本已配置为 Force Push
     push_all_remotes_with_retry
 
-    # 再次确保分支是最新的，准备进入下一轮
     ensure_branch || true
   done
 }
 
-############################
-# 9) 入口分发
-############################
 if [[ "${1:-}" == "__inner__" ]]; then
   shift
   inner_main "$@"
