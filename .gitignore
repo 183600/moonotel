@@ -1,0 +1,33 @@
+# Vibe Coding - Git Ignore File
+
+# Sensitive configuration files
+.vibe_coding_repos.conf
+*_repos.conf
+
+# Build directories
+_build/
+target/
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# Node modules (if any)
+node_modules/
+
+# MoonBit build artifacts
+.moon/
