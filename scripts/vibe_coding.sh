@@ -13,6 +13,23 @@ set -euo pipefail
 #   - 若后四项留空，脚本将自动使用下方的全局默认配置。
 #   - 这样允许你为 repo1 使用 NVIDIA API，为 repo2 使用 OpenAI API 等。
 
+# 定义要处理的仓库列表
+# 格式："本地目录名|Gitee克隆地址|GitHub推送地址|BaseURL|APIKey|Model|AuthType"
+# 注意：请在这里配置您的仓库列表，将占位符替换为实际值
+REPO_LIST=(
+  # 示例配置（已注释）：
+  # "RepoName|https://username:password@gitee.com/user/repo.git|https://username:token@github.com/user/repo.git|https://api.example.com/v1|API_KEY_HERE|model-name|openai-compatible"
+  
+  # 实际配置：请取消注释并填写您的信息
+  # "Feather|GITEE_CLONE_URL_HERE|GITHUB_PUSH_URL_HERE|API_BASE_URL_HERE|API_KEY_HERE|MODEL_NAME_HERE|openai-compatible"
+  # "moonotel|GITEE_CLONE_URL_HERE|GITHUB_PUSH_URL_HERE|API_BASE_URL_HERE|API_KEY_HERE|MODEL_NAME_HERE|openai-compatible"
+)
+
+# 从外部配置文件加载仓库列表（如果存在）
+if [[ -f "${HOME}/.vibe_coding_repos.conf" ]]; then
+  source "${HOME}/.vibe_coding_repos.conf"
+fi
+
 # 所有仓库存放的基础目录
 BASE_DIR="${BASE_DIR:-/tmp/iflow_repos}"
 
