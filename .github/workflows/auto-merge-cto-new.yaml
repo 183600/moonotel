@@ -103,7 +103,7 @@ jobs:
                   if (message.includes('unstable status') || message.includes('Base branch was modified')) {
                     if (attempt < 3) {
                       core.info(`⚠️ PR is in unstable status (calculating mergeability). Waiting 3s before retry (Attempt ${attempt}/3)...`);
-                      await sleep(3000); 
+                      await sleep(30000); 
                       continue; // 继续内层循环重试
                     } else {
                       core.warning(`❌ Still unstable after 3 attempts for method ${method}. Moving on...`);
