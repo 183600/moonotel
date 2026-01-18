@@ -114,3 +114,59 @@ test "sampled_flag" {
   let sc3 = span_context(trace_id, span_id, 255)
   assert_true(sc3.is_sampled())
 }
+
+test "trace_id_hex_correctness" {
+  let trace_id = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+  let span_id = [16, 17, 18, 19, 20, 21, 22, 23]
+  
+  let sc = span_context(trace_id, span_id, 1)
+  let hex = sc.trace_id_hex()
+  
+  // Expected: "000102030405060708090a0b0c0d0e0f"
+  assert_eq(hex, "000102030405060708090a0b0c0d0e0f")
+}
+
+test "span_id_hex_correctness" {
+  let trace_id = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+  let span_id = [16, 17, 18, 19, 20, 21, 22, 23]
+  
+  let sc = span_context(trace_id, span_id, 1)
+  let hex = sc.span_id_hex()
+  
+  // Expected: "1011121314151617"
+  assert_eq(hex, "1011121314151617")
+}
+
+test "max_byte_values" {
+  let trace_id = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
+  let span_id = [255, 255, 255, 255, 255, 255, 255, 255]
+  
+  let sc = span_context(trace_id, span_id, 1)
+  assert_true(sc.is_valid())
+  assert_eq(sc.trace_id_hex(), "ffffffffffffffffffffffffffffffff")
+  assert_eq(sc.span_id_hex(), "ffffffffffffffff")
+}
+
+test "is_zero_helper" {
+  // Test with all zeros
+  let zeros = [0, 0, 0, 0]
+  assert_true(is_zero(zeros))
+  
+  // Test with non-zero values
+  let non_zeros = [0, 1, 0, 0]
+  assert_false(is_zero(non_zeros))
+  
+  // Test with empty array
+  let empty : Array[Int] = []
+  assert_true(is_zero(empty))
+}
+
+test "bytes_to_hex_helper" {
+  // Test with simple values
+  let simple = [0, 1, 15, 16, 255]
+  assert_eq(bytes_to_hex(simple), "00010f10ff")
+  
+  // Test with empty array
+  let empty : Array[Int] = []
+  assert_eq(bytes_to_hex(empty), "")
+}

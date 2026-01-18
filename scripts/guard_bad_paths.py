@@ -7,7 +7,7 @@ from pathlib import Path
 PATTERNS = [
     r'[^\x20-\x7E]{5,}',
     r'[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]',
-    r'\',
+    r'\\',
     r'//',
 ]
 
@@ -26,7 +26,7 @@ def clean_file(filepath):
             return False
         
         content = re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]', '', content)
-        content = re.sub(r'\+', '\', content)
+        content = re.sub(r'\\+', '\\', content)
         content = re.sub(r'//+', '//', content)
         
         with open(filepath, 'w', encoding='utf-8') as f:
