@@ -38,7 +38,7 @@ pub fn SpanContext::is_sampled(self : SpanContext) -> Bool {
 }
 
 // Helper: check if byte array is all zeros
-fn is_zero(bytes : Array[Int]) -> Bool {
+pub fn is_zero(bytes : Array[Int]) -> Bool {
   let mut i = 0
   while i < bytes.length() {
     if bytes[i] != 0 {
@@ -50,7 +50,7 @@ fn is_zero(bytes : Array[Int]) -> Bool {
 }
 
 // Helper: convert bytes to hex string
-fn bytes_to_hex(bytes : Array[Int]) -> String {
+pub fn bytes_to_hex(bytes : Array[Int]) -> String {
   let hex_chars = "0123456789abcdef"
   let mut result = ""
   let mut i = 0
