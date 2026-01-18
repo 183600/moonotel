@@ -165,8 +165,43 @@ test "bytes_to_hex_helper" {
   // Test with simple values
   let simple = [0, 1, 15, 16, 255]
   assert_eq(bytes_to_hex(simple), "00010f10ff")
-  
+
   // Test with empty array
   let empty : Array[Int] = []
   assert_eq(bytes_to_hex(empty), "")
+}
+
+test "is_zero_single_nonzero" {
+  // Test with last byte non-zero
+  let arr = [0, 0, 0, 1]
+  assert_false(is_zero(arr))
+}
+
+test "bytes_to_hex_all_zeros" {
+  let zeros = [0, 0, 0, 0, 0]
+  assert_eq(bytes_to_hex(zeros), "0000000000")
+}
+
+test "bytes_to_hex_alternating" {
+  let alt = [170, 85, 170, 85]
+  assert_eq(bytes_to_hex(alt), "aa55aa55")
+}
+
+test "trace_flags_bit2" {
+  let trace_id = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let span_id = [1, 0, 0, 0, 0, 0, 0, 0]
+  // Bit 2 set (4), sampled bit (1) not set
+  let sc = span_context(trace_id, span_id, 4)
+  assert_true(sc.is_valid())
+  assert_false(sc.is_sampled())
+}
+
+test "minimum_nonzero_context" {
+  let trace_id = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let span_id = [1, 0, 0, 0, 0, 0, 0, 0]
+  let sc = span_context(trace_id, span_id, 0)
+  assert_true(sc.is_valid())
+  assert_false(sc.is_sampled())
+  assert_eq(sc.trace_id_hex(), "01000000000000000000000000000000")
+  assert_eq(sc.span_id_hex(), "0100000000000000")
 }
