@@ -42,6 +42,26 @@ type Moonbit_Test_Driver_Internal_TestDriver_Async_With_Args_Map = @moonbitlang/
 ]
 
 let moonbit_test_driver_internal_no_args_tests : Moonbit_Test_Driver_Internal_No_Args_Map = {
+  "w3c_trace_context_test.mbt": {
+    0: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_0, ["hex_to_bytes_simple"]),
+    1: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_1, ["hex_to_bytes_multiple"]),
+    2: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_2, ["hex_to_bytes_empty"]),
+    3: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_3, ["hex_to_int_simple"]),
+    4: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_4, ["hex_to_int_case_insensitive"]),
+    5: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_5, ["hex_to_int_empty"]),
+    6: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_6, ["string_split_basic"]),
+    7: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_7, ["string_find_basic"]),
+    8: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_8, ["string_find_not_found"]),
+    9: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_9, ["string_find_empty"]),
+    10: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_10, ["string_trim_basic"]),
+    11: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_11, ["string_to_lower_basic"]),
+    12: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_12, ["map_basic_operations"]),
+    13: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_13, ["map_case_sensitivity"]),
+    14: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_14, ["span_context_invalid_with_zeros"]),
+    15: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_15, ["span_context_valid_with_nonzero"]),
+    16: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_16, ["span_context_unsampled"]),
+    17: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_17, ["span_context_hex_conversion"]),
+  },
   "span_context_test.mbt": {
     0: (__test_7370616e5f636f6e746578745f746573742e6d6274_0, ["invalid_span_context"]),
     1: (__test_7370616e5f636f6e746578745f746573742e6d6274_1, ["invalid_span_context_trace_id_zero"]),
