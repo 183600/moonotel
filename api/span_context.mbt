@@ -67,16 +67,10 @@ pub fn bytes_to_hex(bytes : Array[Int]) -> String {
 
 // Helper: get char from string at index
 fn char_from(s : String, index : Int) -> String {
-  let chars = s.to_array()
-  let mut result = ""
-  let mut i = 0
-  while i < chars.length() {
-    if i == index {
-      result = result + string_from_char(chars[i])
-    }
-    i = i + 1
+  if index < 0 || index >= s.length() {
+    return ""
   }
-  result
+  string_from_char(s[index])
 }
 
 // Helper: convert char to string
