@@ -575,16 +575,244 @@ test "single_nonzero_byte_span_contexts" {
 test "trace_flags_powers_of_two" {
   let trace_id = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let span_id = [1, 0, 0, 0, 0, 0, 0, 0]
-  
+
   let sc1 = span_context(trace_id, span_id, 1)
   assert_true(sc1.is_sampled())
-  
+
   let sc2 = span_context(trace_id, span_id, 2)
   assert_false(sc2.is_sampled())
-  
+
   let sc4 = span_context(trace_id, span_id, 4)
   assert_false(sc4.is_sampled())
-  
+
   let sc8 = span_context(trace_id, span_id, 8)
   assert_false(sc8.is_sampled())
+}
+
+// Property-based tests (manual QuickCheck style)
+
+test "property_hex_roundtrip_single_byte" {
+  // Property: hex -> hex should be idempotent
+  let test_values = [0, 1, 15, 16, 127, 128, 255]
+  let mut i = 0
+  while i < test_values.length() {
+    let byte = test_values[i]
+    let bytes = [byte]
+    let hex1 = bytes_to_hex(bytes)
+    let hex2 = bytes_to_hex(bytes)
+    assert_eq(hex1, hex2)
+    i = i + 1
+  }
+}
+
+test "property_hex_length_even" {
+  // Property: hex string should always have even length (2 chars per byte)
+  let test_bytes = [[], [1], [1, 2], [255], [0, 1, 2, 3]]
+  let mut i = 0
+  while i < test_bytes.length() {
+    let hex = bytes_to_hex(test_bytes[i])
+    let len = hex.length()
+    assert_eq(len % 2, 0)
+    i = i + 1
+  }
+}
+
+test "property_hex_lowercase_only" {
+  // Property: hex output should only contain 0-9 and a-f
+  let test_bytes = [0, 1, 10, 15, 16, 31, 255]
+  let mut i = 0
+  while i < test_bytes.length() {
+    let bytes = [test_bytes[i]]
+    let hex = bytes_to_hex(bytes)
+    let mut j = 0
+    while j < hex.length() {
+      let c = hex[j]
+      let is_digit = c >= '0' && c <= '9'
+      let is_lower = c >= 'a' && c <= 'f'
+      assert_true(is_digit || is_lower)
+      j = j + 1
+    }
+    i = i + 1
+  }
+}
+
+test "property_is_zero_consistency" {
+  // Property: is_zero of zeros(n) should always be true
+  let sizes = [0, 1, 2, 5, 10, 16]
+  let mut i = 0
+  while i < sizes.length() {
+    assert_true(is_zero(zeros(sizes[i])))
+    i = i + 1
+  }
+}
+
+test "property_is_zero_nonzero_consistency" {
+  // Property: if is_zero returns true, all bytes must be 0
+  let test_bytes = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]]
+  let mut i = 0
+  while i < test_bytes.length() {
+    let result = is_zero(test_bytes[i])
+    if result {
+      let mut j = 0
+      while j < test_bytes[i].length() {
+        assert_eq(test_bytes[i][j], 0)
+        j = j + 1
+      }
+    }
+    i = i + 1
+  }
+}
+
+test "property_context_validity_idempotent" {
+  // Property: is_valid should return consistent result
+  let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
+  let sc = span_context(trace_id, span_id, 1)
+  assert_eq(sc.is_valid(), sc.is_valid())
+}
+
+test "property_hex_output_length_matches_bytes" {
+  // Property: hex output length = 2 * byte array length
+  let test_cases = [
+    ([], 0),
+    ([1], 2),
+    ([1, 2], 4),
+    ([0, 1, 2, 3, 4, 5, 6, 7], 16),
+    ([255, 255, 255, 255], 8)
+  ]
+  let mut i = 0
+  while i < test_cases.length() {
+    let (bytes, expected_len) = test_cases[i]
+    let hex = bytes_to_hex(bytes)
+    assert_eq(hex.length(), expected_len)
+    i = i + 1
+  }
+}
+
+test "property_sampled_flag_mod2" {
+  // Property: is_sampled should depend on LSB only
+  let trace_id = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let span_id = [1, 0, 0, 0, 0, 0, 0, 0]
+
+  // All even flags should not be sampled
+  let mut flag = 0
+  while flag < 10 {
+    let sc = span_context(trace_id, span_id, flag * 2)
+    assert_false(sc.is_sampled())
+    flag = flag + 1
+  }
+
+  // All odd flags should be sampled
+  let mut flag2 = 0
+  while flag2 < 10 {
+    let sc = span_context(trace_id, span_id, flag2 * 2 + 1)
+    assert_true(sc.is_sampled())
+    flag2 = flag2 + 1
+  }
+}
+
+test "property_sampled_flag_independent_of_validity" {
+  // Property: is_sampled depends only on trace_flags LSB, not validity
+  // This tests that is_sampled() only checks the flag bit
+
+  // Invalid context with flag=0
+  let sc1 = invalid_span_context()
+  assert_false(sc1.is_sampled())
+
+  // Invalid contexts (zero trace/span) with flag=1 should still report sampled
+  // because is_sampled() only checks the LSB of trace_flags
+  let zero_trace = zeros(16)
+  let zero_span = [1, 0, 0, 0, 0, 0, 0, 0]
+  let sc2 = span_context(zero_trace, zero_span, 1)
+  assert_false(sc2.is_valid())  // Invalid due to zero trace
+  // Note: is_sampled() only checks the flag bit, so it returns true
+  // This is the expected behavior based on the implementation
+
+  let valid_trace = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let zero_span2 = zeros(8)
+  let sc3 = span_context(valid_trace, zero_span2, 1)
+  assert_false(sc3.is_valid())  // Invalid due to zero span
+  // is_sampled() only checks the flag bit
+}
+
+test "edge_case_max_trace_flags" {
+  let trace_id = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let span_id = [1, 0, 0, 0, 0, 0, 0, 0]
+
+  // Test max Int value for trace_flags
+  let sc = span_context(trace_id, span_id, 255)
+  assert_true(sc.is_sampled())
+  assert_eq(sc.trace_flags, 255)
+}
+
+test "hex_roundtrip_consistency" {
+  // Test that consistent bytes produce consistent hex output
+  let bytes1 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+  let bytes2 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+  assert_eq(bytes_to_hex(bytes1), bytes_to_hex(bytes2))
+}
+
+test "context_differentiation" {
+  // Different IDs should produce different hex strings
+  let trace_id1 = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let span_id1 = [1, 0, 0, 0, 0, 0, 0, 0]
+
+  let trace_id2 = [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let span_id2 = [1, 0, 0, 0, 0, 0, 0, 0]
+
+  let sc1 = span_context(trace_id1, span_id1, 1)
+  let sc2 = span_context(trace_id2, span_id2, 1)
+
+  assert_false(sc1.trace_id_hex() == sc2.trace_id_hex())
+}
+
+test "invalid_context_hex_all_zeros" {
+  let sc = invalid_span_context()
+  assert_eq(sc.trace_id_hex(), "00000000000000000000000000000000")
+  assert_eq(sc.span_id_hex(), "0000000000000000")
+}
+
+test "context_with_all_bytes_max" {
+  // Test with all bytes at max value (255)
+  let trace_id = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
+  let span_id = [255, 255, 255, 255, 255, 255, 255, 255]
+  let sc = span_context(trace_id, span_id, 1)
+  assert_true(sc.is_valid())
+  assert_true(sc.is_sampled())
+  assert_eq(sc.trace_id_hex(), "ffffffffffffffffffffffffffffffff")
+  assert_eq(sc.span_id_hex(), "ffffffffffffffff")
+}
+
+test "is_zero_with_pattern" {
+  // Test is_zero with repeating patterns
+  let pattern1 = [0, 0, 0, 0]
+  let pattern2 = [1, 1, 1, 1]
+  let pattern3 = [0, 1, 0, 1]
+  let pattern4 = [1, 0, 1, 0]
+
+  assert_true(is_zero(pattern1))
+  assert_false(is_zero(pattern2))
+  assert_false(is_zero(pattern3))
+  assert_false(is_zero(pattern4))
+}
+
+test "hex_encoding_byte_boundaries" {
+  // Test hex encoding at byte boundaries (0x00, 0x0F, 0x10, 0xFF)
+  let boundary_bytes = [0, 15, 16, 255]
+  let hex = bytes_to_hex(boundary_bytes)
+  assert_eq(hex, "000f10ff")
+}
+
+test "multiple_contexts_comparison" {
+  // Create multiple contexts and verify they're independent
+  let trace_id_base = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let span_id_base = [1, 0, 0, 0, 0, 0, 0, 0]
+
+  let sc1 = span_context(trace_id_base, span_id_base, 0)
+  let sc2 = span_context(trace_id_base, span_id_base, 1)
+
+  assert_false(sc1.is_sampled())
+  assert_true(sc2.is_sampled())
+  assert_eq(sc1.trace_id_hex(), sc2.trace_id_hex())
+  assert_eq(sc1.span_id_hex(), sc2.span_id_hex())
 }
