@@ -1,0 +1,30 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "yourname/otel/api"
+
+// Values
+pub fn bytes_to_hex(Array[Int]) -> String
+
+pub fn invalid_span_context() -> SpanContext
+
+pub fn is_zero(Array[Int]) -> Bool
+
+pub fn span_context(Array[Int], Array[Int], Int) -> SpanContext
+
+// Errors
+
+// Types and methods
+pub struct SpanContext {
+  trace_id : Array[Int]
+  span_id : Array[Int]
+  trace_flags : Int
+  is_valid : Bool
+}
+pub fn SpanContext::is_sampled(Self) -> Bool
+pub fn SpanContext::is_valid(Self) -> Bool
+pub fn SpanContext::span_id_hex(Self) -> String
+pub fn SpanContext::trace_id_hex(Self) -> String
+
+// Type aliases
+
+// Traits
+
