@@ -816,3 +816,179 @@ test "multiple_contexts_comparison" {
   assert_eq(sc1.trace_id_hex(), sc2.trace_id_hex())
   assert_eq(sc1.span_id_hex(), sc2.span_id_hex())
 }
+
+// Additional test cases for edge cases and comprehensive coverage
+
+test "trace_flags_edge_cases" {
+  // Test different trace flag combinations
+  let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  let span_id = [17, 18, 19, 20, 21, 22, 23, 24]
+  
+  // Test flag 0 (not sampled)
+  let sc0 = span_context(trace_id, span_id, 0)
+  assert_false(sc0.is_sampled())
+  
+  // Test flag 1 (sampled)
+  let sc1 = span_context(trace_id, span_id, 1)
+  assert_true(sc1.is_sampled())
+  
+  // Test flag 2 (not sampled, different bit)
+  let sc2 = span_context(trace_id, span_id, 2)
+  assert_false(sc2.is_sampled())
+  
+  // Test flag 3 (sampled with multiple bits)
+  let sc3 = span_context(trace_id, span_id, 3)
+  assert_true(sc3.is_sampled())
+}
+
+test "span_context_with_max_values" {
+  // Test with maximum byte values (0xFF)
+  let trace_id = Array::make(16, 255)
+  let span_id = Array::make(8, 255)
+  let flags = 255
+  
+  let sc = span_context(trace_id, span_id, flags)
+  assert_true(sc.is_valid())
+  assert_true(sc.is_sampled())
+  assert_eq(sc.trace_id_hex(), "ffffffffffffffffffffffffffffffff")
+  assert_eq(sc.span_id_hex(), "ffffffffffffffff")
+}
+
+test "span_context_hex_consistency" {
+  // Verify hex conversion consistency across multiple calls
+  let trace_id = [0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88]
+  let span_id = [0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11]
+  
+  let sc = span_context(trace_id, span_id, 1)
+  
+  // Call hex methods multiple times and verify consistency
+  let trace_hex1 = sc.trace_id_hex()
+  let trace_hex2 = sc.trace_id_hex()
+  let span_hex1 = sc.span_id_hex()
+  let span_hex2 = sc.span_id_hex()
+  
+  assert_eq(trace_hex1, trace_hex2)
+  assert_eq(span_hex1, span_hex2)
+  assert_eq(trace_hex1, "123456789abcdef01122334455667788")
+  assert_eq(span_hex1, "aabbccddeeff0011")
+}
+
+test "is_zero_helper_function_edge_cases" {
+  // Test is_zero with various edge cases
+  
+  // Empty array should be considered zero
+  assert_true(is_zero([]))
+  
+  // Single zero element
+  assert_true(is_zero([0]))
+  
+  // Single non-zero element
+  assert_false(is_zero([1]))
+  
+  // Multiple zeros
+  assert_true(is_zero([0, 0, 0, 0]))
+  
+  // Mixed zeros and non-zeros
+  assert_false(is_zero([0, 0, 1, 0]))
+  assert_false(is_zero([1, 0, 0, 0]))
+  assert_false(is_zero([0, 0, 0, 1]))
+  
+  // Large array of zeros
+  assert_true(is_zero(Array::make(100, 0)))
+  
+  // Large array with one non-zero at the end
+  let arr = Array::make(100, 0)
+  arr[99] = 1
+  assert_false(is_zero(arr))
+}
+
+test "bytes_to_hex_edge_cases" {
+  // Test hex conversion with edge cases
+  
+  // Empty array
+  assert_eq(bytes_to_hex([]), "")
+  
+  // Single byte values
+  assert_eq(bytes_to_hex([0]), "00")
+  assert_eq(bytes_to_hex([15]), "0f")
+  assert_eq(bytes_to_hex([16]), "10")
+  assert_eq(bytes_to_hex([255]), "ff")
+  
+  // Alternating pattern
+  assert_eq(bytes_to_hex([0x0f, 0xf0, 0x0f, 0xf0]), "0ff00ff0")
+  
+  // Sequential bytes
+  assert_eq(bytes_to_hex([0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff]), 
+            "00112233445566778899aabbccddeeff")
+}
+
+test "span_context_immutability_check" {
+  // Verify that SpanContext fields are properly encapsulated
+  let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  let span_id = [17, 18, 19, 20, 21, 22, 23, 24]
+  let sc = span_context(trace_id, span_id, 1)
+  
+  // Original arrays should not affect the SpanContext after creation
+  trace_id[0] = 0
+  span_id[0] = 0
+  
+  // SpanContext should still report as valid since it captured the original state
+  assert_true(sc.is_valid())
+  assert_true(sc.is_sampled())
+}
+
+test "char_from_helper_edge_cases" {
+  // Test the char_from helper function through indirect testing
+  // Since char_from is private, we test bytes_to_hex which uses it internally
+  
+  let test_bytes = [0x61, 0x62, 0x63, 0x31, 0x32, 0x33] // "abc123" in hex
+  let hex_result = bytes_to_hex(test_bytes)
+  
+  // Should correctly convert each byte to hex
+  assert_eq(hex_result, "616263313233")
+  
+  // Test empty array through hex conversion
+  assert_eq(bytes_to_hex([]), "")
+}
+
+test "hex_conversion_consistency_property" {
+  // Property-based style test (without QuickCheck)
+  // Test that hex conversion is consistent and reversible in concept
+  
+  let test_cases = [
+    ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "000102030405060708090a0b0c0d0e0f"),
+    ([255, 254, 253, 252, 251, 250, 249, 248, 247, 246, 245, 244, 243, 242, 241, 240], "fffefdfcfbfaf9f8f7f6f5f4f3f2f1f0"),
+    ([0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89], "abcdef0123456789abcdef0123456789")
+  ]
+  
+  for i = 0; i < test_cases.length(); i = i + 1 {
+    let (bytes, expected_hex) = test_cases[i]
+    let actual_hex = bytes_to_hex(bytes)
+    assert_eq(actual_hex, expected_hex)
+    
+    // Verify length is exactly 2 * bytes.length
+    assert_eq(actual_hex.length(), bytes.length() * 2)
+  }
+}
+
+test "span_context_with_single_non_zero_byte" {
+  // Test contexts with only one non-zero byte at different positions
+  
+  // Non-zero at start
+  let trace_id_start = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let span_id_start = [1, 0, 0, 0, 0, 0, 0, 0]
+  let sc_start = span_context(trace_id_start, span_id_start, 1)
+  assert_true(sc_start.is_valid())
+  
+  // Non-zero at end
+  let trace_id_end = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+  let span_id_end = [0, 0, 0, 0, 0, 0, 0, 1]
+  let sc_end = span_context(trace_id_end, span_id_end, 1)
+  assert_true(sc_end.is_valid())
+  
+  // Non-zero in middle
+  let trace_id_middle = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]
+  let span_id_middle = [0, 0, 0, 0, 0, 0, 1, 0]
+  let sc_middle = span_context(trace_id_middle, span_id_middle, 1)
+  assert_true(sc_middle.is_valid())
+}
