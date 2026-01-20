@@ -169,7 +169,30 @@ let moonbit_test_driver_internal_no_args_tests : Moonbit_Test_Driver_Internal_No
     94: (__test_7370616e5f636f6e746578745f746573742e6d6274_94, ["hex_conversion_consistency_property"]),
     95: (__test_7370616e5f636f6e746578745f746573742e6d6274_95, ["span_context_with_single_non_zero_byte"]),
   },
+  "span_context_edge_cases_test.mbt": {
+    0: (__test_7370616e5f636f6e746578745f656467655f63617365735f746573742e6d6274_0, ["bytes_to_hex_empty"]),
+    1: (__test_7370616e5f636f6e746578745f656467655f63617365735f746573742e6d6274_1, ["bytes_to_hex_single_byte_roundtrip_0_255"]),
+    2: (__test_7370616e5f636f6e746578745f656467655f63617365735f746573742e6d6274_2, ["is_zero_empty_is_true"]),
+    3: (__test_7370616e5f636f6e746578745f656467655f63617365735f746573742e6d6274_3, ["span_context_invalid_trace_id_wrong_length"]),
+    4: (__test_7370616e5f636f6e746578745f656467655f63617365735f746573742e6d6274_4, ["span_context_invalid_span_id_wrong_length"]),
+    5: (__test_7370616e5f636f6e746578745f656467655f63617365735f746573742e6d6274_5, ["span_context_valid_minimal_nonzero_ids"]),
+  },
   "span_context.mbt": {
+  },
+  "quickcheck_style_test.mbt": {
+    0: (__test_717569636b636865636b5f7374796c655f746573742e6d6274_0, ["property_trace_id_hex_length_always_32_for_valid_length"]),
+    1: (__test_717569636b636865636b5f7374796c655f746573742e6d6274_1, ["property_span_id_hex_length_always_16_for_valid_length"]),
+    2: (__test_717569636b636865636b5f7374796c655f746573742e6d6274_2, ["property_valid_span_context_requires_nonzero_ids"]),
+    3: (__test_717569636b636865636b5f7374796c655f746573742e6d6274_3, ["property_sampled_flag_only_depends_on_bit_0"]),
+    4: (__test_717569636b636865636b5f7374796c655f746573742e6d6274_4, ["property_is_zero_iff_all_elements_zero"]),
+    5: (__test_717569636b636865636b5f7374796c655f746573742e6d6274_5, ["property_bytes_to_hex_only_uses_lower_hex_chars"]),
+    6: (__test_717569636b636865636b5f7374796c655f746573742e6d6274_6, ["property_bytes_to_hex_length_twice_input"]),
+  },
+  "extra_properties_test.mbt": {
+    0: (__test_65787472615f70726f706572746965735f746573742e6d6274_0, ["property_hex_to_bytes_roundtrip"]),
+    1: (__test_65787472615f70726f706572746965735f746573742e6d6274_1, ["property_hex_to_bytes_two_bytes_roundtrip"]),
+    2: (__test_65787472615f70726f706572746965735f746573742e6d6274_2, ["property_is_zero_on_varied_lengths"]),
+    3: (__test_65787472615f70726f706572746965735f746573742e6d6274_3, ["property_hex_to_int_roundtrip"]),
   },
   "comprehensive_test.mbt": {
     0: (__test_636f6d70726568656e736976655f746573742e6d6274_0, ["span_context_equality_test"]),

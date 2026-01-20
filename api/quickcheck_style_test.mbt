@@ -4,7 +4,7 @@
 
 test "property_trace_id_hex_length_always_32_for_valid_length" {
   // For any 16-byte array, hex is 32 characters
-  let mut pattern = Array::make(16, 0)
+  let pattern = Array::make(16, 0)
   let mut i = 0
   while i < 16 {
     pattern[i] = i
@@ -16,7 +16,7 @@ test "property_trace_id_hex_length_always_32_for_valid_length" {
 
 test "property_span_id_hex_length_always_16_for_valid_length" {
   // For any 8-byte array, hex is 16 characters
-  let mut pattern = Array::make(8, 0)
+  let pattern = Array::make(8, 0)
   let mut i = 0
   while i < 8 {
     pattern[i] = i
@@ -66,12 +66,12 @@ test "property_is_zero_iff_all_elements_zero" {
   assert_true(is_zero(Array::make(16, 0)))
 
   // any non-zero => not is_zero
-  let mut arr = Array::make(16, 0)
+  let arr = Array::make(16, 0)
   assert_true(is_zero(arr))
   arr[0] = 1
   assert_false(is_zero(arr))
 
-  let mut arr2 = Array::make(16, 0)
+  let arr2 = Array::make(16, 0)
   arr2[15] = 1
   assert_false(is_zero(arr2))
 }
