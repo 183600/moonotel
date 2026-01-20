@@ -9,7 +9,6 @@ test "hex_to_bytes_simple" {
 }
 
 test "hex_to_bytes_multiple" {
-  let hex = "4b f9"  // multiple bytes, but we'll handle as "4bf9"
   let bytes = hex_to_bytes("4bf9")
   assert_eq(bytes.length(), 2)
   assert_eq(bytes[0], 0x4b)
@@ -53,20 +52,20 @@ test "string_split_basic" {
 test "string_find_basic" {
   let text = "hello world"
   let pos = text.find("world")
-  assert_true(pos.is_some())
+  assert_true(pos is Some(_))
   assert_eq(pos.unwrap(), 6)
 }
 
 test "string_find_not_found" {
   let text = "hello world"
   let pos = text.find("xyz")
-  assert_true(pos.is_none())
+  assert_true(pos is None)
 }
 
 test "string_find_empty" {
   let text = "hello world"
   let pos = text.find("")
-  assert_true(pos.is_some())
+  assert_true(pos is Some(_))
   assert_eq(pos.unwrap(), 0)
 }
 

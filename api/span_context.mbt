@@ -58,22 +58,49 @@ pub fn bytes_to_hex(bytes : Array[Int]) -> String {
     let b = bytes[i]
     let high = b >> 4
     let low = b & 0x0F
-    result = result + char_from(hex_chars, high)
-    result = result + char_from(hex_chars, low)
+    result = result + byte_to_hex_char(high)
+    result = result + byte_to_hex_char(low)
     i = i + 1
   }
   result
 }
 
-// Helper: get char from string at index
-fn char_from(s : String, index : Int) -> String {
-  if index < 0 || index >= s.length() {
-    return ""
+// Helper: convert byte value to hex character
+fn byte_to_hex_char(val : Int) -> String {
+  let hex = "0123456789abcdef"
+  if val == 0 {
+    "0"
+  } else if val == 1 {
+    "1"
+  } else if val == 2 {
+    "2"
+  } else if val == 3 {
+    "3"
+  } else if val == 4 {
+    "4"
+  } else if val == 5 {
+    "5"
+  } else if val == 6 {
+    "6"
+  } else if val == 7 {
+    "7"
+  } else if val == 8 {
+    "8"
+  } else if val == 9 {
+    "9"
+  } else if val == 10 {
+    "a"
+  } else if val == 11 {
+    "b"
+  } else if val == 12 {
+    "c"
+  } else if val == 13 {
+    "d"
+  } else if val == 14 {
+    "e"
+  } else if val == 15 {
+    "f"
+  } else {
+    "0"
   }
-  string_from_char(s[index])
-}
-
-// Helper: convert char to string
-fn string_from_char(c : Char) -> String {
-  c.to_string()
 }

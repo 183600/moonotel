@@ -2,6 +2,7 @@
 target/
 .moon/
 build/
+_build/
 *.wasm
 *.wat
 

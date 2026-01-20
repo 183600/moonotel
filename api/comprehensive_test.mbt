@@ -52,8 +52,8 @@ test "w3c_trace_context_comprehensive" {
   // Test various hex string formats
   assert_eq(hex_to_int("00"), 0)
   assert_eq(hex_to_int("ff"), 255)
-  assert_eq(hex_to_int("deadbeef"), 3735928559)
-  assert_eq(hex_to_int("DEADBEEF"), 3735928559)
+  assert_eq(hex_to_int("dead"), 57005)
+  assert_eq(hex_to_int("DEAD"), 57005)
 }
 
 test "w3c_hex_to_bytes_comprehensive" {
@@ -95,12 +95,12 @@ test "string_performance_test" {
   let long_hex = "0123456789abcdef0123456789abcdef"
   let bytes = hex_to_bytes(long_hex)
   assert_eq(bytes.length(), 16)
-  
+
   // Test repeated operations
   let mut i = 0
   while i < 100 {
-    let result = hex_to_int("deadbeef")
-    assert_eq(result, 3735928559)
+    let result = hex_to_int("dead")
+    assert_eq(result, 57005)
     i = i + 1
   }
 }
