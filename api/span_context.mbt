@@ -51,7 +51,6 @@ pub fn is_zero(bytes : Array[Int]) -> Bool {
 
 // Helper: convert bytes to hex string
 pub fn bytes_to_hex(bytes : Array[Int]) -> String {
-  let hex_chars = "0123456789abcdef"
   let mut result = ""
   let mut i = 0
   while i < bytes.length() {
@@ -67,7 +66,6 @@ pub fn bytes_to_hex(bytes : Array[Int]) -> String {
 
 // Helper: convert byte value to hex character
 fn byte_to_hex_char(val : Int) -> String {
-  let hex = "0123456789abcdef"
   if val == 0 {
     "0"
   } else if val == 1 {
