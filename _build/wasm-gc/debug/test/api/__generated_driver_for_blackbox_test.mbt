@@ -62,6 +62,15 @@ let moonbit_test_driver_internal_no_args_tests : Moonbit_Test_Driver_Internal_No
     16: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_16, ["span_context_unsampled"]),
     17: (__test_7733635f74726163655f636f6e746578745f746573742e6d6274_17, ["span_context_hex_conversion"]),
   },
+  "stress_test.mbt": {
+    0: (__test_7374726573735f746573742e6d6274_0, ["span_context_stress_test"]),
+    1: (__test_7374726573735f746573742e6d6274_1, ["span_context_stress_unsampled"]),
+    2: (__test_7374726573735f746573742e6d6274_2, ["hex_conversion_stress_test"]),
+    3: (__test_7374726573735f746573742e6d6274_3, ["hex_to_bytes_stress_test"]),
+    4: (__test_7374726573735f746573742e6d6274_4, ["edge_case_hex_combinations"]),
+    5: (__test_7374726573735f746573742e6d6274_5, ["boundary_string_tests"]),
+    6: (__test_7374726573735f746573742e6d6274_6, ["performance_regression_test"]),
+  },
   "span_context_test.mbt": {
     0: (__test_7370616e5f636f6e746578745f746573742e6d6274_0, ["invalid_span_context"]),
     1: (__test_7370616e5f636f6e746578745f746573742e6d6274_1, ["invalid_span_context_trace_id_zero"]),
@@ -161,6 +170,18 @@ let moonbit_test_driver_internal_no_args_tests : Moonbit_Test_Driver_Internal_No
     95: (__test_7370616e5f636f6e746578745f746573742e6d6274_95, ["span_context_with_single_non_zero_byte"]),
   },
   "span_context.mbt": {
+  },
+  "comprehensive_test.mbt": {
+    0: (__test_636f6d70726568656e736976655f746573742e6d6274_0, ["span_context_equality_test"]),
+    1: (__test_636f6d70726568656e736976655f746573742e6d6274_1, ["span_context_boundary_conditions"]),
+    2: (__test_636f6d70726568656e736976655f746573742e6d6274_2, ["span_context_invalid_edge_cases"]),
+    3: (__test_636f6d70726568656e736976655f746573742e6d6274_3, ["w3c_trace_context_comprehensive"]),
+    4: (__test_636f6d70726568656e736976655f746573742e6d6274_4, ["w3c_hex_to_bytes_comprehensive"]),
+    5: (__test_636f6d70726568656e736976655f746573742e6d6274_5, ["w3c_edge_cases"]),
+    6: (__test_636f6d70726568656e736976655f746573742e6d6274_6, ["string_performance_test"]),
+    7: (__test_636f6d70726568656e736976655f746573742e6d6274_7, ["span_context_integration_test"]),
+  },
+  "additional_tests.mbt": {
   },
 }
 let moonbit_test_driver_internal_with_args_tests : Moonbit_Test_Driver_Internal_TestDriver_With_Args_Map = { }  // WILL BE REPLACED
