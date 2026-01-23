@@ -9,8 +9,10 @@ maintainer:         developer@example.com
 license:            Apache-2.0
 license-file:       LICENSE
 
-executable otel-test
-  main-is:          test/Main.hs
+test-suite otel-test
+  type:             exitcode-stdio-1.0
+  main-is:          Main.hs
+  hs-source-dirs:   test
   build-depends:    base >= 4.7 && < 5
   default-language: Haskell2010
   ghc-options:      -O0 -rtsopts
