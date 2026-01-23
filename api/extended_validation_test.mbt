@@ -89,7 +89,7 @@ test "bytes_to_hex_multiple_bytes" {
   assert_eq(bytes_to_hex([0, 1]), "0001")
   assert_eq(bytes_to_hex([255, 0]), "ff00")
   assert_eq(bytes_to_hex([1, 2, 3]), "010203")
-  assert_eq(bytes_to_hex([254, 253, 252]), "fefdfC")
+  assert_eq(bytes_to_hex([254, 253, 252]), "fefdfc")
 }
 
 test "is_zero_empty_array" {
@@ -104,19 +104,19 @@ test "is_zero_various_sizes" {
 }
 
 test "is_zero_with_one_nonzero_at_start" {
-  let mut arr = Array::make(16, 0)
+  let arr = Array::make(16, 0)
   arr[0] = 1
   assert_false(is_zero(arr))
 }
 
 test "is_zero_with_one_nonzero_at_end" {
-  let mut arr = Array::make(16, 0)
+  let arr = Array::make(16, 0)
   arr[15] = 1
   assert_false(is_zero(arr))
 }
 
 test "is_zero_with_one_nonzero_in_middle" {
-  let mut arr = Array::make(16, 0)
+  let arr = Array::make(16, 0)
   arr[8] = 1
   assert_false(is_zero(arr))
 }
@@ -144,8 +144,8 @@ test "is_sampled_flag_higher_bits_ignored" {
 }
 
 test "span_context_immutability" {
-  let mut tid = Array::make(16, 1)
-  let mut sid = Array::make(8, 1)
+  let tid = Array::make(16, 1)
+  let sid = Array::make(8, 1)
   
   let sc = span_context(tid, sid, 1)
   assert_true(sc.is_valid())
@@ -189,3 +189,6 @@ test "hex_encoding_specific_patterns" {
   let pattern3 = [0xF0, 0x0F, 0xF0, 0x0F]
   assert_eq(bytes_to_hex(pattern3), "f00ff00f")
 }
+
+
+
