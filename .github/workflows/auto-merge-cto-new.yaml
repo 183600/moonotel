@@ -1,4 +1,4 @@
-name: Auto-merge PRs from cto.new
+name: Auto-push PRs from cto.new
 
 on:
   pull_request:
@@ -9,12 +9,16 @@ permissions:
   pull-requests: write
 
 jobs:
-  automerge:
+  autopush:
     if: github.event.pull_request.user.login == 'cto-new[bot]' && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: cli/cli@v2
-      - run: gh pr merge "${{ github.event.pull_request.number }}" --auto --squash
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Push to base branch
+        run: git push origin HEAD:${{ github.event.pull_request.base.ref }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
