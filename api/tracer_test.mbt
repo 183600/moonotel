@@ -85,7 +85,7 @@ struct TracerProvider {
 
 struct IdGenerator {
   trace_id : Array[Int]
-  span_counter : Int
+  mut span_counter : Int
 }
 
 struct Span {
@@ -106,9 +106,10 @@ fn create_tracer(provider : TracerProvider, name : String) -> Tracer {
 }
 
 pub fn Tracer::start_span(self : Tracer, name : String) -> Span {
+  self.provider.id_generator.span_counter = self.provider.id_generator.span_counter + 1
   let counter = self.provider.id_generator.span_counter
   let trace_id = self.provider.id_generator.trace_id
-  let span_id = generate_span_id_from_counter(counter + 1, trace_id[0])
+  let span_id = generate_span_id_from_counter(counter, trace_id[0])
   let context = span_context(trace_id, span_id, 1)
   Span::{ name: name, context: context }
 }
