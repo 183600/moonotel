@@ -62,7 +62,7 @@ test "hex_encoding_large_array_length" {
   let large = Array::make(100, 0x42)
   let result = bytes_to_hex(large)
   assert_eq!(result.length(), 200)
-  assert_eq!(result.substring(0, 2), "42")
+  assert_eq!(result.substring(start=0, end=2), "42")
 }
 
 test "byte_to_hex_char_boundaries" {
@@ -87,7 +87,7 @@ test "byte_to_hex_char_invalid_negative_values" {
 
 // Span context edge cases
 test "span_context_valid_minimal_trace_id" {
-  let trace_id = Array::make(16, 0x00)
+  let trace_id = Array::make(16, 0x01)
   let span_id = Array::make(8, 0x01)
   let context = span_context(trace_id, span_id, 1)
   assert_true!(context.is_valid())
@@ -158,10 +158,8 @@ test "tracer_provider_empty_service_name" {
 }
 
 test "tracer_provider_long_service_name" {
-  let long_name = "".concat(
-    "extremely-long-service-name-that-could-be-used-for-testing-",
+  let long_name = "extremely-long-service-name-that-could-be-used-for-testing-" +
     "edge-cases-in-trace-id-generation"
-  )
   let provider = create_tracer_provider(long_name)
   assert_eq!(provider.service_name, long_name)
 }

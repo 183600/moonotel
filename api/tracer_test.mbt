@@ -93,6 +93,17 @@ struct Span {
   context : SpanContext
 }
 
+struct Counter {
+  mut value : Int
+}
+
+let counter : Counter = { value: 0 }
+
+fn next_span_counter() -> Int {
+  counter.value = counter.value + 1
+  counter.value
+}
+
 fn create_tracer_provider(service_name : String) -> TracerProvider {
   // Use service_name to create different trace IDs
   // First provider (test-service-1) will have trace_id[0] = 13
@@ -106,9 +117,9 @@ fn create_tracer(provider : TracerProvider, name : String) -> Tracer {
 }
 
 pub fn Tracer::start_span(self : Tracer, name : String) -> Span {
-  let counter = self.provider.id_generator.span_counter
+  let counter = next_span_counter()
   let trace_id = self.provider.id_generator.trace_id
-  let span_id = generate_span_id_from_counter(counter + 1, trace_id[0])
+  let span_id = generate_span_id_from_counter(counter, trace_id[0])
   let context = span_context(trace_id, span_id, 1)
   Span::{ name: name, context: context }
 }
@@ -116,6 +127,13 @@ pub fn Tracer::start_span(self : Tracer, name : String) -> Span {
 fn generate_span_id_from_counter(counter : Int, trace_byte : Int) -> Array[Int] {
   let span_id = Array::make(8, 0)
   // Use both counter and trace_byte for uniqueness
-  span_id[0] = counter + trace_byte
+  span_id[0] = counter & 0xFF
+  span_id[1] = (counter >> 8) & 0xFF
+  span_id[2] = (counter >> 16) & 0xFF
+  span_id[3] = (counter >> 24) & 0xFF
+  span_id[4] = (counter >> 32) & 0xFF
+  span_id[5] = (counter >> 40) & 0xFF
+  span_id[6] = (counter >> 48) & 0xFF
+  span_id[7] = trace_byte & 0xFF
   span_id
 }
