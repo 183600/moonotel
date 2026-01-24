@@ -85,7 +85,7 @@ struct TracerProvider {
 
 struct IdGenerator {
   trace_id : Array[Int]
-  span_counter : Int
+  span_counter : Array[Int]
 }
 
 struct Span {
@@ -98,7 +98,7 @@ fn create_tracer_provider(service_name : String) -> TracerProvider {
   // First provider (test-service-1) will have trace_id[0] = 13
   // Second provider (test-service-2) will have trace_id[0] = 13
   // But we use the full service name in the tracer
-  TracerProvider::{ service_name: service_name, id_generator: IdGenerator::{ trace_id: Array::make(16, service_name.length()), span_counter: 0 } }
+  TracerProvider::{ service_name: service_name, id_generator: IdGenerator::{ trace_id: Array::make(16, service_name.length()), span_counter: [0] } }
 }
 
 fn create_tracer(provider : TracerProvider, name : String) -> Tracer {
@@ -106,7 +106,8 @@ fn create_tracer(provider : TracerProvider, name : String) -> Tracer {
 }
 
 pub fn Tracer::start_span(self : Tracer, name : String) -> Span {
-  let counter = self.provider.id_generator.span_counter
+  let counter = self.provider.id_generator.span_counter[0]
+  self.provider.id_generator.span_counter[0] = counter + 1
   let trace_id = self.provider.id_generator.trace_id
   let span_id = generate_span_id_from_counter(counter + 1, trace_id[0])
   let context = span_context(trace_id, span_id, 1)

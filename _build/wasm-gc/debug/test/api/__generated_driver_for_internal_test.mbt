@@ -70,6 +70,45 @@ let moonbit_test_driver_internal_no_args_tests : MoonBitTestDriverInternalTestMa
     21: (__test_65787472615f74657374732e6d6274_21, ["byte_to_hex_char_negative"]),
     22: (__test_65787472615f74657374732e6d6274_22, ["bytes_to_hex_multiple_bytes"]),
   },
+  "advanced_coverage_tests.mbt": {
+    0: (__test_616476616e6365645f636f7665726167655f74657374732e6d6274_0, ["span_context_extreme_boundary_values"]),
+    1: (__test_616476616e6365645f636f7665726167655f74657374732e6d6274_1, ["span_context_invalid_edge_cases"]),
+    2: (__test_616476616e6365645f636f7665726167655f74657374732e6d6274_2, ["hex_encoding_advanced_patterns"]),
+    3: (__test_616476616e6365645f636f7665726167655f74657374732e6d6274_3, ["byte_to_hex_char_comprehensive"]),
+    4: (__test_616476616e6365645f636f7665726167655f74657374732e6d6274_4, ["is_zero_comprehensive"]),
+    5: (__test_616476616e6365645f636f7665726167655f74657374732e6d6274_5, ["trace_flags_comprehensive"]),
+    6: (__test_616476616e6365645f636f7665726167655f74657374732e6d6274_6, ["span_context_array_operations"]),
+    7: (__test_616476616e6365645f636f7665726167655f74657374732e6d6274_7, ["hex_concatenation_stress"]),
+    8: (__test_616476616e6365645f636f7665726167655f74657374732e6d6274_8, ["span_context_regression_checks"]),
+    9: (__test_616476616e6365645f636f7665726167655f74657374732e6d6274_9, ["memory_efficiency_check"]),
+    10: (__test_616476616e6365645f636f7665726167655f74657374732e6d6274_10, ["edge_case_mathematical_sequences"]),
+  },
+  "additional_validation_tests.mbt": {
+    0: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_0, ["span_context_trace_flags_variations"]),
+    1: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_1, ["span_context_partial_zero_trace_id"]),
+    2: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_2, ["span_context_partial_zero_span_id"]),
+    3: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_3, ["span_context_invalid_wrong_lengths"]),
+    4: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_4, ["is_zero_comprehensive"]),
+    5: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_5, ["span_context_id_generation_patterns"]),
+    6: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_6, ["hex_boundary_64_bytes"]),
+    7: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_7, ["span_context_trace_flags_boundary"]),
+    8: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_8, ["span_context_hex_roundtrip"]),
+    9: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_9, ["bytes_to_hex_special_characters"]),
+    10: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_10, ["span_context_minimal_valid"]),
+    11: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_11, ["span_context_maximal_values"]),
+    12: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_12, ["hex_consecutive_zeros"]),
+    13: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_13, ["span_context_multiple_instances"]),
+    14: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_14, ["hex_byte_values_0_to_255"]),
+    15: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_15, ["invalid_span_context_properties"]),
+    16: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_16, ["span_context_trace_id_hex_various"]),
+    17: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_17, ["span_context_singleton_bytes"]),
+    18: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_18, ["span_context_is_zero_edge"]),
+    19: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_19, ["bytes_to_hex_consistency"]),
+    20: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_20, ["span_context_trace_flags_only_lsb"]),
+    21: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_21, ["bytes_to_hex_large_repeated_pattern"]),
+    22: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_22, ["span_context_first_last_byte_nonzero"]),
+    23: (__test_6164646974696f6e616c5f76616c69646174696f6e5f74657374732e6d6274_23, ["is_zero_array_make"]),
+  },
   "additional_tests.mbt": {
     0: (__test_6164646974696f6e616c5f74657374732e6d6274_0, ["trace_id_first_byte_zero_others_nonzero"]),
     1: (__test_6164646974696f6e616c5f74657374732e6d6274_1, ["trace_id_last_byte_zero_others_nonzero"]),
@@ -118,6 +157,10 @@ let moonbit_test_driver_internal_with_args_tests : MoonBitTestDriverInternalTest
   },
   "extra_tests.mbt": {
   },
+  "advanced_coverage_tests.mbt": {
+  },
+  "additional_validation_tests.mbt": {
+  },
   "additional_tests.mbt": {
   },
 }
@@ -132,6 +175,10 @@ let moonbit_test_driver_internal_async_tests : MoonBitTestDriverInternalTestMap[
   },
   "extra_tests.mbt": {
   },
+  "advanced_coverage_tests.mbt": {
+  },
+  "additional_validation_tests.mbt": {
+  },
   "additional_tests.mbt": {
   },
 }
@@ -145,6 +192,10 @@ let moonbit_test_driver_internal_async_tests_with_args : MoonBitTestDriverIntern
   "new_comprehensive_tests.mbt": {
   },
   "extra_tests.mbt": {
+  },
+  "advanced_coverage_tests.mbt": {
+  },
+  "additional_validation_tests.mbt": {
   },
   "additional_tests.mbt": {
   },
