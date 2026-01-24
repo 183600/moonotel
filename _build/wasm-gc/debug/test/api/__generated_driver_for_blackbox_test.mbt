@@ -405,6 +405,68 @@ let moonbit_test_driver_internal_no_args_tests : MoonBitTestDriverInternalTestMa
     65: (__test_657868617573746976655f636f7665726167655f746573742e6d6274_65, ["bytes_to_hex_single_0x3F"]),
     66: (__test_657868617573746976655f636f7665726167655f746573742e6d6274_66, ["bytes_to_hex_single_0x40"]),
   },
+  "enhanced_edge_cases_test.mbt": {
+    0: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_0, ["trace_id_all_ones"]),
+    1: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_1, ["trace_id_alternating_bits"]),
+    2: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_2, ["trace_id_single_nonzero_byte_first"]),
+    3: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_3, ["trace_id_single_nonzero_byte_last"]),
+    4: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_4, ["trace_id_single_nonzero_byte_middle"]),
+    5: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_5, ["span_id_all_ones"]),
+    6: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_6, ["span_id_alternating_bits"]),
+    7: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_7, ["span_id_single_nonzero_byte_first"]),
+    8: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_8, ["span_id_single_nonzero_byte_last"]),
+    9: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_9, ["span_id_single_nonzero_byte_middle"]),
+    10: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_10, ["trace_flags_max_value"]),
+    11: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_11, ["trace_flags_even_values"]),
+    12: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_12, ["trace_flags_multiple_bits_set"]),
+    13: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_13, ["trace_flags_bit_pattern_10101010"]),
+    14: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_14, ["trace_flags_bit_pattern_01010101"]),
+    15: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_15, ["hex_encoding_boundary_0x00"]),
+    16: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_16, ["hex_encoding_boundary_0x0F"]),
+    17: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_17, ["hex_encoding_boundary_0xF0"]),
+    18: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_18, ["hex_encoding_boundary_0xFF"]),
+    19: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_19, ["hex_encoding_multiple_boundaries"]),
+    20: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_20, ["hex_encoding_all_hex_digits"]),
+    21: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_21, ["is_zero_empty_array"]),
+    22: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_22, ["is_zero_single_zero"]),
+    23: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_23, ["is_zero_single_nonzero"]),
+    24: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_24, ["is_zero_long_array_all_zeros"]),
+    25: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_25, ["is_zero_long_array_last_nonzero"]),
+    26: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_26, ["invalid_context_trace_id_too_short"]),
+    27: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_27, ["invalid_context_trace_id_too_long"]),
+    28: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_28, ["invalid_context_span_id_too_short"]),
+    29: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_29, ["invalid_context_span_id_too_long"]),
+    30: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_30, ["invalid_context_both_ids_wrong_length"]),
+    31: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_31, ["sampled_with_all_max_values"]),
+    32: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_32, ["not_sampled_with_all_max_values"]),
+    33: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_33, ["trace_id_sequential_ascending"]),
+    34: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_34, ["trace_id_sequential_descending"]),
+    35: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_35, ["span_id_sequential_ascending"]),
+    36: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_36, ["span_id_sequential_descending"]),
+    37: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_37, ["trace_id_repeating_pattern_01"]),
+    38: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_38, ["trace_id_repeating_pattern_AA"]),
+    39: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_39, ["span_id_repeating_pattern_01"]),
+    40: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_40, ["span_id_repeating_pattern_FF"]),
+    41: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_41, ["byte_to_hex_char_all_valid_values"]),
+    42: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_42, ["byte_to_hex_char_invalid_value_16"]),
+    43: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_43, ["byte_to_hex_char_invalid_value_255"]),
+    44: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_44, ["byte_to_hex_char_invalid_negative"]),
+    45: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_45, ["invalid_span_context_has_correct_properties"]),
+    46: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_46, ["invalid_span_context_trace_id_is_zero"]),
+    47: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_47, ["invalid_span_context_span_id_is_zero"]),
+    48: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_48, ["invalid_span_context_hex_encoding"]),
+    49: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_49, ["minimal_valid_trace_id"]),
+    50: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_50, ["minimal_valid_span_id"]),
+    51: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_51, ["trace_flags_only_bit_0_set"]),
+    52: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_52, ["trace_flags_only_bit_1_set"]),
+    53: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_53, ["trace_flags_only_bit_7_set"]),
+    54: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_54, ["trace_flags_bits_0_and_7_set"]),
+    55: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_55, ["trace_id_powers_of_2"]),
+    56: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_56, ["span_id_powers_of_2"]),
+    57: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_57, ["valid_context_with_zero_trace_flags"]),
+    58: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_58, ["hex_encoding_preserves_leading_zeros"]),
+    59: (__test_656e68616e6365645f656467655f63617365735f746573742e6d6274_59, ["hex_encoding_preserves_trailing_zeros"]),
+  },
   "enhanced_context_test.mbt": {
     0: (__test_656e68616e6365645f636f6e746578745f746573742e6d6274_0, ["byte_to_hex_char_0"]),
     1: (__test_656e68616e6365645f636f6e746578745f746573742e6d6274_1, ["byte_to_hex_char_1"]),
@@ -472,6 +534,37 @@ let moonbit_test_driver_internal_no_args_tests : MoonBitTestDriverInternalTestMa
     63: (__test_656e68616e6365645f636f6e746578745f746573742e6d6274_63, ["bytes_to_hex_even_values"]),
     64: (__test_656e68616e6365645f636f6e746578745f746573742e6d6274_64, ["bytes_to_hex_fibonacci_sequence"]),
   },
+  "edge_case_validation_test.mbt": {
+    0: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_0, ["hex_encoding_empty_array"]),
+    1: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_1, ["hex_encoding_single_byte_min"]),
+    2: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_2, ["hex_encoding_single_byte_max"]),
+    3: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_3, ["hex_encoding_all_zeros"]),
+    4: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_4, ["hex_encoding_all_ones"]),
+    5: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_5, ["hex_encoding_alternating_pattern"]),
+    6: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_6, ["hex_encoding_incrementing_sequence"]),
+    7: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_7, ["hex_encoding_bit_patterns"]),
+    8: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_8, ["hex_encoding_twos_complement_patterns"]),
+    9: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_9, ["hex_encoding_palindromes"]),
+    10: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_10, ["hex_encoding_large_array_length"]),
+    11: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_11, ["byte_to_hex_char_boundaries"]),
+    12: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_12, ["byte_to_hex_char_invalid_high_values"]),
+    13: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_13, ["byte_to_hex_char_invalid_negative_values"]),
+    14: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_14, ["span_context_valid_minimal_trace_id"]),
+    15: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_15, ["span_context_valid_maximal_trace_id"]),
+    16: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_16, ["span_context_unsampled_flag"]),
+    17: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_17, ["span_context_sampled_flag"]),
+    18: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_18, ["span_context_all_sample_flags"]),
+    19: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_19, ["span_context_trace_id_hex_length"]),
+    20: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_20, ["span_context_span_id_hex_length"]),
+    21: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_21, ["span_context_empty_trace_id_invalid"]),
+    22: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_22, ["span_context_empty_span_id_invalid"]),
+    23: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_23, ["tracer_provider_empty_service_name"]),
+    24: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_24, ["tracer_provider_long_service_name"]),
+    25: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_25, ["tracer_empty_name"]),
+    26: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_26, ["tracer_unique_spans_same_tracer"]),
+    27: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_27, ["tracer_span_names_preserved"]),
+    28: (__test_656467655f636173655f76616c69646174696f6e5f746573742e6d6274_28, ["different_providers_unique_trace_ids"]),
+  },
   "distributed_tracing_test.mbt": {
     0: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_0, ["cross_service_trace_propagation"]),
     1: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_1, ["async_job_tracing"]),
@@ -524,6 +617,59 @@ let moonbit_test_driver_internal_no_args_tests : MoonBitTestDriverInternalTestMa
     12: (__test_626f756e646172795f746573742e6d6274_12, ["is_zero_large_arrays"]),
     13: (__test_626f756e646172795f746573742e6d6274_13, ["is_zero_single_nonzero_in_large_array"]),
     14: (__test_626f756e646172795f746573742e6d6274_14, ["trace_flags_odd_even_pattern"]),
+  },
+  "advanced_scenarios_test.mbt": {
+    0: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_0, ["context_with_identical_trace_and_span_prefixes"]),
+    1: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_1, ["context_with_complementary_ids"]),
+    2: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_2, ["context_with_mirror_pattern_ids"]),
+    3: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_3, ["hex_full_spectrum_single_nibble"]),
+    4: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_4, ["hex_nibble_boundaries_low"]),
+    5: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_5, ["hex_nibble_boundaries_high"]),
+    6: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_6, ["hex_upper_nibble_variations"]),
+    7: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_7, ["hex_lower_nibble_variations"]),
+    8: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_8, ["is_zero_with_negative_values"]),
+    9: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_9, ["is_zero_with_large_values"]),
+    10: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_10, ["is_zero_mixed_zeros_and_nonzeros"]),
+    11: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_11, ["is_zero_very_long_zero_array"]),
+    12: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_12, ["trace_flags_all_odd_bits_set"]),
+    13: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_13, ["trace_flags_all_even_bits_set"]),
+    14: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_14, ["trace_flags_lower_nibble_set"]),
+    15: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_15, ["trace_flags_upper_nibble_set"]),
+    16: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_16, ["context_validation_with_near_zero_trace_id"]),
+    17: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_17, ["context_validation_with_near_zero_span_id"]),
+    18: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_18, ["hex_byte_with_zero_high_nibble"]),
+    19: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_19, ["hex_byte_with_zero_low_nibble"]),
+    20: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_20, ["hex_mixed_high_low_nibbles"]),
+    21: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_21, ["context_properties_remain_consistent_after_creation"]),
+    22: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_22, ["invalid_context_properties_remain_consistent"]),
+    23: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_23, ["trace_id_length_15_is_invalid"]),
+    24: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_24, ["trace_id_length_17_is_invalid"]),
+    25: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_25, ["span_id_length_7_is_invalid"]),
+    26: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_26, ["span_id_length_9_is_invalid"]),
+    27: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_27, ["trace_id_fibonacci_like_pattern"]),
+    28: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_28, ["span_id_prime_like_pattern"]),
+    29: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_29, ["context_creates_readable_hex_pattern"]),
+    30: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_30, ["context_with_ascii_like_values"]),
+    31: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_31, ["byte_to_hex_char_values_above_15"]),
+    32: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_32, ["multiple_contexts_different_sampling"]),
+    33: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_33, ["is_zero_array_size_1_zero"]),
+    34: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_34, ["is_zero_array_size_2_zeros"]),
+    35: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_35, ["is_zero_array_size_8_zeros"]),
+    36: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_36, ["is_zero_array_size_16_zeros"]),
+    37: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_37, ["is_zero_array_size_1_nonzero"]),
+    38: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_38, ["is_zero_array_size_2_one_nonzero"]),
+    39: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_39, ["hex_single_byte_00"]),
+    40: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_40, ["hex_single_byte_FF"]),
+    41: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_41, ["hex_single_byte_AA"]),
+    42: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_42, ["hex_single_byte_55"]),
+    43: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_43, ["hex_two_bytes"]),
+    44: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_44, ["hex_three_bytes"]),
+    45: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_45, ["hex_four_bytes"]),
+    46: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_46, ["context_preserves_trace_id_values"]),
+    47: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_47, ["context_preserves_span_id_values"]),
+    48: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_48, ["trace_flags_value_preserved_0x00"]),
+    49: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_49, ["trace_flags_value_preserved_0xFF"]),
+    50: (__test_616476616e6365645f7363656e6172696f735f746573742e6d6274_50, ["trace_flags_value_preserved_0x55"]),
   },
   "advanced_pattern_test.mbt": {
     0: (__test_616476616e6365645f7061747465726e5f746573742e6d6274_0, ["trace_flags_bit_pattern_0b00000001"]),
@@ -579,6 +725,10 @@ let moonbit_test_driver_internal_no_args_tests : MoonBitTestDriverInternalTestMa
     50: (__test_616476616e6365645f7061747465726e5f746573742e6d6274_50, ["byte_to_hex_char_17"]),
     51: (__test_616476616e6365645f7061747465726e5f746573742e6d6274_51, ["byte_to_hex_char_32"]),
   },
+  "advanced_coverage_tests.mbt": {
+  },
+  "additional_validation_tests.mbt": {
+  },
   "additional_tests.mbt": {
   },
 }
@@ -621,7 +771,11 @@ let moonbit_test_driver_internal_with_args_tests : MoonBitTestDriverInternalTest
   },
   "exhaustive_coverage_test.mbt": {
   },
+  "enhanced_edge_cases_test.mbt": {
+  },
   "enhanced_context_test.mbt": {
+  },
+  "edge_case_validation_test.mbt": {
   },
   "distributed_tracing_test.mbt": {
   },
@@ -629,7 +783,13 @@ let moonbit_test_driver_internal_with_args_tests : MoonBitTestDriverInternalTest
   },
   "boundary_test.mbt": {
   },
+  "advanced_scenarios_test.mbt": {
+  },
   "advanced_pattern_test.mbt": {
+  },
+  "advanced_coverage_tests.mbt": {
+  },
+  "additional_validation_tests.mbt": {
   },
   "additional_tests.mbt": {
   },
@@ -673,7 +833,11 @@ let moonbit_test_driver_internal_async_tests : MoonBitTestDriverInternalTestMap[
   },
   "exhaustive_coverage_test.mbt": {
   },
+  "enhanced_edge_cases_test.mbt": {
+  },
   "enhanced_context_test.mbt": {
+  },
+  "edge_case_validation_test.mbt": {
   },
   "distributed_tracing_test.mbt": {
   },
@@ -681,7 +845,13 @@ let moonbit_test_driver_internal_async_tests : MoonBitTestDriverInternalTestMap[
   },
   "boundary_test.mbt": {
   },
+  "advanced_scenarios_test.mbt": {
+  },
   "advanced_pattern_test.mbt": {
+  },
+  "advanced_coverage_tests.mbt": {
+  },
+  "additional_validation_tests.mbt": {
   },
   "additional_tests.mbt": {
   },
@@ -725,7 +895,11 @@ let moonbit_test_driver_internal_async_tests_with_args : MoonBitTestDriverIntern
   },
   "exhaustive_coverage_test.mbt": {
   },
+  "enhanced_edge_cases_test.mbt": {
+  },
   "enhanced_context_test.mbt": {
+  },
+  "edge_case_validation_test.mbt": {
   },
   "distributed_tracing_test.mbt": {
   },
@@ -733,7 +907,13 @@ let moonbit_test_driver_internal_async_tests_with_args : MoonBitTestDriverIntern
   },
   "boundary_test.mbt": {
   },
+  "advanced_scenarios_test.mbt": {
+  },
   "advanced_pattern_test.mbt": {
+  },
+  "advanced_coverage_tests.mbt": {
+  },
+  "additional_validation_tests.mbt": {
   },
   "additional_tests.mbt": {
   },
