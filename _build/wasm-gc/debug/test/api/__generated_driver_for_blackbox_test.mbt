@@ -270,6 +270,32 @@ let moonbit_test_driver_internal_no_args_tests : MoonBitTestDriverInternalTestMa
     5: (__test_717569636b636865636b5f7374796c655f746573742e6d6274_5, ["property_bytes_to_hex_only_uses_lower_hex_chars"]),
     6: (__test_717569636b636865636b5f7374796c655f746573742e6d6274_6, ["property_bytes_to_hex_length_twice_input"]),
   },
+  "performance_test.mbt": {
+    0: (__test_706572666f726d616e63655f746573742e6d6274_0, ["span_context_creation_performance"]),
+    1: (__test_706572666f726d616e63655f746573742e6d6274_1, ["hex_conversion_performance"]),
+    2: (__test_706572666f726d616e63655f746573742e6d6274_2, ["multiple_context_creation"]),
+    3: (__test_706572666f726d616e63655f746573742e6d6274_3, ["hex_string_generation_benchmark"]),
+    4: (__test_706572666f726d616e63655f746573742e6d6274_4, ["memory_efficient_context_handling"]),
+    5: (__test_706572666f726d616e63655f746573742e6d6274_5, ["large_array_handling"]),
+    6: (__test_706572666f726d616e63655f746573742e6d6274_6, ["rapid_context_validation"]),
+    7: (__test_706572666f726d616e63655f746573742e6d6274_7, ["batch_hex_processing"]),
+    8: (__test_706572666f726d616e63655f746573742e6d6274_8, ["context_creation_edge_cases"]),
+    9: (__test_706572666f726d616e63655f746573742e6d6274_9, ["stress_hex_conversion"]),
+  },
+  "new_comprehensive_tests.mbt": {
+  },
+  "integration_test.mbt": {
+    0: (__test_696e746567726174696f6e5f746573742e6d6274_0, ["web_request_trace_scenario"]),
+    1: (__test_696e746567726174696f6e5f746573742e6d6274_1, ["microservice_chain_trace"]),
+    2: (__test_696e746567726174696f6e5f746573742e6d6274_2, ["database_operation_trace"]),
+    3: (__test_696e746567726174696f6e5f746573742e6d6274_3, ["api_gateway_scenario"]),
+    4: (__test_696e746567726174696f6e5f746573742e6d6274_4, ["cache_layer_trace"]),
+    5: (__test_696e746567726174696f6e5f746573742e6d6274_5, ["load_balancer_scenario"]),
+    6: (__test_696e746567726174696f6e5f746573742e6d6274_6, ["error_propagation_trace"]),
+    7: (__test_696e746567726174696f6e5f746573742e6d6274_7, ["batch_processing_trace"]),
+    8: (__test_696e746567726174696f6e5f746573742e6d6274_8, ["real_world_trace_correlation"]),
+    9: (__test_696e746567726174696f6e5f746573742e6d6274_9, ["distributed_transaction_trace"]),
+  },
   "hex_encoding_test.mbt": {
     0: (__test_6865785f656e636f64696e675f746573742e6d6274_0, ["hex_nibble_boundaries"]),
     1: (__test_6865785f656e636f64696e675f746573742e6d6274_1, ["hex_multi_byte_sequences"]),
@@ -285,6 +311,8 @@ let moonbit_test_driver_internal_no_args_tests : MoonBitTestDriverInternalTestMa
     11: (__test_6865785f656e636f64696e675f746573742e6d6274_11, ["byte_to_hex_char_invalid_values"]),
     12: (__test_6865785f656e636f64696e675f746573742e6d6274_12, ["hex_repeating_sequences"]),
     13: (__test_6865785f656e636f64696e675f746573742e6d6274_13, ["hex_checksum_like_patterns"]),
+  },
+  "extra_tests.mbt": {
   },
   "extended_validation_test.mbt": {
     0: (__test_657874656e6465645f76616c69646174696f6e5f746573742e6d6274_0, ["invalid_span_context_has_all_zero_ids"]),
@@ -444,6 +472,32 @@ let moonbit_test_driver_internal_no_args_tests : MoonBitTestDriverInternalTestMa
     63: (__test_656e68616e6365645f636f6e746578745f746573742e6d6274_63, ["bytes_to_hex_even_values"]),
     64: (__test_656e68616e6365645f636f6e746578745f746573742e6d6274_64, ["bytes_to_hex_fibonacci_sequence"]),
   },
+  "distributed_tracing_test.mbt": {
+    0: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_0, ["cross_service_trace_propagation"]),
+    1: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_1, ["async_job_tracing"]),
+    2: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_2, ["batch_request_tracing"]),
+    3: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_3, ["circuit_breaker_tracing"]),
+    4: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_4, ["retry_mechanism_tracing"]),
+    5: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_5, ["fan_out_tracing"]),
+    6: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_6, ["fan_in_tracing"]),
+    7: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_7, ["message_queue_tracing"]),
+    8: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_8, ["graphql_resolver_tracing"]),
+    9: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_9, ["event_sourcing_tracing"]),
+    10: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_10, ["rate_limiting_tracing"]),
+    11: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_11, ["distributed_transaction_tracing"]),
+    12: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_12, ["api_versioning_tracing"]),
+    13: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_13, ["webhook_delivery_tracing"]),
+    14: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_14, ["health_check_tracing"]),
+    15: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_15, ["background_worker_tracing"]),
+    16: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_16, ["cache_invalidation_tracing"]),
+    17: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_17, ["streaming_processing_tracing"]),
+    18: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_18, ["microservices_mashup_tracing"]),
+    19: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_19, ["trace_parent_child_relationships"]),
+    20: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_20, ["multi_region_tracing"]),
+    21: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_21, ["long_running_operation_tracing"]),
+    22: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_22, ["sampling_propagation_across_services"]),
+    23: (__test_64697374726962757465645f74726163696e675f746573742e6d6274_23, ["trace_flags_edge_cases"]),
+  },
   "comprehensive_test.mbt": {
     0: (__test_636f6d70726568656e736976655f746573742e6d6274_0, ["span_context_equality_test"]),
     1: (__test_636f6d70726568656e736976655f746573742e6d6274_1, ["span_context_boundary_conditions"]),
@@ -553,13 +607,23 @@ let moonbit_test_driver_internal_with_args_tests : MoonBitTestDriverInternalTest
   },
   "quickcheck_style_test.mbt": {
   },
+  "performance_test.mbt": {
+  },
+  "new_comprehensive_tests.mbt": {
+  },
+  "integration_test.mbt": {
+  },
   "hex_encoding_test.mbt": {
+  },
+  "extra_tests.mbt": {
   },
   "extended_validation_test.mbt": {
   },
   "exhaustive_coverage_test.mbt": {
   },
   "enhanced_context_test.mbt": {
+  },
+  "distributed_tracing_test.mbt": {
   },
   "comprehensive_test.mbt": {
   },
@@ -595,13 +659,23 @@ let moonbit_test_driver_internal_async_tests : MoonBitTestDriverInternalTestMap[
   },
   "quickcheck_style_test.mbt": {
   },
+  "performance_test.mbt": {
+  },
+  "new_comprehensive_tests.mbt": {
+  },
+  "integration_test.mbt": {
+  },
   "hex_encoding_test.mbt": {
+  },
+  "extra_tests.mbt": {
   },
   "extended_validation_test.mbt": {
   },
   "exhaustive_coverage_test.mbt": {
   },
   "enhanced_context_test.mbt": {
+  },
+  "distributed_tracing_test.mbt": {
   },
   "comprehensive_test.mbt": {
   },
@@ -637,13 +711,23 @@ let moonbit_test_driver_internal_async_tests_with_args : MoonBitTestDriverIntern
   },
   "quickcheck_style_test.mbt": {
   },
+  "performance_test.mbt": {
+  },
+  "new_comprehensive_tests.mbt": {
+  },
+  "integration_test.mbt": {
+  },
   "hex_encoding_test.mbt": {
+  },
+  "extra_tests.mbt": {
   },
   "extended_validation_test.mbt": {
   },
   "exhaustive_coverage_test.mbt": {
   },
   "enhanced_context_test.mbt": {
+  },
+  "distributed_tracing_test.mbt": {
   },
   "comprehensive_test.mbt": {
   },
