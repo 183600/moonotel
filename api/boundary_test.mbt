@@ -60,7 +60,7 @@ test "maximum_valid_span_context" {
 }
 
 test "single_nonzero_byte_in_trace_id" {
-  let mut tid = Array::make(16, 0)
+  let tid = Array::make(16, 0)
   tid[0] = 1
   let sid = Array::make(8, 1)
   let sc = span_context(tid, sid, 0)
@@ -69,14 +69,14 @@ test "single_nonzero_byte_in_trace_id" {
 
 test "single_nonzero_byte_in_span_id" {
   let tid = Array::make(16, 1)
-  let mut sid = Array::make(8, 0)
+  let sid = Array::make(8, 0)
   sid[0] = 1
   let sc = span_context(tid, sid, 0)
   assert_true(sc.is_valid())
 }
 
 test "last_byte_nonzero_in_trace_id" {
-  let mut tid = Array::make(16, 0)
+  let tid = Array::make(16, 0)
   tid[15] = 1
   let sid = Array::make(8, 1)
   let sc = span_context(tid, sid, 0)
@@ -85,7 +85,7 @@ test "last_byte_nonzero_in_trace_id" {
 
 test "last_byte_nonzero_in_span_id" {
   let tid = Array::make(16, 1)
-  let mut sid = Array::make(8, 0)
+  let sid = Array::make(8, 0)
   sid[7] = 1
   let sc = span_context(tid, sid, 0)
   assert_true(sc.is_valid())
@@ -108,7 +108,7 @@ test "is_zero_large_arrays" {
 }
 
 test "is_zero_single_nonzero_in_large_array" {
-  let mut large = Array::make(1000, 0)
+  let large = Array::make(1000, 0)
   large[500] = 1
   assert_false(is_zero(large))
 }
@@ -129,3 +129,6 @@ test "trace_flags_odd_even_pattern" {
   assert_true(span_context(tid, sid, 5).is_sampled())
   assert_true(span_context(tid, sid, 255).is_sampled())
 }
+
+
+

@@ -59,10 +59,10 @@ test "span_context_invalid_span_id_wrong_length" {
 }
 
 test "span_context_valid_minimal_nonzero_ids" {
-  let mut trace_id = Array::make(16, 0)
+  let trace_id = Array::make(16, 0)
   trace_id[15] = 1
 
-  let mut span_id = Array::make(8, 0)
+  let span_id = Array::make(8, 0)
   span_id[7] = 1
 
   let sc = span_context(trace_id, span_id, 0)
@@ -71,3 +71,4 @@ test "span_context_valid_minimal_nonzero_ids" {
   assert_eq(sc.trace_id_hex(), "00000000000000000000000000000001")
   assert_eq(sc.span_id_hex(), "0000000000000001")
 }
+

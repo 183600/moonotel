@@ -3,12 +3,17 @@
 test "create_many_span_contexts" {
   let mut count = 0
   while count < 100 {
-    let mut tid = Array::make(16, 0)
-    let mut sid = Array::make(8, 0)
+    let tid = Array::make(16, 0)
+    let sid = Array::make(8, 0)
     tid[0] = count % 256
     sid[0] = count % 256
     let sc = span_context(tid, sid, count % 2)
-    assert_true(sc.is_valid())
+    // First iteration has all zeros, which is invalid
+    if count == 0 {
+      assert_false(sc.is_valid())
+    } else {
+      assert_true(sc.is_valid())
+    }
     count = count + 1
   }
 }
@@ -51,7 +56,7 @@ test "hex_conversion_consistency" {
 }
 
 test "is_zero_with_progressive_fill" {
-  let mut arr = Array::make(16, 0)
+  let arr = Array::make(16, 0)
   assert_true(is_zero(arr))
   
   let mut i = 0
@@ -69,7 +74,7 @@ test "span_context_trace_id_variations" {
   
   let mut i = 0
   while i < 256 {
-    let mut tid = Array::make(16, 0)
+    let tid = Array::make(16, 0)
     tid[0] = i
     if i > 0 {
       let sc = span_context(tid, sid, 0)
@@ -84,7 +89,7 @@ test "span_context_span_id_variations" {
   
   let mut i = 0
   while i < 256 {
-    let mut sid = Array::make(8, 0)
+    let sid = Array::make(8, 0)
     sid[0] = i
     if i > 0 {
       let sc = span_context(tid, sid, 0)
@@ -172,3 +177,8 @@ test "span_context_repeated_creation" {
     count = count + 1
   }
 }
+
+
+
+
+
