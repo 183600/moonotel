@@ -333,6 +333,8 @@ let moonbit_test_driver_internal_no_args_tests : MoonBitTestDriverInternalTestMa
     8: (__test_706572666f726d616e63655f746573742e6d6274_8, ["context_creation_edge_cases"]),
     9: (__test_706572666f726d616e63655f746573742e6d6274_9, ["stress_hex_conversion"]),
   },
+  "new_span_context_tests.mbt": {
+  },
   "new_comprehensive_tests.mbt": {
   },
   "integration_test.mbt": {
@@ -949,6 +951,8 @@ let moonbit_test_driver_internal_with_args_tests : MoonBitTestDriverInternalTest
   },
   "performance_test.mbt": {
   },
+  "new_span_context_tests.mbt": {
+  },
   "new_comprehensive_tests.mbt": {
   },
   "integration_test.mbt": {
@@ -1023,6 +1027,8 @@ let moonbit_test_driver_internal_async_tests : MoonBitTestDriverInternalTestMap[
   },
   "performance_test.mbt": {
   },
+  "new_span_context_tests.mbt": {
+  },
   "new_comprehensive_tests.mbt": {
   },
   "integration_test.mbt": {
@@ -1096,6 +1102,8 @@ let moonbit_test_driver_internal_async_tests_with_args : MoonBitTestDriverIntern
   "quickcheck_style_test.mbt": {
   },
   "performance_test.mbt": {
+  },
+  "new_span_context_tests.mbt": {
   },
   "new_comprehensive_tests.mbt": {
   },
