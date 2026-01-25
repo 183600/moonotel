@@ -17,6 +17,36 @@ let moonbit_test_driver_internal_no_args_tests : MoonBitTestDriverInternalTestMa
 ] = {
   "span_context.mbt": {
   },
+  "simple_additional_tests.mbt": {
+    0: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_0, ["span_context_boundary_validation_1"]),
+    1: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_1, ["span_context_boundary_validation_2"]),
+    2: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_2, ["span_context_invalid_trace_zero"]),
+    3: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_3, ["span_context_invalid_span_zero"]),
+    4: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_4, ["span_context_invalid_both_zero"]),
+    5: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_5, ["span_context_hex_format_comprehensive"]),
+    6: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_6, ["span_context_real_world_hex_patterns"]),
+    7: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_7, ["byte_to_hex_char_all_valid_values"]),
+    8: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_8, ["byte_to_hex_char_invalid_values"]),
+    9: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_9, ["is_zero_function_comprehensive"]),
+    10: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_10, ["invalid_span_context_properties"]),
+    11: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_11, ["span_context_maximum_values_test"]),
+    12: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_12, ["span_context_minimum_nonzero_values"]),
+    13: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_13, ["hex_conversion_alternating_high_low"]),
+    14: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_14, ["span_context_wrong_id_lengths"]),
+    15: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_15, ["hex_conversion_empty_and_single"]),
+    16: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_16, ["span_context_hex_length_consistency"]),
+    17: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_17, ["span_context_sampling_edge_cases"]),
+    18: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_18, ["hex_conversion_stress_various_sizes"]),
+    19: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_19, ["span_context_mixed_validity_scenarios"]),
+    20: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_20, ["span_context_concurrent_access_simulation"]),
+    21: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_21, ["span_context_performance_stress_small"]),
+    22: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_22, ["span_context_hex_character_validation"]),
+    23: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_23, ["span_context_comprehensive_validation"]),
+    24: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_24, ["span_context_database_transaction_patterns"]),
+    25: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_25, ["span_context_microservice_communication"]),
+    26: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_26, ["span_context_error_handling_edge_cases"]),
+    27: (__test_73696d706c655f6164646974696f6e616c5f74657374732e6d6274_27, ["span_context_hex_permutation_consistency"]),
+  },
   "new_span_context_tests.mbt": {
     0: (__test_6e65775f7370616e5f636f6e746578745f74657374732e6d6274_0, ["trace_id_hex_lowercase_consistency"]),
     1: (__test_6e65775f7370616e5f636f6e746578745f74657374732e6d6274_1, ["span_id_hex_with_zero_values"]),
@@ -347,6 +377,8 @@ let moonbit_test_driver_internal_with_args_tests : MoonBitTestDriverInternalTest
 ] = {
   "span_context.mbt": {
   },
+  "simple_additional_tests.mbt": {
+  },
   "new_span_context_tests.mbt": {
   },
   "new_comprehensive_tests.mbt": {
@@ -371,6 +403,8 @@ let moonbit_test_driver_internal_async_tests : MoonBitTestDriverInternalTestMap[
 ] = {
   "span_context.mbt": {
   },
+  "simple_additional_tests.mbt": {
+  },
   "new_span_context_tests.mbt": {
   },
   "new_comprehensive_tests.mbt": {
@@ -394,6 +428,8 @@ let moonbit_test_driver_internal_async_tests_with_args : MoonBitTestDriverIntern
   async (Moonbit_Test_Driver_Internal_Test_Arg) -> Unit,
 ] = {
   "span_context.mbt": {
+  },
+  "simple_additional_tests.mbt": {
   },
   "new_span_context_tests.mbt": {
   },

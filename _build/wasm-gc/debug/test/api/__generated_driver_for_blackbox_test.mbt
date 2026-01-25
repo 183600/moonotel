@@ -287,6 +287,8 @@ let moonbit_test_driver_internal_no_args_tests : MoonBitTestDriverInternalTestMa
   },
   "span_context.mbt": {
   },
+  "simple_additional_tests.mbt": {
+  },
   "sampler_test.mbt": {
     0: (__test_73616d706c65725f746573742e6d6274_0, ["sampler_always_on_records_and_samples"]),
     1: (__test_73616d706c65725f746573742e6d6274_1, ["sampler_always_off_neither_records_nor_samples"]),
@@ -943,6 +945,8 @@ let moonbit_test_driver_internal_with_args_tests : MoonBitTestDriverInternalTest
   },
   "span_context.mbt": {
   },
+  "simple_additional_tests.mbt": {
+  },
   "sampler_test.mbt": {
   },
   "robustness_test.mbt": {
@@ -1019,6 +1023,8 @@ let moonbit_test_driver_internal_async_tests : MoonBitTestDriverInternalTestMap[
   },
   "span_context.mbt": {
   },
+  "simple_additional_tests.mbt": {
+  },
   "sampler_test.mbt": {
   },
   "robustness_test.mbt": {
@@ -1094,6 +1100,8 @@ let moonbit_test_driver_internal_async_tests_with_args : MoonBitTestDriverIntern
   "span_context_edge_cases_test.mbt": {
   },
   "span_context.mbt": {
+  },
+  "simple_additional_tests.mbt": {
   },
   "sampler_test.mbt": {
   },
