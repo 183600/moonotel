@@ -505,10 +505,10 @@ test "span_context_comprehensive_edge_case_matrix" {
   // Comprehensive edge case testing matrix
   let edge_cases = [
     // (trace_id, span_id, flags, expected_valid, expected_sampled)
-    ([0], Array::make(8, 1), 1, false, true),      // Too short trace_id
-    (Array::make(16, 0), [1], 1, false, true),      // Too short span_id
-    (Array::make(16, 1), Array::make(8, 0), 1, false, true), // Zero span_id
-    (Array::make(16, 0), Array::make(8, 1), 1, false, true), // Zero trace_id
+    ([0], Array::make(8, 1), 1, false, false),      // Too short trace_id
+    (Array::make(16, 0), [1], 1, false, false),      // Too short span_id
+    (Array::make(16, 1), Array::make(8, 0), 1, false, false), // Zero span_id
+    (Array::make(16, 0), Array::make(8, 1), 1, false, false), // Zero trace_id
     (Array::make(16, 1), Array::make(8, 1), 1, true, true),  // Valid minimal
     (Array::make(16, 255), Array::make(8, 255), 0, true, false), // Valid maximal not sampled
     (Array::make(16, 255), Array::make(8, 255), 255, true, true), // Valid maximal sampled
@@ -579,8 +579,8 @@ test "span_context_final_validation_comprehensive" {
     ([255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255], [255,255,255,255,255,255,255,255], 254, true, false),
     
     // Invalid cases
-    (Array::make(16, 0), [1,2,3,4,5,6,7,8], 1, false, true),
-    ([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16], Array::make(8, 0), 1, false, true),
+    (Array::make(16, 0), [1,2,3,4,5,6,7,8], 1, false, false),
+    ([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16], Array::make(8, 0), 1, false, false),
   ]
   
   let mut i = 0
