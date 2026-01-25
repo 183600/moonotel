@@ -871,6 +871,34 @@ let moonbit_test_driver_internal_no_args_tests : MoonBitTestDriverInternalTestMa
     50: (__test_616476616e6365645f7061747465726e5f746573742e6d6274_50, ["byte_to_hex_char_17"]),
     51: (__test_616476616e6365645f7061747465726e5f746573742e6d6274_51, ["byte_to_hex_char_32"]),
   },
+  "advanced_integration_test.mbt": {
+    0: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_0, ["multiple_tracer_creation_scenarios"]),
+    1: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_1, ["tracer_provider_lifecycle_management"]),
+    2: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_2, ["complex_span_context_relationships"]),
+    3: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_3, ["span_context_sampling_variations"]),
+    4: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_4, ["hex_encoding_edge_cases_extended"]),
+    5: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_5, ["span_context_boundary_stress_test"]),
+    6: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_6, ["tracer_configuration_validation"]),
+    7: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_7, ["span_context_hex_round_trip_conversion"]),
+    8: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_8, ["tracer_provider_multiple_instances"]),
+    9: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_9, ["span_context_flag_variations"]),
+    10: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_10, ["hex_string_case_insensitivity"]),
+    11: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_11, ["span_context_memory_patterns"]),
+    12: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_12, ["tracer_provider_state_transitions"]),
+    13: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_13, ["span_context_invalid_trace_patterns"]),
+    14: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_14, ["hex_to_bytes_length_validation"]),
+    15: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_15, ["tracer_with_extreme_versions"]),
+    16: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_16, ["span_context_trace_continuity_test"]),
+    17: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_17, ["hex_bytes_conversion_consistency"]),
+    18: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_18, ["tracer_provider_service_name_edge_cases"]),
+    19: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_19, ["span_context_mixed_sampling_scenarios"]),
+    20: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_20, ["comprehensive_hex_encoding_performance"]),
+    21: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_21, ["span_context_regression_prevention"]),
+    22: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_22, ["tracer_lifecycle_with_memory_management"]),
+    23: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_23, ["span_context_concurrent_style_operations"]),
+    24: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_24, ["hex_string_boundary_conditions"]),
+    25: (__test_616476616e6365645f696e746567726174696f6e5f746573742e6d6274_25, ["span_context_extreme_flag_combinations"]),
+  },
   "advanced_coverage_tests.mbt": {
   },
   "additional_validation_tests.mbt": {
@@ -987,6 +1015,8 @@ let moonbit_test_driver_internal_with_args_tests : MoonBitTestDriverInternalTest
   },
   "advanced_pattern_test.mbt": {
   },
+  "advanced_integration_test.mbt": {
+  },
   "advanced_coverage_tests.mbt": {
   },
   "additional_validation_tests.mbt": {
@@ -1063,6 +1093,8 @@ let moonbit_test_driver_internal_async_tests : MoonBitTestDriverInternalTestMap[
   },
   "advanced_pattern_test.mbt": {
   },
+  "advanced_integration_test.mbt": {
+  },
   "advanced_coverage_tests.mbt": {
   },
   "additional_validation_tests.mbt": {
@@ -1138,6 +1170,8 @@ let moonbit_test_driver_internal_async_tests_with_args : MoonBitTestDriverIntern
   "advanced_scenarios_test.mbt": {
   },
   "advanced_pattern_test.mbt": {
+  },
+  "advanced_integration_test.mbt": {
   },
   "advanced_coverage_tests.mbt": {
   },
