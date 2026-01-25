@@ -120,3 +120,71 @@ fn generate_span_id_from_counter(counter : Int, trace_byte : Int) -> Array[Int] 
   span_id[0] = counter + trace_byte
   span_id
 }
+
+test "tracer_span_with_custom_name" {
+  let provider = create_tracer_provider("test-service")
+  let tracer = create_tracer(provider, "test-tracer")
+  let span_name = "custom-span-name"
+  let span = tracer.start_span(span_name)
+  
+  assert_eq(span.name, span_name)
+}
+
+test "tracer_multiple_spans_from_same_tracer" {
+  let provider = create_tracer_provider("test-service")
+  let tracer = create_tracer(provider, "test-tracer")
+  let span1 = tracer.start_span("span-1")
+  let span2 = tracer.start_span("span-2")
+  
+  assert_eq(span1.name, "span-1")
+  assert_eq(span2.name, "span-2")
+  assert_true(span1.context.span_id_hex() != span2.context.span_id_hex())
+}
+
+test "tracer_provider_empty_service_name" {
+  let provider = create_tracer_provider("")
+  assert_eq(provider.service_name, "")
+}
+
+test "tracer_with_empty_name" {
+  let provider = create_tracer_provider("test-service")
+  let tracer = create_tracer(provider, "")
+  assert_eq(tracer.name, "")
+}
+
+test "span_name_long" {
+  let provider = create_tracer_provider("test")
+  let tracer = create_tracer(provider, "test")
+  let long_name = "a".repeat(1024)
+  let span = tracer.start_span(long_name)
+  assert_eq(span.name, long_name)
+}
+
+test "tracer_provider_long_service_name" {
+  let long_name = "s".repeat(1024)
+  let provider = create_tracer_provider(long_name)
+  assert_eq(provider.service_name, long_name)
+}
+
+test "tracer_name_long" {
+  let provider = create_tracer_provider("test")
+  let long_name = "t".repeat(1024)
+  let tracer = create_tracer(provider, long_name)
+  assert_eq(tracer.name, long_name)
+}
+
+test "tracer_start_span_multiple_times" {
+  let provider = create_tracer_provider("test")
+  let tracer = create_tracer(provider, "test")
+  let mut i = 0
+  while i < 10 {
+    let span = tracer.start_span("span-" + i.to_string())
+    assert_true(span.context.is_valid())
+    i = i + 1
+  }
+}
+
+test "tracer_provider_resource_attributes_mock" {
+  let provider = create_tracer_provider("resource-service")
+  assert_eq(provider.service_name, "resource-service")
+}
