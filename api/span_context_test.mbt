@@ -992,3 +992,123 @@ test "span_context_with_single_non_zero_byte" {
   let sc_middle = span_context(trace_id_middle, span_id_middle, 1)
   assert_true(sc_middle.is_valid())
 }
+
+test "span_context_flags_sampling" {
+  let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
+  
+  let sc1 = span_context(trace_id, span_id, 0)
+  assert_false(sc1.is_sampled())
+  
+  let sc2 = span_context(trace_id, span_id, 1)
+  assert_true(sc2.is_sampled())
+  
+  let sc3 = span_context(trace_id, span_id, 2)
+  assert_false(sc3.is_sampled()) // Only bit 0 is sampled
+  
+  let sc4 = span_context(trace_id, span_id, 255)
+  assert_true(sc4.is_sampled())
+}
+
+test "span_context_hex_format" {
+  let trace_id = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+  let span_id = [7, 6, 5, 4, 3, 2, 1, 0]
+  let sc = span_context(trace_id, span_id, 0)
+  
+  assert_eq(sc.trace_id_hex(), "0f0e0d0c0b0a09080706050403020100")
+  assert_eq(sc.span_id_hex(), "0706050403020100")
+}
+
+test "span_context_equality_different_trace_id" {
+  let tid1 = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  let tid2 = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+  let sid = [1, 2, 3, 4, 5, 6, 7, 8]
+  let sc1 = span_context(tid1, sid, 1)
+  let sc2 = span_context(tid2, sid, 1)
+  
+  assert_true(sc1.trace_id_hex() != sc2.trace_id_hex())
+}
+
+test "span_context_equality_different_span_id" {
+  let tid = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  let sid1 = [1, 2, 3, 4, 5, 6, 7, 8]
+  let sid2 = [8, 7, 6, 5, 4, 3, 2, 1]
+  let sc1 = span_context(tid, sid1, 1)
+  let sc2 = span_context(tid, sid2, 1)
+  
+  assert_true(sc1.span_id_hex() != sc2.span_id_hex())
+}
+
+test "span_context_equality_different_flags" {
+  let tid = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  let sid = [1, 2, 3, 4, 5, 6, 7, 8]
+  let sc1 = span_context(tid, sid, 0)
+  let sc2 = span_context(tid, sid, 1)
+  
+  assert_eq(sc1.trace_id_hex(), sc2.trace_id_hex())
+  assert_eq(sc1.span_id_hex(), sc2.span_id_hex())
+  assert_true(sc1.trace_flags != sc2.trace_flags)
+}
+
+test "span_context_max_values" {
+  let tid = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
+  let sid = [255, 255, 255, 255, 255, 255, 255, 255]
+  let sc = span_context(tid, sid, 255)
+  
+  assert_eq(sc.trace_id_hex(), "ffffffffffffffffffffffffffffffff")
+  assert_eq(sc.span_id_hex(), "ffffffffffffffff")
+  assert_true(sc.is_sampled())
+}
+
+test "span_context_min_values" {
+  let tid = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let sid = [0, 0, 0, 0, 0, 0, 0, 0]
+  let sc = span_context(tid, sid, 0)
+  
+  assert_eq(sc.trace_id_hex(), "00000000000000000000000000000000")
+  assert_eq(sc.span_id_hex(), "0000000000000000")
+  assert_false(sc.is_sampled())
+  assert_false(sc.is_valid())
+}
+
+test "span_context_is_valid_mixed" {
+  let tid_valid = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+  let sid_valid = [0, 0, 0, 0, 0, 0, 0, 1]
+  let sid_invalid = [0, 0, 0, 0, 0, 0, 0, 0]
+  let tid_invalid = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  
+  assert_true(span_context(tid_valid, sid_valid, 0).is_valid())
+  assert_false(span_context(tid_invalid, sid_valid, 0).is_valid())
+  assert_false(span_context(tid_valid, sid_invalid, 0).is_valid())
+  assert_false(span_context(tid_invalid, sid_invalid, 0).is_valid())
+}
+
+test "span_context_hex_lowercase" {
+  let tid = [10, 11, 12, 13, 14, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let sid = [10, 11, 12, 13, 14, 15, 0, 0]
+  let sc = span_context(tid, sid, 0)
+  
+  let tid_hex = sc.trace_id_hex()
+  let sid_hex = sc.span_id_hex()
+  
+  assert_eq(tid_hex[0:6].to_string(), "0a0b0c")
+  assert_eq(sid_hex[0:6].to_string(), "0a0b0c")
+}
+
+test "span_context_trace_flags_all_bits" {
+  let tid = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  let sid = [1, 2, 3, 4, 5, 6, 7, 8]
+  
+  let sc = span_context(tid, sid, 255)
+  assert_eq(sc.trace_flags, 255)
+  assert_true(sc.is_sampled())
+}
+
+test "span_context_trace_flags_only_sampled_bit" {
+  let tid = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  let sid = [1, 2, 3, 4, 5, 6, 7, 8]
+  
+  let sc = span_context(tid, sid, 1)
+  assert_eq(sc.trace_flags, 1)
+  assert_true(sc.is_sampled())
+}
