@@ -1,0 +1,4 @@
+STEP 1: Git pull - DONE
+STEP 2: Configure moonbit environment - IN PROGRESS
+STEP 3: Run moon test - PENDING
+STEP 4: Analyze results - PENDING
