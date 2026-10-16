@@ -87,3 +87,69 @@ pub fn byte_to_hex_char(val : Int) -> String {
     "0"
   }
 }
+
+// Trace flag bit indicating that the trace is sampled
+pub const TRACE_FLAGS_SAMPLED : Int = 1
+
+// Get the raw trace flags
+pub fn SpanContext::trace_flags(self : SpanContext) -> Int {
+  self.trace_flags
+}
+
+// Get a copy of the trace ID bytes
+pub fn SpanContext::trace_id(self : SpanContext) -> Array[Int] {
+  self.trace_id.copy()
+}
+
+// Get a copy of the span ID bytes
+pub fn SpanContext::span_id(self : SpanContext) -> Array[Int] {
+  self.span_id.copy()
+}
+
+// Helper: convert a hex character to its 0-15 value
+fn hex_char_value(c : Char) -> Int? {
+  if c >= '0' && c <= '9' {
+    Some(c.to_int() - 48)
+  } else if c >= 'a' && c <= 'f' {
+    Some(c.to_int() - 87)
+  } else if c >= 'A' && c <= 'F' {
+    Some(c.to_int() - 55)
+  } else {
+    None
+  }
+}
+
+// Parse a hex string into a byte array; returns None on odd length or invalid chars
+pub fn bytes_from_hex(hex : String) -> Array[Int]? {
+  let chars = hex.to_array()
+  if chars.length() % 2 != 0 {
+    return None
+  }
+  let out : Array[Int] = []
+  let mut i = 0
+  while i < chars.length() {
+    match (hex_char_value(chars[i]), hex_char_value(chars[i + 1])) {
+      (Some(hi), Some(lo)) => out.push(hi * 16 + lo)
+      _ => return None
+    }
+    i = i + 2
+  }
+  Some(out)
+}
+
+// Build a SpanContext from hex-encoded trace and span IDs
+pub fn span_context_from_hex(
+  trace_id_hex : String,
+  span_id_hex : String,
+  trace_flags : Int
+) -> SpanContext {
+  match (bytes_from_hex(trace_id_hex), bytes_from_hex(span_id_hex)) {
+    (Some(trace_id), Some(span_id)) =>
+      if trace_id.length() == 16 && span_id.length() == 8 {
+        span_context(trace_id, span_id, trace_flags)
+      } else {
+        invalid_span_context()
+      }
+    _ => invalid_span_context()
+  }
+}

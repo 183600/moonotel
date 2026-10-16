@@ -1,5 +1,5 @@
-options(
-  "is": "pkg",
-  name: "yourname/otel/api",
-  depend: [ ],
-)
+import {
+  "moonbitlang/core/debug",
+}
+
+pkgtype(kind: "library")

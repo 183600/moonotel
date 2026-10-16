@@ -1,0 +1,9 @@
+import {
+  "yourname/otel/api" @api,
+  "yourname/otel/context" @context,
+  "yourname/otel/propagation" @propagation,
+  "yourname/otel/sdk" @sdk,
+  "yourname/otel/exporter/otlp" @otlp,
+}
+
+pkgtype(kind: "library")

@@ -1,0 +1,13 @@
+// Stable attribute keys from the OpenTelemetry semantic conventions.
+// Only the keys needed by the MVP HTTP instrumentation are listed.
+
+pub const HTTP_REQUEST_METHOD : String = "http.request.method"
+pub const HTTP_RESPONSE_STATUS_CODE : String = "http.response.status_code"
+pub const URL_FULL : String = "url.full"
+pub const URL_SCHEME : String = "url.scheme"
+pub const SERVER_ADDRESS : String = "server.address"
+pub const SERVER_PORT : String = "server.port"
+pub const ERROR_TYPE : String = "error.type"
+pub const SERVICE_NAME : String = "service.name"
+pub const SERVICE_VERSION : String = "service.version"
+pub const DEPLOYMENT_ENVIRONMENT : String = "deployment.environment"

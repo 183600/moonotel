@@ -1,0 +1,5 @@
+import {
+  "yourname/otel/api" @api,
+}
+
+pkgtype(kind: "library")
