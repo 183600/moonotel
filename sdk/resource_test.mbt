@@ -33,6 +33,16 @@ test "resource_attributes_from_env" {
   assert_eq(resource.get("service.version"), Some(@sdk.StringValue("1.2.3")))
 }
 
+test "resource_attributes_decode_percent_with_surrogate_pair" {
+  @env.set_env_var("OTEL_RESOURCE_ATTRIBUTES", "note=smile😀%41")
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
+  @env.unset_env_var("OTEL_RESOURCE_ATTRIBUTES")
+  assert_eq(
+    provider.resource().get("note"),
+    Some(@sdk.StringValue("smile😀A")),
+  )
+}
+
 test "service_name_falls_back_to_resource_attributes" {
   @env.set_env_var("OTEL_RESOURCE_ATTRIBUTES", "service.name=from-resource")
   let provider = @sdk.TracerProviderSdk::new()

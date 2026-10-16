@@ -51,12 +51,23 @@ fn decode_percent(value : StringView) -> String {
       // ASCII characters encode to a single UTF-8 byte; avoid building an
       // intermediate one-character string.
       bytes.push(code.to_byte())
+      i = i + 1
     } else {
-      for byte in @utf8.encode(c.to_string()) {
+      // Encode a whole run of non-ASCII code units at once so that surrogate
+      // pairs are converted to UTF-8 instead of aborting on a lone half.
+      let run_start = i
+      let mut j = i
+      while j < len {
+        if value.unsafe_get(j).to_int() < 0x80 {
+          break
+        }
+        j = j + 1
+      }
+      for byte in @utf8.encode(value.view(start_offset=run_start, end_offset=j)) {
         bytes.push(byte)
       }
+      i = j
     }
-    i = i + 1
   }
   @utf8.decode_lossy(Bytes::from_array(bytes).exact_view())
 }

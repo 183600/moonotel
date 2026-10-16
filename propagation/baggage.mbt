@@ -38,9 +38,10 @@ fn is_valid_baggage_key(key : StringView) -> Bool {
 }
 
 // Whether a byte may appear literally in a baggage value. Percent-encoding is
-// required for everything else (including `"`, `,`, `;` and `\`).
+// required for everything else (including `"`, `%`, `,`, `;` and `\`).
 fn is_baggage_value_char(code : Int) -> Bool {
-  (code >= 0x21 && code <= 0x2B) ||
+  (code == 0x21) ||
+  (code >= 0x23 && code <= 0x2B && code != 0x25) ||
   (code >= 0x2D && code <= 0x3A) ||
   (code >= 0x3C && code <= 0x5B) ||
   (code >= 0x5D && code <= 0x7E)

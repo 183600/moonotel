@@ -4,6 +4,22 @@ test "percent_encode_escapes_reserved_characters" {
   assert_eq(@propagation.percent_encode("a b,c;d\\e"), "a%20b%2Cc%3Bd%5Ce")
 }
 
+test "percent_encode_escapes_percent_and_quote" {
+  assert_eq(@propagation.percent_encode("100%"), "100%25")
+  assert_eq(@propagation.percent_encode("a\"b"), "a%22b")
+}
+
+test "percent_decode_round_trips_percent" {
+  assert_eq(@propagation.percent_decode("100%25"), Some("100%"))
+  assert_eq(@propagation.percent_decode("a%22b"), Some("a\"b"))
+}
+
+test "baggage_round_trips_percent_in_value" {
+  let header = @propagation.format_baggage([("a", "100%")])
+  assert_eq(header, "a=100%25")
+  assert_eq(@propagation.parse_baggage(header), [("a", "100%")])
+}
+
 test "percent_encode_keeps_allowed_characters" {
   assert_eq(@propagation.percent_encode("abc-._~123"), "abc-._~123")
 }
