@@ -80,12 +80,15 @@ fn split_path_query(path : String) -> (String, String) {
 }
 
 // Parse the W3C `traceparent` header of an incoming request, if present.
+// Request headers are already keyed case-insensitively, so the header can be
+// fetched directly instead of copying every header into a carrier.
 pub fn extract_parent(
   headers : Map[@http.CaseInsensitiveString, String]
 ) -> @api.SpanContext? {
-  let carrier = @propagation.TextMapCarrier::new()
-  headers.each(fn(key, value) { carrier.set(key.to_string().to_lower(), value) })
-  @propagation.extract(carrier)
+  match headers.get(@http.CaseInsensitiveString("traceparent")) {
+    Some(value) => @propagation.parse_traceparent(value)
+    None => None
+  }
 }
 
 fn record_host_attributes(

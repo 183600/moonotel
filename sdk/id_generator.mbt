@@ -56,25 +56,64 @@ fn pseudo_random_bytes(n : Int, state : Ref[UInt64]) -> Array[Int] {
   fill_zero_checked(out)
 }
 
-fn random_bytes(n : Int, state : Ref[UInt64]) -> Array[Int] {
-  match @env.rand(n) {
-    Some(bytes) => {
-      let out : Array[Int] = Array(capacity=bytes.length())
-      for i = 0; i < bytes.length(); i = i + 1 {
-        out.push(bytes[i].to_int() & 0xFF)
+// Bytes requested from the entropy source per draw. A trace ID (16 bytes)
+// plus a span ID (8 bytes) fit in one draw, so a whole span costs a single
+// entropy call; the surplus stays buffered for the following call.
+const RANDOM_DRAW_BYTES : Int = 24
+
+fn take_buffered(n : Int, pending : Ref[Array[Int]]) -> Array[Int]? {
+  let available = pending.val.length()
+  if available < n {
+    return None
+  }
+  let source = pending.val
+  let out : Array[Int] = Array(capacity=n)
+  for i = 0; i < n; i = i + 1 {
+    out.push(source[i])
+  }
+  let rest : Array[Int] = Array(capacity=available - n)
+  for i = n; i < available; i = i + 1 {
+    rest.push(source[i])
+  }
+  pending.val = rest
+  Some(fill_zero_checked(out))
+}
+
+fn random_bytes(n : Int, state : Ref[UInt64], pending : Ref[Array[Int]]) -> Array[Int] {
+  match take_buffered(n, pending) {
+    Some(bytes) => bytes
+    None => {
+      let draw = if n < RANDOM_DRAW_BYTES { RANDOM_DRAW_BYTES } else { n }
+      match @env.rand(draw) {
+        Some(bytes) => {
+          let all : Array[Int] = Array(capacity=draw)
+          for i = 0; i < draw; i = i + 1 {
+            all.push(bytes[i].to_int() & 0xFF)
+          }
+          let out : Array[Int] = Array(capacity=n)
+          for i = 0; i < n; i = i + 1 {
+            out.push(all[i])
+          }
+          let rest : Array[Int] = Array(capacity=draw - n)
+          for i = n; i < draw; i = i + 1 {
+            rest.push(all[i])
+          }
+          pending.val = rest
+          fill_zero_checked(out)
+        }
+        None => pseudo_random_bytes(n, state)
       }
-      fill_zero_checked(out)
     }
-    None => pseudo_random_bytes(n, state)
   }
 }
 
 // A generator producing random IDs.
 pub fn IdGenerator::random() -> IdGenerator {
   let state = Ref(@env.now() ^ 88172645463325252)
+  let pending : Ref[Array[Int]] = Ref([])
   IdGenerator::new(
-    fn() { random_bytes(16, state) },
-    fn() { random_bytes(8, state) },
+    fn() { random_bytes(16, state, pending) },
+    fn() { random_bytes(8, state, pending) },
   )
 }
 

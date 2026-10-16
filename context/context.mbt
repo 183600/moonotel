@@ -11,9 +11,13 @@ pub struct Context {
   parent : Context?
 }
 
+// The empty root context. `Context` is immutable, so one shared instance can
+// serve every caller and avoid an allocation per lookup.
+let root_context : Context = { span_ctx: None, key: None, value: None, parent: None }
+
 // An empty root context.
 pub fn Context::root() -> Context {
-  { span_ctx: None, key: None, value: None, parent: None }
+  root_context
 }
 
 // Derive a context carrying the given span.

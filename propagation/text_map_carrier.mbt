@@ -16,11 +16,7 @@ pub fn TextMapCarrier::from_map(entries : Map[String, String]) -> TextMapCarrier
 
 // Create a carrier from an array of key/value pairs
 pub fn TextMapCarrier::from_entries(entries : Array[(String, String)]) -> TextMapCarrier {
-  let map = Map::new()
-  for entry in entries {
-    map.set(entry.0, entry.1)
-  }
-  { entries: map, }
+  { entries: Map(entries), }
 }
 
 // Look up a single header value. HTTP header names are case-insensitive: an

@@ -110,7 +110,9 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
       } else if dash2 < 0 {
         dash2 = i
       } else {
+        // A fourth dash marks an extra field; no later position is needed.
         extra_dashes = true
+        break
       }
     }
     i = i + 1

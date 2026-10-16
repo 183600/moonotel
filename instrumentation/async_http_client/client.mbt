@@ -81,38 +81,32 @@ pub fn split_url(url : String) -> (String, Int) {
   }
 }
 
-fn to_http_headers(
-  carrier : @propagation.TextMapCarrier
-) -> Map[@http.CaseInsensitiveString, String] {
-  let headers = Map([])
-  carrier.to_map().each(fn(key, value) {
-    headers.set(@http.CaseInsensitiveString(key), value)
-  })
-  headers
-}
-
 fn plain_headers(
   headers : Map[String, String]?
 ) -> Map[@http.CaseInsensitiveString, String] {
-  let carrier = @propagation.TextMapCarrier::new()
+  let out = Map([])
   match headers {
-    Some(values) => values.each(fn(key, value) { carrier.set(key, value) })
+    Some(values) =>
+      values.each(fn(key, value) {
+        out.set(@http.CaseInsensitiveString(key), value)
+      })
     None => ()
   }
-  to_http_headers(carrier)
+  out
 }
 
 fn traced_headers(
   headers : Map[String, String]?,
   span_context : @api.SpanContext
 ) -> Map[@http.CaseInsensitiveString, String] {
-  let carrier = @propagation.TextMapCarrier::new()
-  match headers {
-    Some(values) => values.each(fn(key, value) { carrier.set(key, value) })
-    None => ()
+  let out = plain_headers(headers)
+  if span_context.is_valid() {
+    out.set(
+      @http.CaseInsensitiveString("traceparent"),
+      @propagation.format_traceparent(span_context),
+    )
   }
-  @propagation.inject(span_context, carrier)
-  to_http_headers(carrier)
+  out
 }
 
 // Perform a traced HTTP request. The response headers, the fully read
@@ -133,16 +127,14 @@ pub async fn request(
   match active_tracer {
     None => @http.request(url, method, plain_headers(headers), body)
     Some(tracer) => {
+      let method_name = http_method_name(method)
       let span = tracer.start_span(
-        span_name.unwrap_or(http_method_name(method)),
+        span_name.unwrap_or(method_name),
         kind=@api.SpanKind::Client,
         parent?=@context.current_span_context(),
       )
       defer span.end()
-      span.set_attribute(
-        @sdk.HTTP_REQUEST_METHOD,
-        @sdk.StringValue(http_method_name(method)),
-      )
+      span.set_attribute(@sdk.HTTP_REQUEST_METHOD, @sdk.StringValue(method_name))
       span.set_attribute(@sdk.URL_FULL, @sdk.StringValue(url))
       let (host, port) = split_url(url)
       span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(host))

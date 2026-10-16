@@ -14,7 +14,8 @@ fn read_response_varint(data : BytesView, offset : Int) -> (UInt64, Int)? {
   let mut shift = 0
   let mut pos = offset
   while pos < length {
-    let byte = data.at(pos).to_int() & 0xFF
+    // SAFETY: `pos < length` is checked by the loop condition.
+    let byte = data.unsafe_get(pos).to_int() & 0xFF
     if shift >= 64 {
       return None
     }

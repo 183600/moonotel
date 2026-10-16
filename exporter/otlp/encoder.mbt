@@ -157,6 +157,9 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
     for scope in target.scopes {
       if scope.scope_name == data.scope_name && scope.scope_version == data.scope_version {
         scope_group = Some(scope)
+        // Scope groups are unique per resource group, so the first match is
+        // the only match.
+        break
       }
     }
     match scope_group {
