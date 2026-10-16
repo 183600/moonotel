@@ -43,7 +43,10 @@ pub fn Context::with_baggage(
   values : Map[String, String]
 ) -> Context {
   let mut result = self
-  values.each(fn(key, value) { result = result.with_value(key, value) })
+  for entry in values.iter() {
+    let (key, value) = entry
+    result = result.with_value(key, value)
+  }
   result
 }
 
@@ -87,20 +90,35 @@ pub fn Context::value(self : Context, key : String) -> String? {
 
 // Whether the chain carries at least one visible baggage value. Keys removed
 // with `without_value` do not count.
+//
+// The `seen` table is only needed once a key has been removed, so it is
+// allocated lazily and chains without baggage stay allocation-free.
 pub fn Context::has_baggage(self : Context) -> Bool {
-  let seen : Map[String, Bool] = Map([])
+  let mut seen : Map[String, Bool]? = None
   let mut cursor : Context? = Some(self)
   while true {
     match cursor {
       Some(context) => {
         match context.key {
           Some(key) =>
-            if seen.get(key) is None {
-              seen.set(key, true)
-              match context.value {
-                Some(_) => return true
-                None => ()
-              }
+            match seen {
+              Some(keys) =>
+                if keys.get(key) is None {
+                  keys.set(key, true)
+                  match context.value {
+                    Some(_) => return true
+                    None => ()
+                  }
+                }
+              None =>
+                match context.value {
+                  Some(_) => return true
+                  None => {
+                    let keys : Map[String, Bool] = Map([])
+                    keys.set(key, true)
+                    seen = Some(keys)
+                  }
+                }
             }
           None => ()
         }
@@ -116,19 +134,38 @@ pub fn Context::has_baggage(self : Context) -> Bool {
 // removed with `without_value` are excluded.
 pub fn Context::baggage(self : Context) -> Map[String, String] {
   let values = Map([])
-  let deleted : Map[String, Bool] = Map([])
+  let mut deleted : Map[String, Bool]? = None
   let mut cursor : Context? = Some(self)
   while true {
     match cursor {
       Some(context) => {
         match context.key {
-          Some(key) =>
-            if values.get(key) is None && deleted.get(key) is None {
-              match context.value {
-                Some(value) => values.set(key, value)
-                None => deleted.set(key, true)
+          Some(key) => {
+            let mut visible = values.get(key) is None
+            if visible {
+              match deleted {
+                Some(removed) =>
+                  if removed.get(key) is Some(_) {
+                    visible = false
+                  }
+                None => ()
               }
             }
+            if visible {
+              match context.value {
+                Some(value) => values.set(key, value)
+                None =>
+                  match deleted {
+                    Some(removed) => removed.set(key, true)
+                    None => {
+                      let removed : Map[String, Bool] = Map([])
+                      removed.set(key, true)
+                      deleted = Some(removed)
+                    }
+                  }
+              }
+            }
+          }
           None => ()
         }
         cursor = context.parent

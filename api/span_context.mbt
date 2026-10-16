@@ -102,7 +102,7 @@ fn nibble_to_hex_char(val : Int) -> Char {
 // Helper: convert bytes to hex string
 pub fn bytes_to_hex(bytes : Array[Int]) -> String {
   let len = bytes.length()
-  let sb = StringBuilder(size_hint = len * 4)
+  let sb = StringBuilder(size_hint = len * 2)
   let mut i = 0
   while i < len {
     let b = bytes.unsafe_get(i)

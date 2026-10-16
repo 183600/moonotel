@@ -257,9 +257,10 @@ pub async fn ServerCall::respond(
   let extra_headers : @http.Headers = Map([])
   match headers {
     Some(values) =>
-      values.each(fn(key, value) {
+      for entry in values.iter() {
+        let (key, value) = entry
         extra_headers.set(@http.CaseInsensitiveString(key), value)
-      })
+      }
     None => ()
   }
   self.connection.send_response(

@@ -146,9 +146,10 @@ pub fn TracerProviderSdk::with_resource_attribute(
   value : AttributeValue
 ) -> TracerProviderSdk {
   let resource = Map([])
-  self.resource.each(fn(existing_key, existing_value) {
+  for entry in self.resource.iter() {
+    let (existing_key, existing_value) = entry
     resource.set(existing_key, existing_value)
-  })
+  }
   resource.set(key, value)
   { ..self, resource }
 }
@@ -159,10 +160,14 @@ pub fn TracerProviderSdk::with_resource_attributes(
   values : Map[String, AttributeValue]
 ) -> TracerProviderSdk {
   let resource = Map([])
-  self.resource.each(fn(existing_key, existing_value) {
+  for entry in self.resource.iter() {
+    let (existing_key, existing_value) = entry
     resource.set(existing_key, existing_value)
-  })
-  values.each(fn(key, value) { resource.set(key, value) })
+  }
+  for entry in values.iter() {
+    let (key, value) = entry
+    resource.set(key, value)
+  }
   { ..self, resource }
 }
 

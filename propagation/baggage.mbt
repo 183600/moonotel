@@ -239,24 +239,49 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
 // Format the baggage of `context` as a `baggage` header value, or `None` when
 // the context carries no (valid) baggage. Keys are emitted in sorted order for
 // a deterministic header.
+//
+// The chain is walked once, collecting the innermost value of every key; the
+// duplicate-tracking table is only allocated once a key is seen, so contexts
+// without baggage stay allocation-free.
 pub fn context_baggage_header(context : @context.Context) -> String? {
-  if !context.has_baggage() {
-    return None
-  }
-  let baggage = context.baggage()
-  if baggage.length() == 0 {
-    return None
-  }
-  let keys : Array[String] = []
-  baggage.each(fn(key, _value) { keys.push(key) })
-  keys.sort()
   let entries : Array[(String, String)] = []
-  for key in keys {
-    match baggage.get(key) {
-      Some(value) => entries.push((key, value))
-      None => ()
+  let mut seen : Map[String, Bool]? = None
+  let mut cursor : @context.Context? = Some(context)
+  while true {
+    match cursor {
+      Some(node) => {
+        match node.key {
+          Some(key) =>
+            match seen {
+              Some(keys) =>
+                if keys.get(key) is None {
+                  keys.set(key, true)
+                  match node.value {
+                    Some(value) => entries.push((key, value))
+                    None => ()
+                  }
+                }
+              None => {
+                let keys : Map[String, Bool] = Map([])
+                keys.set(key, true)
+                seen = Some(keys)
+                match node.value {
+                  Some(value) => entries.push((key, value))
+                  None => ()
+                }
+              }
+            }
+          None => ()
+        }
+        cursor = node.parent
+      }
+      None => break
     }
   }
+  if entries.length() == 0 {
+    return None
+  }
+  entries.sort_by(fn(a, b) { a.0.compare(b.0) })
   let formatted = format_baggage(entries)
   if formatted == "" {
     None

@@ -20,9 +20,10 @@ fn request_headers(
   config : @otlp.OtlpHttpConfig
 ) -> Map[@http.CaseInsensitiveString, String] {
   let headers = Map([])
-  config.headers.each(fn(key, value) {
+  for entry in config.headers.iter() {
+    let (key, value) = entry
     headers.set(@http.CaseInsensitiveString(key), value)
-  })
+  }
   headers.set(
     @http.CaseInsensitiveString("content-type"),
     "application/x-protobuf",

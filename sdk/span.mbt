@@ -177,7 +177,10 @@ pub fn SpanSdk::set_attributes(
   attributes : Map[String, AttributeValue]
 ) -> Unit {
   if self.recording && !self.ended {
-    attributes.each(fn(key, value) { self.attributes.set(key, value) })
+    for entry in attributes.iter() {
+      let (key, value) = entry
+      self.attributes.set(key, value)
+    }
   }
 }
 

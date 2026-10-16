@@ -102,15 +102,13 @@ fn OtlpHttpAsyncSpanExporter::enqueue(
   }
 }
 
-// Export `first` plus every batch that is already queued.
+// Export `first` plus every batch that is already queued. The incoming batch
+// array is extended in place: the queue handed over its only reference.
 async fn OtlpHttpAsyncSpanExporter::export_available(
   self : OtlpHttpAsyncSpanExporter,
   first : Array[@sdk.SpanData]
 ) -> Unit {
-  let batch : Array[@sdk.SpanData] = []
-  for data in first {
-    batch.push(data)
-  }
+  let batch = first
   while batch.length() < MAX_EXPORT_SPANS {
     let next : Array[@sdk.SpanData]? = try {
       self.queue.try_get()

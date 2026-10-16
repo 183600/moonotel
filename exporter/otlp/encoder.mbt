@@ -89,7 +89,8 @@ fn encode_attributes(
   field : Int,
   attributes : Map[String, @sdk.AttributeValue]
 ) -> Unit {
-  attributes.each(fn(key, value) {
+  for entry in attributes.iter() {
+    let (key, value) = entry
     let kv = writer.take_scratch()
     kv.write_string_field(1, key)
     match value {
@@ -105,7 +106,7 @@ fn encode_attributes(
       }
     }
     writer.append_message(field, kv)
-  })
+  }
 }
 
 fn encode_resource(writer : ProtoWriter, resource : Map[String, @sdk.AttributeValue]) -> Unit {
@@ -197,7 +198,9 @@ fn resource_key_value(value : @sdk.AttributeValue) -> String {
 
 fn resource_key(resource : Map[String, @sdk.AttributeValue]) -> String {
   let keys : Array[String] = []
-  resource.each(fn(key, _value) { keys.push(key) })
+  for entry in resource.iter() {
+    keys.push(entry.0)
+  }
   keys.sort()
   let sb = StringBuilder()
   for key in keys {

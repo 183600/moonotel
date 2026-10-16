@@ -66,44 +66,47 @@ fn is_alpha(c : Char) -> Bool {
   (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
 }
 
-// Lower-case scheme of an absolute URL, without the `://` separator.
-// Returns "" when the URL has no scheme or the text before `://` is not a
-// valid scheme.
-pub fn split_scheme(url : String) -> String {
-  match url.find("://") {
+// Split an absolute URL into (scheme, host, port) in a single pass. The scheme
+// is "" when the URL has no valid scheme; the port falls back to the scheme
+// default when it is not explicit; malformed URLs yield `(host, -1)`.
+fn split_url_parts(url : String) -> (String, String, Int) {
+  let scheme_index = url.find("://")
+  let scheme = match scheme_index {
     Some(index) => {
       if index == 0 {
-        return ""
-      }
-      let candidate = url[:index]
-      if !is_alpha(candidate.unsafe_get(0).unsafe_to_char()) {
-        return ""
-      }
-      let sb = StringBuilder(size_hint=index)
-      let mut i = 0
-      while i < index {
-        let c = candidate.unsafe_get(i).unsafe_to_char()
-        if !is_scheme_char(c) {
-          return ""
+        ""
+      } else {
+        let candidate = url[:index]
+        if !is_alpha(candidate.unsafe_get(0).unsafe_to_char()) {
+          ""
+        } else {
+          let sb = StringBuilder(size_hint=index)
+          let mut valid = true
+          let mut i = 0
+          while i < index {
+            let c = candidate.unsafe_get(i).unsafe_to_char()
+            if !is_scheme_char(c) {
+              valid = false
+              break
+            }
+            sb.write_char(ascii_to_lower(c))
+            i = i + 1
+          }
+          if valid {
+            sb.to_string()
+          } else {
+            ""
+          }
         }
-        sb.write_char(ascii_to_lower(c))
-        i = i + 1
       }
-      sb.to_string()
     }
     None => ""
   }
-}
-
-// Best-effort split of an absolute URL into (host, port). The port falls back
-// to the scheme default when it is not explicit; malformed URLs yield
-// `(host, -1)` and are still traced.
-pub fn split_url(url : String) -> (String, Int) {
-  let after_scheme = match url.find("://") {
+  let after_scheme = match scheme_index {
     Some(index) => url[index + 3:]
     None => url
   }
-  let default_port = if split_scheme(url) == "https" { 443 } else { 80 }
+  let default_port = if scheme == "https" { 443 } else { 80 }
   let authority = match after_scheme.find("/") {
     Some(index) => after_scheme[:index]
     None => after_scheme
@@ -121,17 +124,32 @@ pub fn split_url(url : String) -> (String, Int) {
           Some(colon) => parse_port(rest[colon + 1:])
           None => default_port
         }
-        (host, port)
+        (scheme, host, port)
       }
-      None => (host_port.to_owned(), default_port)
+      None => (scheme, host_port.to_owned(), default_port)
     }
   } else {
     match host_port.find(":") {
       Some(colon) =>
-        (host_port[:colon].to_owned(), parse_port(host_port[colon + 1:]))
-      None => (host_port.to_owned(), default_port)
+        (scheme, host_port[:colon].to_owned(), parse_port(host_port[colon + 1:]))
+      None => (scheme, host_port.to_owned(), default_port)
     }
   }
+}
+
+// Lower-case scheme of an absolute URL, without the `://` separator.
+// Returns "" when the URL has no scheme or the text before `://` is not a
+// valid scheme.
+pub fn split_scheme(url : String) -> String {
+  split_url_parts(url).0
+}
+
+// Best-effort split of an absolute URL into (host, port). The port falls back
+// to the scheme default when it is not explicit; malformed URLs yield
+// `(host, -1)` and are still traced.
+pub fn split_url(url : String) -> (String, Int) {
+  let (_, host, port) = split_url_parts(url)
+  (host, port)
 }
 
 fn plain_headers(
@@ -140,9 +158,10 @@ fn plain_headers(
   let out = Map([])
   match headers {
     Some(values) =>
-      values.each(fn(key, value) {
+      for entry in values.iter() {
+        let (key, value) = entry
         out.set(@http.CaseInsensitiveString(key), value)
-      })
+      }
     None => ()
   }
   out
@@ -213,11 +232,10 @@ pub async fn request(
       defer span.end()
       span.set_attribute(@sdk.HTTP_REQUEST_METHOD, @sdk.StringValue(method_name))
       span.set_attribute(@sdk.URL_FULL, @sdk.StringValue(url))
-      let scheme = split_scheme(url)
+      let (scheme, host, port) = split_url_parts(url)
       if scheme != "" {
         span.set_attribute(@sdk.URL_SCHEME, @sdk.StringValue(scheme))
       }
-      let (host, port) = split_url(url)
       span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(host))
       span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
       let outcome = try {
