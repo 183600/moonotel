@@ -15,9 +15,12 @@ pub(all) struct TransportResponse {
 pub type Transport = (String, Map[String, String], Bytes) -> TransportResponse
 
 // Exporter configuration, following the OTEL_EXPORTER_OTLP_* environment
-// variables.
+// variables. `endpoint` is a base URL; `traces_endpoint` (when present) is the
+// full signal-specific URL set via OTEL_EXPORTER_OTLP_TRACES_ENDPOINT and is
+// used verbatim.
 pub(all) struct OtlpHttpConfig {
   endpoint : String
+  traces_endpoint : String?
   headers : Map[String, String]
   timeout_millis : Int
   compression : String
@@ -35,6 +38,7 @@ pub fn OtlpHttpConfig::new(
 ) -> OtlpHttpConfig {
   {
     endpoint: endpoint.unwrap_or("http://localhost:4318"),
+    traces_endpoint: None,
     headers: headers.unwrap_or(Map::new()),
     timeout_millis: timeout_millis.unwrap_or(10000),
     compression: compression.unwrap_or("none"),
@@ -61,11 +65,11 @@ fn parse_headers(value : String) -> Map[String, String] {
 // Build a configuration from the standard OTLP environment variables:
 // OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
 // OTEL_EXPORTER_OTLP_HEADERS, OTEL_EXPORTER_OTLP_COMPRESSION,
-// OTEL_EXPORTER_OTLP_TIMEOUT_TASK? (milliseconds).
+// OTEL_EXPORTER_OTLP_TIMEOUT (milliseconds).
 pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
   let traces_endpoint = @env.get_env_var("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
   let generic_endpoint = @env.get_env_var("OTEL_EXPORTER_OTLP_ENDPOINT")
-  let endpoint = match (traces_endpoint, generic_endpoint) {
+  let endpoint = match (generic_endpoint, traces_endpoint) {
     (Some(value), _) => value
     (None, Some(value)) => value
     (None, None) => "http://localhost:4318"
@@ -88,6 +92,7 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
   }
   {
     endpoint,
+    traces_endpoint,
     headers,
     timeout_millis,
     compression,
@@ -95,12 +100,18 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
   }
 }
 
-// Full URL of the trace export endpoint (`<endpoint>/v1/traces`).
+// Full URL of the trace export endpoint. The signal-specific
+// `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` value is used verbatim; otherwise
+// `/v1/traces` is appended to the base endpoint.
 pub fn OtlpHttpConfig::traces_url(self : OtlpHttpConfig) -> String {
-  if self.endpoint.has_suffix("/") {
-    self.endpoint + "v1/traces"
-  } else {
-    self.endpoint + "/v1/traces"
+  match self.traces_endpoint {
+    Some(full_url) => full_url
+    None =>
+      if self.endpoint.has_suffix("/") {
+        self.endpoint + "v1/traces"
+      } else {
+        self.endpoint + "/v1/traces"
+      }
   }
 }
 

@@ -2,58 +2,90 @@
 // success. A `partial_success` field reports rejected spans; per the OTLP
 // spec a partial success must not be retried.
 
-fn read_response_varint(data : BytesView, offset : Int) -> (UInt64, Int) {
+fn malformed_response() -> @sdk.ExportResult {
+  @sdk.ExportFailure("malformed OTLP response body")
+}
+
+// Read a protobuf varint. Returns `None` when the body ends in the middle of a
+// varint or the varint is longer than 64 bits.
+fn read_response_varint(data : BytesView, offset : Int) -> (UInt64, Int)? {
+  let length = data.length()
   let mut result : UInt64 = 0
   let mut shift = 0
   let mut pos = offset
-  let mut done = false
-  while !done {
+  while pos < length {
     let byte = data.at(pos).to_int() & 0xFF
+    if shift >= 64 {
+      return None
+    }
     result = result | ((byte & 0x7F).to_uint64() << shift)
     pos = pos + 1
     if byte < 0x80 {
-      done = true
-    } else {
-      shift = shift + 7
+      return Some((result, pos))
     }
+    shift = shift + 7
   }
-  (result, pos)
+  None
 }
 
 // Interpret an `ExportTraceServiceResponse` protobuf body.
+// Well-formed bodies decode exactly as prescribed by the OTLP trace service
+// proto; truncated or otherwise malformed bodies are reported as failures
+// instead of aborting.
 pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
   let data = body.exact_view()
   let length = data.length()
   let mut pos = 0
   while pos < length {
-    let (tag, after_tag) = read_response_varint(data, pos)
+    let (tag, after_tag) = match read_response_varint(data, pos) {
+      Some(pair) => pair
+      None => return malformed_response()
+    }
     pos = after_tag
     let field = (tag >> 3).to_int()
     let wire = (tag & 7).to_int()
     if wire == 2 {
-      let (size, after_size) = read_response_varint(data, pos)
+      let (size, after_size) = match read_response_varint(data, pos) {
+        Some(pair) => pair
+        None => return malformed_response()
+      }
+      if size > (length - after_size).to_uint64() {
+        return malformed_response()
+      }
       let end = after_size + size.to_int()
       if field == 1 {
-        // partial_success { int64 rejected_spans = 2; string error_message = 3; }
+        // partial_success { int64 rejected_spans = 1; string error_message = 2; }
         let partial = data.exact_view(start=after_size, end=end)
         let mut inner = 0
         let mut rejected : UInt64 = 0
         let mut error_message = ""
         while inner < partial.length() {
-          let (inner_tag, inner_after) = read_response_varint(partial, inner)
+          let (inner_tag, inner_after) = match read_response_varint(partial, inner) {
+            Some(pair) => pair
+            None => return malformed_response()
+          }
           inner = inner_after
           let inner_field = (inner_tag >> 3).to_int()
           let inner_wire = (inner_tag & 7).to_int()
           if inner_wire == 0 {
-            let (value, value_after) = read_response_varint(partial, inner)
+            let (value, value_after) = match read_response_varint(partial, inner) {
+              Some(pair) => pair
+              None => return malformed_response()
+            }
             inner = value_after
-            if inner_field == 2 {
+            if inner_field == 1 {
               rejected = value
             }
           } else if inner_wire == 2 {
-            let (size2, after2) = read_response_varint(partial, inner)
+            let (size2, after2) = match read_response_varint(partial, inner) {
+              Some(pair) => pair
+              None => return malformed_response()
+            }
+            if size2 > (partial.length() - after2).to_uint64() {
+              return malformed_response()
+            }
             let end2 = after2 + size2.to_int()
-            if inner_field == 3 {
+            if inner_field == 2 {
               error_message = @utf8.decode_lossy(partial.exact_view(start=after2, end=end2))
             }
             inner = end2
@@ -72,11 +104,20 @@ pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
       }
       pos = end
     } else if wire == 0 {
-      let (_value, after) = read_response_varint(data, pos)
+      let (_value, after) = match read_response_varint(data, pos) {
+        Some(pair) => pair
+        None => return malformed_response()
+      }
       pos = after
     } else if wire == 1 {
+      if length - pos < 8 {
+        return malformed_response()
+      }
       pos = pos + 8
     } else if wire == 5 {
+      if length - pos < 4 {
+        return malformed_response()
+      }
       pos = pos + 4
     } else {
       break

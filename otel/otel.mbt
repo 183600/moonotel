@@ -87,6 +87,10 @@ pub fn setup(
       let config : @otlp.OtlpHttpConfig = {
         ..base,
         endpoint: endpoint.unwrap_or(base.endpoint),
+        traces_endpoint: match endpoint {
+          Some(_) => None
+          None => base.traces_endpoint
+        },
         headers: headers.unwrap_or(base.headers),
       }
       let exporter = @otlp.OtlpHttpExporter::new(config, send)

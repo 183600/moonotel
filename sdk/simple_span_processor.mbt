@@ -1,4 +1,4 @@
-// A SpanProcessor that exports every finished span immediately.
+// A SpanProcessor that exports every finished sampled span immediately.
 // Suitable for tests, demos and low-throughput services.
 
 pub struct SimpleSpanProcessor {
@@ -21,7 +21,7 @@ pub impl SpanProcessor for SimpleSpanProcessor with on_start(self, _span) {
 }
 
 pub impl SpanProcessor for SimpleSpanProcessor with on_end(self, data) {
-  if !self.shutdown_called {
+  if !self.shutdown_called && data.span_context.is_sampled() {
     let _ = self.exporter.export_spans([data])
   }
 }

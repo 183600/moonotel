@@ -1,4 +1,5 @@
-// A SpanProcessor that buffers finished spans and exports them in batches.
+// A SpanProcessor that buffers finished sampled spans and exports them in
+// batches.
 //
 // The processor is bounded: when the queue exceeds `max_queue_size` the oldest
 // spans are dropped. A batch is exported synchronously as soon as the queue
@@ -101,6 +102,9 @@ pub impl SpanProcessor for BatchSpanProcessor with on_start(self, _span) {
 
 pub impl SpanProcessor for BatchSpanProcessor with on_end(self, data) {
   if self.shutdown_called {
+    return
+  }
+  if !data.span_context.is_sampled() {
     return
   }
   self.queue.push(data)
