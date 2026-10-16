@@ -51,7 +51,11 @@ async test "get creates a client span and injects traceparent" {
       })
     }
     let url = "http://127.0.0.1:\{port}/hello"
-    let (response, _body) = get(url, tracer=tracer)
+    let (response, _body) = get(
+      url,
+      tracer=tracer,
+      context=@context.Context::root(),
+    )
     assert_eq(response.code, 200)
     assert_eq(exporter.spans.val.length(), 1)
     let data = exporter.spans.val[0]
@@ -169,6 +173,47 @@ async test "requests are untraced when no tracer is available" {
     }
     let (response, _body) = get("http://127.0.0.1:\{port}/plain")
     assert_eq(response.code, 200)
+  }
+}
+
+async test "client propagates tracestate and baggage" {
+  let (tracer, exporter) = test_tracer("client-test-state")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    let received_tracestate : Ref[String] = Ref("")
+    let received_baggage : Ref[String] = Ref("")
+    group.spawn_bg(no_wait=true) <| () => {
+      server.run_forever() <| ((request, _body, conn) => {
+        received_tracestate.val = request.headers
+          .get(@http.CaseInsensitiveString("tracestate"))
+          .unwrap_or("")
+        received_baggage.val = request.headers
+          .get(@http.CaseInsensitiveString("baggage"))
+          .unwrap_or("")
+        conn.send_response(200, "OK")
+      })
+    }
+    let parent = @api.span_context(
+      Array::make(16, 5),
+      Array::make(8, 6),
+      @api.TRACE_FLAGS_SAMPLED,
+      tracestate="congo=t61rcWkgMzE",
+    )
+    let request_context = @context.Context::root()
+      .with_span(parent)
+      .with_value("user.id", "42")
+    let (response, _body) = get(
+      "http://127.0.0.1:\{port}/state",
+      tracer=tracer,
+      context=request_context,
+    )
+    assert_eq(response.code, 200)
+    assert_eq(received_tracestate.val, "congo=t61rcWkgMzE")
+    assert_eq(received_baggage.val, "user.id=42")
+    let data = exporter.spans.val[0]
+    assert_eq(data.span_context.tracestate(), "congo=t61rcWkgMzE")
+    assert_eq(data.parent_span_id, parent.span_id())
   }
 }
 

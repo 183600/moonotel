@@ -197,6 +197,90 @@ async test "handler exceptions are recorded and end the span" {
   }
 }
 
+test "extract_context parses traceparent, tracestate and baggage" {
+  let parent = @api.span_context(
+    Array::make(16, 21),
+    Array::make(8, 22),
+    @api.TRACE_FLAGS_SAMPLED,
+  )
+  let headers : Map[@http.CaseInsensitiveString, String] = Map([])
+  headers.set(
+    @http.CaseInsensitiveString("traceparent"),
+    @propagation.format_traceparent(parent),
+  )
+  headers.set(@http.CaseInsensitiveString("tracestate"), "congo=t61rcWkgMzE")
+  headers.set(
+    @http.CaseInsensitiveString("baggage"),
+    "user.id=42,note=a%2Cb",
+  )
+  let context = extract_context(headers)
+  let span_context = context.span_context().unwrap()
+  assert_eq(span_context.trace_id_hex(), parent.trace_id_hex())
+  assert_eq(span_context.span_id_hex(), parent.span_id_hex())
+  assert_eq(span_context.tracestate(), "congo=t61rcWkgMzE")
+  assert_eq(context.value("user.id"), Some("42"))
+  assert_eq(context.value("note"), Some("a,b"))
+}
+
+test "extract_context ignores an invalid tracestate" {
+  let parent = @api.span_context(
+    Array::make(16, 31),
+    Array::make(8, 32),
+    @api.TRACE_FLAGS_SAMPLED,
+  )
+  let headers : Map[@http.CaseInsensitiveString, String] = Map([])
+  headers.set(
+    @http.CaseInsensitiveString("traceparent"),
+    @propagation.format_traceparent(parent),
+  )
+  headers.set(@http.CaseInsensitiveString("tracestate"), "not a valid state")
+  let context = extract_context(headers)
+  assert_eq(context.span_context().unwrap().tracestate(), "")
+}
+
+test "extract_context is empty without headers" {
+  let headers : Map[@http.CaseInsensitiveString, String] = Map([])
+  let context = extract_context(headers)
+  assert_true(context.span_context() is None)
+  assert_eq(context.baggage().length(), 0)
+}
+
+async test "server propagates tracestate and baggage headers" {
+  let (tracer, exporter) = test_tracer("server-test-state")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      run_server_on(
+        server,
+        call => {
+          call.respond(200)
+        },
+        tracer=tracer,
+      )
+    }
+    let parent = @api.span_context(
+      Array::make(16, 21),
+      Array::make(8, 22),
+      @api.TRACE_FLAGS_SAMPLED,
+    )
+    let (response, _body) = @http.get(
+      "http://127.0.0.1:\{port}/state",
+      headers={
+        "traceparent": @propagation.format_traceparent(parent),
+        "tracestate": "congo=t61rcWkgMzE",
+        "baggage": "user.id=42,note=a%2Cb",
+      },
+    )
+    assert_eq(response.code, 200)
+    @async.sleep(50)
+    let data = exporter.spans.val[0]
+    assert_eq(data.span_context.tracestate(), "congo=t61rcWkgMzE")
+    assert_eq(data.span_context.trace_id_hex(), parent.trace_id_hex())
+    assert_eq(data.parent_span_id, parent.span_id())
+  }
+}
+
 async test "server runs untraced when no tracer is available" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))

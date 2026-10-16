@@ -3,6 +3,7 @@ pub struct SpanContext {
   trace_id : Array[Int]
   span_id : Array[Int]
   trace_flags : Int
+  tracestate : String
   is_valid : Bool
 }
 
@@ -11,6 +12,7 @@ let invalid_context : SpanContext = {
   trace_id: Array::make(16, 0),
   span_id: Array::make(8, 0),
   trace_flags: 0,
+  tracestate: "",
   is_valid: false,
 }
 
@@ -18,10 +20,35 @@ pub fn invalid_span_context() -> SpanContext {
   invalid_context
 }
 
-// Create a valid SpanContext with given IDs
-pub fn span_context(trace_id : Array[Int], span_id : Array[Int], trace_flags : Int) -> SpanContext {
+// Create a valid SpanContext with given IDs. `tracestate` is the raw W3C
+// `tracestate` header value associated with the context ("" when absent).
+pub fn span_context(
+  trace_id : Array[Int],
+  span_id : Array[Int],
+  trace_flags : Int,
+  tracestate? : String
+) -> SpanContext {
   let is_valid = trace_id.length() == 16 && span_id.length() == 8 && !is_zero(trace_id) && !is_zero(span_id)
-  { trace_id: trace_id, span_id: span_id, trace_flags: trace_flags, is_valid: is_valid }
+  {
+    trace_id: trace_id,
+    span_id: span_id,
+    trace_flags: trace_flags,
+    tracestate: tracestate.unwrap_or(""),
+    is_valid: is_valid,
+  }
+}
+
+// The W3C `tracestate` associated with this context ("" when absent).
+pub fn SpanContext::tracestate(self : SpanContext) -> String {
+  self.tracestate
+}
+
+// Derive a copy of this context carrying the given `tracestate` value.
+pub fn SpanContext::with_tracestate(
+  self : SpanContext,
+  tracestate : String
+) -> SpanContext {
+  { ..self, tracestate }
 }
 
 // Check if SpanContext is valid

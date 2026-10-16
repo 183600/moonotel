@@ -31,6 +31,10 @@ pub using @sdk {
   global_tracer_provider,
   set_global_tracer_provider,
   shutdown_global_tracer_provider,
+  SDK_VERSION,
+  TELEMETRY_SDK_NAME,
+  TELEMETRY_SDK_LANGUAGE,
+  TELEMETRY_SDK_VERSION,
 }
 
 pub using @context {
@@ -51,6 +55,13 @@ pub using @propagation {
   parse_traceparent,
   extract_tracestate,
   inject_with_tracestate,
+  baggage_header_name,
+  context_baggage_header,
+  inject_baggage,
+  extract_baggage,
+  extract_baggage_context,
+  parse_baggage,
+  format_baggage,
 }
 
 pub using @otlp {
@@ -67,9 +78,11 @@ pub using @otlp {
 // process-wide provider.
 //
 // `endpoint` and `headers` override the values read from the
-// OTEL_EXPORTER_OTLP_* environment variables.
+// OTEL_EXPORTER_OTLP_* environment variables. `resource_attributes` are
+// merged into the resource built from the environment.
 pub fn setup(
   service_name? : String,
+  resource_attributes? : Map[String, @sdk.AttributeValue],
   endpoint? : String,
   headers? : Map[String, String],
   sampler? : @sdk.Sampler,
@@ -77,6 +90,10 @@ pub fn setup(
   use_batch? : Bool
 ) -> @sdk.TracerProviderSdk {
   let mut provider = @sdk.TracerProviderSdk::new(service_name?=service_name)
+  match resource_attributes {
+    Some(values) => provider = provider.with_resource_attributes(values)
+    None => ()
+  }
   match sampler {
     Some(value) => provider = provider.with_sampler(value)
     None => ()

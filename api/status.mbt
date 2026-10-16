@@ -22,3 +22,6 @@ pub fn StatusCode::otlp_value(self : StatusCode) -> Int {
     Error => 2
   }
 }
+
+pub extend StatusCode with Eq::{not_equal, equal}
+pub extend StatusCode with @debug.Debug::{to_repr}

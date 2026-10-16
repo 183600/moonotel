@@ -173,18 +173,40 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
   }
 }
 
-// Inject a SpanContext into the carrier as a `traceparent` header.
+// Inject a SpanContext into the carrier as a `traceparent` header, plus a
+// `tracestate` header when the SpanContext carries a valid one.
 // Does nothing when the SpanContext is invalid.
 pub fn inject(sc : @api.SpanContext, carrier : TextMapCarrier) -> Unit {
   if sc.is_valid() {
     carrier.set(traceparent_header_name(), format_traceparent(sc))
+    let state = sc.tracestate()
+    if state != "" {
+      match parse_tracestate(state) {
+        Some(normalized) => carrier.set(tracestate_header_name(), normalized)
+        None => ()
+      }
+    }
   }
 }
 
-// Extract a SpanContext from the carrier's `traceparent` header.
+// Extract a SpanContext from the carrier's `traceparent` header, attaching the
+// `tracestate` header when it is present and valid. An invalid `tracestate`
+// is ignored, as required by the specification.
 pub fn extract(carrier : TextMapCarrier) -> @api.SpanContext? {
   match carrier.get(traceparent_header_name()) {
-    Some(value) => parse_traceparent(value)
+    Some(value) =>
+      match parse_traceparent(value) {
+        Some(sc) =>
+          match carrier.get(tracestate_header_name()) {
+            Some(state) =>
+              match parse_tracestate(state) {
+                Some(normalized) => Some(sc.with_tracestate(normalized))
+                None => Some(sc)
+              }
+            None => Some(sc)
+          }
+        None => None
+      }
     None => None
   }
 }
@@ -209,4 +231,132 @@ pub fn inject_with_tracestate(
 // The value is passed through unchanged.
 pub fn extract_tracestate(carrier : TextMapCarrier) -> String? {
   carrier.get(tracestate_header_name())
+}
+
+fn is_lcalpha(c : Char) -> Bool {
+  c >= 'a' && c <= 'z'
+}
+
+fn is_digit_char(c : Char) -> Bool {
+  c >= '0' && c <= '9'
+}
+
+fn is_tracestate_key_tail(c : Char) -> Bool {
+  is_lcalpha(c) || is_digit_char(c) || c == '_' || c == '-' || c == '*' || c == '/'
+}
+
+// Validate a `tracestate` key: either a simple key (`lcalpha` followed by up to
+// 255 key characters) or a multi-tenant key (`tenant-id@system-id`).
+fn is_valid_tracestate_key(key : String) -> Bool {
+  let len = key.length()
+  if len == 0 || len > 256 {
+    return false
+  }
+  let mut at = -1
+  let mut i = 0
+  while i < len {
+    if key.unsafe_get(i).unsafe_to_char() == '@' {
+      if at >= 0 {
+        // At most one `@` per key.
+        return false
+      }
+      at = i
+    }
+    i = i + 1
+  }
+  if at < 0 {
+    if !is_lcalpha(key.unsafe_get(0).unsafe_to_char()) {
+      return false
+    }
+    let mut j = 1
+    while j < len {
+      if !is_tracestate_key_tail(key.unsafe_get(j).unsafe_to_char()) {
+        return false
+      }
+      j = j + 1
+    }
+    true
+  } else {
+    let tenant_len = at
+    let system_len = len - at - 1
+    if tenant_len < 1 || tenant_len > 241 || system_len < 1 || system_len > 14 {
+      return false
+    }
+    let first = key.unsafe_get(0).unsafe_to_char()
+    if !is_lcalpha(first) && !is_digit_char(first) {
+      return false
+    }
+    let mut j = 1
+    while j < at {
+      if !is_tracestate_key_tail(key.unsafe_get(j).unsafe_to_char()) {
+        return false
+      }
+      j = j + 1
+    }
+    if !is_lcalpha(key.unsafe_get(at + 1).unsafe_to_char()) {
+      return false
+    }
+    let mut k = at + 2
+    while k < len {
+      if !is_tracestate_key_tail(key.unsafe_get(k).unsafe_to_char()) {
+        return false
+      }
+      k = k + 1
+    }
+    true
+  }
+}
+
+// Validate a `tracestate` value: printable ASCII without `,` or `=`.
+fn is_valid_tracestate_value(value : String) -> Bool {
+  let len = value.length()
+  if len > 255 {
+    return false
+  }
+  let mut i = 0
+  while i < len {
+    let code = value.unsafe_get(i).unsafe_to_char().to_int()
+    if code < 0x20 || code > 0x7E || code == 0x2C || code == 0x3D {
+      return false
+    }
+    i = i + 1
+  }
+  true
+}
+
+// Validate and normalize a `tracestate` header value.
+//
+// The result is the list of members joined by `,` with optional whitespace
+// trimmed. Returns None when the value is empty, has more than 32 members,
+// contains a malformed or duplicate key, or has an invalid value.
+pub fn parse_tracestate(value : String) -> String? {
+  if value == "" {
+    return None
+  }
+  let members : Array[String] = []
+  let seen : Map[String, Unit] = Map([])
+  for raw in value.split(",") {
+    if members.length() >= 32 {
+      return None
+    }
+    let item = raw.trim()
+    if item == "" {
+      return None
+    }
+    let (key_view, value_view) = match item.split_once("=") {
+      Some(pair) => pair
+      None => return None
+    }
+    let key = key_view.trim().to_owned()
+    let member_value = value_view.trim().to_owned()
+    if !is_valid_tracestate_key(key) || !is_valid_tracestate_value(member_value) {
+      return None
+    }
+    if seen.get(key) is Some(_) {
+      return None
+    }
+    seen.set(key, ())
+    members.push(key + "=" + member_value)
+  }
+  Some(members.join(","))
 }

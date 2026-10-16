@@ -10,16 +10,94 @@ pub struct TracerProviderSdk {
   mut shutdown_called : Bool
 }
 
-// Create a provider. The service name defaults to `OTEL_SERVICE_NAME` and
-// falls back to `unknown_service`. The default sampler is
-// ParentBased(AlwaysOn); the default ID generator produces random IDs.
+// Version reported as `telemetry.sdk.version` in the resource.
+pub const SDK_VERSION : String = "0.1.0"
+
+fn hex_digit_value(c : Char) -> Int {
+  let code = c.to_int()
+  if code >= 48 && code <= 57 {
+    code - 48
+  } else if code >= 97 && code <= 102 {
+    code - 87
+  } else if code >= 65 && code <= 70 {
+    code - 55
+  } else {
+    -1
+  }
+}
+
+// Decode the `%XX` sequences used by `OTEL_RESOURCE_ATTRIBUTES` values.
+// Invalid sequences are kept verbatim.
+fn decode_percent(value : String) -> String {
+  if value.find("%") is None {
+    return value
+  }
+  let bytes : Array[Byte] = Array(capacity=value.length())
+  let mut i = 0
+  while i < value.length() {
+    let c = value.unsafe_get(i).unsafe_to_char()
+    if c == '%' && i + 2 < value.length() {
+      let hi = hex_digit_value(value.unsafe_get(i + 1).unsafe_to_char())
+      let lo = hex_digit_value(value.unsafe_get(i + 2).unsafe_to_char())
+      if hi >= 0 && lo >= 0 {
+        bytes.push((hi * 16 + lo).to_byte())
+        i = i + 3
+        continue
+      }
+    }
+    for byte in @utf8.encode(c.to_string()) {
+      bytes.push(byte)
+    }
+    i = i + 1
+  }
+  @utf8.decode_lossy(Bytes::from_array(bytes).exact_view())
+}
+
+// Parse the `key=value,key2=value2` format of `OTEL_RESOURCE_ATTRIBUTES`.
+fn parse_resource_attributes(
+  value : String,
+  resource : Map[String, AttributeValue]
+) -> Unit {
+  for pair in value.split(",") {
+    match pair.trim().split_once("=") {
+      Some((key, raw_value)) => {
+        let name = key.trim().to_owned()
+        if name != "" {
+          resource.set(name, StringValue(decode_percent(raw_value.trim().to_owned())))
+        }
+      }
+      None => ()
+    }
+  }
+}
+
+// Create a provider. The service name defaults to `OTEL_SERVICE_NAME`, then
+// to `service.name` from `OTEL_RESOURCE_ATTRIBUTES`, and finally to
+// `unknown_service`. The resource also carries the `telemetry.sdk.*`
+// attributes. The default sampler is ParentBased(AlwaysOn); the default ID
+// generator produces random IDs.
 pub fn TracerProviderSdk::new(service_name? : String) -> TracerProviderSdk {
+  let resource = Map([])
+  match @env.get_env_var("OTEL_RESOURCE_ATTRIBUTES") {
+    Some(value) => parse_resource_attributes(value, resource)
+    None => ()
+  }
   let name = match service_name {
     Some(value) => value
-    None => @env.get_env_var("OTEL_SERVICE_NAME").unwrap_or("unknown_service")
+    None =>
+      match @env.get_env_var("OTEL_SERVICE_NAME") {
+        Some(value) => value
+        None =>
+          match resource.get(SERVICE_NAME) {
+            Some(StringValue(existing)) => existing
+            _ => "unknown_service"
+          }
+      }
   }
-  let resource = Map::new()
   resource.set(SERVICE_NAME, StringValue(name))
+  resource.set(TELEMETRY_SDK_NAME, StringValue("opentelemetry"))
+  resource.set(TELEMETRY_SDK_LANGUAGE, StringValue("moonbit"))
+  resource.set(TELEMETRY_SDK_VERSION, StringValue(SDK_VERSION))
   {
     resource,
     sampler: Sampler::parent_based(Sampler::always_on()),
@@ -35,8 +113,25 @@ pub fn TracerProviderSdk::with_resource_attribute(
   key : String,
   value : AttributeValue
 ) -> TracerProviderSdk {
-  self.resource.set(key, value)
-  self
+  let resource = Map([])
+  self.resource.each(fn(existing_key, existing_value) {
+    resource.set(existing_key, existing_value)
+  })
+  resource.set(key, value)
+  { ..self, resource }
+}
+
+// Add several resource attributes at once.
+pub fn TracerProviderSdk::with_resource_attributes(
+  self : TracerProviderSdk,
+  values : Map[String, AttributeValue]
+) -> TracerProviderSdk {
+  let resource = Map([])
+  self.resource.each(fn(existing_key, existing_value) {
+    resource.set(existing_key, existing_value)
+  })
+  values.each(fn(key, value) { resource.set(key, value) })
+  { ..self, resource }
 }
 
 // Use a custom sampler.
@@ -60,8 +155,9 @@ pub fn TracerProviderSdk::with_span_processor(
   self : TracerProviderSdk,
   processor : &SpanProcessor
 ) -> TracerProviderSdk {
-  self.processors.push(processor)
-  self
+  let processors = self.processors.copy()
+  processors.push(processor)
+  { ..self, processors }
 }
 
 // The resource attributes of this provider.

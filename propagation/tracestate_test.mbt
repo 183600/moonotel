@@ -1,0 +1,115 @@
+// Blackbox tests for W3C `tracestate` parsing and propagation.
+
+fn tracestate_test_context() -> @api.SpanContext {
+  @api.span_context(
+    [
+      0x4b, 0xf9, 0x2f, 0x35, 0x9d, 0x1e, 0x75, 0xb7,
+      0x61, 0x8a, 0x2d, 0x1f, 0x3c, 0x4e, 0x5a, 0x6b,
+    ],
+    [0x00, 0xf0, 0x67, 0xaa, 0x0b, 0xa9, 0x02, 0xb7],
+    1,
+  )
+}
+
+test "parse_tracestate_accepts_simple_members" {
+  assert_eq(
+    @propagation.parse_tracestate("congo=t61rcWkgMzE,rojo=00f067aa0ba902b7"),
+    Some("congo=t61rcWkgMzE,rojo=00f067aa0ba902b7"),
+  )
+}
+
+test "parse_tracestate_trims_surrounding_whitespace" {
+  assert_eq(@propagation.parse_tracestate("a=1 , b=2"), Some("a=1,b=2"))
+  assert_eq(@propagation.parse_tracestate("a = 1"), Some("a=1"))
+}
+
+test "parse_tracestate_accepts_multi_tenant_keys" {
+  assert_eq(@propagation.parse_tracestate("foo@bar=baz"), Some("foo@bar=baz"))
+  assert_eq(@propagation.parse_tracestate("1a@b=c"), Some("1a@b=c"))
+}
+
+test "parse_tracestate_rejects_empty_values" {
+  assert_eq(@propagation.parse_tracestate(""), None)
+  assert_eq(@propagation.parse_tracestate("a=1,"), None)
+  assert_eq(@propagation.parse_tracestate(",a=1"), None)
+}
+
+test "parse_tracestate_rejects_malformed_members" {
+  assert_eq(@propagation.parse_tracestate("no_equals"), None)
+  assert_eq(@propagation.parse_tracestate("=value"), None)
+  assert_eq(@propagation.parse_tracestate("Key=value"), None)
+  assert_eq(@propagation.parse_tracestate("a=b=c"), None)
+}
+
+test "parse_tracestate_rejects_duplicate_keys" {
+  assert_eq(@propagation.parse_tracestate("a=1,a=2"), None)
+}
+
+test "parse_tracestate_rejects_invalid_multi_tenant_keys" {
+  assert_eq(@propagation.parse_tracestate("a@b@c=1"), None)
+  assert_eq(@propagation.parse_tracestate("@b=1"), None)
+  assert_eq(@propagation.parse_tracestate("a@=1"), None)
+  assert_eq(@propagation.parse_tracestate("a@B=1"), None)
+}
+
+test "parse_tracestate_rejects_too_many_members" {
+  let mut state = "k0=v"
+  for i = 1; i < 33; i = i + 1 {
+    state = state + ",k" + i.to_string() + "=v"
+  }
+  assert_eq(@propagation.parse_tracestate(state), None)
+}
+
+test "inject_writes_tracestate_from_span_context" {
+  let sc = tracestate_test_context().with_tracestate("congo=t61rcWkgMzE")
+  let carrier = @propagation.TextMapCarrier::new()
+  @propagation.inject(sc, carrier)
+  assert_eq(
+    carrier.get(@propagation.tracestate_header_name()),
+    Some("congo=t61rcWkgMzE"),
+  )
+  assert_eq(
+    carrier.get(@propagation.traceparent_header_name()),
+    Some(@propagation.format_traceparent(sc)),
+  )
+}
+
+test "inject_skips_invalid_tracestate" {
+  let sc = tracestate_test_context().with_tracestate("bad key=value")
+  let carrier = @propagation.TextMapCarrier::new()
+  @propagation.inject(sc, carrier)
+  assert_eq(carrier.get(@propagation.tracestate_header_name()), None)
+  assert_true(carrier.get(@propagation.traceparent_header_name()) is Some(_))
+}
+
+test "extract_attaches_valid_tracestate" {
+  let sc = tracestate_test_context()
+  let carrier = @propagation.TextMapCarrier::new()
+  carrier.set(
+    @propagation.traceparent_header_name(),
+    @propagation.format_traceparent(sc),
+  )
+  carrier.set(@propagation.tracestate_header_name(), "a=1 , b=2")
+  let extracted = @propagation.extract(carrier).unwrap()
+  assert_eq(extracted.tracestate(), "a=1,b=2")
+}
+
+test "extract_ignores_invalid_tracestate" {
+  let sc = tracestate_test_context()
+  let carrier = @propagation.TextMapCarrier::new()
+  carrier.set(
+    @propagation.traceparent_header_name(),
+    @propagation.format_traceparent(sc),
+  )
+  carrier.set(@propagation.tracestate_header_name(), "not a valid state")
+  let extracted = @propagation.extract(carrier).unwrap()
+  assert_eq(extracted.tracestate(), "")
+}
+
+test "extract_without_tracestate_leaves_it_empty" {
+  let sc = tracestate_test_context()
+  let carrier = @propagation.TextMapCarrier::new()
+  @propagation.inject(sc, carrier)
+  let extracted = @propagation.extract(carrier).unwrap()
+  assert_eq(extracted.tracestate(), "")
+}

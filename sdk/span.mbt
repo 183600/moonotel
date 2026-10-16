@@ -37,7 +37,7 @@ pub(all) struct SpanData {
 
 // Current wall-clock time in nanoseconds since the Unix epoch.
 fn unix_nano_now() -> Int64 {
-  (@env.now() * 1000000).to_int64()
+  (@env.now() * 1000000).reinterpret_as_int64()
 }
 
 // A recording span. Non-recording spans (sampler decision DROP) discard
@@ -82,7 +82,7 @@ fn create_span(
     end_time_unix_nano: 0,
     ended: false,
     recording,
-    attributes: Map::new(),
+    attributes: Map([]),
     events: [],
     status: @api.StatusCode::Unset,
     status_description: "",
@@ -195,7 +195,7 @@ pub fn SpanSdk::add_event(
     }
     let event_attributes = match attributes {
       Some(map) => map
-      None => Map::new()
+      None => Map([])
     }
     self.events.push({ name, time_unix_nano: timestamp, attributes: event_attributes })
   }
@@ -212,7 +212,7 @@ pub fn SpanSdk::record_exception(
 ) -> Unit {
   if self.recording && !self.ended {
     let message = @debug.to_string(error)
-    let attributes = Map::new()
+    let attributes = Map([])
     let type_name = match exception_type {
       Some(value) => value
       None => error.to_string()
@@ -290,3 +290,6 @@ pub fn SpanSdk::end(self : SpanSdk, end_time_unix_nano? : Int64) -> Unit {
     }
   }
 }
+
+pub extend AttributeValue with Eq::{not_equal, equal}
+pub extend AttributeValue with @debug.Debug::{to_repr}

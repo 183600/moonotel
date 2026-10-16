@@ -39,7 +39,7 @@ async fn main {
             }
             None => ()
           }
-          call.respond(200, body="hello from " + call.method())
+          call.respond(200, body="hello from " + call.http_method())
         }
         _ => call.respond(404, body="not found")
       }

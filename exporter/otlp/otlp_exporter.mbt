@@ -39,7 +39,7 @@ pub fn OtlpHttpConfig::new(
   {
     endpoint: endpoint.unwrap_or("http://localhost:4318"),
     traces_endpoint: None,
-    headers: headers.unwrap_or(Map::new()),
+    headers: headers.unwrap_or(Map([])),
     timeout_millis: timeout_millis.unwrap_or(10000),
     compression: compression.unwrap_or("none"),
     max_retries: max_retries.unwrap_or(0),
@@ -47,15 +47,11 @@ pub fn OtlpHttpConfig::new(
 }
 
 fn parse_headers(value : String) -> Map[String, String] {
-  let headers = Map::new()
+  let headers = Map([])
   for pair in value.split(",") {
-    let text = pair.to_string()
-    match text.split_once("=") {
+    match pair.trim().split_once("=") {
       Some((key, header_value)) =>
-        headers.set(
-          key.to_string().trim().to_string(),
-          header_value.to_string().trim().to_string(),
-        )
+        headers.set(key.trim().to_owned(), header_value.trim().to_owned())
       None => ()
     }
   }
@@ -64,31 +60,44 @@ fn parse_headers(value : String) -> Map[String, String] {
 
 // Build a configuration from the standard OTLP environment variables:
 // OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
-// OTEL_EXPORTER_OTLP_HEADERS, OTEL_EXPORTER_OTLP_COMPRESSION,
-// OTEL_EXPORTER_OTLP_TIMEOUT (milliseconds).
+// OTEL_EXPORTER_OTLP_HEADERS, OTEL_EXPORTER_OTLP_TRACES_HEADERS,
+// OTEL_EXPORTER_OTLP_COMPRESSION, OTEL_EXPORTER_OTLP_TRACES_COMPRESSION,
+// OTEL_EXPORTER_OTLP_TIMEOUT and OTEL_EXPORTER_OTLP_TRACES_TIMEOUT
+// (timeouts in milliseconds). Signal-specific variables take precedence over
+// their generic counterparts.
 pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
   let traces_endpoint = @env.get_env_var("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
   let generic_endpoint = @env.get_env_var("OTEL_EXPORTER_OTLP_ENDPOINT")
-  let endpoint = match (generic_endpoint, traces_endpoint) {
-    (Some(value), _) => value
-    (None, Some(value)) => value
-    (None, None) => "http://localhost:4318"
+  let endpoint = match traces_endpoint {
+    Some(value) => value
+    None =>
+      match generic_endpoint {
+        Some(value) => value
+        None => "http://localhost:4318"
+      }
   }
   let headers = match @env.get_env_var("OTEL_EXPORTER_OTLP_HEADERS") {
     Some(value) => parse_headers(value)
-    None => Map::new()
+    None => Map([])
   }
-  let compression = @env
-    .get_env_var("OTEL_EXPORTER_OTLP_COMPRESSION")
-    .unwrap_or("none")
-  let timeout_millis = match @env.get_env_var("OTEL_EXPORTER_OTLP_TIMEOUT") {
-    Some(value) => {
-      let parsed = try @string.parse_int(value) catch {
-        _ => 0
+  match @env.get_env_var("OTEL_EXPORTER_OTLP_TRACES_HEADERS") {
+    Some(value) =>
+      parse_headers(value).each(fn(key, header_value) {
+        headers.set(key, header_value)
+      })
+    None => ()
+  }
+  let compression = match @env.get_env_var("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION") {
+    Some(value) => value
+    None => @env.get_env_var("OTEL_EXPORTER_OTLP_COMPRESSION").unwrap_or("none")
+  }
+  let timeout_millis = match @env.get_env_var("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT") {
+    Some(value) => parse_timeout(value)
+    None =>
+      match @env.get_env_var("OTEL_EXPORTER_OTLP_TIMEOUT") {
+        Some(value) => parse_timeout(value)
+        None => 10000
       }
-      if parsed > 0 { parsed } else { 10000 }
-    }
-    None => 10000
   }
   {
     endpoint,
@@ -98,6 +107,13 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
     compression,
     max_retries: 0,
   }
+}
+
+fn parse_timeout(value : String) -> Int {
+  let parsed = try @string.parse_int(value) catch {
+    _ => 0
+  }
+  if parsed > 0 { parsed } else { 10000 }
 }
 
 // Full URL of the trace export endpoint. The signal-specific
@@ -142,16 +158,17 @@ pub fn OtlpHttpExporter::config(self : OtlpHttpExporter) -> OtlpHttpConfig {
 }
 
 fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
-  let headers = Map::new()
+  let headers = Map([])
   config.headers.each(fn(key, value) { headers.set(key, value) })
   headers.set("content-type", "application/x-protobuf")
   headers
 }
 
 // Encode and POST the given spans. HTTP 200 (including partial success) is a
-// success and is never retried; retryable status codes are retried up to
-// `max_retries` times. The gzip compression setting is currently rejected at
-// encode time.
+// success and is never retried; the response body is decoded so that a
+// `partial_success` is surfaced as an export failure. Retryable status codes
+// are retried up to `max_retries` times. The gzip compression setting is
+// currently rejected at encode time.
 pub fn OtlpHttpExporter::export_spans_http(
   self : OtlpHttpExporter,
   spans : Array[@sdk.SpanData]
@@ -172,7 +189,7 @@ pub fn OtlpHttpExporter::export_spans_http(
   while attempt <= self.config.max_retries {
     let response = (self.transport)(url, headers, body)
     if response.status_code == 200 {
-      return @sdk.ExportSuccess
+      return decode_export_response(response.body)
     }
     last_failure = "OTLP export failed with HTTP status " +
       response.status_code.to_string()
@@ -191,3 +208,5 @@ pub impl @sdk.SpanExporter for OtlpHttpExporter with export_spans(self, spans) {
 pub impl @sdk.SpanExporter for OtlpHttpExporter with shutdown(self) {
   let _ = self
 }
+
+pub extend OtlpHttpExporter with @sdk.SpanExporter::{export_spans, shutdown}

@@ -121,3 +121,6 @@ pub fn Sampler::should_sample(
 ) -> SamplingDecision {
   (self.sample)(parent, trace_id)
 }
+
+pub extend SamplingDecision with Eq::{not_equal, equal}
+pub extend SamplingDecision with @debug.Debug::{to_repr}

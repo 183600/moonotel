@@ -30,6 +30,17 @@ pub fn Context::with_value(self : Context, key : String, value : String) -> Cont
   { span_ctx: None, key: Some(key), value: Some(value), parent: Some(self) }
 }
 
+// Derive a context carrying every key/value pair of `values` as baggage.
+// Pairs are applied in map order; lookups always see the innermost value.
+pub fn Context::with_baggage(
+  self : Context,
+  values : Map[String, String]
+) -> Context {
+  let mut result = self
+  values.each(fn(key, value) { result = result.with_value(key, value) })
+  result
+}
+
 // The nearest span context in the chain, if any.
 pub fn Context::span_context(self : Context) -> @api.SpanContext? {
   let mut cursor : Context? = Some(self)
@@ -69,7 +80,7 @@ pub fn Context::value(self : Context, key : String) -> String? {
 
 // Flatten the baggage of the whole chain, innermost values winning.
 pub fn Context::baggage(self : Context) -> Map[String, String] {
-  let values = Map::new()
+  let values = Map([])
   let mut cursor : Context? = Some(self)
   while true {
     match cursor {

@@ -29,3 +29,6 @@ pub fn SpanKind::otlp_value(self : SpanKind) -> Int {
     Consumer => 5
   }
 }
+
+pub extend SpanKind with Eq::{not_equal, equal}
+pub extend SpanKind with @debug.Debug::{to_repr}

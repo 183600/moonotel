@@ -115,3 +115,33 @@ test "facade_encode_trace_request_smoke" {
   let encoded = @otel.encode_trace_request([])
   assert_eq(encoded.length(), 0)
 }
+
+test "setup_merges_resource_attributes" {
+  @otel.shutdown_global_tracer_provider()
+  let attributes : Map[String, @otel.AttributeValue] = Map([])
+  attributes.set("deployment.environment", @sdk.StringValue("test"))
+  let provider = @otel.setup(
+    service_name="resource-test",
+    resource_attributes=attributes,
+  )
+  let resource = provider.resource()
+  assert_eq(
+    resource.get("deployment.environment"),
+    Some(@sdk.StringValue("test")),
+  )
+  assert_eq(
+    resource.get(@otel.TELEMETRY_SDK_NAME),
+    Some(@sdk.StringValue("opentelemetry")),
+  )
+  provider.shutdown()
+  @otel.shutdown_global_tracer_provider()
+}
+
+test "facade_baggage_round_trip" {
+  let context = @otel.Context::root().with_value("user.id", "42")
+  let carrier = @otel.TextMapCarrier::new()
+  @otel.inject_baggage(context, carrier)
+  assert_eq(carrier.get(@otel.baggage_header_name()), Some("user.id=42"))
+  let restored = @otel.extract_baggage_context(carrier)
+  assert_eq(restored.value("user.id"), Some("42"))
+}

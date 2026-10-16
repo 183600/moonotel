@@ -109,7 +109,7 @@ pub fn OtlpHttpAsyncExporter::config(
 }
 
 // Export a batch of finished spans.
-pub async fn OtlpHttpAsyncExporter::export(
+pub async fn OtlpHttpAsyncExporter::export_batch(
   self : OtlpHttpAsyncExporter,
   spans : Array[@sdk.SpanData]
 ) -> @sdk.ExportResult {

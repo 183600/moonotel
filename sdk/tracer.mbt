@@ -42,7 +42,16 @@ pub fn Tracer::start_span(
   } else {
     0
   }
-  let span_context = @api.span_context(trace_id, span_id, flags)
+  let tracestate = match valid_parent {
+    Some(ctx) => ctx.tracestate()
+    None => ""
+  }
+  let span_context = @api.span_context(
+    trace_id,
+    span_id,
+    flags,
+    tracestate=tracestate,
+  )
   let parent_span_id = match valid_parent {
     Some(ctx) => ctx.span_id()
     None => []

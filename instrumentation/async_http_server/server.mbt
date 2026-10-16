@@ -19,8 +19,8 @@ fn default_tracer() -> @sdk.Tracer? {
   }
 }
 
-fn http_method_name(method : @http.RequestMethod) -> String {
-  match method {
+fn http_method_name(request_method : @http.RequestMethod) -> String {
+  match request_method {
     Get => "GET"
     Head => "HEAD"
     Post => "POST"
@@ -79,16 +79,56 @@ fn split_path_query(path : String) -> (String, String) {
   }
 }
 
+// Parse the incoming W3C context of a request: `traceparent` (with a valid
+// `tracestate`) and `baggage`. Request headers are already keyed
+// case-insensitively, so the headers can be fetched directly instead of
+// copying every header into a carrier.
+pub fn extract_context(
+  headers : Map[@http.CaseInsensitiveString, String]
+) -> @context.Context {
+  let mut context = @context.Context::root()
+  match headers.get(
+    @http.CaseInsensitiveString(@propagation.traceparent_header_name()),
+  ) {
+    Some(value) =>
+      match @propagation.parse_traceparent(value) {
+        Some(parsed) => {
+          let mut span_context = parsed
+          match headers.get(
+            @http.CaseInsensitiveString(@propagation.tracestate_header_name()),
+          ) {
+            Some(state) =>
+              match @propagation.parse_tracestate(state) {
+                Some(normalized) =>
+                  span_context = span_context.with_tracestate(normalized)
+                None => ()
+              }
+            None => ()
+          }
+          context = context.with_span(span_context)
+        }
+        None => ()
+      }
+    None => ()
+  }
+  match headers.get(
+    @http.CaseInsensitiveString(@propagation.baggage_header_name()),
+  ) {
+    Some(value) =>
+      for entry in @propagation.parse_baggage(value) {
+        let (key, item_value) = entry
+        context = context.with_value(key, item_value)
+      }
+    None => ()
+  }
+  context
+}
+
 // Parse the W3C `traceparent` header of an incoming request, if present.
-// Request headers are already keyed case-insensitively, so the header can be
-// fetched directly instead of copying every header into a carrier.
 pub fn extract_parent(
   headers : Map[@http.CaseInsensitiveString, String]
 ) -> @api.SpanContext? {
-  match headers.get(@http.CaseInsensitiveString("traceparent")) {
-    Some(value) => @propagation.parse_traceparent(value)
-    None => None
-  }
+  extract_context(headers).span_context()
 }
 
 fn record_host_attributes(
@@ -134,7 +174,7 @@ pub(all) struct ServerCall {
 }
 
 // Upper-case HTTP method of the request.
-pub fn ServerCall::method(self : ServerCall) -> String {
+pub fn ServerCall::http_method(self : ServerCall) -> String {
   http_method_name(self.request.meth)
 }
 
@@ -175,7 +215,7 @@ pub fn ServerCall::start_span(
         tracer.start_span(
           name,
           kind?=kind,
-          parent?=Some(server_span.context()),
+          parent=server_span.context(),
           attributes?=attributes,
         ),
       )
@@ -259,7 +299,8 @@ pub async fn run_server_on(
   }
   server.run_forever(
     async fn(request, body, connection) {
-      let parent = extract_parent(request.headers)
+      let parent_context = extract_context(request.headers)
+      let parent = parent_context.span_context()
       let method_name = http_method_name(request.meth)
       let span = match active_tracer {
         Some(tracer) =>
@@ -296,10 +337,15 @@ pub async fn run_server_on(
         Some(server_span) =>
           Some(
             @context.attach(
-              @context.Context::root().with_span(server_span.context()),
+              parent_context.with_span(server_span.context()),
             ),
           )
-        None => None
+        None =>
+          if parent_context.baggage().length() > 0 {
+            Some(@context.attach(parent_context))
+          } else {
+            None
+          }
       }
       defer (
         match attached {
@@ -308,8 +354,14 @@ pub async fn run_server_on(
         }
       )
       defer end_span(span)
-      handler(call) catch {
-        error => {
+      let outcome = try {
+        Ok(handler(call))
+      } catch {
+        error => Err(error)
+      }
+      match outcome {
+        Ok(_) => ()
+        Err(error) => {
           match span {
             Some(server_span) => {
               server_span.set_status(

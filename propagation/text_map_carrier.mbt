@@ -6,7 +6,7 @@ pub struct TextMapCarrier {
 
 // Create an empty carrier
 pub fn TextMapCarrier::new() -> TextMapCarrier {
-  { entries: Map::new() }
+  { entries: Map([]) }
 }
 
 // Create a carrier backed by an existing map (values are shared, not copied)

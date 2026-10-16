@@ -31,3 +31,6 @@ pub(open) trait SpanProcessor {
   force_flush(Self) -> Unit
   shutdown(Self) -> Unit
 }
+
+pub extend ExportResult with Eq::{not_equal, equal}
+pub extend ExportResult with @debug.Debug::{to_repr}

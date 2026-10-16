@@ -20,8 +20,8 @@ fn default_tracer() -> @sdk.Tracer? {
 
 // Upper-case name of a request method, as required by the semantic
 // conventions (`http.request.method`).
-pub fn http_method_name(method : @http.RequestMethod) -> String {
-  match method {
+pub fn http_method_name(request_method : @http.RequestMethod) -> String {
+  match request_method {
     Get => "GET"
     Head => "HEAD"
     Post => "POST"
@@ -97,14 +97,30 @@ fn plain_headers(
 
 fn traced_headers(
   headers : Map[String, String]?,
-  span_context : @api.SpanContext
+  span_context : @api.SpanContext,
+  context : @context.Context
 ) -> Map[@http.CaseInsensitiveString, String] {
   let out = plain_headers(headers)
   if span_context.is_valid() {
     out.set(
-      @http.CaseInsensitiveString("traceparent"),
+      @http.CaseInsensitiveString(@propagation.traceparent_header_name()),
       @propagation.format_traceparent(span_context),
     )
+    let tracestate = span_context.tracestate()
+    if tracestate != "" {
+      out.set(
+        @http.CaseInsensitiveString(@propagation.tracestate_header_name()),
+        tracestate,
+      )
+    }
+  }
+  match @propagation.context_baggage_header(context) {
+    Some(value) =>
+      out.set(
+        @http.CaseInsensitiveString(@propagation.baggage_header_name()),
+        value,
+      )
+    None => ()
   }
   out
 }
@@ -112,26 +128,34 @@ fn traced_headers(
 // Perform a traced HTTP request. The response headers, the fully read
 // response body and the client span are returned; the span is ended before
 // this function returns.
+//
+// The parent span and baggage are taken from `context` when given, and from
+// the current context otherwise.
 pub async fn request(
   url : String,
-  method : @http.RequestMethod,
+  request_method : @http.RequestMethod,
   body : &@io.Data,
   headers? : Map[String, String],
   tracer? : @sdk.Tracer,
-  span_name? : String
+  span_name? : String,
+  context? : @context.Context
 ) -> (@http.Response, &@io.Data) {
   let active_tracer : @sdk.Tracer? = match tracer {
     Some(value) => Some(value)
     None => default_tracer()
   }
   match active_tracer {
-    None => @http.request(url, method, plain_headers(headers), body)
+    None => @http.request(url, request_method, plain_headers(headers), body)
     Some(tracer) => {
-      let method_name = http_method_name(method)
+      let request_context : @context.Context = match context {
+        Some(value) => value
+        None => @context.current_context()
+      }
+      let method_name = http_method_name(request_method)
       let span = tracer.start_span(
         span_name.unwrap_or(method_name),
         kind=@api.SpanKind::Client,
-        parent?=@context.current_span_context(),
+        parent?=request_context.span_context(),
       )
       defer span.end()
       span.set_attribute(@sdk.HTTP_REQUEST_METHOD, @sdk.StringValue(method_name))
@@ -139,16 +163,26 @@ pub async fn request(
       let (host, port) = split_url(url)
       span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(host))
       span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
-      let result = try {
-        @http.request(url, method, traced_headers(headers, span.context()), body)
+      let outcome = try {
+        Ok(
+          @http.request(
+            url,
+            request_method,
+            traced_headers(headers, span.context(), request_context),
+            body,
+          ),
+        )
       } catch {
-        error => {
+        error => Err(error)
+      }
+      let (response, response_body) = match outcome {
+        Ok(result) => result
+        Err(error) => {
           span.set_status(@api.StatusCode::Error, description=error.to_string())
           span.record_exception(error)
           raise error
         }
       }
-      let (response, response_body) = result
       span.set_attribute(
         @sdk.HTTP_RESPONSE_STATUS_CODE,
         @sdk.IntValue(response.code.to_int64()),
@@ -169,7 +203,8 @@ pub async fn get(
   url : String,
   headers? : Map[String, String],
   tracer? : @sdk.Tracer,
-  span_name? : String
+  span_name? : String,
+  context? : @context.Context
 ) -> (@http.Response, &@io.Data) {
   request(
     url,
@@ -178,6 +213,7 @@ pub async fn get(
     headers?=headers,
     tracer?=tracer,
     span_name?=span_name,
+    context?=context,
   )
 }
 
@@ -187,7 +223,8 @@ pub async fn post(
   body : &@io.Data,
   headers? : Map[String, String],
   tracer? : @sdk.Tracer,
-  span_name? : String
+  span_name? : String,
+  context? : @context.Context
 ) -> (@http.Response, &@io.Data) {
   request(
     url,
@@ -196,6 +233,7 @@ pub async fn post(
     headers?=headers,
     tracer?=tracer,
     span_name?=span_name,
+    context?=context,
   )
 }
 
@@ -205,7 +243,8 @@ pub async fn put(
   body : &@io.Data,
   headers? : Map[String, String],
   tracer? : @sdk.Tracer,
-  span_name? : String
+  span_name? : String,
+  context? : @context.Context
 ) -> (@http.Response, &@io.Data) {
   request(
     url,
@@ -214,6 +253,7 @@ pub async fn put(
     headers?=headers,
     tracer?=tracer,
     span_name?=span_name,
+    context?=context,
   )
 }
 
@@ -222,7 +262,8 @@ pub async fn delete(
   url : String,
   headers? : Map[String, String],
   tracer? : @sdk.Tracer,
-  span_name? : String
+  span_name? : String,
+  context? : @context.Context
 ) -> (@http.Response, &@io.Data) {
   request(
     url,
@@ -231,5 +272,6 @@ pub async fn delete(
     headers?=headers,
     tracer?=tracer,
     span_name?=span_name,
+    context?=context,
   )
 }

@@ -36,3 +36,5 @@ pub impl SpanProcessor for SimpleSpanProcessor with shutdown(self) {
     self.exporter.shutdown()
   }
 }
+
+pub extend SimpleSpanProcessor with SpanProcessor::{on_end, on_start, force_flush, shutdown}

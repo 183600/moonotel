@@ -87,7 +87,10 @@ fn encode_span(writer : ProtoWriter, data : @sdk.SpanData) -> Unit {
     encode_event(span, event)
   }
   encode_status(span, data)
-  span.write_fixed32_field(16, data.span_context.trace_flags().to_uint())
+  span.write_fixed32_field(
+    16,
+    data.span_context.trace_flags().reinterpret_as_uint(),
+  )
   writer.append_message(2, span)
 }
 
@@ -124,21 +127,20 @@ fn resource_key(resource : Map[String, @sdk.AttributeValue]) -> String {
   parts.join("")
 }
 
-struct ScopeGroup {
+priv struct ScopeGroup {
   scope_name : String
   scope_version : String
   spans : Array[@sdk.SpanData]
 }
 
-struct ResourceGroup {
-  key : String
+priv struct ResourceGroup {
   resource : Map[String, @sdk.AttributeValue]
   scopes : Array[ScopeGroup]
 }
 
 fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   let groups : Array[ResourceGroup] = []
-  let resource_index : Map[String, Int] = Map::new()
+  let resource_index : Map[String, Int] = Map([])
   let mut last_resource : Map[String, @sdk.AttributeValue]? = None
   let mut last_resource_key = ""
   for data in spans {
@@ -161,7 +163,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
     let target = match resource_index.get(key) {
       Some(index) => groups[index]
       None => {
-        let created : ResourceGroup = { key, resource: data.resource, scopes: [] }
+        let created : ResourceGroup = { resource: data.resource, scopes: [] }
         resource_index.set(key, groups.length())
         groups.push(created)
         created
