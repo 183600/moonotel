@@ -240,3 +240,28 @@ test "encode_root_span_omits_parent" {
   let span_fields = parse_fields(first_of(scope_spans, 2).unwrap().payload)
   assert_true(first_of(span_fields, 4) is None)
 }
+
+fn span_field_text(span : @sdk.SpanData, number : Int) -> String? {
+  let encoded = @otlp.encode_trace_request([span])
+  let request = parse_fields(encoded.exact_view())
+  let resource_spans = parse_fields(fields_of(request, 1)[0].payload)
+  let scope_spans = parse_fields(first_of(resource_spans, 2).unwrap().payload)
+  let span_fields = parse_fields(first_of(scope_spans, 2).unwrap().payload)
+  match first_of(span_fields, number) {
+    Some(field) => Some(field.payload |> @utf8.decode_lossy)
+    None => None
+  }
+}
+
+test "encode_span_writes_trace_state" {
+  let span = sample_span()
+  let with_state : @sdk.SpanData = {
+    ..span,
+    span_context: span.span_context.with_tracestate("congo=t61rcWkgMzE,vendor=1"),
+  }
+  assert_eq(
+    span_field_text(with_state, 3),
+    Some("congo=t61rcWkgMzE,vendor=1"),
+  )
+  assert_true(span_field_text(span, 3) is None)
+}

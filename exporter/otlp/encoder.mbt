@@ -149,6 +149,10 @@ fn encode_span(writer : ProtoWriter, data : @sdk.SpanData) -> Unit {
   let span = writer.take_scratch()
   span.write_bytes_from_int_array(1, data.span_context.trace_id_view())
   span.write_bytes_from_int_array(2, data.span_context.span_id_view())
+  let tracestate = data.span_context.tracestate()
+  if tracestate != "" {
+    span.write_string_field(3, tracestate)
+  }
   if data.parent_span_id.length() > 0 {
     span.write_bytes_from_int_array(4, data.parent_span_id)
   }

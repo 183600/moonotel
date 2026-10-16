@@ -33,3 +33,37 @@ test "with_baggage_keeps_existing_values" {
   assert_eq(context.value("a"), Some("1"))
   assert_eq(context.value("b"), Some("2"))
 }
+
+test "without_value_hides_outer_values" {
+  let context = @context.Context::root()
+    .with_value("user.id", "42")
+    .without_value("user.id")
+  assert_eq(context.value("user.id"), None)
+  assert_eq(context.baggage().length(), 0)
+  assert_false(context.has_baggage())
+}
+
+test "without_value_keeps_other_keys" {
+  let context = @context.Context::root()
+    .with_value("a", "1")
+    .with_value("b", "2")
+    .without_value("a")
+  assert_eq(context.value("a"), None)
+  assert_eq(context.value("b"), Some("2"))
+  assert_eq(context.baggage().length(), 1)
+  assert_true(context.has_baggage())
+}
+
+test "without_value_can_be_overridden_again" {
+  let context = @context.Context::root()
+    .with_value("a", "1")
+    .without_value("a")
+    .with_value("a", "3")
+  assert_eq(context.value("a"), Some("3"))
+}
+
+test "without_value_on_missing_key_is_noop" {
+  let context = @context.Context::root().with_value("a", "1").without_value("b")
+  assert_eq(context.value("a"), Some("1"))
+  assert_eq(context.baggage().length(), 1)
+}

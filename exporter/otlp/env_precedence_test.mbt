@@ -8,6 +8,8 @@ fn unset_otlp_env() -> Unit {
   @env.unset_env_var("OTEL_EXPORTER_OTLP_TRACES_HEADERS")
   @env.unset_env_var("OTEL_EXPORTER_OTLP_COMPRESSION")
   @env.unset_env_var("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION")
+  @env.unset_env_var("OTEL_EXPORTER_OTLP_PROTOCOL")
+  @env.unset_env_var("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL")
   @env.unset_env_var("OTEL_EXPORTER_OTLP_TIMEOUT")
   @env.unset_env_var("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT")
 }
@@ -66,6 +68,41 @@ test "traces_timeout_takes_precedence" {
   let config = @otlp.OtlpHttpConfig::from_env()
   unset_otlp_env()
   assert_eq(config.timeout_millis, 2500)
+}
+
+test "traces_protocol_takes_precedence" {
+  unset_otlp_env()
+  @env.set_env_var("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+  @env.set_env_var("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "http/protobuf")
+  let config = @otlp.OtlpHttpConfig::from_env()
+  unset_otlp_env()
+  assert_eq(config.protocol, "http/protobuf")
+}
+
+test "generic_protocol_is_used_when_traces_protocol_is_absent" {
+  unset_otlp_env()
+  @env.set_env_var("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+  let config = @otlp.OtlpHttpConfig::from_env()
+  unset_otlp_env()
+  assert_eq(config.protocol, "grpc")
+}
+
+test "protocol_defaults_to_http_protobuf" {
+  unset_otlp_env()
+  let config = @otlp.OtlpHttpConfig::from_env()
+  assert_eq(config.protocol, "http/protobuf")
+  let explicit = @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318")
+  assert_eq(explicit.protocol, "http/protobuf")
+}
+
+test "unsupported_protocol_fails_export" {
+  let config = @otlp.OtlpHttpConfig::new(
+    endpoint="http://collector:4318",
+    protocol="grpc",
+  )
+  let exporter = @otlp.OtlpHttpExporter::new(config, body_transport(b""))
+  let result = exporter.export_spans([test_span()])
+  assert_false(result.is_success())
 }
 
 test "invalid_timeout_falls_back_to_default" {

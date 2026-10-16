@@ -113,7 +113,10 @@ pub fn setup(
       let exporter = @otlp.OtlpHttpExporter::new(config, send)
       let batch = use_batch.unwrap_or(true)
       let processor : &@sdk.SpanProcessor = if batch {
-        let value : &@sdk.SpanProcessor = @sdk.BatchSpanProcessor::new(exporter)
+        // Queue/batch/interval defaults come from the OTEL_BSP_* variables.
+        let value : &@sdk.SpanProcessor = @sdk.BatchSpanProcessor::from_env(
+          exporter,
+        )
         value
       } else {
         let value : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)

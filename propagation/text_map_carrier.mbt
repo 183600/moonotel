@@ -67,6 +67,21 @@ pub fn TextMapCarrier::set(self : TextMapCarrier, key : String, value : String) 
   self.entries.set(key, value)
 }
 
+// Remove a single header value. Like `get`, the lookup is case-insensitive.
+pub fn TextMapCarrier::remove(self : TextMapCarrier, key : String) -> Unit {
+  self.entries.remove(key)
+  let matches : Array[String] = []
+  for entry in self.entries.iter() {
+    let (candidate, _value) = entry
+    if ascii_case_insensitive_equal(candidate, key) {
+      matches.push(candidate)
+    }
+  }
+  for candidate in matches {
+    self.entries.remove(candidate)
+  }
+}
+
 // Number of headers stored in the carrier
 pub fn TextMapCarrier::length(self : TextMapCarrier) -> Int {
   self.entries.length()

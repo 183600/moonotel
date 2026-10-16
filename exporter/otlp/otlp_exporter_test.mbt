@@ -73,6 +73,17 @@ test "export_keeps_endpoint_trailing_slash" {
   assert_eq(mock.urls[0], "http://collector:4318/v1/traces")
 }
 
+test "explicit_traces_endpoint_is_used_verbatim" {
+  let mock = mock_transport(200)
+  let config = @otlp.OtlpHttpConfig::new(
+    endpoint="http://collector:4318",
+    traces_endpoint="http://gateway:443/custom/traces",
+  )
+  let exporter = @otlp.OtlpHttpExporter::new(config, mock.as_transport())
+  let _ = exporter.export_spans([test_span()])
+  assert_eq(mock.urls[0], "http://gateway:443/custom/traces")
+}
+
 test "export_passes_custom_headers" {
   let mock = mock_transport(200)
   let headers : Map[String, String] = Map::new()

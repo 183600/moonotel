@@ -38,6 +38,9 @@ pub async fn post_trace_request(
   config : @otlp.OtlpHttpConfig,
   body : Bytes
 ) -> @sdk.ExportResult {
+  if config.protocol != @otlp.OTLP_HTTP_PROTOBUF_PROTOCOL {
+    return @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol)
+  }
   if config.compression != "none" {
     return @sdk.ExportFailure(
       "unsupported OTLP compression: " + config.compression,

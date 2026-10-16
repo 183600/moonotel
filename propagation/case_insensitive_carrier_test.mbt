@@ -21,6 +21,17 @@ test "missing headers stay missing" {
   assert_eq(carrier.get("traceparent"), None)
 }
 
+test "remove deletes headers case-insensitively" {
+  let carrier = @propagation.TextMapCarrier::new()
+  carrier.set("TraceParent", "00-abc")
+  carrier.set("tracestate", "vendor=value")
+  carrier.remove("traceparent")
+  assert_eq(carrier.get("traceparent"), None)
+  assert_eq(carrier.length(), 1)
+  carrier.remove("TRACESTATE")
+  assert_eq(carrier.length(), 0)
+}
+
 test "extract accepts differently cased traceparent headers" {
   let sc = @propagation.parse_traceparent(
     "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",

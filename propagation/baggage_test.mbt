@@ -109,3 +109,13 @@ test "extract_baggage_missing_header" {
   assert_eq(@propagation.extract_baggage(carrier).length(), 0)
   assert_eq(@propagation.extract_baggage_context(carrier).baggage().length(), 0)
 }
+
+test "inject_baggage_omits_removed_keys" {
+  let context = @context.Context::root()
+    .with_value("user.id", "42")
+    .with_value("secret", "hidden")
+    .without_value("secret")
+  let carrier = @propagation.TextMapCarrier::new()
+  @propagation.inject_baggage(context, carrier)
+  assert_eq(carrier.get(@propagation.baggage_header_name()), Some("user.id=42"))
+}

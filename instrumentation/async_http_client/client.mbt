@@ -42,6 +42,59 @@ fn parse_port(text : StringView) -> Int {
   }
 }
 
+fn ascii_to_lower(c : Char) -> Char {
+  let code = c.to_int()
+  if code >= 65 && code <= 90 {
+    (code + 32).unsafe_to_char()
+  } else {
+    c
+  }
+}
+
+fn is_scheme_char(c : Char) -> Bool {
+  let code = c.to_int()
+  (code >= 48 && code <= 57) ||
+  (code >= 65 && code <= 90) ||
+  (code >= 97 && code <= 122) ||
+  c == '+' ||
+  c == '-' ||
+  c == '.'
+}
+
+fn is_alpha(c : Char) -> Bool {
+  let code = c.to_int()
+  (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
+}
+
+// Lower-case scheme of an absolute URL, without the `://` separator.
+// Returns "" when the URL has no scheme or the text before `://` is not a
+// valid scheme.
+pub fn split_scheme(url : String) -> String {
+  match url.find("://") {
+    Some(index) => {
+      if index == 0 {
+        return ""
+      }
+      let candidate = url[:index]
+      if !is_alpha(candidate.unsafe_get(0).unsafe_to_char()) {
+        return ""
+      }
+      let sb = StringBuilder(size_hint=index)
+      let mut i = 0
+      while i < index {
+        let c = candidate.unsafe_get(i).unsafe_to_char()
+        if !is_scheme_char(c) {
+          return ""
+        }
+        sb.write_char(ascii_to_lower(c))
+        i = i + 1
+      }
+      sb.to_string()
+    }
+    None => ""
+  }
+}
+
 // Best-effort split of an absolute URL into (host, port). The port falls back
 // to the scheme default when it is not explicit; malformed URLs yield
 // `(host, -1)` and are still traced.
@@ -50,7 +103,7 @@ pub fn split_url(url : String) -> (String, Int) {
     Some(index) => url[index + 3:]
     None => url
   }
-  let default_port = if url.has_prefix("https://") { 443 } else { 80 }
+  let default_port = if split_scheme(url) == "https" { 443 } else { 80 }
   let authority = match after_scheme.find("/") {
     Some(index) => after_scheme[:index]
     None => after_scheme
@@ -160,6 +213,10 @@ pub async fn request(
       defer span.end()
       span.set_attribute(@sdk.HTTP_REQUEST_METHOD, @sdk.StringValue(method_name))
       span.set_attribute(@sdk.URL_FULL, @sdk.StringValue(url))
+      let scheme = split_scheme(url)
+      if scheme != "" {
+        span.set_attribute(@sdk.URL_SCHEME, @sdk.StringValue(scheme))
+      }
       let (host, port) = split_url(url)
       span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(host))
       span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
@@ -188,6 +245,10 @@ pub async fn request(
         @sdk.IntValue(response.code.to_int64()),
       )
       if response.code >= 400 {
+        span.set_attribute(
+          @sdk.ERROR_TYPE,
+          @sdk.StringValue(response.code.to_string()),
+        )
         span.set_status(
           @api.StatusCode::Error,
           description=response.code.to_string(),

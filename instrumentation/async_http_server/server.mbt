@@ -279,6 +279,10 @@ pub async fn ServerCall::respond(
         @sdk.IntValue(status_code.to_int64()),
       )
       if status_code >= 500 {
+        span.set_attribute(
+          @sdk.ERROR_TYPE,
+          @sdk.StringValue(status_code.to_string()),
+        )
         span.set_status(
           @api.StatusCode::Error,
           description=status_code.to_string(),

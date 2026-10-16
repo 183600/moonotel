@@ -29,6 +29,13 @@ pub fn Context::with_value(self : Context, key : String, value : String) -> Cont
   { span_ctx: None, key: Some(key), value: Some(value), parent: Some(self) }
 }
 
+// Derive a context in which `key` no longer has a baggage value: values
+// stored in outer contexts are hidden. A later `with_value` call can
+// reintroduce the key.
+pub fn Context::without_value(self : Context, key : String) -> Context {
+  { span_ctx: None, key: Some(key), value: None, parent: Some(self) }
+}
+
 // Derive a context carrying every key/value pair of `values` as baggage.
 // Pairs are applied in map order; lookups always see the innermost value.
 pub fn Context::with_baggage(
@@ -56,20 +63,21 @@ pub fn Context::span_context(self : Context) -> @api.SpanContext? {
   None
 }
 
-// Look up a baggage value, searching outer contexts last.
+// Look up a baggage value, searching outer contexts last. A key removed with
+// `without_value` resolves to `None` and hides values from outer contexts.
 pub fn Context::value(self : Context, key : String) -> String? {
   let mut cursor : Context? = Some(self)
   while true {
     match cursor {
       Some(context) =>
-        match (context.key, context.value) {
-          (Some(entry_key), Some(entry_value)) =>
+        match context.key {
+          Some(entry_key) =>
             if entry_key == key {
-              return Some(entry_value)
+              return context.value
             } else {
               cursor = context.parent
             }
-          _ => cursor = context.parent
+          None => cursor = context.parent
         }
       None => break
     }
@@ -77,35 +85,51 @@ pub fn Context::value(self : Context, key : String) -> String? {
   None
 }
 
-// Whether the chain carries at least one baggage value.
+// Whether the chain carries at least one visible baggage value. Keys removed
+// with `without_value` do not count.
 pub fn Context::has_baggage(self : Context) -> Bool {
+  let seen : Map[String, Bool] = Map([])
   let mut cursor : Context? = Some(self)
   while true {
     match cursor {
-      Some(context) =>
-        match (context.key, context.value) {
-          (Some(_), Some(_)) => return true
-          _ => cursor = context.parent
+      Some(context) => {
+        match context.key {
+          Some(key) =>
+            if seen.get(key) is None {
+              seen.set(key, true)
+              match context.value {
+                Some(_) => return true
+                None => ()
+              }
+            }
+          None => ()
         }
+        cursor = context.parent
+      }
       None => break
     }
   }
   false
 }
 
-// Flatten the baggage of the whole chain, innermost values winning.
+// Flatten the baggage of the whole chain, innermost values winning. Keys
+// removed with `without_value` are excluded.
 pub fn Context::baggage(self : Context) -> Map[String, String] {
   let values = Map([])
+  let deleted : Map[String, Bool] = Map([])
   let mut cursor : Context? = Some(self)
   while true {
     match cursor {
       Some(context) => {
-        match (context.key, context.value) {
-          (Some(key), Some(value)) =>
-            if values.get(key) is None {
-              values.set(key, value)
+        match context.key {
+          Some(key) =>
+            if values.get(key) is None && deleted.get(key) is None {
+              match context.value {
+                Some(value) => values.set(key, value)
+                None => deleted.set(key, true)
+              }
             }
-          _ => ()
+          None => ()
         }
         cursor = context.parent
       }

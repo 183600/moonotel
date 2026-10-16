@@ -34,6 +34,16 @@ test "split_url handles schemes, ports, userinfo and IPv6 hosts" {
   )
   assert_eq(split_url("http://[::1]:4318/v1/traces"), ("[::1]", 4318))
   assert_eq(split_url("example.com"), ("example.com", 80))
+  assert_eq(split_url("HTTPS://example.com/x"), ("example.com", 443))
+}
+
+test "split_scheme lower-cases and validates schemes" {
+  assert_eq(split_scheme("https://example.com/x"), "https")
+  assert_eq(split_scheme("HTTP://example.com"), "http")
+  assert_eq(split_scheme("http+unix://sock"), "http+unix")
+  assert_eq(split_scheme("example.com/path"), "")
+  assert_eq(split_scheme("1http://example.com"), "")
+  assert_eq(split_scheme("http://"), "http")
 }
 
 async test "get creates a client span and injects traceparent" {
@@ -73,6 +83,10 @@ async test "get creates a client span and injects traceparent" {
       Some(@sdk.StringValue("GET")),
     )
     assert_eq(data.attributes.get(@sdk.URL_FULL), Some(@sdk.StringValue(url)))
+    assert_eq(
+      data.attributes.get(@sdk.URL_SCHEME),
+      Some(@sdk.StringValue("http")),
+    )
     assert_eq(
       data.attributes.get(@sdk.SERVER_ADDRESS),
       Some(@sdk.StringValue("127.0.0.1")),
@@ -131,6 +145,10 @@ async test "client span is marked as error for 5xx responses" {
     assert_eq(
       data.attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE),
       Some(@sdk.IntValue(503)),
+    )
+    assert_eq(
+      data.attributes.get(@sdk.ERROR_TYPE),
+      Some(@sdk.StringValue("503")),
     )
   }
 }
