@@ -1,0 +1,10 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/socket" @socket,
+  "yourname/otel/instrumentation/async_http_server" @server,
+  "yourname/otel/sdk" @sdk,
+}
+
+supported_targets = "+native"
+
+pkgtype(kind: "executable")

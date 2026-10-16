@@ -23,9 +23,22 @@ pub fn TextMapCarrier::from_entries(entries : Array[(String, String)]) -> TextMa
   { entries: map, }
 }
 
-// Look up a single header value
+// Look up a single header value. HTTP header names are case-insensitive: an
+// exact match is preferred, otherwise the first case-insensitive match wins.
 pub fn TextMapCarrier::get(self : TextMapCarrier, key : String) -> String? {
-  self.entries.get(key)
+  match self.entries.get(key) {
+    Some(value) => Some(value)
+    None => {
+      let lowered = key.to_lower()
+      let mut found : String? = None
+      self.entries.each(fn(candidate, value) {
+        if found is None && candidate.to_lower() == lowered {
+          found = Some(value)
+        }
+      })
+      found
+    }
+  }
 }
 
 // Set a single header value

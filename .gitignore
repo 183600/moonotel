@@ -1,6 +1,7 @@
 # MoonBit build artifacts
 target/
 .moon/
+.mooncakes/
 build/
 _build/
 *.wasm

@@ -195,6 +195,31 @@ pub fn SpanSdk::add_event(
   }
 }
 
+// Record an exception as an `exception` event, following the OpenTelemetry
+// semantic conventions (`exception.type` / `exception.message`).
+// No-op for non-recording or ended spans.
+pub fn SpanSdk::record_exception(
+  self : SpanSdk,
+  error : Error,
+  exception_type? : String,
+  time_unix_nano? : Int64
+) -> Unit {
+  if self.recording && !self.ended {
+    let message = @debug.to_string(error)
+    let attributes = Map::new()
+    attributes.set(
+      EXCEPTION_TYPE,
+      StringValue(exception_type.unwrap_or(error.to_string())),
+    )
+    attributes.set(EXCEPTION_MESSAGE, StringValue(message))
+    self.add_event(
+      "exception",
+      attributes=attributes,
+      time_unix_nano?=time_unix_nano,
+    )
+  }
+}
+
 // Set the span status. No-op for non-recording spans; the last status of an
 // ended span is retained.
 pub fn SpanSdk::set_status(
