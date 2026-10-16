@@ -37,6 +37,15 @@ test "split_url handles schemes, ports, userinfo and IPv6 hosts" {
   assert_eq(split_url("HTTPS://example.com/x"), ("example.com", 443))
 }
 
+test "split_url ignores query and fragment when no path is present" {
+  assert_eq(split_url("http://example.com?x=1"), ("example.com", 80))
+  assert_eq(split_url("https://example.com?x=1"), ("example.com", 443))
+  assert_eq(split_url("http://example.com:8080?x=1"), ("example.com", 8080))
+  assert_eq(split_url("http://example.com#frag"), ("example.com", 80))
+  assert_eq(split_url("http://user:pass@host.test:9000?x=1"), ("host.test", 9000))
+  assert_eq(split_url("http://[::1]?x=1"), ("[::1]", 80))
+}
+
 test "split_scheme lower-cases and validates schemes" {
   assert_eq(split_scheme("https://example.com/x"), "https")
   assert_eq(split_scheme("HTTP://example.com"), "http")

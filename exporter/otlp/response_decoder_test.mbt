@@ -37,6 +37,16 @@ test "decode_truncated_body_is_failure" {
   assert_false(@otlp.decode_export_response(b"\x0a\x05\x08").is_success())
 }
 
+test "decode_invalid_wire_types_is_failure" {
+  // Field 1 with wire type 3 (start group) / 6 / 7 never occurs in this
+  // message and must be rejected instead of silently accepted.
+  assert_false(@otlp.decode_export_response(b"\x0b").is_success())
+  assert_false(@otlp.decode_export_response(b"\x0e").is_success())
+  assert_false(@otlp.decode_export_response(b"\x0f").is_success())
+  // The same applies to an invalid wire type inside partial_success.
+  assert_false(@otlp.decode_export_response(b"\x0a\x01\x0b").is_success())
+}
+
 test "decode_ignores_unknown_fields" {
   // Unknown varint field 4 followed by partial_success { rejected_spans = 1 }.
   let body : Bytes = b"\x20\x01\x0a\x02\x08\x01"

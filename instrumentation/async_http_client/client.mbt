@@ -107,10 +107,16 @@ fn split_url_parts(url : String) -> (String, String, Int) {
     None => url
   }
   let default_port = if scheme == "https" { 443 } else { 80 }
-  let authority = match after_scheme.find("/") {
-    Some(index) => after_scheme[:index]
-    None => after_scheme
+  // The authority ends at the first `/` (path), `?` (query) or `#` (fragment);
+  // query or fragment text must not be mistaken for a host or port.
+  let mut authority_end = after_scheme.length()
+  for delimiter in ["/", "?", "#"] {
+    match after_scheme.find(delimiter) {
+      Some(index) => if index < authority_end { authority_end = index }
+      None => ()
+    }
   }
+  let authority = after_scheme[:authority_end]
   let host_port = match authority.rev_find("@") {
     Some(index) => authority[index + 1:]
     None => authority

@@ -83,18 +83,24 @@ fn OtlpHttpAsyncSpanExporter::enqueue(
     return @sdk.ExportSuccess
   }
   // `try_put` refuses to evict when the queue is full, so discard the oldest
-  // batch explicitly and retry once.
-  let _ : Array[@sdk.SpanData]? = try {
-    self.queue.try_get()
+  // batch explicitly and retry once. Only count the discard when a batch was
+  // actually removed.
+  let discarded : Bool = try {
+    match self.queue.try_get() {
+      Some(_) => true
+      None => false
+    }
   } catch {
-    _ => None
+    _ => false
   }
   let accepted = try {
     self.queue.try_put(spans)
   } catch {
     _ => false
   }
-  self.dropped = self.dropped + 1
+  if discarded {
+    self.dropped = self.dropped + 1
+  }
   if accepted {
     @sdk.ExportSuccess
   } else {

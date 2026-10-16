@@ -91,7 +91,8 @@ pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
             }
             inner = end2
           } else {
-            break
+            // Wire types 3/4 (groups) and 6/7 cannot occur in this message.
+            return malformed_response()
           }
         }
         if rejected > 0 || error_message != "" {
@@ -121,7 +122,8 @@ pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
       }
       pos = pos + 4
     } else {
-      break
+      // Wire types 3/4 (groups) and 6/7 cannot occur in this message.
+      return malformed_response()
     }
   }
   @sdk.ExportSuccess

@@ -82,6 +82,24 @@ async test "shutdown closes the queue and stops accepting spans" {
   }
 }
 
+async test "queue overflow discards only the batches that were evicted" {
+  @async.with_task_group() <| group => {
+    let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:1")
+    let exporter = @async_runtime.OtlpHttpAsyncSpanExporter::new(
+      config,
+      group,
+      max_queue_size=1,
+    )
+    let batch : Array[@sdk.SpanData] = []
+    assert_true(exporter.export_spans(batch).is_success())
+    assert_eq(exporter.dropped_batches(), 0)
+    // The queue holds one batch, so the next two exports each evict one.
+    assert_true(exporter.export_spans(batch).is_success())
+    assert_true(exporter.export_spans(batch).is_success())
+    assert_eq(exporter.dropped_batches(), 2)
+  }
+}
+
 async test "spawn_flush_loop exports spans within the interval" {
   let exporter : CollectingExporter = { spans: Ref([]) }
   let processor = @sdk.BatchSpanProcessor::new(
