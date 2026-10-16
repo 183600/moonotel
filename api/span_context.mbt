@@ -39,8 +39,9 @@ pub fn SpanContext::is_sampled(self : SpanContext) -> Bool {
 
 // Helper: check if byte array is all zeros
 pub fn is_zero(bytes : Array[Int]) -> Bool {
+  let len = bytes.length()
   let mut i = 0
-  while i < bytes.length() {
+  while i < len {
     if bytes[i] != 0 {
       return false
     }
@@ -49,71 +50,40 @@ pub fn is_zero(bytes : Array[Int]) -> Bool {
   true
 }
 
+let hex_digits : Array[String] = [
+  "0", "1", "2", "3", "4", "5", "6", "7",
+  "8", "9", "a", "b", "c", "d", "e", "f",
+]
+
+fn nibble_to_hex_char(val : Int) -> Char {
+  if val >= 0 && val < 10 {
+    (val + 48).unsafe_to_char()
+  } else if val >= 10 && val < 16 {
+    (val + 87).unsafe_to_char()
+  } else {
+    '0'
+  }
+}
+
 // Helper: convert bytes to hex string
 pub fn bytes_to_hex(bytes : Array[Int]) -> String {
-  let mut result = ""
+  let len = bytes.length()
+  let sb = StringBuilder(size_hint = len * 4)
   let mut i = 0
-  while i < bytes.length() {
+  while i < len {
     let b = bytes[i]
-    let high = b >> 4
-    let low = b & 0x0F
-    result = result + byte_to_hex_char(high)
-    result = result + byte_to_hex_char(low)
+    sb.write_char(nibble_to_hex_char(b >> 4))
+    sb.write_char(nibble_to_hex_char(b & 0x0F))
     i = i + 1
   }
-  result
+  sb.to_string()
 }
 
 // Helper: convert byte value to hex character
 pub fn byte_to_hex_char(val : Int) -> String {
-  if val == 0 {
-    "0"
-  } else if val == 1 {
-    "1"
-  } else if val == 2 {
-    "2"
-  } else if val == 3 {
-    "3"
-  } else if val == 4 {
-    "4"
-  } else if val == 5 {
-    "5"
-  } else if val == 6 {
-    "6"
-  } else if val == 7 {
-    "7"
-  } else if val == 8 {
-    "8"
-  } else if val == 9 {
-    "9"
-  } else if val == 10 {
-    "a"
-  } else if val == 11 {
-    "b"
-  } else if val == 12 {
-    "c"
-  } else if val == 13 {
-    "d"
-  } else if val == 14 {
-    "e"
-  } else if val == 15 {
-    "f"
+  if val >= 0 && val < 16 {
+    hex_digits[val]
   } else {
     "0"
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
