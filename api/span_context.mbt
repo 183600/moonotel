@@ -113,16 +113,18 @@ pub fn SpanContext::span_id(self : SpanContext) -> Array[Int] {
   self.span_id.copy()
 }
 
-// Helper: convert a hex character to its 0-15 value
-fn hex_char_value(c : Char) -> Int? {
-  if c >= '0' && c <= '9' {
-    Some(c.to_int() - 48)
-  } else if c >= 'a' && c <= 'f' {
-    Some(c.to_int() - 87)
-  } else if c >= 'A' && c <= 'F' {
-    Some(c.to_int() - 55)
+// Helper: convert a hex character to its 0-15 value, or -1 when the character
+// is not a hex digit. Avoids allocating an `Option` per digit.
+fn hex_char_value(c : Char) -> Int {
+  let code = c.to_int()
+  if code >= 48 && code <= 57 {
+    code - 48
+  } else if code >= 97 && code <= 102 {
+    code - 87
+  } else if code >= 65 && code <= 70 {
+    code - 55
   } else {
-    None
+    -1
   }
 }
 
@@ -135,13 +137,12 @@ pub fn bytes_from_hex(hex : String) -> Array[Int]? {
   let out : Array[Int] = Array(capacity=len / 2)
   let mut i = 0
   while i < len {
-    match (
-      hex_char_value(hex.unsafe_get(i).unsafe_to_char()),
-      hex_char_value(hex.unsafe_get(i + 1).unsafe_to_char()),
-    ) {
-      (Some(hi), Some(lo)) => out.push(hi * 16 + lo)
-      _ => return None
+    let hi = hex_char_value(hex.unsafe_get(i).unsafe_to_char())
+    let lo = hex_char_value(hex.unsafe_get(i + 1).unsafe_to_char())
+    if hi < 0 || lo < 0 {
+      return None
     }
+    out.push(hi * 16 + lo)
     i = i + 2
   }
   Some(out)

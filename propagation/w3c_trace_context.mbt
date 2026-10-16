@@ -24,36 +24,35 @@ fn is_hex_digit(c : Char) -> Bool {
   (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
 }
 
-fn is_hex_range(value : String, start : Int, end : Int) -> Bool {
-  for i = start; i < end; i = i + 1 {
-    if !is_hex_digit(value.unsafe_get(i).unsafe_to_char()) {
-      return false
-    }
-  }
-  true
-}
-
+// Value of a hex digit, or -1 when the character is not a hex digit.
 fn hex_digit_value(c : Char) -> Int {
   let code = c.to_int()
   if code >= 48 && code <= 57 {
     code - 48
   } else if code >= 97 && code <= 102 {
     code - 87
-  } else {
+  } else if code >= 65 && code <= 70 {
     code - 55
+  } else {
+    -1
   }
 }
 
-fn decode_hex(value : String, start : Int, byte_count : Int) -> Array[Int] {
+// Decode `byte_count` hex byte pairs starting at `start`, validating as it
+// goes. Returns None when any character is not a hex digit.
+fn decode_hex(value : String, start : Int, byte_count : Int) -> Array[Int]? {
   let out : Array[Int] = Array(capacity=byte_count)
   let mut i = 0
   while i < byte_count {
     let hi = hex_digit_value(value.unsafe_get(start + i * 2).unsafe_to_char())
     let lo = hex_digit_value(value.unsafe_get(start + i * 2 + 1).unsafe_to_char())
+    if hi < 0 || lo < 0 {
+      return None
+    }
     out.push(hi * 16 + lo)
     i = i + 1
   }
-  out
+  Some(out)
 }
 
 fn nibble_to_hex_char(value : Int) -> Char {
@@ -96,6 +95,11 @@ pub fn format_traceparent(sc : @api.SpanContext) -> String {
 // all-zero IDs, or otherwise violates the specification.
 pub fn parse_traceparent(value : String) -> @api.SpanContext? {
   let len = value.length()
+  // The shortest well-formed value is `00-` + 32 + `-` + 16 + `-` + 2 = 55
+  // characters, so anything shorter cannot parse.
+  if len < 55 {
+    return None
+  }
   let mut dash0 = -1
   let mut dash1 = -1
   let mut dash2 = -1
@@ -133,12 +137,15 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
   if dash1 - dash0 != 33 || dash2 - dash1 != 17 {
     return None
   }
-  if !is_hex_range(value, dash0 + 1, dash1) ||
-    !is_hex_range(value, dash1 + 1, dash2) {
+  let flags_start = dash2 + 1
+  if flags_start + 2 > len {
     return None
   }
-  let flags_start = dash2 + 1
-  if flags_start + 2 > len || !is_hex_range(value, flags_start, flags_start + 2) {
+  let flags_hi = hex_digit_value(value.unsafe_get(flags_start).unsafe_to_char())
+  let flags_lo = hex_digit_value(
+    value.unsafe_get(flags_start + 1).unsafe_to_char(),
+  )
+  if flags_hi < 0 || flags_lo < 0 {
     return None
   }
   if flags_start + 2 < len &&
@@ -149,10 +156,15 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
     // Version 00 does not allow additional fields.
     return None
   }
-  let trace_id = decode_hex(value, dash0 + 1, 16)
-  let span_id = decode_hex(value, dash1 + 1, 8)
-  let flags = hex_digit_value(value.unsafe_get(flags_start).unsafe_to_char()) * 16 +
-    hex_digit_value(value.unsafe_get(flags_start + 1).unsafe_to_char())
+  let trace_id = match decode_hex(value, dash0 + 1, 16) {
+    Some(bytes) => bytes
+    None => return None
+  }
+  let span_id = match decode_hex(value, dash1 + 1, 8) {
+    Some(bytes) => bytes
+    None => return None
+  }
+  let flags = flags_hi * 16 + flags_lo
   let sc = @api.span_context(trace_id, span_id, flags & @api.TRACE_FLAGS_SAMPLED)
   if sc.is_valid() {
     Some(sc)

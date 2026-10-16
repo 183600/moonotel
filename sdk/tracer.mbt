@@ -47,12 +47,16 @@ pub fn Tracer::start_span(
     Some(ctx) => ctx.span_id()
     None => []
   }
+  let start_time = match start_time_unix_nano {
+    Some(value) => value
+    None => unix_nano_now()
+  }
   let span = create_span(
     name,
     span_context,
     parent_span_id,
     kind.unwrap_or(@api.SpanKind::Internal),
-    start_time_unix_nano.unwrap_or(unix_nano_now()),
+    start_time,
     decision.is_recorded,
     self.provider.processors,
     self.provider.resource,

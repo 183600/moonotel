@@ -260,11 +260,12 @@ pub async fn run_server_on(
   server.run_forever(
     async fn(request, body, connection) {
       let parent = extract_parent(request.headers)
+      let method_name = http_method_name(request.meth)
       let span = match active_tracer {
         Some(tracer) =>
           Some(
             tracer.start_span(
-              http_method_name(request.meth),
+              method_name,
               kind=@api.SpanKind::Server,
               parent?=parent,
             ),
@@ -276,7 +277,7 @@ pub async fn run_server_on(
         Some(server_span) => {
           server_span.set_attribute(
             @sdk.HTTP_REQUEST_METHOD,
-            @sdk.StringValue(http_method_name(request.meth)),
+            @sdk.StringValue(method_name),
           )
           let (path, query) = split_path_query(request.path)
           server_span.set_attribute(@sdk.URL_PATH, @sdk.StringValue(path))

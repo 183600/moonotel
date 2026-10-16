@@ -61,44 +61,54 @@ fn pseudo_random_bytes(n : Int, state : Ref[UInt64]) -> Array[Int] {
 // entropy call; the surplus stays buffered for the following call.
 const RANDOM_DRAW_BYTES : Int = 24
 
-fn take_buffered(n : Int, pending : Ref[Array[Int]]) -> Array[Int]? {
-  let available = pending.val.length()
-  if available < n {
+// Consume `n` bytes from the buffered draw, if enough remain. The consumed
+// bytes are copied out of the buffer; the unconsumed tail is tracked with an
+// offset instead of being copied into a fresh array.
+fn take_buffered(
+  n : Int,
+  pending : Ref[Array[Int]],
+  offset : Ref[Int]
+) -> Array[Int]? {
+  let source = pending.val
+  let start = offset.val
+  if source.length() - start < n {
     return None
   }
-  let source = pending.val
   let out : Array[Int] = Array(capacity=n)
   for i = 0; i < n; i = i + 1 {
-    out.push(source[i])
+    out.push(source[start + i])
   }
-  let rest : Array[Int] = Array(capacity=available - n)
-  for i = n; i < available; i = i + 1 {
-    rest.push(source[i])
+  if start + n >= source.length() {
+    pending.val = []
+    offset.val = 0
+  } else {
+    offset.val = start + n
   }
-  pending.val = rest
   Some(fill_zero_checked(out))
 }
 
-fn random_bytes(n : Int, state : Ref[UInt64], pending : Ref[Array[Int]]) -> Array[Int] {
-  match take_buffered(n, pending) {
+fn random_bytes(
+  n : Int,
+  state : Ref[UInt64],
+  pending : Ref[Array[Int]],
+  offset : Ref[Int]
+) -> Array[Int] {
+  match take_buffered(n, pending, offset) {
     Some(bytes) => bytes
     None => {
       let draw = if n < RANDOM_DRAW_BYTES { RANDOM_DRAW_BYTES } else { n }
       match @env.rand(draw) {
         Some(bytes) => {
-          let all : Array[Int] = Array(capacity=draw)
-          for i = 0; i < draw; i = i + 1 {
-            all.push(bytes[i].to_int() & 0xFF)
-          }
           let out : Array[Int] = Array(capacity=n)
           for i = 0; i < n; i = i + 1 {
-            out.push(all[i])
+            out.push(bytes[i].to_int() & 0xFF)
           }
           let rest : Array[Int] = Array(capacity=draw - n)
           for i = n; i < draw; i = i + 1 {
-            rest.push(all[i])
+            rest.push(bytes[i].to_int() & 0xFF)
           }
           pending.val = rest
+          offset.val = 0
           fill_zero_checked(out)
         }
         None => pseudo_random_bytes(n, state)
@@ -111,9 +121,10 @@ fn random_bytes(n : Int, state : Ref[UInt64], pending : Ref[Array[Int]]) -> Arra
 pub fn IdGenerator::random() -> IdGenerator {
   let state = Ref(@env.now() ^ 88172645463325252)
   let pending : Ref[Array[Int]] = Ref([])
+  let offset : Ref[Int] = Ref(0)
   IdGenerator::new(
-    fn() { random_bytes(16, state, pending) },
-    fn() { random_bytes(8, state, pending) },
+    fn() { random_bytes(16, state, pending, offset) },
+    fn() { random_bytes(8, state, pending, offset) },
   )
 }
 

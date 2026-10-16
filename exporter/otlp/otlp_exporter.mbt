@@ -166,10 +166,11 @@ pub fn OtlpHttpExporter::export_spans_http(
   }
   let body = encode_trace_request(spans)
   let url = self.config.traces_url()
+  let headers = exporter_headers(self.config)
   let mut attempt = 0
   let mut last_failure = ""
   while attempt <= self.config.max_retries {
-    let response = (self.transport)(url, exporter_headers(self.config), body)
+    let response = (self.transport)(url, headers, body)
     if response.status_code == 200 {
       return @sdk.ExportSuccess
     }

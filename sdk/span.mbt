@@ -189,8 +189,14 @@ pub fn SpanSdk::add_event(
   time_unix_nano? : Int64
 ) -> Unit {
   if self.recording && !self.ended {
-    let timestamp = time_unix_nano.unwrap_or(unix_nano_now())
-    let event_attributes = attributes.unwrap_or(Map::new())
+    let timestamp = match time_unix_nano {
+      Some(value) => value
+      None => unix_nano_now()
+    }
+    let event_attributes = match attributes {
+      Some(map) => map
+      None => Map::new()
+    }
     self.events.push({ name, time_unix_nano: timestamp, attributes: event_attributes })
   }
 }
@@ -207,10 +213,11 @@ pub fn SpanSdk::record_exception(
   if self.recording && !self.ended {
     let message = @debug.to_string(error)
     let attributes = Map::new()
-    attributes.set(
-      EXCEPTION_TYPE,
-      StringValue(exception_type.unwrap_or(error.to_string())),
-    )
+    let type_name = match exception_type {
+      Some(value) => value
+      None => error.to_string()
+    }
+    attributes.set(EXCEPTION_TYPE, StringValue(type_name))
     attributes.set(EXCEPTION_MESSAGE, StringValue(message))
     self.add_event(
       "exception",
@@ -261,8 +268,11 @@ pub fn SpanSdk::end(self : SpanSdk, end_time_unix_nano? : Int64) -> Unit {
     return
   }
   self.ended = true
-  self.end_time_unix_nano = end_time_unix_nano.unwrap_or(unix_nano_now())
-  if self.recording {
+  self.end_time_unix_nano = match end_time_unix_nano {
+    Some(value) => value
+    None => unix_nano_now()
+  }
+  if self.recording && self.processors.length() > 0 {
     let data = SpanData::from_span(self)
     for processor in self.processors {
       processor.on_end(data)
