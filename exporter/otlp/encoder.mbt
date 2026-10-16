@@ -73,10 +73,10 @@ fn encode_status(writer : ProtoWriter, data : @sdk.SpanData) -> Unit {
 
 fn encode_span(writer : ProtoWriter, data : @sdk.SpanData) -> Unit {
   let span = writer.take_scratch()
-  span.write_bytes_field(1, bytes_from_bytes_array(data.span_context.trace_id()))
-  span.write_bytes_field(2, bytes_from_bytes_array(data.span_context.span_id()))
+  span.write_bytes_from_int_array(1, data.span_context.trace_id_view())
+  span.write_bytes_from_int_array(2, data.span_context.span_id_view())
   if data.parent_span_id.length() > 0 {
-    span.write_bytes_field(4, bytes_from_bytes_array(data.parent_span_id))
+    span.write_bytes_from_int_array(4, data.parent_span_id)
   }
   span.write_string_field(5, data.name)
   span.write_varint_field(6, data.kind.otlp_value().to_uint64())
@@ -151,33 +151,30 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   let groups : Array[ResourceGroup] = []
   let resource_index : Map[String, Int] = Map([])
   let mut last_resource : Map[String, @sdk.AttributeValue]? = None
-  let mut last_resource_key = ""
+  // Index of the group for `last_resource`; spans from the same producer
+  // usually share one resource object, so the hash lookup is skipped for all
+  // but the first span of each run.
+  let mut last_index = -1
   for data in spans {
-    let key = match last_resource {
-      Some(resource) =>
-        if physical_equal(resource, data.resource) {
-          last_resource_key
-        } else {
-          let computed = resource_key(data.resource)
-          last_resource_key = computed
-          computed
+    let index = match last_resource {
+      Some(resource) if physical_equal(resource, data.resource) => last_index
+      _ => {
+        let key = resource_key(data.resource)
+        last_resource = Some(data.resource)
+        let resolved = match resource_index.get(key) {
+          Some(index) => index
+          None => {
+            let created : ResourceGroup = { resource: data.resource, scopes: [] }
+            resource_index.set(key, groups.length())
+            groups.push(created)
+            groups.length() - 1
+          }
         }
-      None => {
-        let computed = resource_key(data.resource)
-        last_resource_key = computed
-        computed
+        last_index = resolved
+        resolved
       }
     }
-    last_resource = Some(data.resource)
-    let target = match resource_index.get(key) {
-      Some(index) => groups[index]
-      None => {
-        let created : ResourceGroup = { resource: data.resource, scopes: [] }
-        resource_index.set(key, groups.length())
-        groups.push(created)
-        created
-      }
-    }
+    let target = groups[index]
     let mut scope_group : ScopeGroup? = None
     for scope in target.scopes {
       if scope.scope_name == data.scope_name && scope.scope_version == data.scope_version {

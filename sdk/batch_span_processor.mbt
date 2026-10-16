@@ -109,14 +109,23 @@ pub fn BatchSpanProcessor::flush_batch(self : BatchSpanProcessor) -> Unit {
   } else {
     self.max_export_batch_size
   }
-  let batch : Array[SpanData] = Array(capacity=n)
-  let end = self.head + n
-  let mut i = self.head
-  while i < end {
-    batch.push(self.queue[i])
-    i = i + 1
+  let batch : Array[SpanData] = if self.head == 0 && n == self.queue.length() {
+    // The whole queue is being exported: hand the buffer over instead of
+    // copying every element into a fresh array.
+    let queue = self.queue
+    self.queue = []
+    queue
+  } else {
+    let batch : Array[SpanData] = Array(capacity=n)
+    let end = self.head + n
+    let mut i = self.head
+    while i < end {
+      batch.push(self.queue[i])
+      i = i + 1
+    }
+    self.head = end
+    batch
   }
-  self.head = end
   self.compact_if_needed()
   self.last_flush_time_millis = @env.now()
   let _ = self.exporter.export_spans(batch)

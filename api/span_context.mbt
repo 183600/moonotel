@@ -102,7 +102,7 @@ fn nibble_to_hex_char(val : Int) -> Char {
 // Helper: convert bytes to hex string
 pub fn bytes_to_hex(bytes : Array[Int]) -> String {
   let len = bytes.length()
-  let sb = StringBuilder(size_hint = len * 2)
+  let sb = StringBuilder(size_hint = len * 4)
   let mut i = 0
   while i < len {
     let b = bytes.unsafe_get(i)
@@ -138,6 +138,18 @@ pub fn SpanContext::trace_id(self : SpanContext) -> Array[Int] {
 // Get a copy of the span ID bytes
 pub fn SpanContext::span_id(self : SpanContext) -> Array[Int] {
   self.span_id.copy()
+}
+
+// Borrow the underlying trace ID bytes without copying. The returned array
+// shares storage with the context and must not be mutated.
+pub fn SpanContext::trace_id_view(self : SpanContext) -> Array[Int] {
+  self.trace_id
+}
+
+// Borrow the underlying span ID bytes without copying. The returned array
+// shares storage with the context and must not be mutated.
+pub fn SpanContext::span_id_view(self : SpanContext) -> Array[Int] {
+  self.span_id
 }
 
 // Helper: convert a hex character to its 0-15 value, or -1 when the character

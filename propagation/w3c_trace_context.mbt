@@ -24,6 +24,48 @@ fn is_hex_digit(c : Char) -> Bool {
   (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
 }
 
+fn is_trim_char(c : Char) -> Bool {
+  c == ' ' || c == '\t' || c == '\n' || c == '\r'
+}
+
+// Equivalent to `value.trim()` (the default whitespace set), but skips the
+// trimming machinery when neither end carries whitespace, which is the case
+// for almost every header member.
+fn trim_ows(value : StringView) -> StringView {
+  let len = value.length()
+  if len == 0 {
+    return value
+  }
+  if !is_trim_char(value.unsafe_get(0).unsafe_to_char()) &&
+    !is_trim_char(value.unsafe_get(len - 1).unsafe_to_char()) {
+    return value
+  }
+  let mut start = 0
+  let mut end = len
+  while start < end && is_trim_char(value.unsafe_get(start).unsafe_to_char()) {
+    start = start + 1
+  }
+  while end > start && is_trim_char(value.unsafe_get(end - 1).unsafe_to_char()) {
+    end = end - 1
+  }
+  value.view(start_offset=start, end_offset=end)
+}
+
+// Index of the first occurrence of `needle` at or after `start`, or the view
+// length when absent. Scanning code units directly avoids the per-call setup
+// of the generic `find`/`split` machinery on short header members.
+fn find_code_unit(view : StringView, needle : UInt16, start : Int) -> Int {
+  let len = view.length()
+  let mut i = start
+  while i < len {
+    if view.unsafe_get(i) == needle {
+      return i
+    }
+    i = i + 1
+  }
+  len
+}
+
 // Value of a hex digit, or -1 when the character is not a hex digit.
 fn hex_digit_value(c : Char) -> Int {
   let code = c.to_int()
@@ -66,9 +108,13 @@ fn nibble_to_hex_char(value : Int) -> Char {
 }
 
 fn write_hex(sb : StringBuilder, bytes : Array[Int]) -> Unit {
-  for byte in bytes {
-    sb.write_char(nibble_to_hex_char(byte >> 4))
-    sb.write_char(nibble_to_hex_char(byte & 0x0F))
+  let len = bytes.length()
+  let mut i = 0
+  while i < len {
+    let b = bytes.unsafe_get(i)
+    sb.write_char(nibble_to_hex_char(b >> 4))
+    sb.write_char(nibble_to_hex_char(b & 0x0F))
+    i = i + 1
   }
 }
 
@@ -79,11 +125,11 @@ pub fn format_traceparent(sc : @api.SpanContext) -> String {
     return ""
   }
   let flags = sc.trace_flags() & 0xFF
-  let sb = StringBuilder(size_hint=55)
+  let sb = StringBuilder(size_hint=110)
   sb.write_string("00-")
-  write_hex(sb, sc.trace_id())
+  write_hex(sb, sc.trace_id_view())
   sb.write_char('-')
-  write_hex(sb, sc.span_id())
+  write_hex(sb, sc.span_id_view())
   sb.write_char('-')
   sb.write_char(nibble_to_hex_char(flags >> 4))
   sb.write_char(nibble_to_hex_char(flags & 0x0F))
@@ -224,7 +270,7 @@ fn is_tracestate_key_tail(c : Char) -> Bool {
 
 // Validate a `tracestate` key: either a simple key (`lcalpha` followed by up to
 // 255 key characters) or a multi-tenant key (`tenant-id@system-id`).
-fn is_valid_tracestate_key(key : String) -> Bool {
+fn is_valid_tracestate_key(key : StringView) -> Bool {
   let len = key.length()
   if len == 0 || len > 256 {
     return false
@@ -285,7 +331,7 @@ fn is_valid_tracestate_key(key : String) -> Bool {
 }
 
 // Validate a `tracestate` value: printable ASCII without `,` or `=`.
-fn is_valid_tracestate_value(value : String) -> Bool {
+fn is_valid_tracestate_value(value : StringView) -> Bool {
   let len = value.length()
   if len > 255 {
     return false
@@ -310,37 +356,49 @@ pub fn parse_tracestate(value : String) -> String? {
   if value == "" {
     return None
   }
-  let sb = StringBuilder(size_hint=value.length())
-  let seen : Map[String, Unit] = Map([])
+  let sb = StringBuilder(size_hint=value.length() * 2)
+  // At most 32 members are accepted, so a linear scan over the trimmed key
+  // views detects duplicates without allocating a set or copies of the keys.
+  let seen : Array[StringView] = []
+  let view = value[:]
+  let len = view.length()
   let mut count = 0
-  for raw in value.split(",") {
+  let mut start = 0
+  while true {
     if count >= 32 {
       return None
     }
-    let item = raw.trim()
-    if item == "" {
+    let end = find_code_unit(view, ',', start)
+    let item = trim_ows(view.view(start_offset=start, end_offset=end))
+    if item.length() == 0 {
       return None
     }
-    let (key_view, value_view) = match item.split_once("=") {
-      Some(pair) => pair
-      None => return None
+    let eq = find_code_unit(item, '=', 0)
+    if eq >= item.length() {
+      return None
     }
-    let key = key_view.trim().to_owned()
-    let member_value = value_view.trim().to_owned()
+    let key = trim_ows(item[:eq])
+    let member_value = trim_ows(item[eq + 1:])
     if !is_valid_tracestate_key(key) || !is_valid_tracestate_value(member_value) {
       return None
     }
-    if seen.get(key) is Some(_) {
-      return None
+    for existing in seen {
+      if existing == key {
+        return None
+      }
     }
-    seen.set(key, ())
+    seen.push(key)
     if count > 0 {
       sb.write_char(',')
     }
-    sb.write_string(key)
+    sb.write_stringview(key)
     sb.write_char('=')
-    sb.write_string(member_value)
+    sb.write_stringview(member_value)
     count = count + 1
+    if end == len {
+      break
+    }
+    start = end + 1
   }
   Some(sb.to_string())
 }

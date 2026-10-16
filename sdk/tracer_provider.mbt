@@ -28,15 +28,16 @@ fn hex_digit_value(c : Char) -> Int {
 
 // Decode the `%XX` sequences used by `OTEL_RESOURCE_ATTRIBUTES` values.
 // Invalid sequences are kept verbatim.
-fn decode_percent(value : String) -> String {
+fn decode_percent(value : StringView) -> String {
   if value.find("%") is None {
-    return value
+    return value.to_owned()
   }
-  let bytes : Array[Byte] = Array(capacity=value.length())
+  let len = value.length()
+  let bytes : Array[Byte] = Array(capacity=len)
   let mut i = 0
-  while i < value.length() {
+  while i < len {
     let c = value.unsafe_get(i).unsafe_to_char()
-    if c == '%' && i + 2 < value.length() {
+    if c == '%' && i + 2 < len {
       let hi = hex_digit_value(value.unsafe_get(i + 1).unsafe_to_char())
       let lo = hex_digit_value(value.unsafe_get(i + 2).unsafe_to_char())
       if hi >= 0 && lo >= 0 {
@@ -45,8 +46,15 @@ fn decode_percent(value : String) -> String {
         continue
       }
     }
-    for byte in @utf8.encode(c.to_string()) {
-      bytes.push(byte)
+    let code = c.to_int()
+    if code < 0x80 {
+      // ASCII characters encode to a single UTF-8 byte; avoid building an
+      // intermediate one-character string.
+      bytes.push(code.to_byte())
+    } else {
+      for byte in @utf8.encode(c.to_string()) {
+        bytes.push(byte)
+      }
     }
     i = i + 1
   }
@@ -63,7 +71,7 @@ fn parse_resource_attributes(
       Some((key, raw_value)) => {
         let name = key.trim().to_owned()
         if name != "" {
-          resource.set(name, StringValue(decode_percent(raw_value.trim().to_owned())))
+          resource.set(name, StringValue(decode_percent(raw_value.trim())))
         }
       }
       None => ()

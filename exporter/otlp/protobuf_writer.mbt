@@ -98,9 +98,23 @@ fn ProtoWriter::write_bytes(self : ProtoWriter, value : Bytes) -> Unit {
   self.len = self.len + value.length()
 }
 
-fn ProtoWriter::write_bytes_field(self : ProtoWriter, field : Int, value : Bytes) -> Unit {
+// Write a length-delimited bytes field from an array of byte values, masking
+// each element to 8 bits. Avoids materializing an intermediate `Bytes`.
+fn ProtoWriter::write_bytes_from_int_array(
+  self : ProtoWriter,
+  field : Int,
+  values : Array[Int]
+) -> Unit {
   self.write_tag(field, 2)
-  self.write_bytes(value)
+  let len = values.length()
+  self.write_varint(len.to_uint64())
+  self.reserve(len)
+  let mut i = 0
+  while i < len {
+    self.buf.unsafe_set(self.len, (values.unsafe_get(i) & 0xFF).to_byte())
+    self.len = self.len + 1
+    i = i + 1
+  }
 }
 
 // Write a length-delimited string field. ASCII strings (the common case) are
@@ -139,7 +153,3 @@ fn ProtoWriter::append_message(self : ProtoWriter, field : Int, inner : ProtoWri
   self.release_scratch(inner)
 }
 
-// Helper: convert a byte array (values are masked to 8 bits) to Bytes.
-fn bytes_from_bytes_array(values : Array[Int]) -> Bytes {
-  Bytes::makei(values.length(), fn(i) { (values.unsafe_get(i) & 0xFF).to_byte() })
-}

@@ -22,7 +22,7 @@ fn is_token_char(c : Char) -> Bool {
   }
 }
 
-fn is_valid_baggage_key(key : String) -> Bool {
+fn is_valid_baggage_key(key : StringView) -> Bool {
   let len = key.length()
   if len == 0 {
     return false
@@ -56,26 +56,9 @@ fn upper_hex_digit(value : Int) -> Char {
   }
 }
 
-// Percent-decode a baggage value. Returns None when a `%` sequence is
-// truncated or not followed by two hex digits.
-pub fn percent_decode(value : String) -> String? {
+// Decode the body of a baggage value that contains at least one `%`.
+fn percent_decode_escaped(value : StringView) -> String? {
   let len = value.length()
-  // Fast path: a value without `%` decodes to itself; only its characters
-  // need validating, and no byte buffer has to be built.
-  let mut i = 0
-  while i < len {
-    let code = value.unsafe_get(i).to_int()
-    if code == 0x25 {
-      break
-    }
-    if !is_baggage_value_char(code) {
-      return None
-    }
-    i = i + 1
-  }
-  if i == len {
-    return Some(value)
-  }
   let bytes : Array[Byte] = Array(capacity=len)
   let mut j = 0
   while j < len {
@@ -103,6 +86,52 @@ pub fn percent_decode(value : String) -> String? {
   Some(@utf8.decode_lossy(Bytes::from_array(bytes).exact_view()))
 }
 
+// Percent-decode a baggage value held as a view. Returns None when a `%`
+// sequence is truncated or not followed by two hex digits.
+fn percent_decode_view(value : StringView) -> String? {
+  let len = value.length()
+  // Fast path: a value without `%` decodes to itself; only its characters
+  // need validating, and no byte buffer has to be built.
+  let mut i = 0
+  while i < len {
+    let code = value.unsafe_get(i).to_int()
+    if code == 0x25 {
+      break
+    }
+    if !is_baggage_value_char(code) {
+      return None
+    }
+    i = i + 1
+  }
+  if i == len {
+    return Some(value.to_owned())
+  }
+  percent_decode_escaped(value)
+}
+
+// Percent-decode a baggage value. Returns None when a `%` sequence is
+// truncated or not followed by two hex digits.
+pub fn percent_decode(value : String) -> String? {
+  let len = value.length()
+  // Fast path: a value without `%` decodes to itself; only its characters
+  // need validating, and no byte buffer has to be built.
+  let mut i = 0
+  while i < len {
+    let code = value.unsafe_get(i).to_int()
+    if code == 0x25 {
+      break
+    }
+    if !is_baggage_value_char(code) {
+      return None
+    }
+    i = i + 1
+  }
+  if i == len {
+    return Some(value)
+  }
+  percent_decode_escaped(value[:])
+}
+
 fn write_percent_encoded(sb : StringBuilder, code : Int) -> Unit {
   if is_baggage_value_char(code) {
     sb.write_char(code.unsafe_to_char())
@@ -113,11 +142,9 @@ fn write_percent_encoded(sb : StringBuilder, code : Int) -> Unit {
   }
 }
 
-// Percent-encode a baggage value, leaving the characters allowed by the
-// specification untouched and encoding everything else as `%XX` (UTF-8).
-pub fn percent_encode(value : String) -> String {
+// Append the percent-encoded form of `value` to `sb`.
+fn write_percent_encode(sb : StringBuilder, value : String) -> Unit {
   let len = value.length()
-  let sb = StringBuilder(size_hint=len)
   // ASCII-only values (the common case) are encoded straight from their code
   // units, avoiding the intermediate UTF-8 byte array.
   let mut ascii = true
@@ -140,6 +167,13 @@ pub fn percent_encode(value : String) -> String {
       write_percent_encoded(sb, byte.to_int() & 0xFF)
     }
   }
+}
+
+// Percent-encode a baggage value, leaving the characters allowed by the
+// specification untouched and encoding everything else as `%XX` (UTF-8).
+pub fn percent_encode(value : String) -> String {
+  let sb = StringBuilder(size_hint=value.length() * 2)
+  write_percent_encode(sb, value)
   sb.to_string()
 }
 
@@ -147,27 +181,30 @@ pub fn percent_encode(value : String) -> String {
 // Members that are malformed are skipped; properties are ignored.
 pub fn parse_baggage(value : String) -> Array[(String, String)] {
   let entries : Array[(String, String)] = []
-  for raw in value.split(",") {
-    let item = raw.trim()
-    if item == "" {
-      continue
+  let view = value[:]
+  let len = view.length()
+  let mut start = 0
+  while start <= len {
+    let end = find_code_unit(view, ',', start)
+    let item = trim_ows(view.view(start_offset=start, end_offset=end))
+    if item.length() > 0 {
+      let semi = find_code_unit(item, ';', 0)
+      let pair_text = if semi < item.length() { item[:semi] } else { item }
+      let eq = find_code_unit(pair_text, '=', 0)
+      if eq < pair_text.length() {
+        let key_view = trim_ows(pair_text[:eq])
+        if is_valid_baggage_key(key_view) {
+          match percent_decode_view(trim_ows(pair_text[eq + 1:])) {
+            Some(decoded) => entries.push((key_view.to_owned(), decoded))
+            None => ()
+          }
+        }
+      }
     }
-    let pair_text = match item.find(";") {
-      Some(index) => item[:index]
-      None => item
+    if end == len {
+      break
     }
-    let (key_view, value_view) = match pair_text.split_once("=") {
-      Some(pair) => pair
-      None => continue
-    }
-    let key = key_view.trim().to_owned()
-    if !is_valid_baggage_key(key) {
-      continue
-    }
-    match percent_decode(value_view.trim().to_owned()) {
-      Some(decoded) => entries.push((key, decoded))
-      None => continue
-    }
+    start = end + 1
   }
   entries
 }
@@ -175,7 +212,7 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
 // Format an ordered list of key/value pairs as a `baggage` header value.
 // Pairs with an invalid key are skipped.
 pub fn format_baggage(entries : Array[(String, String)]) -> String {
-  let sb = StringBuilder()
+  let sb = StringBuilder(size_hint=entries.length() * 4)
   let mut count = 0
   for entry in entries {
     let (key, value) = entry
@@ -185,7 +222,7 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
       }
       sb.write_string(key)
       sb.write_char('=')
-      sb.write_string(percent_encode(value))
+      write_percent_encode(sb, value)
       count = count + 1
     }
   }

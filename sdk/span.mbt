@@ -212,13 +212,14 @@ pub fn SpanSdk::record_exception(
 ) -> Unit {
   if self.recording && !self.ended {
     let message = @debug.to_string(error)
-    let attributes = Map([])
     let type_name = match exception_type {
       Some(value) => value
       None => error.to_string()
     }
-    attributes.set(EXCEPTION_TYPE, StringValue(type_name))
-    attributes.set(EXCEPTION_MESSAGE, StringValue(message))
+    let attributes : Map[String, AttributeValue] = Map([
+      (EXCEPTION_TYPE, StringValue(type_name)),
+      (EXCEPTION_MESSAGE, StringValue(message)),
+    ])
     self.add_event(
       "exception",
       attributes=attributes,
