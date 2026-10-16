@@ -89,8 +89,7 @@ fn varint_size(value : UInt64) -> Int32 {
   }
 }
 
-// Byte length of `text` once encoded as UTF-8. ASCII (the common case) avoids
-// allocating, matching the fast path of `ProtoWriter::write_string_field`.
+// Byte length of `text` once encoded as UTF-8.
 
 ///|
 fn utf8_length(text : String) -> Int32 {
@@ -105,8 +104,7 @@ fn utf8_length(text : String) -> Int32 {
   len
 }
 
-// Exact encoded size of the scalar `AnyValue` forms, used to emit them inline
-// without a nested scratch writer.
+// Exact encoded size of the scalar `AnyValue` forms.
 
 ///|
 fn scalar_any_value_size(value : @sdk.AttributeValue) -> Int32 {
@@ -125,7 +123,7 @@ fn scalar_any_value_size(value : @sdk.AttributeValue) -> Int32 {
   }
 }
 
-// Whether the value is an array (encoded through a nested scratch writer).
+// Whether the value is an array.
 
 ///|
 fn is_array_value(value : @sdk.AttributeValue) -> Bool {
@@ -426,8 +424,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
 
 ///|
 pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
-  // 160 bytes per span covers a typical span (Ids, name, times, flags plus a
-  // few attributes), so a full batch rarely triggers a buffer regrow.
+  // Initial capacity estimate: 160 bytes per span plus the message header.
   let writer = ProtoWriter::with_capacity(64 + spans.length() * 160)
   for group in group_spans(spans) {
     let resource_spans = writer.take_scratch()

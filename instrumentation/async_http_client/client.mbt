@@ -107,8 +107,7 @@ fn split_url_parts(url : String) -> (String, String, Int) {
     None => url
   }
   let default_port = if scheme == "https" { 443 } else { 80 }
-  // The authority ends at the first `/` (path), `?` (query) or `#` (fragment);
-  // query or fragment text must not be mistaken for a host or port.
+  // The authority ends at the first `/` (path), `?` (query) or `#` (fragment).
   let mut authority_end = after_scheme.length()
   for delimiter in ["/", "?", "#"] {
     match after_scheme.find(delimiter) {

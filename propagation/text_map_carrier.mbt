@@ -48,7 +48,6 @@ pub fn TextMapCarrier::get(self : TextMapCarrier, key : String) -> String? {
   match self.entries.get(key) {
     Some(value) => Some(value)
     None => {
-      // Iterate explicitly so the scan stops at the first match.
       let mut found : String? = None
       for entry in self.entries.iter() {
         let (candidate, value) = entry

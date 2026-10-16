@@ -31,8 +31,7 @@ fn read_response_varint(data : BytesView, offset : Int) -> (UInt64, Int)? {
 
 // Interpret an `ExportTraceServiceResponse` protobuf body.
 // Well-formed bodies decode exactly as prescribed by the OTLP trace service
-// proto; truncated or otherwise malformed bodies are reported as failures
-// instead of aborting.
+// proto; truncated or otherwise malformed bodies are reported as failures.
 pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
   let data = body.exact_view()
   let length = data.length()

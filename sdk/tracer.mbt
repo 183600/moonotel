@@ -59,8 +59,7 @@ pub fn Tracer::start_span(
     Some(ctx) => if ctx.is_valid() { Some(ctx) } else { None }
     None => None
   }
-  // Tracing a child reuses the parent's ID arrays: SpanContext is immutable,
-  // so sharing avoids a copy per span.
+  // A child span reuses the parent's ID arrays; SpanContext is immutable.
   let (trace_id, parent_span_id, tracestate) = match valid_parent {
     Some(ctx) => (ctx.trace_id_view(), ctx.span_id_view(), ctx.tracestate())
     None => (self.provider.id_generator.generate_trace_id(), [], "")

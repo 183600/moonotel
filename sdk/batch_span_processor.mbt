@@ -17,7 +17,7 @@ pub struct BatchSpanProcessor {
   flush_interval_millis : Int
   // Fixed-capacity ring buffer: `head` is the index of the oldest buffered
   // span and `count` is how many spans are live. Once full, the oldest span is
-  // overwritten in place, so the buffer never grows or needs compaction.
+  // overwritten in place.
   queue : Array[SpanData]
   mut head : Int
   mut count : Int

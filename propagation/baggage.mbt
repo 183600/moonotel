@@ -212,8 +212,7 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
 // Format an ordered list of key/value pairs as a `baggage` header value.
 // Pairs with an invalid key are skipped.
 pub fn format_baggage(entries : Array[(String, String)]) -> String {
-  // Sum the member lengths first so the builder rarely has to grow; the exact
-  // size is only larger when values need percent-encoding.
+  // Approximate output size: key, value and the `key=` separator per member.
   let mut size_hint = 0
   for entry in entries {
     let (key, value) = entry
@@ -241,8 +240,7 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
 // a deterministic header.
 //
 // The chain is walked once, collecting the innermost value of every key; the
-// duplicate-tracking table is only allocated once a key is seen, so contexts
-// without baggage stay allocation-free.
+// duplicate-tracking table is only needed once a key is seen.
 pub fn context_baggage_header(context : @context.Context) -> String? {
   let entries : Array[(String, String)] = []
   let mut seen : Map[String, Bool]? = None

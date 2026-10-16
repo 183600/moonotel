@@ -82,9 +82,7 @@ fn OtlpHttpAsyncSpanExporter::enqueue(
   if accepted {
     return @sdk.ExportSuccess
   }
-  // `try_put` refuses to evict when the queue is full, so discard the oldest
-  // batch explicitly and retry once. Only count the discard when a batch was
-  // actually removed.
+  // The queue is full: discard the oldest batch to make room, then retry once.
   let discarded : Bool = try {
     match self.queue.try_get() {
       Some(_) => true

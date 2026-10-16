@@ -209,8 +209,7 @@ fn is_retryable_status(status_code : Int32) -> Bool {
 pub struct OtlpHttpExporter {
   config : OtlpHttpConfig
   transport : Transport
-  // The trace endpoint URL derived from the (immutable) config strings, so it
-  // is computed once instead of on every export.
+  // The trace endpoint URL derived from the config strings.
   url : String
 }
 
