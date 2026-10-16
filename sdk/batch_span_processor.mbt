@@ -76,11 +76,12 @@ fn BatchSpanProcessor::is_flush_due(self : BatchSpanProcessor) -> Bool {
 // Drop the consumed slots at the front, dropping empty or mostly-consumed
 // backing arrays so the buffer does not grow without bound.
 fn BatchSpanProcessor::compact(self : BatchSpanProcessor) -> Unit {
-  let remaining = self.live_count()
+  let queue = self.queue
+  let remaining = queue.length() - self.head
   let rest : Array[SpanData] = Array(capacity=remaining)
   let mut i = self.head
-  while i < self.queue.length() {
-    rest.push(self.queue[i])
+  while i < queue.length() {
+    rest.push(queue.unsafe_get(i))
     i = i + 1
   }
   self.queue = rest
@@ -114,11 +115,12 @@ pub fn BatchSpanProcessor::flush_batch(self : BatchSpanProcessor) -> Unit {
     self.queue = []
     queue
   } else {
+    let queue = self.queue
     let batch : Array[SpanData] = Array(capacity=n)
     let end = self.head + n
     let mut i = self.head
     while i < end {
-      batch.push(self.queue[i])
+      batch.push(queue.unsafe_get(i))
       i = i + 1
     }
     self.head = end

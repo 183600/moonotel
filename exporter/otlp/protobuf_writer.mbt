@@ -46,14 +46,15 @@ fn ProtoWriter::to_bytes(self : ProtoWriter) -> Bytes {
 fn ProtoWriter::write_varint(self : ProtoWriter, value : UInt64) -> Unit {
   // A 64-bit varint is at most 10 bytes.
   self.reserve(10)
+  let buf = self.buf
   let mut v = value
   let mut i = self.len
   while v >= 0x80 {
-    self.buf.unsafe_set(i, ((v & 0x7F) | 0x80).to_int().to_byte())
+    buf.unsafe_set(i, ((v & 0x7F) | 0x80).to_int().to_byte())
     v = v >> 7
     i = i + 1
   }
-  self.buf.unsafe_set(i, v.to_int().to_byte())
+  buf.unsafe_set(i, v.to_int().to_byte())
   self.len = i + 1
 }
 
@@ -106,12 +107,15 @@ fn ProtoWriter::write_bytes_from_int_array(
   let len = values.length()
   self.write_varint(len.to_uint64())
   self.reserve(len)
+  let buf = self.buf
+  let mut pos = self.len
   let mut i = 0
   while i < len {
-    self.buf.unsafe_set(self.len, (values.unsafe_get(i) & 0xFF).to_byte())
-    self.len = self.len + 1
+    buf.unsafe_set(pos, (values.unsafe_get(i) & 0xFF).to_byte())
+    pos = pos + 1
     i = i + 1
   }
+  self.len = pos
 }
 
 // Write a length-delimited string field, encoding non-ASCII text as UTF-8.
@@ -121,6 +125,8 @@ fn ProtoWriter::write_string_field(self : ProtoWriter, field : Int, value : Stri
   let start = self.len
   self.write_varint(len.to_uint64())
   self.reserve(len)
+  let buf = self.buf
+  let mut pos = self.len
   let mut i = 0
   while i < len {
     let code = value.unsafe_get(i).to_int()
@@ -130,10 +136,11 @@ fn ProtoWriter::write_string_field(self : ProtoWriter, field : Int, value : Stri
       self.write_bytes(encoded)
       return
     }
-    self.buf.unsafe_set(self.len, code.to_byte())
-    self.len = self.len + 1
+    buf.unsafe_set(pos, code.to_byte())
+    pos = pos + 1
     i = i + 1
   }
+  self.len = pos
 }
 
 // Append an already encoded nested message with a length prefix, releasing

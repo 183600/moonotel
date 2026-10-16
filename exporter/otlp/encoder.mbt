@@ -19,6 +19,71 @@ fn encode_any_value(writer : ProtoWriter, value : @sdk.AttributeValue) -> Unit {
   }
 }
 
+// Number of bytes a varint takes on the wire.
+fn varint_size(value : UInt64) -> Int {
+  if value < 0x80 {
+    1
+  } else if value < 0x4000 {
+    2
+  } else if value < 0x200000 {
+    3
+  } else if value < 0x10000000 {
+    4
+  } else if value < 0x800000000 {
+    5
+  } else if value < 0x40000000000 {
+    6
+  } else if value < 0x2000000000000 {
+    7
+  } else if value < 0x100000000000000 {
+    8
+  } else if value < 0x8000000000000000 {
+    9
+  } else {
+    10
+  }
+}
+
+// Byte length of `text` once encoded as UTF-8. ASCII (the common case) avoids
+// allocating, matching the fast path of `ProtoWriter::write_string_field`.
+fn utf8_length(text : String) -> Int {
+  let len = text.length()
+  let mut i = 0
+  while i < len {
+    if text.unsafe_get(i).to_int() >= 0x80 {
+      return @utf8.encode(text).length()
+    }
+    i = i + 1
+  }
+  len
+}
+
+// Exact encoded size of the scalar `AnyValue` forms, used to emit them inline
+// without a nested scratch writer.
+fn scalar_any_value_size(value : @sdk.AttributeValue) -> Int {
+  match value {
+    @sdk.StringValue(text) => {
+      let n = utf8_length(text)
+      1 + varint_size(n.to_uint64()) + n
+    }
+    @sdk.BoolValue(_) => 2
+    @sdk.IntValue(number) => 1 + varint_size(number.reinterpret_as_uint64())
+    @sdk.DoubleValue(_) => 9
+    @sdk.StringArrayValue(_) => 0
+  }
+}
+
+// Write the body of a scalar `AnyValue` (without its enclosing length prefix).
+fn encode_scalar_any_value(writer : ProtoWriter, value : @sdk.AttributeValue) -> Unit {
+  match value {
+    @sdk.StringValue(text) => writer.write_string_field(1, text)
+    @sdk.BoolValue(flag) => writer.write_bool_field(2, flag)
+    @sdk.IntValue(number) => writer.write_varint_field(3, number.reinterpret_as_uint64())
+    @sdk.DoubleValue(number) => writer.write_double_field(4, number)
+    @sdk.StringArrayValue(_) => ()
+  }
+}
+
 fn encode_attributes(
   writer : ProtoWriter,
   field : Int,
@@ -27,9 +92,18 @@ fn encode_attributes(
   attributes.each(fn(key, value) {
     let kv = writer.take_scratch()
     kv.write_string_field(1, key)
-    let any_value = kv.take_scratch()
-    encode_any_value(any_value, value)
-    kv.append_message(2, any_value)
+    match value {
+      @sdk.StringArrayValue(_) => {
+        let any_value = kv.take_scratch()
+        encode_any_value(any_value, value)
+        kv.append_message(2, any_value)
+      }
+      _ => {
+        kv.write_tag(2, 2)
+        kv.write_varint(scalar_any_value_size(value).to_uint64())
+        encode_scalar_any_value(kv, value)
+      }
+    }
     writer.append_message(field, kv)
   })
 }
@@ -199,7 +273,9 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
 
 // Encode spans as an `ExportTraceServiceRequest` protobuf message.
 pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
-  let writer = ProtoWriter::with_capacity(64 + spans.length() * 128)
+  // 160 bytes per span covers a typical span (Ids, name, times, flags plus a
+  // few attributes), so a full batch rarely triggers a buffer regrow.
+  let writer = ProtoWriter::with_capacity(64 + spans.length() * 160)
   for group in group_spans(spans) {
     let resource_spans = writer.take_scratch()
     encode_resource(resource_spans, group.resource)

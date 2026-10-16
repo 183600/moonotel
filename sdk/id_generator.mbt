@@ -94,17 +94,31 @@ fn random_bytes(
       let draw = if n < RANDOM_DRAW_BYTES { RANDOM_DRAW_BYTES } else { n }
       match @env.rand(draw) {
         Some(bytes) => {
+          let view = bytes.exact_view()
           let out : Array[Int] = Array::make(n, 0)
-          for i = 0; i < n; i = i + 1 {
-            out.unsafe_set(i, bytes[i].to_int() & 0xFF)
-          }
           let rest : Array[Int] = Array::make(draw - n, 0)
-          for i = n; i < draw; i = i + 1 {
-            rest.unsafe_set(i - n, bytes[i].to_int() & 0xFF)
+          let mut nonzero = false
+          let mut i = 0
+          while i < n {
+            let b = view.unsafe_get(i).to_int() & 0xFF
+            out.unsafe_set(i, b)
+            if b != 0 {
+              nonzero = true
+            }
+            i = i + 1
+          }
+          let mut j = 0
+          while i < draw {
+            rest.unsafe_set(j, view.unsafe_get(i).to_int() & 0xFF)
+            j = j + 1
+            i = i + 1
+          }
+          if !nonzero {
+            out.unsafe_set(n - 1, 1)
           }
           pending.val = rest
           offset.val = 0
-          fill_zero_checked(out)
+          out
         }
         None => pseudo_random_bytes(n, state)
       }

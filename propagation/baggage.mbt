@@ -212,7 +212,14 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
 // Format an ordered list of key/value pairs as a `baggage` header value.
 // Pairs with an invalid key are skipped.
 pub fn format_baggage(entries : Array[(String, String)]) -> String {
-  let sb = StringBuilder(size_hint=entries.length() * 4)
+  // Sum the member lengths first so the builder rarely has to grow; the exact
+  // size is only larger when values need percent-encoding.
+  let mut size_hint = 0
+  for entry in entries {
+    let (key, value) = entry
+    size_hint = size_hint + key.length() + value.length() + 2
+  }
+  let sb = StringBuilder(size_hint=size_hint * 2)
   let mut count = 0
   for entry in entries {
     let (key, value) = entry
