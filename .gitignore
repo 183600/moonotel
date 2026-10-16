@@ -46,6 +46,3 @@ node_modules/
 # Test coverage
 coverage/
 .nyc_output/
-
-# iFlow artifacts (from vibe_coding.sh)
-iflow_*.log
