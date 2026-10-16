@@ -83,9 +83,9 @@ fn split_path_query(path : String) -> (String, String) {
 // `tracestate`) and `baggage`. Request headers are already keyed
 // case-insensitively, so the headers can be fetched directly instead of
 // copying every header into a carrier.
-pub fn extract_context(
+fn extract_context_with_baggage(
   headers : Map[@http.CaseInsensitiveString, String]
-) -> @context.Context {
+) -> (@context.Context, Bool) {
   let mut context = @context.Context::root()
   match headers.get(
     @http.CaseInsensitiveString(@propagation.traceparent_header_name()),
@@ -111,17 +111,25 @@ pub fn extract_context(
       }
     None => ()
   }
+  let mut has_baggage = false
   match headers.get(
     @http.CaseInsensitiveString(@propagation.baggage_header_name()),
   ) {
     Some(value) =>
       for entry in @propagation.parse_baggage(value) {
+        has_baggage = true
         let (key, item_value) = entry
         context = context.with_value(key, item_value)
       }
     None => ()
   }
-  context
+  (context, has_baggage)
+}
+
+pub fn extract_context(
+  headers : Map[@http.CaseInsensitiveString, String]
+) -> @context.Context {
+  extract_context_with_baggage(headers).0
 }
 
 // Parse the W3C `traceparent` header of an incoming request, if present.
@@ -299,7 +307,9 @@ pub async fn run_server_on(
   }
   server.run_forever(
     async fn(request, body, connection) {
-      let parent_context = extract_context(request.headers)
+      let (parent_context, parent_has_baggage) = extract_context_with_baggage(
+        request.headers,
+      )
       let parent = parent_context.span_context()
       let method_name = http_method_name(request.meth)
       let span = match active_tracer {
@@ -341,7 +351,7 @@ pub async fn run_server_on(
             ),
           )
         None =>
-          if parent_context.baggage().length() > 0 {
+          if parent_has_baggage {
             Some(@context.attach(parent_context))
           } else {
             None

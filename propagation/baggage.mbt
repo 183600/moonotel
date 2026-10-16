@@ -60,45 +60,84 @@ fn upper_hex_digit(value : Int) -> Char {
 // truncated or not followed by two hex digits.
 pub fn percent_decode(value : String) -> String? {
   let len = value.length()
-  let bytes : Array[Byte] = Array(capacity=len)
+  // Fast path: a value without `%` decodes to itself; only its characters
+  // need validating, and no byte buffer has to be built.
   let mut i = 0
   while i < len {
-    let c = value.unsafe_get(i).unsafe_to_char()
+    let code = value.unsafe_get(i).to_int()
+    if code == 0x25 {
+      break
+    }
+    if !is_baggage_value_char(code) {
+      return None
+    }
+    i = i + 1
+  }
+  if i == len {
+    return Some(value)
+  }
+  let bytes : Array[Byte] = Array(capacity=len)
+  let mut j = 0
+  while j < len {
+    let c = value.unsafe_get(j).unsafe_to_char()
     if c == '%' {
-      if i + 2 >= len {
+      if j + 2 >= len {
         return None
       }
-      let hi = hex_digit_value(value.unsafe_get(i + 1).unsafe_to_char())
-      let lo = hex_digit_value(value.unsafe_get(i + 2).unsafe_to_char())
+      let hi = hex_digit_value(value.unsafe_get(j + 1).unsafe_to_char())
+      let lo = hex_digit_value(value.unsafe_get(j + 2).unsafe_to_char())
       if hi < 0 || lo < 0 {
         return None
       }
       bytes.push((hi * 16 + lo).to_byte())
-      i = i + 3
+      j = j + 3
     } else {
       let code = c.to_int()
       if !is_baggage_value_char(code) {
         return None
       }
       bytes.push(code.to_byte())
-      i = i + 1
+      j = j + 1
     }
   }
   Some(@utf8.decode_lossy(Bytes::from_array(bytes).exact_view()))
 }
 
+fn write_percent_encoded(sb : StringBuilder, code : Int) -> Unit {
+  if is_baggage_value_char(code) {
+    sb.write_char(code.unsafe_to_char())
+  } else {
+    sb.write_char('%')
+    sb.write_char(upper_hex_digit(code >> 4))
+    sb.write_char(upper_hex_digit(code & 0x0F))
+  }
+}
+
 // Percent-encode a baggage value, leaving the characters allowed by the
 // specification untouched and encoding everything else as `%XX` (UTF-8).
 pub fn percent_encode(value : String) -> String {
-  let sb = StringBuilder(size_hint=value.length())
-  for byte in @utf8.encode(value) {
-    let code = byte.to_int() & 0xFF
-    if is_baggage_value_char(code) {
-      sb.write_char(code.unsafe_to_char())
-    } else {
-      sb.write_char('%')
-      sb.write_char(upper_hex_digit(code >> 4))
-      sb.write_char(upper_hex_digit(code & 0x0F))
+  let len = value.length()
+  let sb = StringBuilder(size_hint=len)
+  // ASCII-only values (the common case) are encoded straight from their code
+  // units, avoiding the intermediate UTF-8 byte array.
+  let mut ascii = true
+  let mut i = 0
+  while i < len {
+    if value.unsafe_get(i).to_int() >= 0x80 {
+      ascii = false
+      break
+    }
+    i = i + 1
+  }
+  if ascii {
+    let mut j = 0
+    while j < len {
+      write_percent_encoded(sb, value.unsafe_get(j).to_int())
+      j = j + 1
+    }
+  } else {
+    for byte in @utf8.encode(value) {
+      write_percent_encoded(sb, byte.to_int() & 0xFF)
     }
   }
   sb.to_string()
@@ -136,20 +175,30 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
 // Format an ordered list of key/value pairs as a `baggage` header value.
 // Pairs with an invalid key are skipped.
 pub fn format_baggage(entries : Array[(String, String)]) -> String {
-  let parts : Array[String] = []
+  let sb = StringBuilder()
+  let mut count = 0
   for entry in entries {
     let (key, value) = entry
     if is_valid_baggage_key(key) {
-      parts.push(key + "=" + percent_encode(value))
+      if count > 0 {
+        sb.write_char(',')
+      }
+      sb.write_string(key)
+      sb.write_char('=')
+      sb.write_string(percent_encode(value))
+      count = count + 1
     }
   }
-  parts.join(",")
+  sb.to_string()
 }
 
 // Format the baggage of `context` as a `baggage` header value, or `None` when
 // the context carries no (valid) baggage. Keys are emitted in sorted order for
 // a deterministic header.
 pub fn context_baggage_header(context : @context.Context) -> String? {
+  if !context.has_baggage() {
+    return None
+  }
   let baggage = context.baggage()
   if baggage.length() == 0 {
     return None

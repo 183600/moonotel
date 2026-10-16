@@ -78,6 +78,23 @@ pub fn Context::value(self : Context, key : String) -> String? {
   None
 }
 
+// Whether the chain carries at least one baggage value. Cheaper than
+// flattening the baggage when only presence matters.
+pub fn Context::has_baggage(self : Context) -> Bool {
+  let mut cursor : Context? = Some(self)
+  while true {
+    match cursor {
+      Some(context) =>
+        match (context.key, context.value) {
+          (Some(_), Some(_)) => return true
+          _ => cursor = context.parent
+        }
+      None => break
+    }
+  }
+  false
+}
+
 // Flatten the baggage of the whole chain, innermost values winning.
 pub fn Context::baggage(self : Context) -> Map[String, String] {
   let values = Map([])

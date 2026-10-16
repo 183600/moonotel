@@ -31,7 +31,7 @@ fn trace_id_fraction(trace_id : Array[Int]) -> UInt64 {
   let mut value : UInt64 = 0
   let n = if trace_id.length() < 8 { trace_id.length() } else { 8 }
   for i = 0; i < n; i = i + 1 {
-    value = (value << 8) | (trace_id[i].to_uint64() & 0xFF)
+    value = (value << 8) | (trace_id.unsafe_get(i).to_uint64() & 0xFF)
   }
   value
 }

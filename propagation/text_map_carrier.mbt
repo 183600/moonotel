@@ -19,19 +19,44 @@ pub fn TextMapCarrier::from_entries(entries : Array[(String, String)]) -> TextMa
   { entries: Map(entries), }
 }
 
+// ASCII-case-insensitive equality. Equivalent to `a.to_lower() == b.to_lower()`
+// because `to_lower` only maps `A`-`Z`, but allocation-free.
+fn ascii_case_insensitive_equal(a : String, b : String) -> Bool {
+  let len = a.length()
+  if len != b.length() {
+    return false
+  }
+  let mut i = 0
+  while i < len {
+    let ca = a.unsafe_get(i).to_int()
+    let cb = b.unsafe_get(i).to_int()
+    if ca != cb {
+      let na = if ca >= 65 && ca <= 90 { ca + 32 } else { ca }
+      let nb = if cb >= 65 && cb <= 90 { cb + 32 } else { cb }
+      if na != nb {
+        return false
+      }
+    }
+    i = i + 1
+  }
+  true
+}
+
 // Look up a single header value. HTTP header names are case-insensitive: an
 // exact match is preferred, otherwise the first case-insensitive match wins.
 pub fn TextMapCarrier::get(self : TextMapCarrier, key : String) -> String? {
   match self.entries.get(key) {
     Some(value) => Some(value)
     None => {
-      let lowered = key.to_lower()
+      // Iterate explicitly so the scan stops at the first match.
       let mut found : String? = None
-      self.entries.each(fn(candidate, value) {
-        if found is None && candidate.to_lower() == lowered {
+      for entry in self.entries.iter() {
+        let (candidate, value) = entry
+        if ascii_case_insensitive_equal(candidate, key) {
           found = Some(value)
+          break
         }
-      })
+      }
       found
     }
   }

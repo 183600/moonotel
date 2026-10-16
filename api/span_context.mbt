@@ -76,7 +76,7 @@ pub fn is_zero(bytes : Array[Int]) -> Bool {
   let len = bytes.length()
   let mut i = 0
   while i < len {
-    if bytes[i] != 0 {
+    if bytes.unsafe_get(i) != 0 {
       return false
     }
     i = i + 1
@@ -105,7 +105,7 @@ pub fn bytes_to_hex(bytes : Array[Int]) -> String {
   let sb = StringBuilder(size_hint = len * 2)
   let mut i = 0
   while i < len {
-    let b = bytes[i]
+    let b = bytes.unsafe_get(i)
     sb.write_char(nibble_to_hex_char(b >> 4))
     sb.write_char(nibble_to_hex_char(b & 0x0F))
     i = i + 1
@@ -161,7 +161,7 @@ pub fn bytes_from_hex(hex : String) -> Array[Int]? {
   if len % 2 != 0 {
     return None
   }
-  let out : Array[Int] = Array(capacity=len / 2)
+  let out : Array[Int] = Array::make(len / 2, 0)
   let mut i = 0
   while i < len {
     let hi = hex_char_value(hex.unsafe_get(i).unsafe_to_char())
@@ -169,7 +169,7 @@ pub fn bytes_from_hex(hex : String) -> Array[Int]? {
     if hi < 0 || lo < 0 {
       return None
     }
-    out.push(hi * 16 + lo)
+    out.unsafe_set(i / 2, hi * 16 + lo)
     i = i + 2
   }
   Some(out)

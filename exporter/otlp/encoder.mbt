@@ -103,11 +103,16 @@ fn resource_key_value(value : @sdk.AttributeValue) -> String {
     @sdk.DoubleValue(number) =>
       "d" + number.reinterpret_as_uint64().to_string() + ";"
     @sdk.StringArrayValue(items) => {
-      let mut text = "a" + items.length().to_string() + ":"
+      let sb = StringBuilder()
+      sb.write_char('a')
+      sb.write_string(items.length().to_string())
+      sb.write_char(':')
       for item in items {
-        text = text + item.length().to_string() + ":" + item
+        sb.write_string(item.length().to_string())
+        sb.write_char(':')
+        sb.write_string(item)
       }
-      text
+      sb.to_string()
     }
   }
 }
@@ -116,15 +121,19 @@ fn resource_key(resource : Map[String, @sdk.AttributeValue]) -> String {
   let keys : Array[String] = []
   resource.each(fn(key, _value) { keys.push(key) })
   keys.sort()
-  let parts : Array[String] = []
+  let sb = StringBuilder()
   for key in keys {
     let value_text = match resource.get(key) {
       Some(value) => resource_key_value(value)
       None => ""
     }
-    parts.push(key.length().to_string() + ":" + key + "=" + value_text)
+    sb.write_string(key.length().to_string())
+    sb.write_char(':')
+    sb.write_string(key)
+    sb.write_char('=')
+    sb.write_string(value_text)
   }
-  parts.join("")
+  sb.to_string()
 }
 
 priv struct ScopeGroup {

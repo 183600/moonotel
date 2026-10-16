@@ -41,7 +41,7 @@ fn hex_digit_value(c : Char) -> Int {
 // Decode `byte_count` hex byte pairs starting at `start`, validating as it
 // goes. Returns None when any character is not a hex digit.
 fn decode_hex(value : String, start : Int, byte_count : Int) -> Array[Int]? {
-  let out : Array[Int] = Array(capacity=byte_count)
+  let out : Array[Int] = Array::make(byte_count, 0)
   let mut i = 0
   while i < byte_count {
     let hi = hex_digit_value(value.unsafe_get(start + i * 2).unsafe_to_char())
@@ -49,7 +49,7 @@ fn decode_hex(value : String, start : Int, byte_count : Int) -> Array[Int]? {
     if hi < 0 || lo < 0 {
       return None
     }
-    out.push(hi * 16 + lo)
+    out.unsafe_set(i, hi * 16 + lo)
     i = i + 1
   }
   Some(out)
@@ -100,28 +100,12 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
   if len < 55 {
     return None
   }
-  let mut dash0 = -1
-  let mut dash1 = -1
-  let mut dash2 = -1
-  let mut extra_dashes = false
-  let mut i = 0
-  while i < len {
-    if value.unsafe_get(i).unsafe_to_char() == '-' {
-      if dash0 < 0 {
-        dash0 = i
-      } else if dash1 < 0 {
-        dash1 = i
-      } else if dash2 < 0 {
-        dash2 = i
-      } else {
-        // A fourth dash marks an extra field; no later position is needed.
-        extra_dashes = true
-        break
-      }
-    }
-    i = i + 1
-  }
-  if dash2 < 0 || dash0 != 2 {
+  // Any parseable value has its dashes exactly at 2, 35 and 52; a dash
+  // anywhere else fails the hex decoding below. Checking the three positions
+  // directly avoids a scan over the whole value.
+  if value.unsafe_get(2).unsafe_to_char() != '-' ||
+    value.unsafe_get(35).unsafe_to_char() != '-' ||
+    value.unsafe_get(52).unsafe_to_char() != '-' {
     return None
   }
   let version_hi = value.unsafe_get(0).unsafe_to_char()
@@ -134,13 +118,7 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
     // `ff` is a reserved invalid version.
     return None
   }
-  if dash1 - dash0 != 33 || dash2 - dash1 != 17 {
-    return None
-  }
-  let flags_start = dash2 + 1
-  if flags_start + 2 > len {
-    return None
-  }
+  let flags_start = 53
   let flags_hi = hex_digit_value(value.unsafe_get(flags_start).unsafe_to_char())
   let flags_lo = hex_digit_value(
     value.unsafe_get(flags_start + 1).unsafe_to_char(),
@@ -148,19 +126,18 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
   if flags_hi < 0 || flags_lo < 0 {
     return None
   }
-  if flags_start + 2 < len &&
-    value.unsafe_get(flags_start + 2).unsafe_to_char() != '-' {
+  if len > 55 && value.unsafe_get(55).unsafe_to_char() != '-' {
     return None
   }
-  if version_hi == '0' && version_lo == '0' && extra_dashes {
+  if version_hi == '0' && version_lo == '0' && len > 55 {
     // Version 00 does not allow additional fields.
     return None
   }
-  let trace_id = match decode_hex(value, dash0 + 1, 16) {
+  let trace_id = match decode_hex(value, 3, 16) {
     Some(bytes) => bytes
     None => return None
   }
-  let span_id = match decode_hex(value, dash1 + 1, 8) {
+  let span_id = match decode_hex(value, 36, 8) {
     Some(bytes) => bytes
     None => return None
   }
@@ -333,10 +310,11 @@ pub fn parse_tracestate(value : String) -> String? {
   if value == "" {
     return None
   }
-  let members : Array[String] = []
+  let sb = StringBuilder(size_hint=value.length())
   let seen : Map[String, Unit] = Map([])
+  let mut count = 0
   for raw in value.split(",") {
-    if members.length() >= 32 {
+    if count >= 32 {
       return None
     }
     let item = raw.trim()
@@ -356,7 +334,13 @@ pub fn parse_tracestate(value : String) -> String? {
       return None
     }
     seen.set(key, ())
-    members.push(key + "=" + member_value)
+    if count > 0 {
+      sb.write_char(',')
+    }
+    sb.write_string(key)
+    sb.write_char('=')
+    sb.write_string(member_value)
+    count = count + 1
   }
-  Some(members.join(","))
+  Some(sb.to_string())
 }

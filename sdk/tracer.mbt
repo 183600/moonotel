@@ -31,9 +31,9 @@ pub fn Tracer::start_span(
     Some(ctx) => if ctx.is_valid() { Some(ctx) } else { None }
     None => None
   }
-  let trace_id = match valid_parent {
-    Some(ctx) => ctx.trace_id()
-    None => self.provider.id_generator.generate_trace_id()
+  let (trace_id, parent_span_id, tracestate) = match valid_parent {
+    Some(ctx) => (ctx.trace_id(), ctx.span_id(), ctx.tracestate())
+    None => (self.provider.id_generator.generate_trace_id(), [], "")
   }
   let span_id = self.provider.id_generator.generate_span_id()
   let decision = self.provider.sampler.should_sample(valid_parent, trace_id)
@@ -42,20 +42,12 @@ pub fn Tracer::start_span(
   } else {
     0
   }
-  let tracestate = match valid_parent {
-    Some(ctx) => ctx.tracestate()
-    None => ""
-  }
   let span_context = @api.span_context(
     trace_id,
     span_id,
     flags,
     tracestate=tracestate,
   )
-  let parent_span_id = match valid_parent {
-    Some(ctx) => ctx.span_id()
-    None => []
-  }
   let start_time = match start_time_unix_nano {
     Some(value) => value
     None => unix_nano_now()

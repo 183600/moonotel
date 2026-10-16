@@ -45,19 +45,19 @@ fn ProtoWriter::to_bytes(self : ProtoWriter) -> Bytes {
   Bytes::from_array(self.buf[:self.len])
 }
 
-fn ProtoWriter::write_byte(self : ProtoWriter, value : Byte) -> Unit {
-  self.reserve(1)
-  self.buf[self.len] = value
-  self.len = self.len + 1
-}
-
 fn ProtoWriter::write_varint(self : ProtoWriter, value : UInt64) -> Unit {
+  // A 64-bit varint is at most 10 bytes: reserve once, then write without
+  // re-checking bounds for every byte.
+  self.reserve(10)
   let mut v = value
+  let mut i = self.len
   while v >= 0x80 {
-    self.write_byte(((v & 0x7F) | 0x80).to_int().to_byte())
+    self.buf.unsafe_set(i, ((v & 0x7F) | 0x80).to_int().to_byte())
     v = v >> 7
+    i = i + 1
   }
-  self.write_byte(v.to_int().to_byte())
+  self.buf.unsafe_set(i, v.to_int().to_byte())
+  self.len = i + 1
 }
 
 fn ProtoWriter::write_tag(self : ProtoWriter, field : Int, wire_type : Int) -> Unit {
@@ -103,40 +103,27 @@ fn ProtoWriter::write_bytes_field(self : ProtoWriter, field : Int, value : Bytes
   self.write_bytes(value)
 }
 
-// Whether every UTF-16 code unit of the string is ASCII. For such strings the
-// UTF-8 byte length equals the code-unit length and the string can be written
-// without materializing an intermediate encoded byte array.
-fn is_ascii_string(value : String) -> Bool {
+// Write a length-delimited string field. ASCII strings (the common case) are
+// copied straight from their code units while scanning; the first non-ASCII
+// code unit restarts the field with the general UTF-8 encoding.
+fn ProtoWriter::write_string_field(self : ProtoWriter, field : Int, value : String) -> Unit {
+  self.write_tag(field, 2)
   let len = value.length()
-  let mut i = 0
-  while i < len {
-    if value.unsafe_get(i).to_int() >= 0x80 {
-      return false
-    }
-    i = i + 1
-  }
-  true
-}
-
-fn ProtoWriter::write_ascii_string(self : ProtoWriter, value : String) -> Unit {
-  let len = value.length()
+  let start = self.len
+  self.write_varint(len.to_uint64())
   self.reserve(len)
   let mut i = 0
   while i < len {
-    self.buf[self.len + i] = value.unsafe_get(i).to_int().to_byte()
+    let code = value.unsafe_get(i).to_int()
+    if code >= 0x80 {
+      self.len = start
+      let encoded = @utf8.encode(value)
+      self.write_bytes(encoded)
+      return
+    }
+    self.buf.unsafe_set(self.len, code.to_byte())
+    self.len = self.len + 1
     i = i + 1
-  }
-  self.len = self.len + len
-}
-
-fn ProtoWriter::write_string_field(self : ProtoWriter, field : Int, value : String) -> Unit {
-  self.write_tag(field, 2)
-  if is_ascii_string(value) {
-    self.write_varint(value.length().to_uint64())
-    self.write_ascii_string(value)
-  } else {
-    let encoded = @utf8.encode(value)
-    self.write_bytes(encoded)
   }
 }
 
@@ -154,5 +141,5 @@ fn ProtoWriter::append_message(self : ProtoWriter, field : Int, inner : ProtoWri
 
 // Helper: convert a byte array (values are masked to 8 bits) to Bytes.
 fn bytes_from_bytes_array(values : Array[Int]) -> Bytes {
-  Bytes::makei(values.length(), fn(i) { (values[i] & 0xFF).to_byte() })
+  Bytes::makei(values.length(), fn(i) { (values.unsafe_get(i) & 0xFF).to_byte() })
 }

@@ -41,13 +41,13 @@ pub fn IdGenerator::new(
 }
 
 fn pseudo_random_bytes(n : Int, state : Ref[UInt64]) -> Array[Int] {
-  let out : Array[Int] = Array(capacity=n)
+  let out : Array[Int] = Array::make(n, 0)
   let mut filled = 0
   while filled < n {
     let mut word = splitmix64(state)
     let mut taken = 0
     while taken < 8 && filled < n {
-      out.push((word & 0xFF).to_int())
+      out.unsafe_set(filled, (word & 0xFF).to_int())
       word = word >> 8
       taken = taken + 1
       filled = filled + 1
@@ -74,9 +74,9 @@ fn take_buffered(
   if source.length() - start < n {
     return None
   }
-  let out : Array[Int] = Array(capacity=n)
+  let out : Array[Int] = Array::make(n, 0)
   for i = 0; i < n; i = i + 1 {
-    out.push(source[start + i])
+    out.unsafe_set(i, source.unsafe_get(start + i))
   }
   if start + n >= source.length() {
     pending.val = []
@@ -99,13 +99,13 @@ fn random_bytes(
       let draw = if n < RANDOM_DRAW_BYTES { RANDOM_DRAW_BYTES } else { n }
       match @env.rand(draw) {
         Some(bytes) => {
-          let out : Array[Int] = Array(capacity=n)
+          let out : Array[Int] = Array::make(n, 0)
           for i = 0; i < n; i = i + 1 {
-            out.push(bytes[i].to_int() & 0xFF)
+            out.unsafe_set(i, bytes[i].to_int() & 0xFF)
           }
-          let rest : Array[Int] = Array(capacity=draw - n)
+          let rest : Array[Int] = Array::make(draw - n, 0)
           for i = n; i < draw; i = i + 1 {
-            rest.push(bytes[i].to_int() & 0xFF)
+            rest.unsafe_set(i - n, bytes[i].to_int() & 0xFF)
           }
           pending.val = rest
           offset.val = 0
