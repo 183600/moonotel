@@ -75,13 +75,14 @@ pub fn Sampler::record_only() -> Sampler {
 // Sample a deterministic fraction of traces based on the trace ID.
 // `ratio` is clamped: values <= 0 never sample, values >= 1 always sample.
 pub fn Sampler::trace_id_ratio_based(ratio : Double) -> Sampler {
+  let threshold = ratio_threshold(ratio)
   {
     sample: fn(_parent, trace_id) {
       if ratio <= 0.0 {
         sampling_decision_drop()
       } else if ratio >= 1.0 {
         sampling_decision_record_and_sample()
-      } else if trace_id_fraction(trace_id) < ratio_threshold(ratio) {
+      } else if trace_id_fraction(trace_id) < threshold {
         sampling_decision_record_and_sample()
       } else {
         sampling_decision_drop()

@@ -28,34 +28,39 @@ pub fn Context::with_value(self : Context, key : String, value : String) -> Cont
 
 // The nearest span context in the chain, if any.
 pub fn Context::span_context(self : Context) -> @api.SpanContext? {
-  match self.span_ctx {
-    Some(sc) => Some(sc)
-    None =>
-      match self.parent {
-        Some(parent) => parent.span_context()
-        None => None
-      }
+  let mut cursor : Context? = Some(self)
+  while true {
+    match cursor {
+      Some(context) =>
+        match context.span_ctx {
+          Some(sc) => return Some(sc)
+          None => cursor = context.parent
+        }
+      None => break
+    }
   }
+  None
 }
 
 // Look up a baggage value, searching outer contexts last.
 pub fn Context::value(self : Context, key : String) -> String? {
-  match (self.key, self.value) {
-    (Some(entry_key), Some(entry_value)) =>
-      if entry_key == key {
-        Some(entry_value)
-      } else {
-        match self.parent {
-          Some(parent) => parent.value(key)
-          None => None
+  let mut cursor : Context? = Some(self)
+  while true {
+    match cursor {
+      Some(context) =>
+        match (context.key, context.value) {
+          (Some(entry_key), Some(entry_value)) =>
+            if entry_key == key {
+              return Some(entry_value)
+            } else {
+              cursor = context.parent
+            }
+          _ => cursor = context.parent
         }
-      }
-    _ =>
-      match self.parent {
-        Some(parent) => parent.value(key)
-        None => None
-      }
+      None => break
+    }
   }
+  None
 }
 
 // Flatten the baggage of the whole chain, innermost values winning.

@@ -124,18 +124,31 @@ struct ResourceGroup {
 
 fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   let groups : Array[ResourceGroup] = []
+  let resource_index : Map[String, Int] = Map::new()
+  let mut last_resource : Map[String, @sdk.AttributeValue]? = None
+  let mut last_resource_key = ""
   for data in spans {
-    let key = resource_key(data.resource)
-    let mut resource_group : ResourceGroup? = None
-    for group in groups {
-      if group.key == key {
-        resource_group = Some(group)
+    let key = match last_resource {
+      Some(resource) =>
+        if physical_equal(resource, data.resource) {
+          last_resource_key
+        } else {
+          let computed = resource_key(data.resource)
+          last_resource_key = computed
+          computed
+        }
+      None => {
+        let computed = resource_key(data.resource)
+        last_resource_key = computed
+        computed
       }
     }
-    let target = match resource_group {
-      Some(group) => group
+    last_resource = Some(data.resource)
+    let target = match resource_index.get(key) {
+      Some(index) => groups[index]
       None => {
         let created : ResourceGroup = { key, resource: data.resource, scopes: [] }
+        resource_index.set(key, groups.length())
         groups.push(created)
         created
       }
@@ -163,7 +176,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
 
 // Encode spans as an `ExportTraceServiceRequest` protobuf message.
 pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
-  let writer = ProtoWriter::new()
+  let writer = ProtoWriter::with_capacity(64 + spans.length() * 128)
   for group in group_spans(spans) {
     writer.write_message_field(1, fn(resource_spans) {
       encode_resource(resource_spans, group.resource)

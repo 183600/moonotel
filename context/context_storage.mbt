@@ -20,8 +20,13 @@ pub fn current_context() -> Context {
 
 // Push a context, returning the previous top of the stack.
 pub fn attach(context : Context) -> Context {
-  let previous = current_context()
-  context_stack.val.push(context)
+  let stack = context_stack.val
+  let previous = if stack.length() == 0 {
+    Context::root()
+  } else {
+    stack[stack.length() - 1]
+  }
+  stack.push(context)
   previous
 }
 

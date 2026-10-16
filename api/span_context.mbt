@@ -7,8 +7,15 @@ pub struct SpanContext {
 }
 
 // Create an invalid SpanContext
+let invalid_context : SpanContext = {
+  trace_id: Array::make(16, 0),
+  span_id: Array::make(8, 0),
+  trace_flags: 0,
+  is_valid: false,
+}
+
 pub fn invalid_span_context() -> SpanContext {
-  { trace_id: Array::make(16, 0), span_id: Array::make(8, 0), trace_flags: 0, is_valid: false }
+  invalid_context
 }
 
 // Create a valid SpanContext with given IDs
@@ -68,7 +75,7 @@ fn nibble_to_hex_char(val : Int) -> Char {
 // Helper: convert bytes to hex string
 pub fn bytes_to_hex(bytes : Array[Int]) -> String {
   let len = bytes.length()
-  let sb = StringBuilder(size_hint = len * 4)
+  let sb = StringBuilder(size_hint = len * 2)
   let mut i = 0
   while i < len {
     let b = bytes[i]
@@ -121,14 +128,17 @@ fn hex_char_value(c : Char) -> Int? {
 
 // Parse a hex string into a byte array; returns None on odd length or invalid chars
 pub fn bytes_from_hex(hex : String) -> Array[Int]? {
-  let chars = hex.to_array()
-  if chars.length() % 2 != 0 {
+  let len = hex.length()
+  if len % 2 != 0 {
     return None
   }
-  let out : Array[Int] = []
+  let out : Array[Int] = Array(capacity=len / 2)
   let mut i = 0
-  while i < chars.length() {
-    match (hex_char_value(chars[i]), hex_char_value(chars[i + 1])) {
+  while i < len {
+    match (
+      hex_char_value(hex.unsafe_get(i).unsafe_to_char()),
+      hex_char_value(hex.unsafe_get(i + 1).unsafe_to_char()),
+    ) {
       (Some(hi), Some(lo)) => out.push(hi * 16 + lo)
       _ => return None
     }
@@ -143,6 +153,9 @@ pub fn span_context_from_hex(
   span_id_hex : String,
   trace_flags : Int
 ) -> SpanContext {
+  if trace_id_hex.length() != 32 || span_id_hex.length() != 16 {
+    return invalid_span_context()
+  }
   match (bytes_from_hex(trace_id_hex), bytes_from_hex(span_id_hex)) {
     (Some(trace_id), Some(span_id)) =>
       if trace_id.length() == 16 && span_id.length() == 8 {

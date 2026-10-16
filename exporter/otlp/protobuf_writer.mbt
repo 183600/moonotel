@@ -6,7 +6,11 @@ priv struct ProtoWriter {
 }
 
 fn ProtoWriter::new() -> ProtoWriter {
-  { buf: Buffer() }
+  { buf: Buffer(size_hint=32) }
+}
+
+fn ProtoWriter::with_capacity(size_hint : Int) -> ProtoWriter {
+  { buf: Buffer(size_hint=size_hint) }
 }
 
 fn ProtoWriter::to_bytes(self : ProtoWriter) -> Bytes {
@@ -76,9 +80,5 @@ fn ProtoWriter::write_message_field(
 
 // Helper: convert a byte array (values are masked to 8 bits) to Bytes.
 fn bytes_from_bytes_array(values : Array[Int]) -> Bytes {
-  let buffer = Buffer(size_hint=values.length())
-  for value in values {
-    buffer.write_byte((value & 0xFF).to_byte())
-  }
-  buffer.to_bytes()
+  Bytes::makei(values.length(), fn(i) { (values[i] & 0xFF).to_byte() })
 }

@@ -17,6 +17,7 @@ fn fill_zero_checked(bytes : Array[Int]) -> Array[Int] {
   for b in bytes {
     if b != 0 {
       nonzero = true
+      break
     }
   }
   if !nonzero {
@@ -40,14 +41,16 @@ pub fn IdGenerator::new(
 }
 
 fn pseudo_random_bytes(n : Int, state : Ref[UInt64]) -> Array[Int] {
-  let out : Array[Int] = []
-  while out.length() < n {
+  let out : Array[Int] = Array(capacity=n)
+  let mut filled = 0
+  while filled < n {
     let mut word = splitmix64(state)
-    for j = 0; j < 8; j = j + 1 {
-      if out.length() < n {
-        out.push((word % 256).to_int())
-        word = word / 256
-      }
+    let mut taken = 0
+    while taken < 8 && filled < n {
+      out.push((word & 0xFF).to_int())
+      word = word >> 8
+      taken = taken + 1
+      filled = filled + 1
     }
   }
   fill_zero_checked(out)
@@ -56,7 +59,7 @@ fn pseudo_random_bytes(n : Int, state : Ref[UInt64]) -> Array[Int] {
 fn random_bytes(n : Int, state : Ref[UInt64]) -> Array[Int] {
   match @env.rand(n) {
     Some(bytes) => {
-      let out : Array[Int] = []
+      let out : Array[Int] = Array(capacity=bytes.length())
       for i = 0; i < bytes.length(); i = i + 1 {
         out.push(bytes[i].to_int() & 0xFF)
       }
