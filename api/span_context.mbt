@@ -34,7 +34,7 @@ pub fn SpanContext::span_id_hex(self : SpanContext) -> String {
 
 // Check if trace flags indicate sampled
 pub fn SpanContext::is_sampled(self : SpanContext) -> Bool {
-  self.is_valid && (self.trace_flags & 1) != 0
+  (self.trace_flags & 1) != 0
 }
 
 // Helper: check if byte array is all zeros

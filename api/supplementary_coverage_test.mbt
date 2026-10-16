@@ -119,7 +119,7 @@ test "span_context_trace_id_all_zeros_length_16" {
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
   let sc = span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
-  assert_false(sc.is_sampled())
+  assert_true(sc.is_sampled())
 }
 
 test "span_context_trace_id_single_nonzero_at_start" {
@@ -168,7 +168,7 @@ test "span_context_span_id_all_zeros_length_8" {
   let span_id = [0, 0, 0, 0, 0, 0, 0, 0]
   let sc = span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
-  assert_false(sc.is_sampled())
+  assert_true(sc.is_sampled())
 }
 
 test "span_context_span_id_single_nonzero_at_start" {
