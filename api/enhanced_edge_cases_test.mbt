@@ -1,4 +1,4 @@
-// Enhanced edge case tests for OpenTelemetry Span Context
+// Edge case tests for OpenTelemetry Span Context
 // Focus on boundary conditions, special values, and combination scenarios
 
 // Test trace_id with various patterns

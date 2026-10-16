@@ -1,6 +1,3 @@
-// Regression test: an untraced server request (no tracer available) must not
-// pop a context that the caller attached before starting the server.
-
 async test "untraced_server_does_not_pop_caller_context" {
   let parent = @api.span_context(
     Array::make(16, 5),

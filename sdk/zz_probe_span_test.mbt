@@ -1,6 +1,3 @@
-// Regression tests for SpanSdk mutator semantics and processor notification
-// rules on non-recording spans.
-
 struct StartCounter {
   mut starts : Int
 }

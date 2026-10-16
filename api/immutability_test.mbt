@@ -1,5 +1,3 @@
-// Regression tests for SpanContext mutation/aliasing behavior
-
 test "span_context_aliases_input_arrays" {
   let trace_id = Array::make(16, 0)
   trace_id[0] = 1

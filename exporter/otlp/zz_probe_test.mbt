@@ -1,7 +1,3 @@
-// Regression tests: spans whose resources differ must be encoded as separate
-// ResourceSpans groups. Grouping keys must distinguish values that merely look
-// similar when flattened (delimiters inside strings, attribute value types).
-
 fn probe_span_with(resource : Map[String, @sdk.AttributeValue]) -> @sdk.SpanData {
   {
     name: "probe",

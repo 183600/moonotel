@@ -1,6 +1,5 @@
-// Additional comprehensive tests for SpanContext and W3C Trace Context
+// Tests for SpanContext and W3C Trace Context
 
-// Enhanced SpanContext tests
 test "span_context_equality_test" {
   let trace_id1 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
   let span_id1 = [16, 17, 18, 19, 20, 21, 22, 23]

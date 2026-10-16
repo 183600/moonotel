@@ -1,4 +1,4 @@
-// Enhanced comprehensive tests for SpanContext functionality
+// Tests for SpanContext functionality
 
 // Tests for byte_to_hex_char with all valid inputs
 test "byte_to_hex_char_0" {

@@ -1,5 +1,3 @@
-// New comprehensive tests for enhanced coverage
-
 test "span_context_flags_boundary_values" {
   let tid = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
   let sid = [1,2,3,4,5,6,7,8]
@@ -102,7 +100,6 @@ test "span_context_large_flag_values" {
 }
 
 test "is_zero_optimization_patterns" {
-  // Test various array sizes that might trigger optimizations
   let sizes = [0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
   
   let mut i = 0
@@ -531,7 +528,6 @@ test "span_context_comprehensive_edge_case_matrix" {
 }
 
 test "is_zero_optimization_detection" {
-  // Test that is_zero works correctly regardless of optimization opportunities
   let patterns = [
     [], // Empty array
     [0], // Single zero

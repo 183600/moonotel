@@ -1,7 +1,3 @@
-// Regression test: full-fidelity encode/parse round trip covering all
-// attribute types, unicode strings and a resource value large enough to force
-// the protobuf writer to grow its backing buffer.
-
 test "encode_all_attribute_types_and_unicode" {
   let long_resource = "r" + "x".repeat(2000)
   let attributes : Map[String, @sdk.AttributeValue] = Map::new()

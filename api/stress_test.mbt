@@ -89,7 +89,6 @@ test "boundary_string_tests" {
   assert_eq(pair_bytes[0], 255)
 }
 
-// Performance regression test
 test "performance_regression_test" {
   // Test many hex operations
   let mut count = 0

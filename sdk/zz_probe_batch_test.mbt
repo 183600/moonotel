@@ -1,6 +1,3 @@
-// Regression tests: batch processor queue behavior checked against a simple
-// reference model, for a batch smaller and larger than the queue bound.
-
 struct ProbeExporter {
   names : Array[String]
 }

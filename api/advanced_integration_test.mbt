@@ -402,7 +402,6 @@ test "comprehensive_hex_encoding_performance" {
 }
 
 test "span_context_regression_prevention" {
-  // Regression test for common pitfalls
   let standard_trace = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let standard_span = [17, 18, 19, 20, 21, 22, 23, 24]
   
