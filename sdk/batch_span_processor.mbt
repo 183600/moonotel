@@ -123,13 +123,6 @@ fn BatchSpanProcessor::live_count(self : BatchSpanProcessor) -> Int {
   self.count
 }
 
-// Whether the scheduled flush interval has elapsed since the last export.
-fn BatchSpanProcessor::is_flush_due(self : BatchSpanProcessor) -> Bool {
-  self.flush_interval_millis > 0 &&
-  @env.now() - self.last_flush_time_millis >=
-  self.flush_interval_millis.to_uint64()
-}
-
 // Append a span, overwriting the oldest buffered span when the queue is full.
 fn BatchSpanProcessor::push_span(self : BatchSpanProcessor, data : SpanData) -> Unit {
   let capacity = self.max_queue_size
@@ -151,6 +144,16 @@ fn BatchSpanProcessor::push_span(self : BatchSpanProcessor, data : SpanData) -> 
 
 // Export up to `max_export_batch_size` spans from the front of the queue.
 pub fn BatchSpanProcessor::flush_batch(self : BatchSpanProcessor) -> Unit {
+  self.flush_batch_at(@env.now())
+}
+
+// Export up to `max_export_batch_size` spans from the front of the queue,
+// stamping the flush with `now` so callers that already read the clock can
+// avoid a second read.
+fn BatchSpanProcessor::flush_batch_at(
+  self : BatchSpanProcessor,
+  now : UInt64
+) -> Unit {
   let available = self.live_count()
   if available == 0 {
     return
@@ -163,15 +166,19 @@ pub fn BatchSpanProcessor::flush_batch(self : BatchSpanProcessor) -> Unit {
   let capacity = self.max_queue_size
   let queue = self.queue
   let batch : Array[SpanData] = Array(capacity=n)
+  let mut index = self.head
   let mut i = 0
   while i < n {
-    batch.push(queue.unsafe_get((self.head + i) % capacity))
+    batch.push(queue.unsafe_get(index))
+    index = index + 1
+    if index >= capacity {
+      index = 0
+    }
     i = i + 1
   }
-  let next = self.head + n
-  self.head = if next >= capacity { next % capacity } else { next }
+  self.head = index
   self.count = available - n
-  self.last_flush_time_millis = @env.now()
+  self.last_flush_time_millis = now
   let _ = self.exporter.export_spans(batch)
 }
 
@@ -182,8 +189,12 @@ pub fn BatchSpanProcessor::tick(self : BatchSpanProcessor) -> Unit {
   if self.shutdown_called || self.live_count() == 0 {
     return
   }
-  if self.is_flush_due() {
-    self.flush_batch()
+  if self.flush_interval_millis > 0 {
+    let now = @env.now()
+    if now - self.last_flush_time_millis >=
+      self.flush_interval_millis.to_uint64() {
+      self.flush_batch_at(now)
+    }
   }
 }
 
@@ -199,8 +210,14 @@ pub impl SpanProcessor for BatchSpanProcessor with on_end(self, data) {
     return
   }
   self.push_span(data)
-  if self.live_count() >= self.max_export_batch_size || self.is_flush_due() {
+  if self.live_count() >= self.max_export_batch_size {
     self.flush_batch()
+  } else if self.flush_interval_millis > 0 {
+    let now = @env.now()
+    if now - self.last_flush_time_millis >=
+      self.flush_interval_millis.to_uint64() {
+      self.flush_batch_at(now)
+    }
   }
 }
 

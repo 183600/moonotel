@@ -27,24 +27,22 @@ pub fn IdGenerator::new(
 }
 
 fn pseudo_random_bytes(n : Int, state : Ref[UInt64]) -> Array[Int] {
-  let out : Array[Int] = Array::make(n, 0)
+  let out : Array[Int] = Array::unsafe_make_uninit(n)
   let mut filled = 0
-  let mut nonzero = false
+  let mut acc = 0
   while filled < n {
     let mut word = splitmix64(state)
     let mut taken = 0
     while taken < 8 && filled < n {
       let b = (word & 0xFF).to_int()
       out.unsafe_set(filled, b)
-      if b != 0 {
-        nonzero = true
-      }
+      acc = acc | b
       word = word >> 8
       taken = taken + 1
       filled = filled + 1
     }
   }
-  if !nonzero {
+  if acc == 0 {
     out.unsafe_set(n - 1, 1)
   }
   out
@@ -65,18 +63,16 @@ fn take_buffered(
   if source.length() - start < n {
     return None
   }
-  let out : Array[Int] = Array::make(n, 0)
-  let mut nonzero = false
+  let out : Array[Int] = Array::unsafe_make_uninit(n)
+  let mut acc = 0
   let mut i = 0
   while i < n {
     let b = source.unsafe_get(start + i).to_int()
     out.unsafe_set(i, b)
-    if b != 0 {
-      nonzero = true
-    }
+    acc = acc | b
     i = i + 1
   }
-  if !nonzero {
+  if acc == 0 {
     out.unsafe_set(n - 1, 1)
   }
   if start + n >= source.length() {

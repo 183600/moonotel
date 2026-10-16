@@ -141,7 +141,7 @@ pub fn format_traceparent(sc : @api.SpanContext) -> String {
   out.unsafe_set(52 * 2, b'-')
   out.unsafe_set(53 * 2, nibble_to_hex_byte(flags >> 4))
   out.unsafe_set(54 * 2, nibble_to_hex_byte(flags & 0x0F))
-  Bytes::from_array(out[:]).to_unchecked_string()
+  out.unsafe_reinterpret_as_bytes().to_unchecked_string()
 }
 
 // Parse a `traceparent` header value into a SpanContext.

@@ -94,14 +94,34 @@ fn varint_size(value : UInt64) -> Int32 {
 ///|
 fn utf8_length(text : String) -> Int32 {
   let len = text.length()
+  // Fast path: pure-ASCII text has one UTF-8 byte per UTF-16 code unit.
   let mut i = 0
   while i < len {
     if text.unsafe_get(i).to_int() >= 0x80 {
-      return @utf8.encode(text).length()
+      break
     }
     i = i + 1
   }
-  len
+  if i == len {
+    return len
+  }
+  // Count the UTF-8 bytes directly. Surrogates count two bytes each, so a
+  // valid surrogate pair counts four, matching `@utf8.encode`.
+  let mut bytes = i
+  while i < len {
+    let code = text.unsafe_get(i).to_int()
+    if code < 0x80 {
+      bytes = bytes + 1
+    } else if code < 0x800 {
+      bytes = bytes + 2
+    } else if code >= 0xD800 && code <= 0xDFFF {
+      bytes = bytes + 2
+    } else {
+      bytes = bytes + 3
+    }
+    i = i + 1
+  }
+  bytes
 }
 
 // Exact encoded size of the scalar `AnyValue` forms.

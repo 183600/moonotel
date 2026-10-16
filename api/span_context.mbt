@@ -112,7 +112,7 @@ pub fn bytes_to_hex(bytes : Array[Int]) -> String {
     out.unsafe_set(i * 4 + 2, nibble_to_hex_byte(b & 0x0F))
     i = i + 1
   }
-  Bytes::from_array(out[:]).to_unchecked_string()
+  out.unsafe_reinterpret_as_bytes().to_unchecked_string()
 }
 
 // Helper: convert byte value to hex character

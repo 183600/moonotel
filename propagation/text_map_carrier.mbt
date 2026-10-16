@@ -48,15 +48,13 @@ pub fn TextMapCarrier::get(self : TextMapCarrier, key : String) -> String? {
   match self.entries.get(key) {
     Some(value) => Some(value)
     None => {
-      let mut found : String? = None
       for entry in self.entries.iter() {
         let (candidate, value) = entry
         if ascii_case_insensitive_equal(candidate, key) {
-          found = Some(value)
-          break
+          return Some(value)
         }
       }
-      found
+      None
     }
   }
 }
