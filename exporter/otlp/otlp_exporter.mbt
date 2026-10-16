@@ -174,6 +174,9 @@ fn is_retryable_status(status_code : Int) -> Bool {
 pub struct OtlpHttpExporter {
   config : OtlpHttpConfig
   transport : Transport
+  // The trace endpoint URL derived from the (immutable) config strings, so it
+  // is computed once instead of on every export.
+  url : String
 }
 
 // Create an exporter with an injected transport function.
@@ -181,7 +184,7 @@ pub fn OtlpHttpExporter::new(
   config : OtlpHttpConfig,
   transport : Transport
 ) -> OtlpHttpExporter {
-  { config, transport }
+  { config, transport, url: config.traces_url() }
 }
 
 // The exporter configuration.
@@ -222,7 +225,7 @@ pub fn OtlpHttpExporter::export_spans_http(
     )
   }
   let body = encode_trace_request(spans)
-  let url = self.config.traces_url()
+  let url = self.url
   let headers = exporter_headers(self.config)
   let mut attempt = 0
   let mut last_failure = ""

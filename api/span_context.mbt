@@ -89,28 +89,30 @@ let hex_digits : Array[String] = [
   "8", "9", "a", "b", "c", "d", "e", "f",
 ]
 
-fn nibble_to_hex_char(val : Int) -> Char {
+fn nibble_to_hex_byte(val : Int) -> Byte {
   if val >= 0 && val < 10 {
-    (val + 48).unsafe_to_char()
+    (val + 48).to_byte()
   } else if val >= 10 && val < 16 {
-    (val + 87).unsafe_to_char()
+    (val + 87).to_byte()
   } else {
-    '0'
+    b'0'
   }
 }
 
 // Helper: convert bytes to hex string
 pub fn bytes_to_hex(bytes : Array[Int]) -> String {
   let len = bytes.length()
-  let sb = StringBuilder(size_hint = len * 2)
+  // A String stores UTF-16 code units, so each of the `len * 2` hex
+  // characters needs two bytes (low byte first, high byte zero for ASCII).
+  let out = FixedArray::make(len * 4, b'\x00')
   let mut i = 0
   while i < len {
     let b = bytes.unsafe_get(i)
-    sb.write_char(nibble_to_hex_char(b >> 4))
-    sb.write_char(nibble_to_hex_char(b & 0x0F))
+    out.unsafe_set(i * 4, nibble_to_hex_byte(b >> 4))
+    out.unsafe_set(i * 4 + 2, nibble_to_hex_byte(b & 0x0F))
     i = i + 1
   }
-  sb.to_string()
+  Bytes::from_array(out[:]).to_unchecked_string()
 }
 
 // Helper: convert byte value to hex character

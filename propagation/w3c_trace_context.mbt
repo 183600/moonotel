@@ -94,23 +94,30 @@ fn decode_hex(value : String, start : Int, byte_count : Int) -> Array[Int]? {
   Some(out)
 }
 
-fn nibble_to_hex_char(value : Int) -> Char {
+fn nibble_to_hex_byte(value : Int) -> Byte {
   if value >= 0 && value < 10 {
-    (value + 48).unsafe_to_char()
+    (value + 48).to_byte()
   } else if value >= 10 && value < 16 {
-    (value + 87).unsafe_to_char()
+    (value + 87).to_byte()
   } else {
-    '0'
+    b'0'
   }
 }
 
-fn write_hex(sb : StringBuilder, bytes : Array[Int]) -> Unit {
-  let len = bytes.length()
+// Write `byte_count` bytes as hex characters into `out` starting at character
+// index `start`. Each character occupies a UTF-16LE code unit (two bytes, low
+// byte first); the high bytes are left zero by the caller's buffer.
+fn write_hex(
+  out : FixedArray[Byte],
+  start : Int,
+  bytes : Array[Int],
+  byte_count : Int
+) -> Unit {
   let mut i = 0
-  while i < len {
+  while i < byte_count {
     let b = bytes.unsafe_get(i)
-    sb.write_char(nibble_to_hex_char(b >> 4))
-    sb.write_char(nibble_to_hex_char(b & 0x0F))
+    out.unsafe_set((start + i * 2) * 2, nibble_to_hex_byte(b >> 4))
+    out.unsafe_set((start + i * 2 + 1) * 2, nibble_to_hex_byte(b & 0x0F))
     i = i + 1
   }
 }
@@ -122,15 +129,19 @@ pub fn format_traceparent(sc : @api.SpanContext) -> String {
     return ""
   }
   let flags = sc.trace_flags() & 0xFF
-  let sb = StringBuilder(size_hint=110)
-  sb.write_string("00-")
-  write_hex(sb, sc.trace_id_view())
-  sb.write_char('-')
-  write_hex(sb, sc.span_id_view())
-  sb.write_char('-')
-  sb.write_char(nibble_to_hex_char(flags >> 4))
-  sb.write_char(nibble_to_hex_char(flags & 0x0F))
-  sb.to_string()
+  // `00-` + 32 trace chars + `-` + 16 span chars + `-` + 2 flag chars, each
+  // character occupying two UTF-16LE bytes.
+  let out = FixedArray::make(55 * 2, b'\x00')
+  out.unsafe_set(0, b'0')
+  out.unsafe_set(2, b'0')
+  out.unsafe_set(4, b'-')
+  write_hex(out, 3, sc.trace_id_view(), 16)
+  out.unsafe_set(35 * 2, b'-')
+  write_hex(out, 36, sc.span_id_view(), 8)
+  out.unsafe_set(52 * 2, b'-')
+  out.unsafe_set(53 * 2, nibble_to_hex_byte(flags >> 4))
+  out.unsafe_set(54 * 2, nibble_to_hex_byte(flags & 0x0F))
+  Bytes::from_array(out[:]).to_unchecked_string()
 }
 
 // Parse a `traceparent` header value into a SpanContext.
