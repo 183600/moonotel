@@ -9,6 +9,7 @@
 //
 // The package targets native only, because the async HTTP stack does.
 
+///|
 fn is_retryable_status(status_code : Int) -> Bool {
   match status_code {
     429 | 502 | 503 | 504 => true
@@ -16,8 +17,10 @@ fn is_retryable_status(status_code : Int) -> Bool {
   }
 }
 
+///|
 fn request_headers(
-  config : @otlp.OtlpHttpConfig
+  config : @otlp.OtlpHttpConfig,
+  gzip : Bool,
 ) -> Map[@http.CaseInsensitiveString, String] {
   let headers = Map([])
   for entry in config.headers.iter() {
@@ -28,27 +31,60 @@ fn request_headers(
     @http.CaseInsensitiveString("content-type"),
     "application/x-protobuf",
   )
+  if gzip {
+    headers.set(@http.CaseInsensitiveString("content-encoding"), "gzip")
+  }
   headers
+}
+
+// Compress `data` with gzip. The encoder writes into an in-memory pipe that
+// the returned reader drains.
+
+///|
+async fn gzip_compress(data : Bytes) -> Bytes {
+  let reader = @io.MemoryReader() <| w => {
+    let encoder = @gzip.Encoder(w)
+    encoder.write(data)
+    encoder.end()
+  }
+  defer reader.close()
+  reader.read_all().binary()
 }
 
 // POST an already encoded `ExportTraceServiceRequest` body to the configured
 // trace endpoint and interpret the response. Network errors and retryable
 // statuses (429, 502, 503, 504) are retried up to `config.max_retries` times
-// with a short linear backoff.
+// with a short linear backoff. When `config.compression` is `gzip` the body is
+// compressed once and sent with `Content-Encoding: gzip`.
+
+///|
 pub async fn post_trace_request(
   config : @otlp.OtlpHttpConfig,
-  body : Bytes
+  body : Bytes,
 ) -> @sdk.ExportResult {
   if config.protocol != @otlp.OTLP_HTTP_PROTOBUF_PROTOCOL {
     return @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol)
   }
-  if config.compression != "none" {
+  let gzip = config.compression == "gzip"
+  if !gzip && config.compression != "none" {
     return @sdk.ExportFailure(
       "unsupported OTLP compression: " + config.compression,
     )
   }
+  let body = if gzip {
+    let compressed : Bytes? = Some(gzip_compress(body)) catch { _ => None }
+    match compressed {
+      Some(payload) => payload
+      None =>
+        return @sdk.ExportFailure(
+          "failed to gzip-compress the OTLP request body",
+        )
+    }
+  } else {
+    body
+  }
   let url = config.traces_url()
-  let headers = request_headers(config)
+  let headers = request_headers(config, gzip)
   let mut attempt = 0
   let mut last_failure = ""
   while attempt <= config.max_retries {
@@ -59,17 +95,17 @@ pub async fn post_trace_request(
     let outcome = try {
       if timeout > 0 {
         Some(
-          @async.with_timeout(
-            timeout,
-            () => @http.post(url, body, headers=headers),
-          ),
+          @async.with_timeout(timeout, () => @http.post(url, body, headers~)),
         )
       } else {
-        Some(@http.post(url, body, headers=headers))
+        Some(@http.post(url, body, headers~))
       }
     } catch {
       error => {
-        last_failure = "OTLP request to " + url + " failed: " + error.to_string()
+        last_failure = "OTLP request to " +
+          url +
+          " failed: " +
+          error.to_string()
         None
       }
     }
@@ -93,9 +129,11 @@ pub async fn post_trace_request(
 
 // Encode and export the given spans over OTLP/HTTP. Exporting an empty array
 // is a no-op success.
+
+///|
 pub async fn export_spans(
   config : @otlp.OtlpHttpConfig,
-  spans : Array[@sdk.SpanData]
+  spans : Array[@sdk.SpanData],
 ) -> @sdk.ExportResult {
   if spans.length() == 0 {
     return @sdk.ExportSuccess
@@ -105,28 +143,36 @@ pub async fn export_spans(
 
 // An async span exporter over OTLP/HTTP. Use it with an async flush loop
 // (for example `export_spans` inside `@async.with_task_group`).
+
+///|
 pub struct OtlpHttpAsyncExporter {
   config : @otlp.OtlpHttpConfig
 }
 
 // Create an exporter that sends spans to `config`.
+
+///|
 pub fn OtlpHttpAsyncExporter::new(
-  config : @otlp.OtlpHttpConfig
+  config : @otlp.OtlpHttpConfig,
 ) -> OtlpHttpAsyncExporter {
   { config, }
 }
 
 // The exporter configuration.
+
+///|
 pub fn OtlpHttpAsyncExporter::config(
-  self : OtlpHttpAsyncExporter
+  self : OtlpHttpAsyncExporter,
 ) -> @otlp.OtlpHttpConfig {
   self.config
 }
 
 // Export a batch of finished spans.
+
+///|
 pub async fn OtlpHttpAsyncExporter::export_batch(
   self : OtlpHttpAsyncExporter,
-  spans : Array[@sdk.SpanData]
+  spans : Array[@sdk.SpanData],
 ) -> @sdk.ExportResult {
   export_spans(self.config, spans)
 }

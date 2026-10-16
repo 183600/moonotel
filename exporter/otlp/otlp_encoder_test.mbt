@@ -3,14 +3,16 @@
 // These tests decode the produced `ExportTraceServiceRequest` with a minimal
 // protobuf reader and assert on the wire content.
 
+///|
 struct Field {
-  number : Int
-  wire : Int
+  number : Int32
+  wire : Int32
   varint : UInt64
   payload : BytesView
 }
 
-fn read_varint(data : BytesView, offset : Int) -> (UInt64, Int) {
+///|
+fn read_varint(data : BytesView, offset : Int32) -> (UInt64, Int32) {
   let mut result : UInt64 = 0
   let mut shift = 0
   let mut pos = offset
@@ -28,6 +30,7 @@ fn read_varint(data : BytesView, offset : Int) -> (UInt64, Int) {
   (result, pos)
 }
 
+///|
 fn parse_fields(data : BytesView) -> Array[Field] {
   let fields : Array[Field] = []
   let length = data.length()
@@ -40,7 +43,12 @@ fn parse_fields(data : BytesView) -> Array[Field] {
     if wire == 0 {
       let (value, after) = read_varint(data, pos)
       pos = after
-      fields.push({ number, wire, varint: value, payload: data.exact_view(start=0, end=0) })
+      fields.push({
+        number,
+        wire,
+        varint: value,
+        payload: data.exact_view(start=0, end=0),
+      })
     } else if wire == 1 {
       fields.push({
         number,
@@ -74,7 +82,8 @@ fn parse_fields(data : BytesView) -> Array[Field] {
   fields
 }
 
-fn fields_of(fields : Array[Field], number : Int) -> Array[Field] {
+///|
+fn fields_of(fields : Array[Field], number : Int32) -> Array[Field] {
   let out : Array[Field] = []
   for field in fields {
     if field.number == number {
@@ -84,7 +93,8 @@ fn fields_of(fields : Array[Field], number : Int) -> Array[Field] {
   out
 }
 
-fn first_of(fields : Array[Field], number : Int) -> Field? {
+///|
+fn first_of(fields : Array[Field], number : Int32) -> Field? {
   for field in fields {
     if field.number == number {
       return Some(field)
@@ -93,6 +103,7 @@ fn first_of(fields : Array[Field], number : Int) -> Field? {
   None
 }
 
+///|
 fn fixed64_value(payload : BytesView) -> UInt64 {
   let mut value : UInt64 = 0
   for i = 0; i < 8; i = i + 1 {
@@ -101,6 +112,7 @@ fn fixed64_value(payload : BytesView) -> UInt64 {
   value
 }
 
+///|
 fn attribute_value(span_fields : Array[Field], key : String) -> String? {
   for attribute in fields_of(span_fields, 9) {
     let kv = parse_fields(attribute.payload)
@@ -124,6 +136,7 @@ fn attribute_value(span_fields : Array[Field], key : String) -> String? {
   None
 }
 
+///|
 fn sample_span() -> @sdk.SpanData {
   let attributes : Map[String, @sdk.AttributeValue] = Map::new()
   attributes.set("http.request.method", @sdk.StringValue("GET"))
@@ -149,6 +162,7 @@ fn sample_span() -> @sdk.SpanData {
         attributes: Map::new(),
       },
     ],
+    links: [],
     status: @api.StatusCode::Ok,
     status_description: "",
     resource,
@@ -157,6 +171,7 @@ fn sample_span() -> @sdk.SpanData {
   }
 }
 
+///|
 test "encode_trace_request_span_fields" {
   let encoded = @otlp.encode_trace_request([sample_span()])
   let request = parse_fields(encoded.exact_view())
@@ -168,29 +183,47 @@ test "encode_trace_request_span_fields" {
   let resource_attributes = fields_of(resource_fields, 1)
   assert_eq(resource_attributes.length(), 1)
   let resource_kv = parse_fields(resource_attributes[0].payload)
-  assert_eq(first_of(resource_kv, 1).unwrap().payload |> @utf8.decode_lossy, "service.name")
+  assert_eq(
+    first_of(resource_kv, 1).unwrap().payload |> @utf8.decode_lossy,
+    "service.name",
+  )
   let scope_spans = first_of(resource_spans_fields, 2).unwrap()
   let scope_spans_fields = parse_fields(scope_spans.payload)
   let scope = first_of(scope_spans_fields, 1).unwrap()
   let scope_fields = parse_fields(scope.payload)
-  assert_eq(first_of(scope_fields, 1).unwrap().payload |> @utf8.decode_lossy, "encoder-scope")
-  assert_eq(first_of(scope_fields, 2).unwrap().payload |> @utf8.decode_lossy, "1.2.3")
+  assert_eq(
+    first_of(scope_fields, 1).unwrap().payload |> @utf8.decode_lossy,
+    "encoder-scope",
+  )
+  assert_eq(
+    first_of(scope_fields, 2).unwrap().payload |> @utf8.decode_lossy,
+    "1.2.3",
+  )
   let spans = fields_of(scope_spans_fields, 2)
   assert_eq(spans.length(), 1)
   let span = parse_fields(spans[0].payload)
   assert_eq(
-    @api.bytes_to_hex(first_of(span, 1).unwrap().payload.to_array().map(byte_to_int)),
+    @api.bytes_to_hex(
+      first_of(span, 1).unwrap().payload.to_array().map(byte_to_int),
+    ),
     "4bf92f359d1e75b7618a2d1f3c4e5a6b",
   )
   assert_eq(
-    @api.bytes_to_hex(first_of(span, 2).unwrap().payload.to_array().map(byte_to_int)),
+    @api.bytes_to_hex(
+      first_of(span, 2).unwrap().payload.to_array().map(byte_to_int),
+    ),
     "00f067aa0ba902b7",
   )
   assert_eq(
-    @api.bytes_to_hex(first_of(span, 4).unwrap().payload.to_array().map(byte_to_int)),
+    @api.bytes_to_hex(
+      first_of(span, 4).unwrap().payload.to_array().map(byte_to_int),
+    ),
     "1122334455667788",
   )
-  assert_eq(first_of(span, 5).unwrap().payload |> @utf8.decode_lossy, "GET /users")
+  assert_eq(
+    first_of(span, 5).unwrap().payload |> @utf8.decode_lossy,
+    "GET /users",
+  )
   assert_eq(first_of(span, 6).unwrap().varint, 2)
   assert_eq(
     fixed64_value(first_of(span, 7).unwrap().payload).reinterpret_as_int64(),
@@ -207,17 +240,23 @@ test "encode_trace_request_span_fields" {
   let events = fields_of(span, 11)
   assert_eq(events.length(), 1)
   let event_fields = parse_fields(events[0].payload)
-  assert_eq(first_of(event_fields, 2).unwrap().payload |> @utf8.decode_lossy, "retry")
+  assert_eq(
+    first_of(event_fields, 2).unwrap().payload |> @utf8.decode_lossy,
+    "retry",
+  )
 }
 
-fn byte_to_int(value : Byte) -> Int {
+///|
+fn byte_to_int(value : Byte) -> Int32 {
   value.to_int() & 0xFF
 }
 
+///|
 test "encode_trace_request_empty" {
   assert_eq(@otlp.encode_trace_request([]).length(), 0)
 }
 
+///|
 test "encode_trace_request_groups_scopes" {
   let first = sample_span()
   let second = sample_span()
@@ -230,9 +269,10 @@ test "encode_trace_request_groups_scopes" {
   assert_eq(fields_of(parse_fields(scope_spans[0].payload), 2).length(), 2)
 }
 
+///|
 test "encode_root_span_omits_parent" {
   let span = sample_span()
-  let root : @sdk.SpanData = { ..span, parent_span_id: [] }
+  let root : @sdk.SpanData = { ..span, parent_span_id: [], }
   let encoded = @otlp.encode_trace_request([root])
   let request = parse_fields(encoded.exact_view())
   let resource_spans = parse_fields(fields_of(request, 1)[0].payload)
@@ -241,7 +281,8 @@ test "encode_root_span_omits_parent" {
   assert_true(first_of(span_fields, 4) is None)
 }
 
-fn span_field_text(span : @sdk.SpanData, number : Int) -> String? {
+///|
+fn span_field_text(span : @sdk.SpanData, number : Int32) -> String? {
   let encoded = @otlp.encode_trace_request([span])
   let request = parse_fields(encoded.exact_view())
   let resource_spans = parse_fields(fields_of(request, 1)[0].payload)
@@ -253,15 +294,15 @@ fn span_field_text(span : @sdk.SpanData, number : Int) -> String? {
   }
 }
 
+///|
 test "encode_span_writes_trace_state" {
   let span = sample_span()
   let with_state : @sdk.SpanData = {
     ..span,
-    span_context: span.span_context.with_tracestate("congo=t61rcWkgMzE,vendor=1"),
+    span_context: span.span_context.with_tracestate(
+      "congo=t61rcWkgMzE,vendor=1",
+    ),
   }
-  assert_eq(
-    span_field_text(with_state, 3),
-    Some("congo=t61rcWkgMzE,vendor=1"),
-  )
+  assert_eq(span_field_text(with_state, 3), Some("congo=t61rcWkgMzE,vendor=1"))
   assert_true(span_field_text(span, 3) is None)
 }

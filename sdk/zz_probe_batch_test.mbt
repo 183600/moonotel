@@ -1,18 +1,22 @@
+///|
 struct ProbeExporter {
   names : Array[String]
 }
 
-pub impl @sdk.SpanExporter for ProbeExporter with export_spans(self, spans) {
+///|
+pub impl @sdk.SpanExporter for ProbeExporter with fn export_spans(self, spans) {
   for data in spans {
     self.names.push(data.name)
   }
   @sdk.ExportSuccess
 }
 
-pub impl @sdk.SpanExporter for ProbeExporter with shutdown(self) {
+///|
+pub impl @sdk.SpanExporter for ProbeExporter with fn shutdown(self) {
   let _ = self
 }
 
+///|
 fn probe_span(name : String) -> @sdk.SpanData {
   {
     name,
@@ -27,6 +31,7 @@ fn probe_span(name : String) -> @sdk.SpanData {
     end_time_unix_nano: 2L,
     attributes: Map::new(),
     events: [],
+    links: [],
     status: @api.StatusCode::Unset,
     status_description: "",
     resource: Map::new(),
@@ -35,6 +40,7 @@ fn probe_span(name : String) -> @sdk.SpanData {
   }
 }
 
+///|
 fn probe_names_equal(a : Array[String], b : Array[String]) -> Bool {
   if a.length() != b.length() {
     return false
@@ -47,8 +53,9 @@ fn probe_names_equal(a : Array[String], b : Array[String]) -> Bool {
   true
 }
 
+///|
 test "probe_batch_queue_matches_model" {
-  let exporter : ProbeExporter = { names: [] }
+  let exporter : ProbeExporter = { names: [], }
   let max_queue = 3
   let batch_size = 2
   let processor = @sdk.BatchSpanProcessor::new(
@@ -83,8 +90,9 @@ test "probe_batch_queue_matches_model" {
   assert_true(probe_names_equal(exporter.names, model_exported))
 }
 
+///|
 test "probe_batch_queue_larger_batch_matches_model" {
-  let exporter : ProbeExporter = { names: [] }
+  let exporter : ProbeExporter = { names: [], }
   let max_queue = 5
   let batch_size = 7
   let processor = @sdk.BatchSpanProcessor::new(

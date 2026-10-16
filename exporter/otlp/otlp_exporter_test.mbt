@@ -1,17 +1,20 @@
 // Blackbox tests for the OTLP/HTTP exporter using a mock transport.
 
+///|
 struct MockTransport {
   urls : Array[String]
   bodies : Array[Bytes]
   headers : Array[Map[String, String]]
-  responses : Array[Int]
-  default_status : Int
+  responses : Array[Int32]
+  default_status : Int32
 }
 
-fn mock_transport(status : Int) -> MockTransport {
-  { urls: [], bodies: [], headers: [], responses: [], default_status: status }
+///|
+fn mock_transport(status : Int32) -> MockTransport {
+  { urls: [], bodies: [], headers: [], responses: [], default_status: status, }
 }
 
+///|
 fn MockTransport::as_transport(self : MockTransport) -> @otlp.Transport {
   fn(url, headers, body) {
     self.urls.push(url)
@@ -22,10 +25,11 @@ fn MockTransport::as_transport(self : MockTransport) -> @otlp.Transport {
     } else {
       self.default_status
     }
-    { status_code: status, body: b"" }
+    { status_code: status, body: b"", }
   }
 }
 
+///|
 fn test_span() -> @sdk.SpanData {
   let resource : Map[String, @sdk.AttributeValue] = Map::new()
   resource.set(@sdk.SERVICE_NAME, @sdk.StringValue("exporter-test"))
@@ -42,6 +46,7 @@ fn test_span() -> @sdk.SpanData {
     end_time_unix_nano: 2L,
     attributes: Map::new(),
     events: [],
+    links: [],
     status: @api.StatusCode::Unset,
     status_description: "",
     resource,
@@ -50,6 +55,7 @@ fn test_span() -> @sdk.SpanData {
   }
 }
 
+///|
 test "export_posts_protobuf_to_v1_traces" {
   let mock = mock_transport(200)
   let config = @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318")
@@ -58,13 +64,11 @@ test "export_posts_protobuf_to_v1_traces" {
   assert_true(result.is_success())
   assert_eq(mock.urls.length(), 1)
   assert_eq(mock.urls[0], "http://collector:4318/v1/traces")
-  assert_eq(
-    mock.headers[0].get("content-type"),
-    Some("application/x-protobuf"),
-  )
+  assert_eq(mock.headers[0].get("content-type"), Some("application/x-protobuf"))
   assert_true(mock.bodies[0].equal(@otlp.encode_trace_request([test_span()])))
 }
 
+///|
 test "export_keeps_endpoint_trailing_slash" {
   let mock = mock_transport(200)
   let config = @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318/")
@@ -73,6 +77,7 @@ test "export_keeps_endpoint_trailing_slash" {
   assert_eq(mock.urls[0], "http://collector:4318/v1/traces")
 }
 
+///|
 test "explicit_traces_endpoint_is_used_verbatim" {
   let mock = mock_transport(200)
   let config = @otlp.OtlpHttpConfig::new(
@@ -84,19 +89,21 @@ test "explicit_traces_endpoint_is_used_verbatim" {
   assert_eq(mock.urls[0], "http://gateway:443/custom/traces")
 }
 
+///|
 test "export_passes_custom_headers" {
   let mock = mock_transport(200)
   let headers : Map[String, String] = Map::new()
   headers.set("authorization", "Bearer token")
   let config = @otlp.OtlpHttpConfig::new(
     endpoint="http://collector:4318",
-    headers=headers,
+    headers~,
   )
   let exporter = @otlp.OtlpHttpExporter::new(config, mock.as_transport())
   let _ = exporter.export_spans([test_span()])
   assert_eq(mock.headers[0].get("authorization"), Some("Bearer token"))
 }
 
+///|
 test "export_empty_span_list_skips_transport" {
   let mock = mock_transport(200)
   let exporter = @otlp.OtlpHttpExporter::new(
@@ -108,6 +115,7 @@ test "export_empty_span_list_skips_transport" {
   assert_eq(mock.urls.length(), 0)
 }
 
+///|
 test "export_non_retryable_failure" {
   let mock = mock_transport(500)
   let exporter = @otlp.OtlpHttpExporter::new(
@@ -119,6 +127,7 @@ test "export_non_retryable_failure" {
   assert_eq(mock.urls.length(), 1)
 }
 
+///|
 test "export_retries_retryable_status" {
   let mock = mock_transport(200)
   mock.responses.push(503)
@@ -132,6 +141,7 @@ test "export_retries_retryable_status" {
   assert_eq(mock.urls.length(), 3)
 }
 
+///|
 test "export_gives_up_after_max_retries" {
   let mock = mock_transport(503)
   let exporter = @otlp.OtlpHttpExporter::new(
@@ -143,10 +153,14 @@ test "export_gives_up_after_max_retries" {
   assert_eq(mock.urls.length(), 3)
 }
 
+///|
 test "export_rejects_unsupported_compression" {
   let mock = mock_transport(200)
   let exporter = @otlp.OtlpHttpExporter::new(
-    @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318", compression="gzip"),
+    @otlp.OtlpHttpConfig::new(
+      endpoint="http://collector:4318",
+      compression="gzip",
+    ),
     mock.as_transport(),
   )
   let result = exporter.export_spans([test_span()])
@@ -154,6 +168,7 @@ test "export_rejects_unsupported_compression" {
   assert_eq(mock.urls.length(), 0)
 }
 
+///|
 test "exporter_config_accessor" {
   let exporter = @otlp.OtlpHttpExporter::new(
     @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318"),
@@ -163,6 +178,7 @@ test "exporter_config_accessor" {
   assert_eq(exporter.config().timeout_millis, 10000)
 }
 
+///|
 test "config_from_env" {
   @env.set_env_var("OTEL_EXPORTER_OTLP_ENDPOINT", "http://env-collector:4318")
   @env.set_env_var("OTEL_EXPORTER_OTLP_HEADERS", "x-key=abc, x-other = def")
@@ -178,6 +194,7 @@ test "config_from_env" {
   @env.unset_env_var("OTEL_EXPORTER_OTLP_TIMEOUT")
 }
 
+///|
 test "config_from_env_defaults" {
   let config = @otlp.OtlpHttpConfig::from_env()
   assert_eq(config.endpoint, "http://localhost:4318")

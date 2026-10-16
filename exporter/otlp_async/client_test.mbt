@@ -1,10 +1,15 @@
 // Integration tests for the async OTLP/HTTP exporter, driven against a real
 // loopback `@http.Server`.
 
+///|
 fn test_span_data() -> @sdk.SpanData {
   let trace_id = Array::make(16, 7)
   let span_id = Array::make(8, 9)
-  let span_context = @api.span_context(trace_id, span_id, @api.TRACE_FLAGS_SAMPLED)
+  let span_context = @api.span_context(
+    trace_id,
+    span_id,
+    @api.TRACE_FLAGS_SAMPLED,
+  )
   {
     name: "otlp-async-test-op",
     span_context,
@@ -14,6 +19,7 @@ fn test_span_data() -> @sdk.SpanData {
     end_time_unix_nano: 2000L,
     attributes: Map([]),
     events: [],
+    links: [],
     status: @api.StatusCode::Unset,
     status_description: "",
     resource: Map([]),
@@ -22,6 +28,7 @@ fn test_span_data() -> @sdk.SpanData {
   }
 }
 
+///|
 async test "export_spans posts a protobuf body and accepts HTTP 200" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -40,17 +47,19 @@ async test "export_spans posts a protobuf body and accepts HTTP 200" {
   }
 }
 
+///|
 async test "export_spans of an empty batch succeeds without a request" {
   let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:1")
   let result = export_spans(config, [])
   assert_true(result.is_success())
 }
 
+///|
 async test "post_trace_request retries retryable statuses" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
-    let requests : Ref[Int] = Ref(0)
+    let requests : Ref[Int32] = Ref(0)
     group.spawn_bg(no_wait=true) <| () => {
       server.run_forever() <| ((_request, _body, conn) => {
         requests.val = requests.val + 1
@@ -71,11 +80,12 @@ async test "post_trace_request retries retryable statuses" {
   }
 }
 
+///|
 async test "post_trace_request does not retry non-retryable statuses" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
-    let requests : Ref[Int] = Ref(0)
+    let requests : Ref[Int32] = Ref(0)
     group.spawn_bg(no_wait=true) <| () => {
       server.run_forever() <| ((_request, _body, conn) => {
         requests.val = requests.val + 1
@@ -92,6 +102,7 @@ async test "post_trace_request does not retry non-retryable statuses" {
   }
 }
 
+///|
 async test "post_trace_request reports partial success as a failure" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -108,12 +119,14 @@ async test "post_trace_request reports partial success as a failure" {
   }
 }
 
+///|
 async test "post_trace_request fails when the endpoint is unreachable" {
   let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:1")
   let result = export_spans(config, [test_span_data()])
   assert_false(result.is_success())
 }
 
+///|
 async test "post_trace_request times out a collector that never responds" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -140,6 +153,7 @@ async test "post_trace_request times out a collector that never responds" {
   }
 }
 
+///|
 async test "request headers include the OTLP content type" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))

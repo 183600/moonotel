@@ -1,6 +1,7 @@
 // `yourname/otel` is the main entry package. It re-exports the API, SDK,
 // propagation and OTLP exporter surface and offers a one-call initializer.
 
+///|
 pub using @api {
   type SpanContext,
   type SpanKind,
@@ -10,12 +11,15 @@ pub using @api {
   span_context_from_hex,
   bytes_to_hex,
   bytes_from_hex,
+  TRACE_FLAGS_SAMPLED,
 }
 
+///|
 pub using @sdk {
   type AttributeValue,
   type SpanData,
   type SpanEvent,
+  type SpanLink,
   type SamplingDecision,
   type ExportResult,
   type Sampler,
@@ -37,6 +41,7 @@ pub using @sdk {
   TELEMETRY_SDK_VERSION,
 }
 
+///|
 pub using @context {
   type Context,
   current_context,
@@ -47,6 +52,7 @@ pub using @context {
   with_span_context,
 }
 
+///|
 pub using @propagation {
   type TextMapCarrier,
   inject,
@@ -64,6 +70,7 @@ pub using @propagation {
   format_baggage,
 }
 
+///|
 pub using @otlp {
   type OtlpHttpConfig,
   type OtlpHttpExporter,
@@ -80,6 +87,8 @@ pub using @otlp {
 // `endpoint` and `headers` override the values read from the
 // OTEL_EXPORTER_OTLP_* environment variables. `resource_attributes` are
 // merged into the resource built from the environment.
+
+///|
 pub fn setup(
   service_name? : String,
   resource_attributes? : Map[String, @sdk.AttributeValue],
@@ -87,9 +96,9 @@ pub fn setup(
   headers? : Map[String, String],
   sampler? : @sdk.Sampler,
   transport? : @otlp.Transport,
-  use_batch? : Bool
+  use_batch? : Bool,
 ) -> @sdk.TracerProviderSdk {
-  let mut provider = @sdk.TracerProviderSdk::new(service_name?=service_name)
+  let mut provider = @sdk.TracerProviderSdk::new(service_name?)
   match resource_attributes {
     Some(values) => provider = provider.with_resource_attributes(values)
     None => ()
@@ -119,7 +128,9 @@ pub fn setup(
         )
         value
       } else {
-        let value : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
+        let value : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
+          exporter,
+        )
         value
       }
       provider = provider.with_span_processor(processor)

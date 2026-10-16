@@ -1,4 +1,7 @@
-fn probe_span_with(resource : Map[String, @sdk.AttributeValue]) -> @sdk.SpanData {
+///|
+fn probe_span_with(
+  resource : Map[String, @sdk.AttributeValue],
+) -> @sdk.SpanData {
   {
     name: "probe",
     span_context: @api.span_context(
@@ -12,6 +15,7 @@ fn probe_span_with(resource : Map[String, @sdk.AttributeValue]) -> @sdk.SpanData
     end_time_unix_nano: 2L,
     attributes: Map::new(),
     events: [],
+    links: [],
     status: @api.StatusCode::Unset,
     status_description: "",
     resource,
@@ -20,15 +24,20 @@ fn probe_span_with(resource : Map[String, @sdk.AttributeValue]) -> @sdk.SpanData
   }
 }
 
+///|
 fn probe_resource_group_count(
   r1 : Map[String, @sdk.AttributeValue],
-  r2 : Map[String, @sdk.AttributeValue]
-) -> Int {
-  let encoded = @otlp.encode_trace_request([probe_span_with(r1), probe_span_with(r2)])
+  r2 : Map[String, @sdk.AttributeValue],
+) -> Int32 {
+  let encoded = @otlp.encode_trace_request([
+    probe_span_with(r1),
+    probe_span_with(r2),
+  ])
   let request = parse_fields(encoded.exact_view())
   fields_of(request, 1).length()
 }
 
+///|
 test "distinct_resources_with_delimiter_in_value_are_not_merged" {
   let r1 : Map[String, @sdk.AttributeValue] = Map::new()
   r1.set("a", @sdk.StringValue("b;c=d"))
@@ -38,6 +47,7 @@ test "distinct_resources_with_delimiter_in_value_are_not_merged" {
   assert_eq(probe_resource_group_count(r1, r2), 2)
 }
 
+///|
 test "distinct_resources_with_same_text_different_types_are_not_merged" {
   let r1 : Map[String, @sdk.AttributeValue] = Map::new()
   r1.set("a", @sdk.IntValue(1L))
@@ -46,6 +56,7 @@ test "distinct_resources_with_same_text_different_types_are_not_merged" {
   assert_eq(probe_resource_group_count(r1, r2), 2)
 }
 
+///|
 test "identical_resources_share_one_group" {
   let r1 : Map[String, @sdk.AttributeValue] = Map::new()
   r1.set("a", @sdk.StringValue("b;c=d"))

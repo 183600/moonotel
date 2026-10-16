@@ -1,33 +1,66 @@
 // The SDK Span implementation and the immutable SpanData snapshot that is
 // handed to span processors and exporters.
 
-// Value of a span attribute. `StringArrayValue` covers string arrays, which
-// is the only array type required by the OTLP MVP.
+// Value of a span attribute. The array forms map to the OTLP
+// `AnyValue.array_value` field.
+///|
 pub(all) enum AttributeValue {
   StringValue(String)
   BoolValue(Bool)
   IntValue(Int64)
   DoubleValue(Double)
   StringArrayValue(Array[String])
+  BoolArrayValue(Array[Bool])
+  IntArrayValue(Array[Int64])
+  DoubleArrayValue(Array[Double])
 } derive(Eq, @debug.Debug)
 
 // A timestamped event attached to a span.
+
+///|
 pub(all) struct SpanEvent {
   name : String
   time_unix_nano : Int64
   attributes : Map[String, AttributeValue]
 }
 
+// A link from a span to another span in a (possibly different) trace.
+
+///|
+pub(all) struct SpanLink {
+  span_context : @api.SpanContext
+  attributes : Map[String, AttributeValue]
+}
+
+// Create a link to `span_context` with optional attributes.
+
+///|
+pub fn SpanLink::new(
+  span_context : @api.SpanContext,
+  attributes? : Map[String, AttributeValue],
+) -> SpanLink {
+  {
+    span_context,
+    attributes: match attributes {
+      Some(values) => values
+      None => Map([])
+    },
+  }
+}
+
 // Immutable snapshot of a span, produced when the span ends.
+
+///|
 pub(all) struct SpanData {
   name : String
   span_context : @api.SpanContext
-  parent_span_id : Array[Int]
+  parent_span_id : Array[Int32]
   kind : @api.SpanKind
   start_time_unix_nano : Int64
   end_time_unix_nano : Int64
   attributes : Map[String, AttributeValue]
   events : Array[SpanEvent]
+  links : Array[SpanLink]
   status : @api.StatusCode
   status_description : String
   resource : Map[String, AttributeValue]
@@ -36,16 +69,20 @@ pub(all) struct SpanData {
 }
 
 // Current wall-clock time in nanoseconds since the Unix epoch.
+
+///|
 fn unix_nano_now() -> Int64 {
   (@env.now() * 1000000).reinterpret_as_int64()
 }
 
 // A recording span. Non-recording spans (sampler decision DROP) discard
 // attributes and events and are never exported.
+
+///|
 pub struct SpanSdk {
   mut name : String
   context : @api.SpanContext
-  parent_span_id : Array[Int]
+  parent_span_id : Array[Int32]
   kind : @api.SpanKind
   start_time_unix_nano : Int64
   mut end_time_unix_nano : Int64
@@ -53,6 +90,7 @@ pub struct SpanSdk {
   recording : Bool
   attributes : Map[String, AttributeValue]
   events : Array[SpanEvent]
+  links : Array[SpanLink]
   mut status : @api.StatusCode
   mut status_description : String
   processors : Array[&SpanProcessor]
@@ -61,17 +99,19 @@ pub struct SpanSdk {
   scope_version : String
 }
 
+///|
 fn create_span(
   name : String,
   context : @api.SpanContext,
-  parent_span_id : Array[Int],
+  parent_span_id : Array[Int32],
   kind : @api.SpanKind,
   start_time_unix_nano : Int64,
   recording : Bool,
+  links : Array[SpanLink],
   processors : Array[&SpanProcessor],
   resource : Map[String, AttributeValue],
   scope_name : String,
-  scope_version : String
+  scope_version : String,
 ) -> SpanSdk {
   {
     name,
@@ -84,6 +124,7 @@ fn create_span(
     recording,
     attributes: Map([]),
     events: [],
+    links,
     status: @api.StatusCode::Unset,
     status_description: "",
     processors,
@@ -94,66 +135,99 @@ fn create_span(
 }
 
 // The SpanContext of this span.
+
+///|
 pub fn SpanSdk::context(self : SpanSdk) -> @api.SpanContext {
   self.context
 }
 
 // Whether the span records attributes and events.
+
+///|
 pub fn SpanSdk::is_recording(self : SpanSdk) -> Bool {
   self.recording
 }
 
 // Whether the span has already ended.
+
+///|
 pub fn SpanSdk::is_ended(self : SpanSdk) -> Bool {
   self.ended
 }
 
 // The span kind.
+
+///|
 pub fn SpanSdk::kind(self : SpanSdk) -> @api.SpanKind {
   self.kind
 }
 
 // The span name.
+
+///|
 pub fn SpanSdk::name(self : SpanSdk) -> String {
   self.name
 }
 
 // The span start time in nanoseconds since the Unix epoch.
+
+///|
 pub fn SpanSdk::start_time_unix_nano(self : SpanSdk) -> Int64 {
   self.start_time_unix_nano
 }
 
 // The span end time in nanoseconds since the Unix epoch (0 while running).
+
+///|
 pub fn SpanSdk::end_time_unix_nano(self : SpanSdk) -> Int64 {
   self.end_time_unix_nano
 }
 
 // The parent span ID, or an empty array for root spans.
-pub fn SpanSdk::parent_span_id(self : SpanSdk) -> Array[Int] {
+
+///|
+pub fn SpanSdk::parent_span_id(self : SpanSdk) -> Array[Int32] {
   self.parent_span_id.copy()
 }
 
 // The recorded attributes (empty for non-recording spans).
+
+///|
 pub fn SpanSdk::attributes(self : SpanSdk) -> Map[String, AttributeValue] {
   self.attributes
 }
 
 // The recorded events (empty for non-recording spans).
+
+///|
 pub fn SpanSdk::events(self : SpanSdk) -> Array[SpanEvent] {
   self.events
 }
 
+// The links of this span.
+
+///|
+pub fn SpanSdk::links(self : SpanSdk) -> Array[SpanLink] {
+  self.links
+}
+
 // The current span status.
+
+///|
 pub fn SpanSdk::status(self : SpanSdk) -> @api.StatusCode {
   self.status
 }
 
 // The human-readable description associated with the status.
+
+///|
 pub fn SpanSdk::status_description(self : SpanSdk) -> String {
   self.status_description
 }
 
 // Update the span name. No-op for non-recording or ended spans.
+
+///|
 pub fn SpanSdk::update_name(self : SpanSdk, name : String) -> Unit {
   if self.recording && !self.ended {
     self.name = name
@@ -161,10 +235,12 @@ pub fn SpanSdk::update_name(self : SpanSdk, name : String) -> Unit {
 }
 
 // Set a single attribute. No-op for non-recording or ended spans.
+
+///|
 pub fn SpanSdk::set_attribute(
   self : SpanSdk,
   key : String,
-  value : AttributeValue
+  value : AttributeValue,
 ) -> Unit {
   if self.recording && !self.ended {
     self.attributes.set(key, value)
@@ -172,9 +248,11 @@ pub fn SpanSdk::set_attribute(
 }
 
 // Set multiple attributes. No-op for non-recording or ended spans.
+
+///|
 pub fn SpanSdk::set_attributes(
   self : SpanSdk,
-  attributes : Map[String, AttributeValue]
+  attributes : Map[String, AttributeValue],
 ) -> Unit {
   if self.recording && !self.ended {
     for entry in attributes.iter() {
@@ -185,11 +263,13 @@ pub fn SpanSdk::set_attributes(
 }
 
 // Add an event to the span. No-op for non-recording or ended spans.
+
+///|
 pub fn SpanSdk::add_event(
   self : SpanSdk,
   name : String,
   attributes? : Map[String, AttributeValue],
-  time_unix_nano? : Int64
+  time_unix_nano? : Int64,
 ) -> Unit {
   if self.recording && !self.ended {
     let timestamp = match time_unix_nano {
@@ -200,18 +280,34 @@ pub fn SpanSdk::add_event(
       Some(map) => map
       None => Map([])
     }
-    self.events.push({ name, time_unix_nano: timestamp, attributes: event_attributes })
+    self.events.push({
+      name,
+      time_unix_nano: timestamp,
+      attributes: event_attributes,
+    })
+  }
+}
+
+// Add a link to another span. Links with an invalid SpanContext are
+// ignored. No-op for non-recording or ended spans.
+
+///|
+pub fn SpanSdk::add_link(self : SpanSdk, link : SpanLink) -> Unit {
+  if self.recording && !self.ended && link.span_context.is_valid() {
+    self.links.push(link)
   }
 }
 
 // Record an exception as an `exception` event, following the OpenTelemetry
 // semantic conventions (`exception.type` / `exception.message`).
 // No-op for non-recording or ended spans.
+
+///|
 pub fn SpanSdk::record_exception(
   self : SpanSdk,
   error : Error,
   exception_type? : String,
-  time_unix_nano? : Int64
+  time_unix_nano? : Int64,
 ) -> Unit {
   if self.recording && !self.ended {
     let message = @debug.to_string(error)
@@ -223,11 +319,7 @@ pub fn SpanSdk::record_exception(
       (EXCEPTION_TYPE, StringValue(type_name)),
       (EXCEPTION_MESSAGE, StringValue(message)),
     ])
-    self.add_event(
-      "exception",
-      attributes=attributes,
-      time_unix_nano?=time_unix_nano,
-    )
+    self.add_event("exception", attributes~, time_unix_nano?)
   }
 }
 
@@ -236,10 +328,12 @@ pub fn SpanSdk::record_exception(
 // Status follows the OpenTelemetry total order `Ok > Error > Unset`: `Ok` is
 // final, an `Unset` attempt is ignored, and a description is only recorded
 // together with `Error`.
+
+///|
 pub fn SpanSdk::set_status(
   self : SpanSdk,
   status : @api.StatusCode,
-  description? : String
+  description? : String,
 ) -> Unit {
   if self.recording && !self.ended {
     match status {
@@ -258,6 +352,8 @@ pub fn SpanSdk::set_status(
 }
 
 // Build the immutable export snapshot of a span.
+
+///|
 fn SpanData::from_span(span : SpanSdk) -> SpanData {
   {
     name: span.name,
@@ -268,6 +364,7 @@ fn SpanData::from_span(span : SpanSdk) -> SpanData {
     end_time_unix_nano: span.end_time_unix_nano,
     attributes: span.attributes,
     events: span.events,
+    links: span.links,
     status: span.status,
     status_description: span.status_description,
     resource: span.resource,
@@ -278,6 +375,8 @@ fn SpanData::from_span(span : SpanSdk) -> SpanData {
 
 // End the span, notifying the processors if the span is recording.
 // Calling `end` more than once is a no-op.
+
+///|
 pub fn SpanSdk::end(self : SpanSdk, end_time_unix_nano? : Int64) -> Unit {
   if self.ended {
     return
@@ -295,5 +394,8 @@ pub fn SpanSdk::end(self : SpanSdk, end_time_unix_nano? : Int64) -> Unit {
   }
 }
 
+///|
 pub extend AttributeValue with Eq::{not_equal, equal}
+
+///|
 pub extend AttributeValue with @debug.Debug::{to_repr}

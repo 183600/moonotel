@@ -1,3 +1,4 @@
+///|
 test "encode_all_attribute_types_and_unicode" {
   let long_resource = "r" + "x".repeat(2000)
   let attributes : Map[String, @sdk.AttributeValue] = Map::new()
@@ -23,12 +24,9 @@ test "encode_all_attribute_types_and_unicode" {
     end_time_unix_nano: 1600000000500000000L,
     attributes,
     events: [
-      {
-        name: "ev😀",
-        time_unix_nano: 42L,
-        attributes: event_attributes,
-      },
+      { name: "ev😀", time_unix_nano: 42L, attributes: event_attributes, },
     ],
+    links: [],
     status: @api.StatusCode::Error,
     status_description: "oops😀",
     resource,
@@ -56,9 +54,7 @@ test "encode_all_attribute_types_and_unicode" {
   let scope_spans = first_of(rs_fields, 2).unwrap()
   let ss_fields = parse_fields(scope_spans.payload)
   assert_eq(
-    first_of(parse_fields(first_of(ss_fields, 1).unwrap().payload), 1)
-    .unwrap()
-    .payload
+    first_of(parse_fields(first_of(ss_fields, 1).unwrap().payload), 1).unwrap().payload
     |> @utf8.decode_lossy,
     "scope-unicode-😀",
   )
@@ -75,9 +71,7 @@ test "encode_all_attribute_types_and_unicode" {
   assert_eq(attribute_value(span_fields, "s"), Some("héllo😀"))
   // bool
   let bool_any = parse_fields(
-    first_of(parse_fields(fields_of(span_fields, 9)[1].payload), 2)
-    .unwrap()
-    .payload,
+    first_of(parse_fields(fields_of(span_fields, 9)[1].payload), 2).unwrap().payload,
   )
   assert_eq(first_of(bool_any, 2).unwrap().varint, 1)
   // string array
@@ -105,9 +99,6 @@ test "encode_all_attribute_types_and_unicode" {
     "oops😀",
   )
   let event = parse_fields(fields_of(span_fields, 11)[0].payload)
-  assert_eq(
-    first_of(event, 2).unwrap().payload |> @utf8.decode_lossy,
-    "ev😀",
-  )
+  assert_eq(first_of(event, 2).unwrap().payload |> @utf8.decode_lossy, "ev😀")
   assert_eq(fixed64_value(first_of(event, 1).unwrap().payload), 42)
 }
