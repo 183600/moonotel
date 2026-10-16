@@ -110,8 +110,6 @@ pub fn BatchSpanProcessor::flush_batch(self : BatchSpanProcessor) -> Unit {
     self.max_export_batch_size
   }
   let batch : Array[SpanData] = if self.head == 0 && n == self.queue.length() {
-    // The whole queue is being exported: hand the buffer over instead of
-    // copying every element into a fresh array.
     let queue = self.queue
     self.queue = []
     queue

@@ -56,15 +56,11 @@ fn pseudo_random_bytes(n : Int, state : Ref[UInt64]) -> Array[Int] {
   fill_zero_checked(out)
 }
 
-// Bytes requested from the entropy source per draw. Reads from the platform
-// entropy source are comparatively expensive, so the buffer is filled with
-// enough bytes for many spans at once (20 trace IDs plus their span IDs) and
-// consumed across calls instead of drawing once per ID.
+// Bytes requested from the entropy source per draw (enough for 20 trace IDs
+// plus their span IDs).
 const RANDOM_DRAW_BYTES : Int = 480
 
-// Consume `n` bytes from the buffered draw, if enough remain. The consumed
-// bytes are copied out of the buffer; the unconsumed tail is tracked with an
-// offset instead of being copied into a fresh array.
+// Consume `n` bytes from the buffered draw, if enough remain.
 fn take_buffered(
   n : Int,
   pending : Ref[Array[Int]],

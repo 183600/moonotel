@@ -4,9 +4,8 @@
 priv struct ProtoWriter {
   mut buf : FixedArray[Byte]
   mut len : Int
-  // Scratch writers recycled across nested message encodings. Encoding is
-  // depth-first, so the writers behave like a call stack: a nested message
-  // pops one, and the enclosing message pushes it back after appending it.
+  // Scratch writers for nested message encodings, used like a call stack: a
+  // nested message takes one and releases it after appending its bytes.
   scratch : Array[ProtoWriter]
 }
 
@@ -15,8 +14,7 @@ fn ProtoWriter::with_capacity(size_hint : Int) -> ProtoWriter {
   { buf: FixedArray::make(capacity, b'\x00'), len: 0, scratch: [] }
 }
 
-// Ensure room for `extra` more bytes, doubling the capacity as needed so
-// appends are amortized constant time.
+// Ensure room for `extra` more bytes, doubling the capacity as needed.
 fn ProtoWriter::reserve(self : ProtoWriter, extra : Int) -> Unit {
   let required = self.len + extra
   if required <= self.buf.length() {
@@ -46,8 +44,7 @@ fn ProtoWriter::to_bytes(self : ProtoWriter) -> Bytes {
 }
 
 fn ProtoWriter::write_varint(self : ProtoWriter, value : UInt64) -> Unit {
-  // A 64-bit varint is at most 10 bytes: reserve once, then write without
-  // re-checking bounds for every byte.
+  // A 64-bit varint is at most 10 bytes.
   self.reserve(10)
   let mut v = value
   let mut i = self.len
@@ -99,7 +96,7 @@ fn ProtoWriter::write_bytes(self : ProtoWriter, value : Bytes) -> Unit {
 }
 
 // Write a length-delimited bytes field from an array of byte values, masking
-// each element to 8 bits. Avoids materializing an intermediate `Bytes`.
+// each element to 8 bits.
 fn ProtoWriter::write_bytes_from_int_array(
   self : ProtoWriter,
   field : Int,
@@ -117,9 +114,7 @@ fn ProtoWriter::write_bytes_from_int_array(
   }
 }
 
-// Write a length-delimited string field. ASCII strings (the common case) are
-// copied straight from their code units while scanning; the first non-ASCII
-// code unit restarts the field with the general UTF-8 encoding.
+// Write a length-delimited string field, encoding non-ASCII text as UTF-8.
 fn ProtoWriter::write_string_field(self : ProtoWriter, field : Int, value : String) -> Unit {
   self.write_tag(field, 2)
   let len = value.length()
@@ -141,9 +136,8 @@ fn ProtoWriter::write_string_field(self : ProtoWriter, field : Int, value : Stri
   }
 }
 
-// Append an already encoded nested message with a length prefix, recycling
-// the writer that produced it. Callers that can fill a scratch writer directly
-// use this to avoid allocating a closure per nested message.
+// Append an already encoded nested message with a length prefix, releasing
+// the writer that produced it.
 fn ProtoWriter::append_message(self : ProtoWriter, field : Int, inner : ProtoWriter) -> Unit {
   self.write_tag(field, 2)
   self.write_varint(inner.len.to_uint64())

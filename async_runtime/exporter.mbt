@@ -102,8 +102,7 @@ fn OtlpHttpAsyncSpanExporter::enqueue(
   }
 }
 
-// Export `first` plus every batch that is already queued, so bursts are sent
-// as a single request instead of one request per finished span.
+// Export `first` plus every batch that is already queued.
 async fn OtlpHttpAsyncSpanExporter::export_available(
   self : OtlpHttpAsyncSpanExporter,
   first : Array[@sdk.SpanData]

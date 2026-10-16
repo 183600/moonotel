@@ -20,7 +20,7 @@ pub fn TextMapCarrier::from_entries(entries : Array[(String, String)]) -> TextMa
 }
 
 // ASCII-case-insensitive equality. Equivalent to `a.to_lower() == b.to_lower()`
-// because `to_lower` only maps `A`-`Z`, but allocation-free.
+// because `to_lower` only maps `A`-`Z`.
 fn ascii_case_insensitive_equal(a : String, b : String) -> Bool {
   let len = a.length()
   if len != b.length() {

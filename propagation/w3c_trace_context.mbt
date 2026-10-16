@@ -28,9 +28,7 @@ fn is_trim_char(c : Char) -> Bool {
   c == ' ' || c == '\t' || c == '\n' || c == '\r'
 }
 
-// Equivalent to `value.trim()` (the default whitespace set), but skips the
-// trimming machinery when neither end carries whitespace, which is the case
-// for almost every header member.
+// Equivalent to `value.trim()` (the default whitespace set).
 fn trim_ows(value : StringView) -> StringView {
   let len = value.length()
   if len == 0 {
@@ -52,8 +50,7 @@ fn trim_ows(value : StringView) -> StringView {
 }
 
 // Index of the first occurrence of `needle` at or after `start`, or the view
-// length when absent. Scanning code units directly avoids the per-call setup
-// of the generic `find`/`split` machinery on short header members.
+// length when absent.
 fn find_code_unit(view : StringView, needle : UInt16, start : Int) -> Int {
   let len = view.length()
   let mut i = start
@@ -147,8 +144,7 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
     return None
   }
   // Any parseable value has its dashes exactly at 2, 35 and 52; a dash
-  // anywhere else fails the hex decoding below. Checking the three positions
-  // directly avoids a scan over the whole value.
+  // anywhere else fails the hex decoding below.
   if value.unsafe_get(2).unsafe_to_char() != '-' ||
     value.unsafe_get(35).unsafe_to_char() != '-' ||
     value.unsafe_get(52).unsafe_to_char() != '-' {
@@ -357,8 +353,7 @@ pub fn parse_tracestate(value : String) -> String? {
     return None
   }
   let sb = StringBuilder(size_hint=value.length() * 2)
-  // At most 32 members are accepted, so a linear scan over the trimmed key
-  // views detects duplicates without allocating a set or copies of the keys.
+  // Duplicate keys are rejected; at most 32 members are accepted.
   let seen : Array[StringView] = []
   let view = value[:]
   let len = view.length()

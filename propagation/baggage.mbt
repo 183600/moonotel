@@ -91,8 +91,8 @@ fn percent_decode_escaped(value : StringView) -> String? {
 // sequence is truncated or not followed by two hex digits.
 fn percent_decode_view(value : StringView) -> String? {
   let len = value.length()
-  // Fast path: a value without `%` decodes to itself; only its characters
-  // need validating, and no byte buffer has to be built.
+  // A value without `%` decodes to itself; its characters still need
+  // validating.
   let mut i = 0
   while i < len {
     let code = value.unsafe_get(i).to_int()
@@ -114,8 +114,8 @@ fn percent_decode_view(value : StringView) -> String? {
 // truncated or not followed by two hex digits.
 pub fn percent_decode(value : String) -> String? {
   let len = value.length()
-  // Fast path: a value without `%` decodes to itself; only its characters
-  // need validating, and no byte buffer has to be built.
+  // A value without `%` decodes to itself; its characters still need
+  // validating.
   let mut i = 0
   while i < len {
     let code = value.unsafe_get(i).to_int()
@@ -146,8 +146,7 @@ fn write_percent_encoded(sb : StringBuilder, code : Int) -> Unit {
 // Append the percent-encoded form of `value` to `sb`.
 fn write_percent_encode(sb : StringBuilder, value : String) -> Unit {
   let len = value.length()
-  // ASCII-only values (the common case) are encoded straight from their code
-  // units, avoiding the intermediate UTF-8 byte array.
+  // ASCII text is encoded from its code units, other text as UTF-8.
   let mut ascii = true
   let mut i = 0
   while i < len {

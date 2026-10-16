@@ -11,8 +11,7 @@ pub struct Context {
   parent : Context?
 }
 
-// The empty root context. `Context` is immutable, so one shared instance can
-// serve every caller and avoid an allocation per lookup.
+// The empty root context.
 let root_context : Context = { span_ctx: None, key: None, value: None, parent: None }
 
 // An empty root context.
@@ -78,8 +77,7 @@ pub fn Context::value(self : Context, key : String) -> String? {
   None
 }
 
-// Whether the chain carries at least one baggage value. Cheaper than
-// flattening the baggage when only presence matters.
+// Whether the chain carries at least one baggage value.
 pub fn Context::has_baggage(self : Context) -> Bool {
   let mut cursor : Context? = Some(self)
   while true {

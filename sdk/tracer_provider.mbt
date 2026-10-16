@@ -48,13 +48,12 @@ fn decode_percent(value : StringView) -> String {
     }
     let code = c.to_int()
     if code < 0x80 {
-      // ASCII characters encode to a single UTF-8 byte; avoid building an
-      // intermediate one-character string.
+      // ASCII characters encode to a single UTF-8 byte.
       bytes.push(code.to_byte())
       i = i + 1
     } else {
-      // Encode a whole run of non-ASCII code units at once so that surrogate
-      // pairs are converted to UTF-8 instead of aborting on a lone half.
+      // Encode a whole run of non-ASCII code units together so that surrogate
+      // pairs are encoded as one character.
       let run_start = i
       let mut j = i
       while j < len {

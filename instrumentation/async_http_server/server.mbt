@@ -81,8 +81,7 @@ fn split_path_query(path : String) -> (String, String) {
 
 // Parse the incoming W3C context of a request: `traceparent` (with a valid
 // `tracestate`) and `baggage`. Request headers are already keyed
-// case-insensitively, so the headers can be fetched directly instead of
-// copying every header into a carrier.
+// case-insensitively.
 fn extract_context_with_baggage(
   headers : Map[@http.CaseInsensitiveString, String]
 ) -> (@context.Context, Bool) {

@@ -140,20 +140,20 @@ pub fn SpanContext::span_id(self : SpanContext) -> Array[Int] {
   self.span_id.copy()
 }
 
-// Borrow the underlying trace ID bytes without copying. The returned array
-// shares storage with the context and must not be mutated.
+// The trace ID bytes backing this context. The returned array is shared with
+// the context and must not be mutated.
 pub fn SpanContext::trace_id_view(self : SpanContext) -> Array[Int] {
   self.trace_id
 }
 
-// Borrow the underlying span ID bytes without copying. The returned array
-// shares storage with the context and must not be mutated.
+// The span ID bytes backing this context. The returned array is shared with
+// the context and must not be mutated.
 pub fn SpanContext::span_id_view(self : SpanContext) -> Array[Int] {
   self.span_id
 }
 
 // Helper: convert a hex character to its 0-15 value, or -1 when the character
-// is not a hex digit. Avoids allocating an `Option` per digit.
+// is not a hex digit.
 fn hex_char_value(c : Char) -> Int {
   let code = c.to_int()
   if code >= 48 && code <= 57 {

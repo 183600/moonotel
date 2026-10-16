@@ -151,9 +151,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   let groups : Array[ResourceGroup] = []
   let resource_index : Map[String, Int] = Map([])
   let mut last_resource : Map[String, @sdk.AttributeValue]? = None
-  // Index of the group for `last_resource`; spans from the same producer
-  // usually share one resource object, so the hash lookup is skipped for all
-  // but the first span of each run.
+  // Index of the group for `last_resource`.
   let mut last_index = -1
   for data in spans {
     let index = match last_resource {
