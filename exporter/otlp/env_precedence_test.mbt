@@ -30,6 +30,20 @@ test "traces_endpoint_takes_precedence_over_generic" {
   assert_eq(config.traces_url(), "http://specific:4318/custom/traces")
 }
 
+test "generic_endpoint_stays_the_base_url_when_traces_endpoint_is_set" {
+  unset_otlp_env()
+  @env.set_env_var("OTEL_EXPORTER_OTLP_ENDPOINT", "http://generic:4318")
+  @env.set_env_var(
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    "http://specific:4318/custom/traces",
+  )
+  let config = @otlp.OtlpHttpConfig::from_env()
+  unset_otlp_env()
+  assert_eq(config.endpoint, "http://generic:4318")
+  assert_eq(config.traces_endpoint, Some("http://specific:4318/custom/traces"))
+  assert_eq(config.traces_url(), "http://specific:4318/custom/traces")
+}
+
 test "generic_endpoint_is_used_when_traces_endpoint_is_absent" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_ENDPOINT", "http://generic:4318")

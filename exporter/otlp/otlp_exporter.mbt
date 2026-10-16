@@ -90,10 +90,10 @@ fn parse_headers(value : String) -> Map[String, String] {
 pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
   let traces_endpoint = @env.get_env_var("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
   let generic_endpoint = @env.get_env_var("OTEL_EXPORTER_OTLP_ENDPOINT")
-  let endpoint = match traces_endpoint {
+  let endpoint = match generic_endpoint {
     Some(value) => value
     None =>
-      match generic_endpoint {
+      match traces_endpoint {
         Some(value) => value
         None => "http://localhost:4318"
       }
