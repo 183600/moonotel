@@ -122,5 +122,47 @@ pub fn Sampler::should_sample(
   (self.sample)(parent, trace_id)
 }
 
+// The ratio configured through `OTEL_TRACES_SAMPLER_ARG`, or 1.0 when the
+// variable is absent or not a number.
+fn sampler_ratio_from_env() -> Double {
+  match @env.get_env_var("OTEL_TRACES_SAMPLER_ARG") {
+    Some(value) =>
+      try {
+        @string.parse_double(value.trim())
+      } catch {
+        _ => 1.0
+      }
+    None => 1.0
+  }
+}
+
+// Build a sampler from the standard `OTEL_TRACES_SAMPLER` and
+// `OTEL_TRACES_SAMPLER_ARG` environment variables:
+//
+// - `always_on`, `always_off`
+// - `traceidratio`, `parentbased_traceidratio` (ratio argument)
+// - `parentbased_always_on` (the default), `parentbased_always_off`
+//
+// Unknown values fall back to the default `parentbased_always_on` sampler,
+// as required by the OpenTelemetry specification.
+pub fn Sampler::from_env() -> Sampler {
+  let name = match @env.get_env_var("OTEL_TRACES_SAMPLER") {
+    Some(value) => value.trim()
+    None => ""
+  }
+  match name {
+    "always_on" => Sampler::always_on()
+    "always_off" => Sampler::always_off()
+    "traceidratio" => Sampler::trace_id_ratio_based(sampler_ratio_from_env())
+    "parentbased_traceidratio" =>
+      Sampler::parent_based(
+        Sampler::trace_id_ratio_based(sampler_ratio_from_env()),
+      )
+    "parentbased_always_off" => Sampler::parent_based(Sampler::always_off())
+    "parentbased_always_on" | "" => Sampler::parent_based(Sampler::always_on())
+    _ => Sampler::parent_based(Sampler::always_on())
+  }
+}
+
 pub extend SamplingDecision with Eq::{not_equal, equal}
 pub extend SamplingDecision with @debug.Debug::{to_repr}

@@ -209,6 +209,20 @@ pub fn ServerCall::span_context(self : ServerCall) -> @api.SpanContext? {
   }
 }
 
+// Record the matched route on the SERVER span. Following the HTTP semantic
+// conventions the span is renamed to `METHOD route` and the route is stored as
+// the `http.route` attribute. Returns `false` when tracing is disabled.
+pub fn ServerCall::set_route(self : ServerCall, route : String) -> Bool {
+  match self.span {
+    Some(span) => {
+      span.set_attribute(@sdk.HTTP_ROUTE, @sdk.StringValue(route))
+      span.update_name(http_method_name(self.request.meth) + " " + route)
+      true
+    }
+    None => false
+  }
+}
+
 // Start a child span of the SERVER span, explicitly parented to the request.
 // Returns `None` when tracing is disabled.
 pub fn ServerCall::start_span(

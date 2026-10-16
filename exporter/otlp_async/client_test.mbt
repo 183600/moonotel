@@ -114,6 +114,32 @@ async test "post_trace_request fails when the endpoint is unreachable" {
   assert_false(result.is_success())
 }
 
+async test "post_trace_request times out a collector that never responds" {
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      server.run_forever() <| ((_request, _body, conn) => {
+        // Answer only well after the configured timeout, so that a missing
+        // timeout shows up as an unexpected success instead of hanging.
+        @async.sleep(5000)
+        conn.send_response(200, "OK")
+      })
+    }
+    let config = @otlp.OtlpHttpConfig::new(
+      endpoint="http://127.0.0.1:\{port}",
+      timeout_millis=100,
+      max_retries=0,
+    )
+    let result = export_spans(config, [test_span_data()])
+    match result {
+      @sdk.ExportFailure(message) =>
+        assert_true(message.contains("TimeoutError"))
+      @sdk.ExportSuccess => fail("expected the export to time out")
+    }
+  }
+}
+
 async test "request headers include the OTLP content type" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))

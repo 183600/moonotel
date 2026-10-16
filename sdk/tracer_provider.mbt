@@ -90,11 +90,21 @@ fn parse_resource_attributes(
   }
 }
 
+// Whether `OTEL_SDK_DISABLED` requests a disabled SDK.
+fn sdk_disabled() -> Bool {
+  match @env.get_env_var("OTEL_SDK_DISABLED") {
+    Some(value) => value.trim().to_lower() == "true"
+    None => false
+  }
+}
+
 // Create a provider. The service name defaults to `OTEL_SERVICE_NAME`, then
 // to `service.name` from `OTEL_RESOURCE_ATTRIBUTES`, and finally to
 // `unknown_service`. The resource also carries the `telemetry.sdk.*`
-// attributes. The default sampler is ParentBased(AlwaysOn); the default ID
-// generator produces random IDs.
+// attributes. The default sampler follows `OTEL_TRACES_SAMPLER`
+// (`parentbased_always_on` when unset), except when `OTEL_SDK_DISABLED=true`,
+// in which case nothing is recorded or exported. The default ID generator
+// produces random IDs.
 pub fn TracerProviderSdk::new(service_name? : String) -> TracerProviderSdk {
   let resource = Map([])
   match @env.get_env_var("OTEL_RESOURCE_ATTRIBUTES") {
@@ -119,7 +129,11 @@ pub fn TracerProviderSdk::new(service_name? : String) -> TracerProviderSdk {
   resource.set(TELEMETRY_SDK_VERSION, StringValue(SDK_VERSION))
   {
     resource,
-    sampler: Sampler::parent_based(Sampler::always_on()),
+    sampler: if sdk_disabled() {
+      Sampler::always_off()
+    } else {
+      Sampler::from_env()
+    },
     id_generator: IdGenerator::random(),
     processors: [],
     shutdown_called: false,

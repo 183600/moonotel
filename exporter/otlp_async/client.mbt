@@ -4,7 +4,8 @@
 // used by `@otlp.OtlpHttpExporter`: it POSTs an encoded
 // `ExportTraceServiceRequest` to `<endpoint>/v1/traces` with
 // `Content-Type: application/x-protobuf`, decodes the response (including
-// `partial_success`) and retries only retryable HTTP statuses.
+// `partial_success`) and retries only retryable HTTP statuses. Each attempt
+// is bounded by `config.timeout_millis`.
 //
 // The package targets native only, because the async HTTP stack does.
 
@@ -50,8 +51,18 @@ pub async fn post_trace_request(
     if attempt > 0 {
       @async.sleep(100 * attempt)
     }
+    let timeout = config.timeout_millis
     let outcome = try {
-      Some(@http.post(url, body, headers=headers))
+      if timeout > 0 {
+        Some(
+          @async.with_timeout(
+            timeout,
+            () => @http.post(url, body, headers=headers),
+          ),
+        )
+      } else {
+        Some(@http.post(url, body, headers=headers))
+      }
     } catch {
       error => {
         last_failure = "OTLP request to " + url + " failed: " + error.to_string()

@@ -1,0 +1,18 @@
+import {
+  "moonbitlang/async" @async,
+  "moonbitlang/async/aqueue" @aqueue,
+  "yourname/otel/context" @context,
+  "yourname/otel/exporter/otlp" @otlp,
+  "yourname/otel/exporter/otlp_async" @otlp_async,
+  "yourname/otel/sdk" @sdk,
+}
+
+import {
+  "moonbitlang/async/http" @http,
+  "moonbitlang/async/socket" @socket,
+  "yourname/otel/api" @api,
+} for "test"
+
+pkgtype(kind: "library")
+
+supported_targets = "native"
