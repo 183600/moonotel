@@ -292,12 +292,21 @@ pub async fn run_server_on(
         }
         None => ()
       }
-      let previous = match span {
+      let attached : @context.Context? = match span {
         Some(server_span) =>
-          @context.attach(@context.Context::root().with_span(server_span.context()))
-        None => @context.current_context()
+          Some(
+            @context.attach(
+              @context.Context::root().with_span(server_span.context()),
+            ),
+          )
+        None => None
       }
-      defer @context.detach(previous)
+      defer (
+        match attached {
+          Some(previous) => @context.detach(previous)
+          None => ()
+        }
+      )
       defer end_span(span)
       handler(call) catch {
         error => {

@@ -92,6 +92,23 @@ fn encode_span(writer : ProtoWriter, data : @sdk.SpanData) -> Unit {
 }
 
 // Canonical key for grouping spans that share a resource.
+fn resource_key_value(value : @sdk.AttributeValue) -> String {
+  match value {
+    @sdk.StringValue(text) => "s" + text.length().to_string() + ":" + text
+    @sdk.BoolValue(flag) => if flag { "b1" } else { "b0" }
+    @sdk.IntValue(number) => "i" + number.to_string() + ";"
+    @sdk.DoubleValue(number) =>
+      "d" + number.reinterpret_as_uint64().to_string() + ";"
+    @sdk.StringArrayValue(items) => {
+      let mut text = "a" + items.length().to_string() + ":"
+      for item in items {
+        text = text + item.length().to_string() + ":" + item
+      }
+      text
+    }
+  }
+}
+
 fn resource_key(resource : Map[String, @sdk.AttributeValue]) -> String {
   let keys : Array[String] = []
   resource.each(fn(key, _value) { keys.push(key) })
@@ -99,16 +116,12 @@ fn resource_key(resource : Map[String, @sdk.AttributeValue]) -> String {
   let parts : Array[String] = []
   for key in keys {
     let value_text = match resource.get(key) {
-      Some(@sdk.StringValue(text)) => text
-      Some(@sdk.BoolValue(flag)) => flag.to_string()
-      Some(@sdk.IntValue(number)) => number.to_string()
-      Some(@sdk.DoubleValue(number)) => number.to_string()
-      Some(@sdk.StringArrayValue(items)) => items.join(",")
+      Some(value) => resource_key_value(value)
       None => ""
     }
-    parts.push(key + "=" + value_text)
+    parts.push(key.length().to_string() + ":" + key + "=" + value_text)
   }
-  parts.join(";")
+  parts.join("")
 }
 
 struct ScopeGroup {

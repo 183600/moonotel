@@ -63,8 +63,10 @@ pub fn Tracer::start_span(
     self.scope_name,
     self.scope_version,
   )
-  for processor in self.provider.processors {
-    processor.on_start(span)
+  if span.is_recording() {
+    for processor in self.provider.processors {
+      processor.on_start(span)
+    }
   }
   match attributes {
     Some(attrs) => span.set_attributes(attrs)

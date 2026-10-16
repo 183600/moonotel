@@ -153,9 +153,9 @@ pub fn SpanSdk::status_description(self : SpanSdk) -> String {
   self.status_description
 }
 
-// Update the span name. No-op after the span has ended.
+// Update the span name. No-op for non-recording or ended spans.
 pub fn SpanSdk::update_name(self : SpanSdk, name : String) -> Unit {
-  if !self.ended {
+  if self.recording && !self.ended {
     self.name = name
   }
 }
@@ -227,17 +227,28 @@ pub fn SpanSdk::record_exception(
   }
 }
 
-// Set the span status. No-op for non-recording spans; the last status of an
-// ended span is retained.
+// Set the span status. No-op for non-recording or ended spans.
+//
+// Status follows the OpenTelemetry total order `Ok > Error > Unset`: `Ok` is
+// final, an `Unset` attempt is ignored, and a description is only recorded
+// together with `Error`.
 pub fn SpanSdk::set_status(
   self : SpanSdk,
   status : @api.StatusCode,
   description? : String
 ) -> Unit {
-  if self.recording {
-    if !self.ended {
-      self.status = status
-      self.status_description = description.unwrap_or("")
+  if self.recording && !self.ended {
+    match status {
+      @api.StatusCode::Unset => ()
+      @api.StatusCode::Ok => {
+        self.status = @api.StatusCode::Ok
+        self.status_description = ""
+      }
+      @api.StatusCode::Error =>
+        if self.status != @api.StatusCode::Ok {
+          self.status = @api.StatusCode::Error
+          self.status_description = description.unwrap_or("")
+        }
     }
   }
 }
