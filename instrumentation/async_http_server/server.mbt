@@ -114,37 +114,57 @@ fn split_path_query(path : String) -> (String, String) {
 
 // Parse the incoming W3C context of a request: `traceparent` (with a valid
 // `tracestate`) and `baggage`. Request headers are already keyed
-// case-insensitively; only the headers the propagation package reads are
-// copied into the carrier, and requests without trace context or baggage
-// skip the carrier altogether.
+// case-insensitively; the headers are parsed directly instead of being copied
+// into a carrier, and requests without trace context or baggage skip the
+// parsing altogether.
 
 ///|
 fn extract_context_with_baggage(
   headers : Map[@http.CaseInsensitiveString, String],
 ) -> (@context.Context, Bool) {
   let traceparent_name = @propagation.traceparent_header_name()
-  let tracestate_name = @propagation.tracestate_header_name()
   let baggage_name = @propagation.baggage_header_name()
   let traceparent = headers.get(@http.CaseInsensitiveString(traceparent_name))
   let baggage = headers.get(@http.CaseInsensitiveString(baggage_name))
   if traceparent is None && baggage is None {
     return (@context.Context::root(), false)
   }
-  let carrier = @propagation.TextMapCarrier::new()
-  match traceparent {
-    Some(value) => carrier.set(traceparent_name, value)
-    None => ()
-  }
-  match headers.get(@http.CaseInsensitiveString(tracestate_name)) {
-    Some(value) => carrier.set(tracestate_name, value)
-    None => ()
-  }
+  let mut context = @context.Context::root()
+  let mut has_baggage = false
   match baggage {
-    Some(value) => carrier.set(baggage_name, value)
+    Some(value) => {
+      let entries = @propagation.parse_baggage(value)
+      has_baggage = entries.length() > 0
+      for entry in entries {
+        context = context.with_value(entry.0, entry.1)
+      }
+    }
     None => ()
   }
-  let context = @propagation.extract_context(carrier)
-  (context, context.has_baggage())
+  match traceparent {
+    Some(value) =>
+      match @propagation.parse_traceparent(value) {
+        Some(sc) => {
+          let sc = match
+            headers.get(
+              @http.CaseInsensitiveString(
+                @propagation.tracestate_header_name(),
+              ),
+            ) {
+            Some(state) =>
+              match @propagation.parse_tracestate(state) {
+                Some(normalized) => sc.with_tracestate(normalized)
+                None => sc
+              }
+            None => sc
+          }
+          context = context.with_span(sc)
+        }
+        None => ()
+      }
+    None => ()
+  }
+  (context, has_baggage)
 }
 
 ///|

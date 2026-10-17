@@ -443,26 +443,54 @@ pub fn parse_tracestate(value : String) -> String? {
     if member_count >= 32 {
       return None
     }
-    let end = find_code_unit(view, ',', start)
-    let raw_item = view.view(start_offset=start, end_offset=end)
-    let item = trim_ows(raw_item)
-    if item.length() == 0 {
+    // Find the member end (the next `,`) together with the first `=` in a
+    // single pass.
+    let mut end = start
+    let mut eq = -1
+    while end < len {
+      let c = view.unsafe_get(end)
+      if c == 0x2C {
+        break
+      }
+      if c == 0x3D && eq < 0 {
+        eq = end
+      }
+      end = end + 1
+    }
+    // Trim optional whitespace around the member.
+    let mut item_start = start
+    while item_start < end && is_ows_code(view.unsafe_get(item_start)) {
+      item_start = item_start + 1
+    }
+    let mut item_end = end
+    while item_end > item_start && is_ows_code(view.unsafe_get(item_end - 1)) {
+      item_end = item_end - 1
+    }
+    if item_end <= item_start || eq < 0 || eq >= item_end {
       return None
     }
-    if item.length() != raw_item.length() {
+    if item_start != start || item_end != end {
       unchanged = false
     }
-    let eq = find_code_unit(item, '=', 0)
-    if eq >= item.length() {
-      return None
+    // Trim optional whitespace before the `=`.
+    let mut key_end = eq
+    while key_end > item_start && is_ows_code(view.unsafe_get(key_end - 1)) {
+      key_end = key_end - 1
     }
-    let raw_key = item[:eq]
-    let key = trim_ows(raw_key)
-    let raw_value = item[eq + 1:]
-    let member_value = trim_ows(raw_value)
-    if key.length() != raw_key.length() || member_value.length() != raw_value.length() {
+    if key_end != eq {
       unchanged = false
     }
+    let key = view.view(start_offset=item_start, end_offset=key_end)
+    // Trim optional whitespace after the `=`; trailing whitespace was already
+    // removed by the member trim above.
+    let mut value_start = eq + 1
+    while value_start < item_end && is_ows_code(view.unsafe_get(value_start)) {
+      value_start = value_start + 1
+    }
+    if value_start != eq + 1 {
+      unchanged = false
+    }
+    let member_value = view.view(start_offset=value_start, end_offset=item_end)
     if !is_valid_tracestate_key(key) || !is_valid_tracestate_value(member_value) {
       return None
     }

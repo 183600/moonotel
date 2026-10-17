@@ -209,26 +209,20 @@ fn write_percent_encoded(sb : StringBuilder, code : Int) -> Unit {
 // Append the percent-encoded form of `value` to `sb`.
 fn write_percent_encode(sb : StringBuilder, value : String) -> Unit {
   let len = value.length()
-  // ASCII text is encoded from its code units, other text as UTF-8.
-  let mut ascii = true
+  // ASCII text is encoded from its code units in a single pass; when a
+  // non-ASCII code unit shows up the already-written ASCII prefix is a valid
+  // UTF-8 prefix, so only the remainder is encoded as UTF-8.
   let mut i = 0
   while i < len {
-    if value.unsafe_get(i).to_int() >= 0x80 {
-      ascii = false
-      break
+    let code = value.unsafe_get(i).to_int()
+    if code >= 0x80 {
+      for byte in @utf8.encode(value[i:]) {
+        write_percent_encoded(sb, byte.to_int() & 0xFF)
+      }
+      return
     }
+    write_percent_encoded(sb, code)
     i = i + 1
-  }
-  if ascii {
-    let mut j = 0
-    while j < len {
-      write_percent_encoded(sb, value.unsafe_get(j).to_int())
-      j = j + 1
-    }
-  } else {
-    for byte in @utf8.encode(value) {
-      write_percent_encoded(sb, byte.to_int() & 0xFF)
-    }
   }
 }
 
@@ -240,39 +234,39 @@ pub fn percent_encode(value : String) -> String {
   sb.to_string()
 }
 
+// Whether a code unit is HTTP optional whitespace (space, tab, CR, LF).
+fn is_ows_code(c : UInt16) -> Bool {
+  c == 0x20 || c == 0x09 || c == 0x0A || c == 0x0D
+}
+
 // Number of bytes the percent-encoded form of `value` occupies in a `baggage`
 // header. The encoded form is ASCII, so the length equals the byte count; a
 // character outside the allowed set costs three bytes (`%XX`).
 pub fn percent_encoded_length(value : String) -> Int {
   let len = value.length()
-  let mut ascii = true
+  let mut total = 0
   let mut i = 0
+  // ASCII text is measured in a single pass; non-ASCII text is measured on
+  // its UTF-8 bytes from the start.
   while i < len {
-    if value.unsafe_get(i).to_int() >= 0x80 {
-      ascii = false
-      break
+    let code = value.unsafe_get(i).to_int()
+    if code >= 0x80 {
+      let mut total = 0
+      for byte in @utf8.encode(value) {
+        if is_baggage_value_char(byte.to_int() & 0xFF) {
+          total = total + 1
+        } else {
+          total = total + 3
+        }
+      }
+      return total
+    }
+    if is_baggage_value_char(code) {
+      total = total + 1
+    } else {
+      total = total + 3
     }
     i = i + 1
-  }
-  let mut total = 0
-  if ascii {
-    let mut j = 0
-    while j < len {
-      if is_baggage_value_char(value.unsafe_get(j).to_int()) {
-        total = total + 1
-      } else {
-        total = total + 3
-      }
-      j = j + 1
-    }
-  } else {
-    for byte in @utf8.encode(value) {
-      if is_baggage_value_char(byte.to_int() & 0xFF) {
-        total = total + 1
-      } else {
-        total = total + 3
-      }
-    }
   }
   total
 }
@@ -299,45 +293,73 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
     if start >= BAGGAGE_MAX_BYTES {
       break
     }
-    let end = find_code_unit(view, ',', start)
-    let item = trim_ows(view.view(start_offset=start, end_offset=end))
-    if item.length() > 0 {
-      // Locate the first `;` (which starts the properties) and the first `=`
-      // before it in a single pass.
-      let item_len = item.length()
-      let mut semi = item_len
-      let mut eq = -1
-      let mut i = 0
-      while i < item_len {
-        let c = item.unsafe_get(i).unsafe_to_char()
-        if c == ';' {
-          semi = i
-          break
-        }
-        if c == '=' && eq < 0 {
-          eq = i
-        }
-        i = i + 1
+    // Find the member end (the next `,`) together with the first `;` (which
+    // starts the properties) and the first `=` before it in a single pass.
+    let mut end = start
+    let mut eq = -1
+    let mut semi = -1
+    while end < len {
+      let c = view.unsafe_get(end)
+      if c == 0x2C {
+        break
       }
-      if eq >= 0 {
-        let key_view = trim_ows(item[:eq])
-        if is_valid_baggage_key(key_view) {
-          match percent_decode_view(trim_ows(item[eq + 1:semi])) {
-            Some(decoded) => {
-              let key = key_view.to_owned()
-              let separator = if entries.length() > 0 { 1 } else { 0 }
-              let size = key.length() +
-                1 +
-                percent_encoded_length(decoded) +
-                separator
-              if bytes + size > BAGGAGE_MAX_BYTES {
-                break
-              }
-              entries.push((key, decoded))
-              bytes = bytes + size
+      if c == 0x3B {
+        if semi < 0 {
+          semi = end
+        }
+      } else if c == 0x3D {
+        if eq < 0 && semi < 0 {
+          eq = end
+        }
+      }
+      end = end + 1
+    }
+    // Trim optional whitespace around the member.
+    let mut item_start = start
+    while item_start < end && is_ows_code(view.unsafe_get(item_start)) {
+      item_start = item_start + 1
+    }
+    let mut item_end = end
+    while item_end > item_start && is_ows_code(view.unsafe_get(item_end - 1)) {
+      item_end = item_end - 1
+    }
+    if item_end > item_start && eq >= 0 {
+      // `eq` cannot sit in the trimmed whitespace, so it is inside the member.
+      let mut key_end = eq
+      while key_end > item_start && is_ows_code(view.unsafe_get(key_end - 1)) {
+        key_end = key_end - 1
+      }
+      let key_view = view.view(start_offset=item_start, end_offset=key_end)
+      if is_valid_baggage_key(key_view) {
+        let value_limit = if semi >= 0 { semi } else { item_end }
+        let mut value_start = eq + 1
+        while value_start < value_limit &&
+          is_ows_code(view.unsafe_get(value_start)) {
+          value_start = value_start + 1
+        }
+        let mut value_end = value_limit
+        while value_end > value_start &&
+          is_ows_code(view.unsafe_get(value_end - 1)) {
+          value_end = value_end - 1
+        }
+        match
+          percent_decode_view(
+            view.view(start_offset=value_start, end_offset=value_end),
+          ) {
+          Some(decoded) => {
+            let key = key_view.to_owned()
+            let separator = if entries.length() > 0 { 1 } else { 0 }
+            let size = key.length() +
+              1 +
+              percent_encoded_length(decoded) +
+              separator
+            if bytes + size > BAGGAGE_MAX_BYTES {
+              break
             }
-            None => ()
+            entries.push((key, decoded))
+            bytes = bytes + size
           }
+          None => ()
         }
       }
     }

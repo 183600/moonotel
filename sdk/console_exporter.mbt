@@ -18,6 +18,25 @@ pub fn ConsoleSpanExporter::is_shutdown(self : ConsoleSpanExporter) -> Bool {
   self.shutdown_called
 }
 
+// Lower-case hex character of a nibble value.
+fn hex_nibble_char(value : Int) -> Char {
+  if value < 10 {
+    (value + 48).unsafe_to_char()
+  } else {
+    (value + 87).unsafe_to_char()
+  }
+}
+
+// Append the hex form of an `Int32` byte array, matching `@api.bytes_to_hex`
+// (which takes `Array[Int]`) without copying the array first.
+fn write_int32_hex(out : StringBuilder, bytes : Array[Int32]) -> Unit {
+  for byte in bytes {
+    let value = byte & 0xFF
+    out.write_char(hex_nibble_char(value >> 4))
+    out.write_char(hex_nibble_char(value & 0x0F))
+  }
+}
+
 // Render one span as a single summary line:
 // `name=<name> trace_id=<hex> span_id=<hex> parent_span_id=<hex> kind=<kind>
 //  status=<status> duration_ms=<n> attributes=<n> events=<n> links=<n>`
@@ -30,12 +49,8 @@ fn format_span(data : SpanData) -> String {
   out.write_string(" span_id=")
   out.write_string(data.span_context.span_id_hex())
   if data.parent_span_id.length() > 0 {
-    let parent : Array[Int] = []
-    for byte in data.parent_span_id {
-      parent.push(byte)
-    }
     out.write_string(" parent_span_id=")
-    out.write_string(@api.bytes_to_hex(parent))
+    write_int32_hex(out, data.parent_span_id)
   }
   out.write_string(" kind=")
   out.write_string(data.kind.to_string())
