@@ -66,6 +66,37 @@ test "traces_headers_override_generic_headers" {
   assert_eq(config.headers.get("x-traces"), Some("2"))
 }
 
+test "header_values_are_percent_decoded" {
+  unset_otlp_env()
+  @env.set_env_var(
+    "OTEL_EXPORTER_OTLP_HEADERS",
+    "Authorization=Bearer%20abc%2Cdef,x-raw=100%25,x-mix=café%20%E2%98%95",
+  )
+  let config = @otlp.OtlpHttpConfig::from_env()
+  unset_otlp_env()
+  assert_eq(config.headers.get("Authorization"), Some("Bearer abc,def"))
+  assert_eq(config.headers.get("x-raw"), Some("100%"))
+  assert_eq(config.headers.get("x-mix"), Some("café ☕"))
+}
+
+test "header_keys_are_not_percent_decoded" {
+  unset_otlp_env()
+  @env.set_env_var("OTEL_EXPORTER_OTLP_HEADERS", "x%2Dkey=value")
+  let config = @otlp.OtlpHttpConfig::from_env()
+  unset_otlp_env()
+  assert_eq(config.headers.get("x%2Dkey"), Some("value"))
+  assert_eq(config.headers.get("x-key"), None)
+}
+
+test "invalid_header_value_escapes_are_kept_verbatim" {
+  unset_otlp_env()
+  @env.set_env_var("OTEL_EXPORTER_OTLP_HEADERS", "x-bad=%zz,x-short=%4")
+  let config = @otlp.OtlpHttpConfig::from_env()
+  unset_otlp_env()
+  assert_eq(config.headers.get("x-bad"), Some("%zz"))
+  assert_eq(config.headers.get("x-short"), Some("%4"))
+}
+
 test "traces_compression_takes_precedence" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_COMPRESSION", "gzip")

@@ -65,12 +65,75 @@ pub fn OtlpHttpConfig::new(
 }
 
 ///|
+fn hex_digit_value(c : Char) -> Int {
+  let code = c.to_int()
+  if code >= 48 && code <= 57 {
+    code - 48
+  } else if code >= 97 && code <= 102 {
+    code - 87
+  } else if code >= 65 && code <= 70 {
+    code - 55
+  } else {
+    -1
+  }
+}
+
+// Decode the `%XX` sequences used by `OTEL_EXPORTER_OTLP_HEADERS` values.
+// The header format follows W3C Baggage, where values are percent-encoded.
+// Invalid sequences are kept verbatim; keys are not decoded.
+fn decode_header_value(value : StringView) -> String {
+  if value.find("%") is None {
+    return value.to_owned()
+  }
+  let len = value.length()
+  let bytes : Array[Byte] = Array(capacity=len)
+  let mut i = 0
+  while i < len {
+    let c = value.unsafe_get(i).unsafe_to_char()
+    if c == '%' && i + 2 < len {
+      let hi = hex_digit_value(value.unsafe_get(i + 1).unsafe_to_char())
+      let lo = hex_digit_value(value.unsafe_get(i + 2).unsafe_to_char())
+      if hi >= 0 && lo >= 0 {
+        bytes.push((hi * 16 + lo).to_byte())
+        i = i + 3
+        continue
+      }
+    }
+    let code = c.to_int()
+    if code < 0x80 {
+      // ASCII characters encode to a single UTF-8 byte.
+      bytes.push(code.to_byte())
+      i = i + 1
+    } else {
+      // Encode a whole run of non-ASCII code units together so that surrogate
+      // pairs are encoded as one character.
+      let run_start = i
+      let mut j = i
+      while j < len {
+        if value.unsafe_get(j).to_int() < 0x80 {
+          break
+        }
+        j = j + 1
+      }
+      for byte in @utf8.encode(value.view(start_offset=run_start, end_offset=j)) {
+        bytes.push(byte)
+      }
+      i = j
+    }
+  }
+  @utf8.decode_lossy(Bytes::from_array(bytes).exact_view())
+}
+
+///|
 fn parse_headers(value : String) -> Map[String, String] {
   let headers = Map([])
   for pair in value.split(",") {
     match pair.trim().split_once("=") {
       Some((key, header_value)) =>
-        headers.set(key.trim().to_owned(), header_value.trim().to_owned())
+        headers.set(
+          key.trim().to_owned(),
+          decode_header_value(header_value.trim()),
+        )
       None => ()
     }
   }
