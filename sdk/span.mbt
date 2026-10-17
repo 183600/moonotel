@@ -15,21 +15,26 @@ pub(all) enum AttributeValue {
   DoubleArrayValue(Array[Double])
 } derive(Eq, @debug.Debug)
 
-// A timestamped event attached to a span.
+// A timestamped event attached to a span. `dropped_attributes_count` is the
+// number of attributes discarded because of the event attribute limit.
 
 ///|
 pub(all) struct SpanEvent {
   name : String
   time_unix_nano : Int64
   attributes : Map[String, AttributeValue]
+  dropped_attributes_count : Int
 }
 
 // A link from a span to another span in a (possibly different) trace.
+// `dropped_attributes_count` is the number of attributes discarded because of
+// the link attribute limit.
 
 ///|
 pub(all) struct SpanLink {
   span_context : @api.SpanContext
   attributes : Map[String, AttributeValue]
+  dropped_attributes_count : Int
 }
 
 // Create a link to `span_context` with optional attributes.
@@ -45,6 +50,7 @@ pub fn SpanLink::new(
       Some(values) => values
       None => Map([])
     },
+    dropped_attributes_count: 0,
   }
 }
 
@@ -61,6 +67,9 @@ pub(all) struct SpanData {
   attributes : Map[String, AttributeValue]
   events : Array[SpanEvent]
   links : Array[SpanLink]
+  dropped_attributes_count : Int
+  dropped_events_count : Int
+  dropped_links_count : Int
   status : @api.StatusCode
   status_description : String
   resource : Map[String, AttributeValue]
@@ -93,6 +102,10 @@ pub struct SpanSdk {
   mut links : Array[SpanLink]?
   mut status : @api.StatusCode
   mut status_description : String
+  limits : SpanLimits
+  mut dropped_attributes : Int
+  mut dropped_events : Int
+  mut dropped_links : Int
   processors : Array[&SpanProcessor]
   resource : Map[String, AttributeValue]
   scope_name : String
@@ -108,12 +121,13 @@ fn create_span(
   start_time_unix_nano : Int64,
   recording : Bool,
   links : Array[SpanLink]?,
+  limits : SpanLimits,
   processors : Array[&SpanProcessor],
   resource : Map[String, AttributeValue],
   scope_name : String,
   scope_version : String,
 ) -> SpanSdk {
-  {
+  let span : SpanSdk = {
     name,
     context,
     parent_span_id,
@@ -124,14 +138,28 @@ fn create_span(
     recording,
     attributes: None,
     events: None,
-    links,
+    links: None,
     status: @api.StatusCode::Unset,
     status_description: "",
+    limits,
+    dropped_attributes: 0,
+    dropped_events: 0,
+    dropped_links: 0,
     processors,
     resource,
     scope_name,
     scope_version,
   }
+  // Links provided at span creation are subject to the same limits as links
+  // added later; invalid links are ignored.
+  match links {
+    Some(values) =>
+      for link in values {
+        span.add_link(link)
+      }
+    None => ()
+  }
+  span
 }
 
 // Allocate the attribute map on first use, so spans that never record an
@@ -174,6 +202,114 @@ fn SpanSdk::mutable_links(self : SpanSdk) -> Array[SpanLink] {
       self.links = Some(links)
       links
     }
+  }
+}
+
+// Whether a collection has room for one more element under `limit` (-1 means
+// no limit).
+fn within_limit(size : Int, limit : Int) -> Bool {
+  limit < 0 || size < limit
+}
+
+// Truncate a string to at most `limit` characters (code points). A limit of
+// 0 yields the empty string; a negative limit returns the value unchanged. A
+// surrogate pair is never split.
+fn truncate_string(value : String, limit : Int) -> String {
+  if limit < 0 {
+    return value
+  }
+  let len = value.length()
+  if len <= limit {
+    return value
+  }
+  let end = if limit <= 0 {
+    0
+  } else {
+    let last = value.unsafe_get(limit - 1).to_int()
+    if last >= 0xD800 && last <= 0xDBFF {
+      // The character at `limit` is a high surrogate: keep the whole pair
+      // when its low surrogate follows, otherwise drop the lone surrogate.
+      if limit < len && value.unsafe_get(limit).to_int() >= 0xDC00 &&
+        value.unsafe_get(limit).to_int() <= 0xDFFF {
+        limit + 1
+      } else {
+        limit - 1
+      }
+    } else {
+      limit
+    }
+  }
+  value[:end].to_owned()
+}
+
+// Apply the attribute value length limit to a value. String values (and the
+// elements of string arrays) are truncated; other value kinds are unchanged.
+fn truncate_attribute_value(
+  value : AttributeValue,
+  limit : Int
+) -> AttributeValue {
+  if limit < 0 {
+    return value
+  }
+  match value {
+    StringValue(text) => StringValue(truncate_string(text, limit))
+    StringArrayValue(items) => {
+      let out : Array[String] = []
+      for item in items {
+        out.push(truncate_string(item, limit))
+      }
+      StringArrayValue(out)
+    }
+    _ => value
+  }
+}
+
+// Copy `attributes` under the event/link attribute count and value length
+// limits. Returns the kept attributes and how many were dropped.
+fn limited_attributes(
+  attributes : Map[String, AttributeValue],
+  count_limit : Int,
+  value_length_limit : Int
+) -> (Map[String, AttributeValue], Int) {
+  let kept : Map[String, AttributeValue] = Map([])
+  let mut dropped = 0
+  for entry in attributes.iter() {
+    let (key, value) = entry
+    if within_limit(kept.length(), count_limit) {
+      kept.set(key, truncate_attribute_value(value, value_length_limit))
+    } else {
+      dropped = dropped + 1
+    }
+  }
+  (kept, dropped)
+}
+
+// Record one attribute unless the count limit is reached; `key` may overwrite
+// an existing attribute without counting against the limit.
+fn SpanSdk::set_attribute_limited(
+  self : SpanSdk,
+  key : String,
+  value : AttributeValue,
+) -> Unit {
+  let attributes = self.mutable_attributes()
+  match attributes.get(key) {
+    Some(_) =>
+      attributes.set(
+        key,
+        truncate_attribute_value(value, self.limits.attribute_value_length_limit),
+      )
+    None =>
+      if within_limit(attributes.length(), self.limits.attribute_count_limit) {
+        attributes.set(
+          key,
+          truncate_attribute_value(
+            value,
+            self.limits.attribute_value_length_limit,
+          ),
+        )
+      } else {
+        self.dropped_attributes = self.dropped_attributes + 1
+      }
   }
 }
 
@@ -255,6 +391,34 @@ pub fn SpanSdk::links(self : SpanSdk) -> Array[SpanLink] {
   self.mutable_links()
 }
 
+// The collection limits this span enforces.
+
+///|
+pub fn SpanSdk::limits(self : SpanSdk) -> SpanLimits {
+  self.limits
+}
+
+// Number of attributes discarded because of the attribute count limit.
+
+///|
+pub fn SpanSdk::dropped_attributes_count(self : SpanSdk) -> Int {
+  self.dropped_attributes
+}
+
+// Number of events discarded because of the event count limit.
+
+///|
+pub fn SpanSdk::dropped_events_count(self : SpanSdk) -> Int {
+  self.dropped_events
+}
+
+// Number of links discarded because of the link count limit.
+
+///|
+pub fn SpanSdk::dropped_links_count(self : SpanSdk) -> Int {
+  self.dropped_links
+}
+
 // The current span status.
 
 ///|
@@ -278,7 +442,9 @@ pub fn SpanSdk::update_name(self : SpanSdk, name : String) -> Unit {
   }
 }
 
-// Set a single attribute. No-op for non-recording or ended spans.
+// Set a single attribute. No-op for non-recording or ended spans. When the
+// attribute count limit is reached, the attribute is dropped and counted.
+// String values are truncated to the configured value length limit.
 
 ///|
 pub fn SpanSdk::set_attribute(
@@ -287,11 +453,13 @@ pub fn SpanSdk::set_attribute(
   value : AttributeValue,
 ) -> Unit {
   if self.recording && !self.ended {
-    self.mutable_attributes().set(key, value)
+    self.set_attribute_limited(key, value)
   }
 }
 
-// Set multiple attributes. No-op for non-recording or ended spans.
+// Set multiple attributes. No-op for non-recording or ended spans. Every
+// attribute is subject to the same count and value length limits as
+// `set_attribute`.
 
 ///|
 pub fn SpanSdk::set_attributes(
@@ -299,15 +467,17 @@ pub fn SpanSdk::set_attributes(
   attributes : Map[String, AttributeValue],
 ) -> Unit {
   if self.recording && !self.ended {
-    let target = self.mutable_attributes()
     for entry in attributes.iter() {
       let (key, value) = entry
-      target.set(key, value)
+      self.set_attribute_limited(key, value)
     }
   }
 }
 
-// Add an event to the span. No-op for non-recording or ended spans.
+// Add an event to the span. No-op for non-recording or ended spans. When the
+// event count limit is reached the event is dropped and counted; attributes
+// beyond the event attribute count limit are dropped and counted on the
+// event.
 
 ///|
 pub fn SpanSdk::add_event(
@@ -317,29 +487,70 @@ pub fn SpanSdk::add_event(
   time_unix_nano? : Int64,
 ) -> Unit {
   if self.recording && !self.ended {
+    if !within_limit(self.event_count(), self.limits.event_count_limit) {
+      self.dropped_events = self.dropped_events + 1
+      return
+    }
     let timestamp = match time_unix_nano {
       Some(value) => value
       None => unix_nano_now()
     }
-    let event_attributes = match attributes {
-      Some(map) => map
-      None => Map([])
+    let (event_attributes, dropped) = match attributes {
+      Some(map) =>
+        limited_attributes(
+          map,
+          self.limits.event_attribute_count_limit,
+          self.limits.attribute_value_length_limit,
+        )
+      None => (Map([]), 0)
     }
     self.mutable_events().push({
       name,
       time_unix_nano: timestamp,
       attributes: event_attributes,
+      dropped_attributes_count: dropped,
     })
   }
 }
 
+// Number of events already recorded, without allocating the event array.
+fn SpanSdk::event_count(self : SpanSdk) -> Int {
+  match self.events {
+    Some(events) => events.length()
+    None => 0
+  }
+}
+
+// Number of links already recorded, without allocating the link array.
+fn SpanSdk::link_count(self : SpanSdk) -> Int {
+  match self.links {
+    Some(links) => links.length()
+    None => 0
+  }
+}
+
 // Add a link to another span. Links with an invalid SpanContext are
-// ignored. No-op for non-recording or ended spans.
+// ignored. No-op for non-recording or ended spans. When the link count limit
+// is reached the link is dropped and counted; attributes beyond the link
+// attribute count limit are dropped and counted on the link.
 
 ///|
 pub fn SpanSdk::add_link(self : SpanSdk, link : SpanLink) -> Unit {
   if self.recording && !self.ended && link.span_context.is_valid() {
-    self.mutable_links().push(link)
+    if !within_limit(self.link_count(), self.limits.link_count_limit) {
+      self.dropped_links = self.dropped_links + 1
+      return
+    }
+    let (link_attributes, dropped) = limited_attributes(
+      link.attributes,
+      self.limits.link_attribute_count_limit,
+      self.limits.attribute_value_length_limit,
+    )
+    self.mutable_links().push({
+      span_context: link.span_context,
+      attributes: link_attributes,
+      dropped_attributes_count: dropped,
+    })
   }
 }
 
@@ -410,6 +621,9 @@ fn SpanData::from_span(span : SpanSdk) -> SpanData {
     attributes: span.mutable_attributes(),
     events: span.mutable_events(),
     links: span.mutable_links(),
+    dropped_attributes_count: span.dropped_attributes,
+    dropped_events_count: span.dropped_events,
+    dropped_links_count: span.dropped_links,
     status: span.status,
     status_description: span.status_description,
     resource: span.resource,

@@ -23,6 +23,7 @@ pub using @sdk {
   type SamplingDecision,
   type ExportResult,
   type Sampler,
+  type SpanLimits,
   type IdGenerator,
   type SpanSdk,
   type Tracer,
@@ -86,7 +87,8 @@ pub using @otlp {
 //
 // `endpoint` and `headers` override the values read from the
 // OTEL_EXPORTER_OTLP_* environment variables. `resource_attributes` are
-// merged into the resource built from the environment.
+// merged into the resource built from the environment, and `span_limits`
+// replaces the limits read from the OTEL_SPAN_* environment variables.
 
 ///|
 pub fn setup(
@@ -95,6 +97,7 @@ pub fn setup(
   endpoint? : String,
   headers? : Map[String, String],
   sampler? : @sdk.Sampler,
+  span_limits? : @sdk.SpanLimits,
   transport? : @otlp.Transport,
   use_batch? : Bool,
 ) -> @sdk.TracerProviderSdk {
@@ -105,6 +108,10 @@ pub fn setup(
   }
   match sampler {
     Some(value) => provider = provider.with_sampler(value)
+    None => ()
+  }
+  match span_limits {
+    Some(value) => provider = provider.with_span_limits(value)
     None => ()
   }
   match transport {

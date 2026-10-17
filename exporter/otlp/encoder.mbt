@@ -231,6 +231,12 @@ fn encode_event(writer : ProtoWriter, event : @sdk.SpanEvent) -> Unit {
   )
   event_writer.write_string_field(2, event.name)
   encode_attributes(event_writer, 3, event.attributes)
+  if event.dropped_attributes_count > 0 {
+    event_writer.write_varint_field(
+      4,
+      event.dropped_attributes_count.to_uint64(),
+    )
+  }
   writer.append_message(11, event_writer)
 }
 
@@ -244,6 +250,9 @@ fn encode_link(writer : ProtoWriter, link : @sdk.SpanLink) -> Unit {
     link_writer.write_string_field(3, tracestate)
   }
   encode_attributes(link_writer, 4, link.attributes)
+  if link.dropped_attributes_count > 0 {
+    link_writer.write_varint_field(5, link.dropped_attributes_count.to_uint64())
+  }
   link_writer.write_fixed32_field(
     6,
     link.span_context.trace_flags().reinterpret_as_uint(),
@@ -283,11 +292,20 @@ fn encode_span(writer : ProtoWriter, data : @sdk.SpanData) -> Unit {
   span.write_fixed64_field(7, data.start_time_unix_nano.reinterpret_as_uint64())
   span.write_fixed64_field(8, data.end_time_unix_nano.reinterpret_as_uint64())
   encode_attributes(span, 9, data.attributes)
+  if data.dropped_attributes_count > 0 {
+    span.write_varint_field(10, data.dropped_attributes_count.to_uint64())
+  }
   for event in data.events {
     encode_event(span, event)
   }
+  if data.dropped_events_count > 0 {
+    span.write_varint_field(12, data.dropped_events_count.to_uint64())
+  }
   for link in data.links {
     encode_link(span, link)
+  }
+  if data.dropped_links_count > 0 {
+    span.write_varint_field(14, data.dropped_links_count.to_uint64())
   }
   encode_status(span, data)
   span.write_fixed32_field(

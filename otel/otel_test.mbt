@@ -137,6 +137,23 @@ test "setup_merges_resource_attributes" {
   @otel.shutdown_global_tracer_provider()
 }
 
+test "setup_applies_span_limits" {
+  @otel.shutdown_global_tracer_provider()
+  let provider = @otel.setup(
+    service_name="limits-facade",
+    span_limits=@otel.SpanLimits::new(attribute_count_limit=1),
+  )
+  let tracer = @otel.global_tracer("limits-scope")
+  let span = tracer.start_root_span("op")
+  span.set_attribute("a", @sdk.StringValue("1"))
+  span.set_attribute("b", @sdk.StringValue("2"))
+  assert_eq(span.attributes().length(), 1)
+  assert_eq(span.dropped_attributes_count(), 1)
+  span.end()
+  provider.shutdown()
+  @otel.shutdown_global_tracer_provider()
+}
+
 test "facade_baggage_round_trip" {
   let context = @otel.Context::root().with_value("user.id", "42")
   let carrier = @otel.TextMapCarrier::new()

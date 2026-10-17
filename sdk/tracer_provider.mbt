@@ -6,6 +6,7 @@ pub struct TracerProviderSdk {
   resource : Map[String, AttributeValue]
   sampler : Sampler
   id_generator : IdGenerator
+  span_limits : SpanLimits
   processors : Array[&SpanProcessor]
   mut shutdown_called : Bool
 }
@@ -134,6 +135,7 @@ pub fn TracerProviderSdk::new(service_name? : String) -> TracerProviderSdk {
       Sampler::from_env()
     },
     id_generator: IdGenerator::random(),
+    span_limits: SpanLimits::from_env(),
     processors: [],
     shutdown_called: false,
   }
@@ -187,6 +189,16 @@ pub fn TracerProviderSdk::with_id_generator(
   { ..self, id_generator, }
 }
 
+// Use custom span collection limits. By default the limits come from the
+// OTEL_SPAN_* / OTEL_EVENT_* / OTEL_LINK_* environment variables, with the
+// specification defaults (128 attributes, events and links per span).
+pub fn TracerProviderSdk::with_span_limits(
+  self : TracerProviderSdk,
+  span_limits : SpanLimits
+) -> TracerProviderSdk {
+  { ..self, span_limits, }
+}
+
 // Register a span processor (called in registration order).
 pub fn TracerProviderSdk::with_span_processor(
   self : TracerProviderSdk,
@@ -205,6 +217,11 @@ pub fn TracerProviderSdk::resource(self : TracerProviderSdk) -> Map[String, Attr
 // The sampler used by this provider.
 pub fn TracerProviderSdk::sampler(self : TracerProviderSdk) -> Sampler {
   self.sampler
+}
+
+// The span collection limits used by this provider.
+pub fn TracerProviderSdk::span_limits(self : TracerProviderSdk) -> SpanLimits {
+  self.span_limits
 }
 
 // Whether `shutdown` has been called.

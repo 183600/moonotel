@@ -160,9 +160,13 @@ fn sample_span() -> @sdk.SpanData {
         name: "retry",
         time_unix_nano: 1600000000250000000L,
         attributes: Map::new(),
+        dropped_attributes_count: 0,
       },
     ],
     links: [],
+    dropped_attributes_count: 0,
+    dropped_events_count: 0,
+    dropped_links_count: 0,
     status: @api.StatusCode::Ok,
     status_description: "",
     resource,
@@ -305,4 +309,49 @@ test "encode_span_writes_trace_state" {
   }
   assert_eq(span_field_text(with_state, 3), Some("congo=t61rcWkgMzE,vendor=1"))
   assert_true(span_field_text(span, 3) is None)
+}
+
+///|
+test "encode_span_writes_dropped_counts" {
+  let event : @sdk.SpanEvent = {
+    name: "ev",
+    time_unix_nano: 5L,
+    attributes: Map([]),
+    dropped_attributes_count: 6,
+  }
+  let link : @sdk.SpanLink = {
+    span_context: @api.span_context(
+      @api.bytes_from_hex("4bf92f359d1e75b7618a2d1f3c4e5a6b").unwrap(),
+      @api.bytes_from_hex("1122334455667788").unwrap(),
+      @api.TRACE_FLAGS_SAMPLED,
+    ),
+    attributes: Map([]),
+    dropped_attributes_count: 7,
+  }
+  let span : @sdk.SpanData = {
+    ..sample_span(),
+    events: [event],
+    links: [link],
+    dropped_attributes_count: 3,
+    dropped_events_count: 4,
+    dropped_links_count: 5,
+  }
+  let span_fields = link_test_span_fields(span)
+  assert_eq(first_of(span_fields, 10).unwrap().varint, 3)
+  assert_eq(first_of(span_fields, 12).unwrap().varint, 4)
+  assert_eq(first_of(span_fields, 14).unwrap().varint, 5)
+  let event_fields = parse_fields(fields_of(span_fields, 11)[0].payload)
+  assert_eq(first_of(event_fields, 4).unwrap().varint, 6)
+  let link_fields = parse_fields(fields_of(span_fields, 13)[0].payload)
+  assert_eq(first_of(link_fields, 5).unwrap().varint, 7)
+}
+
+///|
+test "encode_span_omits_zero_dropped_counts" {
+  let span_fields = link_test_span_fields(sample_span())
+  assert_true(first_of(span_fields, 10) is None)
+  assert_true(first_of(span_fields, 12) is None)
+  assert_true(first_of(span_fields, 14) is None)
+  let event_fields = parse_fields(fields_of(span_fields, 11)[0].payload)
+  assert_true(first_of(event_fields, 4) is None)
 }

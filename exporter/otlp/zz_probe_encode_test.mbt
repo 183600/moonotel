@@ -24,9 +24,17 @@ test "encode_all_attribute_types_and_unicode" {
     end_time_unix_nano: 1600000000500000000L,
     attributes,
     events: [
-      { name: "ev😀", time_unix_nano: 42L, attributes: event_attributes, },
+      {
+        name: "ev😀",
+        time_unix_nano: 42L,
+        attributes: event_attributes,
+        dropped_attributes_count: 0,
+      },
     ],
     links: [],
+    dropped_attributes_count: 0,
+    dropped_events_count: 0,
+    dropped_links_count: 0,
     status: @api.StatusCode::Error,
     status_description: "oops😀",
     resource,

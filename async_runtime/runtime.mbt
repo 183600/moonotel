@@ -67,10 +67,11 @@ pub fn[G] spawn_bg(
 // provider.
 //
 // `endpoint` and `headers` override the values read from the
-// OTEL_EXPORTER_OTLP_* environment variables, and `resource_attributes` are
-// merged into the resource built from the environment. Spans are handed to
-// the background task when they end and sent in coalesced batches; pending
-// spans are drained when the task group exits.
+// OTEL_EXPORTER_OTLP_* environment variables, `resource_attributes` are
+// merged into the resource built from the environment, and `span_limits`
+// replaces the limits read from the OTEL_SPAN_* environment variables. Spans
+// are handed to the background task when they end and sent in coalesced
+// batches; pending spans are drained when the task group exits.
 pub fn[G] setup(
   group : @async.TaskGroup[G],
   service_name? : String,
@@ -78,6 +79,7 @@ pub fn[G] setup(
   endpoint? : String,
   headers? : Map[String, String],
   sampler? : @sdk.Sampler,
+  span_limits? : @sdk.SpanLimits,
   max_queue_size? : Int
 ) -> @sdk.TracerProviderSdk {
   let base = @otlp.OtlpHttpConfig::from_env()
@@ -102,6 +104,10 @@ pub fn[G] setup(
   }
   match sampler {
     Some(value) => provider = provider.with_sampler(value)
+    None => ()
+  }
+  match span_limits {
+    Some(value) => provider = provider.with_span_limits(value)
     None => ()
   }
   provider = provider.with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))

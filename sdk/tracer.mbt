@@ -22,29 +22,6 @@ pub fn Tracer::scope_version(self : Tracer) -> String {
   self.scope_version
 }
 
-// Keep only the links whose SpanContext is valid; invalid links are dropped,
-// as required by the specification.
-
-///|
-fn valid_links(links : Array[SpanLink]?) -> Array[SpanLink]? {
-  match links {
-    Some(values) => {
-      let out : Array[SpanLink] = []
-      for link in values {
-        if link.span_context.is_valid() {
-          out.push(link)
-        }
-      }
-      if out.length() == 0 {
-        None
-      } else {
-        Some(out)
-      }
-    }
-    None => None
-  }
-}
-
 // Start a new span. When `parent` is a valid SpanContext, the new span joins
 // that trace; otherwise the span is the root of a new trace. `links` may
 // associate the new span with other spans in the same or a different trace.
@@ -76,9 +53,12 @@ pub fn Tracer::start_span(
     Some(value) => value
     None => unix_nano_now()
   }
-  // Non-recording spans (DROP) keep no links, matching the SDK spec.
+  // Non-recording spans (DROP) keep no links, matching the SDK spec;
+  // `create_span` ignores links for non-recording spans. Links with an
+  // invalid SpanContext are dropped, and the link count/attribute limits are
+  // enforced, as required by the specification.
   let span_links : Array[SpanLink]? = if decision.is_recorded {
-    valid_links(links)
+    links
   } else {
     None
   }
@@ -90,6 +70,7 @@ pub fn Tracer::start_span(
     start_time,
     decision.is_recorded,
     span_links,
+    self.provider.span_limits(),
     self.provider.processors,
     self.provider.resource,
     self.scope_name,
