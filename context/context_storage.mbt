@@ -87,12 +87,13 @@ pub fn current_span_context() -> @api.SpanContext? {
   current_context().span_context()
 }
 
-// Run `f` with `sc` attached as the current span context.
+// Run `f` with `sc` attached as the current span context. The rest of the
+// current context (for example baggage values) stays visible inside `f`.
 
 ///|
 pub fn[X] with_span_context(
   sc : @api.SpanContext,
   f : () -> X raise?,
 ) -> X raise? {
-  with_context(Context::root().with_span(sc), f)
+  with_context(current_context().with_span(sc), f)
 }

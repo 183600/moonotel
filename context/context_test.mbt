@@ -104,3 +104,18 @@ test "with_span_context_helper" {
   })
   assert_true(@context.current_span_context() is None)
 }
+
+test "with_span_context_keeps_the_current_baggage" {
+  let current = @context.Context::root().with_value("user.id", "42")
+  @context.with_context(current, fn() {
+    @context.with_span_context(span_context_b(), fn() {
+      assert_eq(@context.current_context().value("user.id"), Some("42"))
+      assert_eq(@context.current_context().baggage().get("user.id"), Some("42"))
+      assert_eq(
+        @context.current_span_context().unwrap().span_id_hex(),
+        "0000000000000001",
+      )
+    })
+    assert_eq(@context.current_context().value("user.id"), Some("42"))
+  })
+}
