@@ -94,7 +94,6 @@ fn varint_size(value : UInt64) -> Int32 {
 ///|
 fn utf8_length(text : String) -> Int32 {
   let len = text.length()
-  // Fast path: pure-ASCII text has one UTF-8 byte per UTF-16 code unit.
   let mut i = 0
   while i < len {
     if text.unsafe_get(i).to_int() >= 0x80 {
@@ -105,8 +104,8 @@ fn utf8_length(text : String) -> Int32 {
   if i == len {
     return len
   }
-  // Count the UTF-8 bytes directly. Surrogates count two bytes each, so a
-  // valid surrogate pair counts four, matching `@utf8.encode`.
+  // Surrogates count two bytes each, so a valid surrogate pair counts four,
+  // matching `@utf8.encode`.
   let mut bytes = i
   while i < len {
     let code = text.unsafe_get(i).to_int()
@@ -411,8 +410,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   // Index of the group for `last_resource`.
   let mut last_index = -1
   // Whether the key of `groups[last_index]` has not been registered in
-  // `resource_index` yet. Batches commonly contain a single resource, in which
-  // case the (comparatively expensive) key is never needed.
+  // `resource_index` yet.
   let mut unindexed = false
   for data in spans {
     let index = match last_resource {

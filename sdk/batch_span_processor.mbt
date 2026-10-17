@@ -148,8 +148,7 @@ pub fn BatchSpanProcessor::flush_batch(self : BatchSpanProcessor) -> Unit {
 }
 
 // Export up to `max_export_batch_size` spans from the front of the queue,
-// stamping the flush with `now` so callers that already read the clock can
-// avoid a second read.
+// stamping the flush with `now`.
 fn BatchSpanProcessor::flush_batch_at(
   self : BatchSpanProcessor,
   now : UInt64
@@ -223,8 +222,6 @@ pub impl SpanProcessor for BatchSpanProcessor with on_end(self, data) {
 
 pub impl SpanProcessor for BatchSpanProcessor with force_flush(self) {
   if self.live_count() > 0 {
-    // One clock read for the whole drain; every batch in it is stamped with
-    // the same time.
     let now = @env.now()
     while self.live_count() > 0 {
       self.flush_batch_at(now)

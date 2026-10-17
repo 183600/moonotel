@@ -162,8 +162,7 @@ fn create_span(
   span
 }
 
-// Allocate the attribute map on first use, so spans that never record an
-// attribute (including non-recording spans) pay nothing.
+// Allocate the attribute map on first use.
 
 ///|
 fn SpanSdk::mutable_attributes(self : SpanSdk) -> Map[String, AttributeValue] {
@@ -513,7 +512,7 @@ pub fn SpanSdk::add_event(
   }
 }
 
-// Number of events already recorded, without allocating the event array.
+// Number of events already recorded.
 fn SpanSdk::event_count(self : SpanSdk) -> Int {
   match self.events {
     Some(events) => events.length()
@@ -521,7 +520,7 @@ fn SpanSdk::event_count(self : SpanSdk) -> Int {
   }
 }
 
-// Number of links already recorded, without allocating the link array.
+// Number of links already recorded.
 fn SpanSdk::link_count(self : SpanSdk) -> Int {
   match self.links {
     Some(links) => links.length()
