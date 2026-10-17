@@ -291,14 +291,16 @@ fn SpanSdk::set_attribute_limited(
   value : AttributeValue,
 ) -> Unit {
   let attributes = self.mutable_attributes()
-  match attributes.get(key) {
-    Some(_) =>
-      attributes.set(
-        key,
-        truncate_attribute_value(value, self.limits.attribute_value_length_limit),
-      )
-    None =>
-      if within_limit(attributes.length(), self.limits.attribute_count_limit) {
+  // While the map has room the key can be set without checking whether it
+  // already exists; only a full map needs the extra lookup.
+  if within_limit(attributes.length(), self.limits.attribute_count_limit) {
+    attributes.set(
+      key,
+      truncate_attribute_value(value, self.limits.attribute_value_length_limit),
+    )
+  } else {
+    match attributes.get(key) {
+      Some(_) =>
         attributes.set(
           key,
           truncate_attribute_value(
@@ -306,9 +308,8 @@ fn SpanSdk::set_attribute_limited(
             self.limits.attribute_value_length_limit,
           ),
         )
-      } else {
-        self.dropped_attributes = self.dropped_attributes + 1
-      }
+      None => self.dropped_attributes = self.dropped_attributes + 1
+    }
   }
 }
 

@@ -133,7 +133,8 @@ fn BatchSpanProcessor::push_span(self : BatchSpanProcessor, data : SpanData) -> 
     self.dropped_spans = self.dropped_spans + 1
     return
   }
-  let index = (self.head + self.count) % capacity
+  let index = self.head + self.count
+  let index = if index >= capacity { index - capacity } else { index }
   if index >= self.queue.length() {
     self.queue.push(data)
   } else {

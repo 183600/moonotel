@@ -89,95 +89,6 @@ fn varint_size(value : UInt64) -> Int32 {
   }
 }
 
-// Byte length of `text` once encoded as UTF-8.
-
-///|
-fn utf8_length(text : String) -> Int32 {
-  let len = text.length()
-  let mut i = 0
-  while i < len {
-    if text.unsafe_get(i).to_int() >= 0x80 {
-      break
-    }
-    i = i + 1
-  }
-  if i == len {
-    return len
-  }
-  // Surrogates count two bytes each, so a valid surrogate pair counts four,
-  // matching `@utf8.encode`.
-  let mut bytes = i
-  while i < len {
-    let code = text.unsafe_get(i).to_int()
-    if code < 0x80 {
-      bytes = bytes + 1
-    } else if code < 0x800 {
-      bytes = bytes + 2
-    } else if code >= 0xD800 && code <= 0xDFFF {
-      bytes = bytes + 2
-    } else {
-      bytes = bytes + 3
-    }
-    i = i + 1
-  }
-  bytes
-}
-
-// Exact encoded size of the scalar `AnyValue` forms.
-
-///|
-fn scalar_any_value_size(value : @sdk.AttributeValue) -> Int32 {
-  match value {
-    @sdk.StringValue(text) => {
-      let n = utf8_length(text)
-      1 + varint_size(n.to_uint64()) + n
-    }
-    @sdk.BoolValue(_) => 2
-    @sdk.IntValue(number) => 1 + varint_size(number.reinterpret_as_uint64())
-    @sdk.DoubleValue(_) => 9
-    @sdk.StringArrayValue(_) => 0
-    @sdk.BoolArrayValue(_) => 0
-    @sdk.IntArrayValue(_) => 0
-    @sdk.DoubleArrayValue(_) => 0
-  }
-}
-
-// Whether the value is an array.
-
-///|
-fn is_array_value(value : @sdk.AttributeValue) -> Bool {
-  match value {
-    @sdk.StringValue(_)
-    | @sdk.BoolValue(_)
-    | @sdk.IntValue(_)
-    | @sdk.DoubleValue(_) => false
-    @sdk.StringArrayValue(_)
-    | @sdk.BoolArrayValue(_)
-    | @sdk.IntArrayValue(_)
-    | @sdk.DoubleArrayValue(_) => true
-  }
-}
-
-// Write the body of a scalar `AnyValue` (without its enclosing length prefix).
-
-///|
-fn encode_scalar_any_value(
-  writer : ProtoWriter,
-  value : @sdk.AttributeValue,
-) -> Unit {
-  match value {
-    @sdk.StringValue(text) => writer.write_string_field(1, text)
-    @sdk.BoolValue(flag) => writer.write_bool_field(2, flag)
-    @sdk.IntValue(number) =>
-      writer.write_varint_field(3, number.reinterpret_as_uint64())
-    @sdk.DoubleValue(number) => writer.write_double_field(4, number)
-    @sdk.StringArrayValue(_) => ()
-    @sdk.BoolArrayValue(_) => ()
-    @sdk.IntArrayValue(_) => ()
-    @sdk.DoubleArrayValue(_) => ()
-  }
-}
-
 ///|
 fn encode_attributes(
   writer : ProtoWriter,
@@ -188,14 +99,38 @@ fn encode_attributes(
     let (key, value) = entry
     let kv = writer.take_scratch()
     kv.write_string_field(1, key)
-    if is_array_value(value) {
-      let any_value = kv.take_scratch()
-      encode_any_value(any_value, value)
-      kv.append_message(2, any_value)
-    } else {
-      kv.write_tag(2, 2)
-      kv.write_varint(scalar_any_value_size(value).to_uint64())
-      encode_scalar_any_value(kv, value)
+    match value {
+      // Strings and arrays are encoded into a scratch writer so that the
+      // `AnyValue` length prefix is known without pre-scanning the value.
+      @sdk.StringValue(text) => {
+        let any_value = kv.take_scratch()
+        any_value.write_string_field(1, text)
+        kv.append_message(2, any_value)
+      }
+      @sdk.StringArrayValue(_)
+      | @sdk.BoolArrayValue(_)
+      | @sdk.IntArrayValue(_)
+      | @sdk.DoubleArrayValue(_) => {
+        let any_value = kv.take_scratch()
+        encode_any_value(any_value, value)
+        kv.append_message(2, any_value)
+      }
+      // Fixed-size scalar `AnyValue`s are written in place.
+      @sdk.BoolValue(flag) => {
+        kv.write_tag(2, 2)
+        kv.write_varint(2)
+        kv.write_bool_field(2, flag)
+      }
+      @sdk.IntValue(number) => {
+        kv.write_tag(2, 2)
+        kv.write_varint((1 + varint_size(number.reinterpret_as_uint64())).to_uint64())
+        kv.write_varint_field(3, number.reinterpret_as_uint64())
+      }
+      @sdk.DoubleValue(number) => {
+        kv.write_tag(2, 2)
+        kv.write_varint(9)
+        kv.write_double_field(4, number)
+      }
     }
     writer.append_message(field, kv)
   }
@@ -405,7 +340,8 @@ priv struct ResourceGroup {
 ///|
 fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   let groups : Array[ResourceGroup] = []
-  let resource_index : Map[String, Int32] = Map([])
+  // The index is only needed once a second distinct resource shows up.
+  let mut resource_index : Map[String, Int32]? = None
   let mut last_resource : Map[String, @sdk.AttributeValue]? = None
   // Index of the group for `last_resource`.
   let mut last_index = -1
@@ -417,13 +353,20 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
       Some(resource) if physical_equal(resource, data.resource) => last_index
       _ => {
         if unindexed {
-          resource_index.set(resource_key(groups[last_index].resource), last_index)
+          let index_map : Map[String, Int32] = match resource_index {
+            Some(map) => map
+            None => {
+              let map : Map[String, Int32] = Map([])
+              resource_index = Some(map)
+              map
+            }
+          }
+          index_map.set(resource_key(groups[last_index].resource), last_index)
           unindexed = false
         }
-        let key = resource_key(data.resource)
-        last_resource = Some(data.resource)
-        let resolved = match resource_index.get(key) {
-          Some(index) => index
+        // The first resource of a batch can never already be indexed, so its
+        // key is only computed when (and if) a second resource shows up.
+        let resolved = match last_resource {
           None => {
             let created : ResourceGroup = {
               resource: data.resource,
@@ -433,7 +376,27 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
             unindexed = true
             groups.length() - 1
           }
+          Some(_) => {
+            let key = resource_key(data.resource)
+            let known : Int32? = match resource_index {
+              Some(map) => map.get(key)
+              None => None
+            }
+            match known {
+              Some(index) => index
+              None => {
+                let created : ResourceGroup = {
+                  resource: data.resource,
+                  scopes: [],
+                }
+                groups.push(created)
+                unindexed = true
+                groups.length() - 1
+              }
+            }
+          }
         }
+        last_resource = Some(data.resource)
         last_index = resolved
         resolved
       }
