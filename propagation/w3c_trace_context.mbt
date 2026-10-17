@@ -162,7 +162,6 @@ fn write_hex(
     let b = bytes.unsafe_get(i)
     let pos = (start + i * 2) * 2
     if b >= 0 && b < 256 {
-      // One 32-bit store writes both hex characters of the byte.
       out.unsafe_write_uint32_le(pos, hex_pairs.unsafe_get(b))
     } else {
       let hi = b >> 4

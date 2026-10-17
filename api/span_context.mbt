@@ -172,7 +172,6 @@ pub fn bytes_to_hex(bytes : Array[Int]) -> String {
   while i < len {
     let b = bytes.unsafe_get(i)
     if b >= 0 && b < 256 {
-      // One 32-bit store writes both hex characters of the byte.
       out.unsafe_write_uint32_le(i * 4, hex_pairs.unsafe_get(b))
       i = i + 1
       continue

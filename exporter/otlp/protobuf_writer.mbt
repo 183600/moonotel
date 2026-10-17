@@ -15,8 +15,7 @@ fn ProtoWriter::with_capacity(size_hint : Int) -> ProtoWriter {
 }
 
 // Grow the buffer to fit `extra` more bytes, doubling the capacity as needed.
-// Call sites check `len + extra <= buf.length()` inline before calling this,
-// so this is the cold path.
+// Call sites check `len + extra <= buf.length()` inline before calling this.
 fn ProtoWriter::reserve(self : ProtoWriter, extra : Int) -> Unit {
   let required = self.len + extra
   let doubled = self.buf.length() * 2
@@ -45,7 +44,6 @@ fn ProtoWriter::to_bytes(self : ProtoWriter) -> Bytes {
 }
 
 fn ProtoWriter::write_varint(self : ProtoWriter, value : UInt64) -> Unit {
-  // Fast path: values below 0x80 (lengths, small integers) are one byte.
   if value < 0x80 {
     if self.len + 1 > self.buf.length() {
       self.reserve(1)
@@ -72,7 +70,6 @@ fn ProtoWriter::write_varint(self : ProtoWriter, value : UInt64) -> Unit {
 
 fn ProtoWriter::write_tag(self : ProtoWriter, field : Int, wire_type : Int) -> Unit {
   let tag = (field << 3) | wire_type
-  // Fast path: almost every field tag fits in one byte.
   if tag >= 0 && tag < 0x80 {
     if self.len + 1 > self.buf.length() {
       self.reserve(1)
@@ -141,7 +138,6 @@ fn ProtoWriter::write_bytes_from_int_array(
   let buf = self.buf
   let mut pos = self.len
   let mut i = 0
-  // Pack four bytes into one 32-bit store while a full word remains.
   while i + 4 <= len {
     let word = ((values.unsafe_get(i) & 0xFF) |
       ((values.unsafe_get(i + 1) & 0xFF) << 8) |

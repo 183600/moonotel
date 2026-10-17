@@ -66,7 +66,6 @@ fn take_buffered(
   let out : Array[Int] = Array::unsafe_make_uninit(n)
   let mut acc : UInt64 = 0
   let mut i = 0
-  // Copy whole 64-bit words while possible: one load feeds eight stores.
   while i + 8 <= n {
     let word = source.unsafe_read_uint64_le(start + i)
     acc = acc | word
