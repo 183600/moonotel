@@ -127,15 +127,21 @@ pub fn Sampler::should_sample(
 }
 
 // The ratio configured through `OTEL_TRACES_SAMPLER_ARG`, or 1.0 when the
-// variable is absent or not a number.
+// variable is absent, not a number, or NaN.
 fn sampler_ratio_from_env() -> Double {
   match @env.get_env_var("OTEL_TRACES_SAMPLER_ARG") {
-    Some(value) =>
-      try {
+    Some(value) => {
+      let ratio = try {
         @string.parse_double(value.trim())
       } catch {
         _ => 1.0
       }
+      if ratio.is_nan() {
+        1.0
+      } else {
+        ratio
+      }
+    }
     None => 1.0
   }
 }

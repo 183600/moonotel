@@ -237,6 +237,9 @@ pub async fn request(
       defer span.end()
       span.set_attribute(@sdk.HTTP_REQUEST_METHOD, @sdk.StringValue(method_name))
       span.set_attribute(@sdk.URL_FULL, @sdk.StringValue(url))
+      span.set_attribute(@sdk.NETWORK_PROTOCOL_NAME, @sdk.StringValue("http"))
+      // `moonbitlang/async/http` speaks HTTP/1.1 only.
+      span.set_attribute(@sdk.NETWORK_PROTOCOL_VERSION, @sdk.StringValue("1.1"))
       let (scheme, host, port) = split_url_parts(url)
       if scheme != "" {
         span.set_attribute(@sdk.URL_SCHEME, @sdk.StringValue(scheme))

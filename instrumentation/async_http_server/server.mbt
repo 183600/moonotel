@@ -260,9 +260,40 @@ pub fn ServerCall::start_span(
   }
 }
 
+// Whether the request asked for the connection to be closed once the
+// response has been sent (`Connection: close`). Handlers that bypass
+// `respond` can use this to decide whether to call
+// `ServerCall::close_connection` themselves.
+
+///|
+pub fn ServerCall::connection_close_requested(self : ServerCall) -> Bool {
+  match self.request.headers.get(@http.CaseInsensitiveString("connection")) {
+    Some(value) => {
+      for token in value.split(",") {
+        if token.trim().to_lower() == "close" {
+          return true
+        }
+      }
+      false
+    }
+    None => false
+  }
+}
+
+// Close the underlying connection after the current response. The server loop
+// then stops reading requests from this connection. Safe to call multiple
+// times.
+
+///|
+pub fn ServerCall::close_connection(self : ServerCall) -> Unit {
+  self.connection.close()
+}
+
 // Send a response and record `http.response.status_code` on the SERVER span.
 // 5xx responses set the span status to `Error`. The body, when present, is
-// written before the response is ended.
+// written before the response is ended. When the request carried
+// `Connection: close`, the connection is closed after the response, as
+// required by HTTP/1.1.
 
 ///|
 pub async fn ServerCall::respond(
@@ -281,6 +312,11 @@ pub async fn ServerCall::respond(
       }
     None => ()
   }
+  let close_requested = self.connection_close_requested()
+  if close_requested &&
+    extra_headers.get(@http.CaseInsensitiveString("connection")) is None {
+    extra_headers.set(@http.CaseInsensitiveString("connection"), "close")
+  }
   self.connection.send_response(
     status_code,
     reason.unwrap_or(status_reason(status_code)),
@@ -291,6 +327,9 @@ pub async fn ServerCall::respond(
     None => ()
   }
   self.connection.end_response()
+  if close_requested {
+    self.connection.close()
+  }
   match self.span {
     Some(span) => {
       span.set_attribute(
@@ -373,6 +412,15 @@ pub async fn run_server_on(
             @sdk.StringValue(method_name),
           )
           server_span.set_attribute(@sdk.URL_SCHEME, @sdk.StringValue("http"))
+          server_span.set_attribute(
+            @sdk.NETWORK_PROTOCOL_NAME,
+            @sdk.StringValue("http"),
+          )
+          // `moonbitlang/async/http` speaks HTTP/1.1 only.
+          server_span.set_attribute(
+            @sdk.NETWORK_PROTOCOL_VERSION,
+            @sdk.StringValue("1.1"),
+          )
           let (path, query) = split_path_query(request.path)
           server_span.set_attribute(@sdk.URL_PATH, @sdk.StringValue(path))
           if query != "" {
