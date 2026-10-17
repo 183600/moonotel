@@ -427,8 +427,11 @@ pub fn parse_tracestate(value : String) -> String? {
   if value == "" {
     return None
   }
-  // Duplicate keys are rejected; at most 32 members are accepted.
-  let mut first_key : StringView? = None
+  // Duplicate keys are rejected; at most 32 members are accepted. The first
+  // key is kept in a plain field (with `have_first`) instead of an option so
+  // the common one- and two-member cases need no boxing.
+  let mut first_key : StringView = ""
+  let mut have_first = false
   let mut seen : Array[StringView]? = None
   let mut member_count = 0
   let view = value[:]
@@ -473,15 +476,15 @@ pub fn parse_tracestate(value : String) -> String? {
         keys.push(key)
       }
       None =>
-        match first_key {
-          None => first_key = Some(key)
-          Some(existing) =>
-            if existing == key {
-              return None
-            } else {
-              let keys : Array[StringView] = [existing, key]
-              seen = Some(keys)
-            }
+        if have_first {
+          if first_key == key {
+            return None
+          }
+          let keys : Array[StringView] = [first_key, key]
+          seen = Some(keys)
+        } else {
+          first_key = key
+          have_first = true
         }
     }
     member_count = member_count + 1

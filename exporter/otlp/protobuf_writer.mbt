@@ -34,6 +34,25 @@ fn ProtoWriter::take_scratch(self : ProtoWriter) -> ProtoWriter {
   }
 }
 
+// Like `take_scratch`, but ensures the returned writer's buffer can hold at
+// least `hint` bytes. A recycled writer carries no data (its length is reset
+// when it is released), so growing it here avoids repeated reallocation and
+// copying while the message is encoded.
+fn ProtoWriter::take_scratch_with_capacity(
+  self : ProtoWriter,
+  hint : Int
+) -> ProtoWriter {
+  match self.scratch.pop() {
+    Some(buffer) => {
+      if buffer.buf.length() < hint {
+        buffer.buf = FixedArray::make(hint, b'\x00')
+      }
+      buffer
+    }
+    None => ProtoWriter::with_capacity(hint)
+  }
+}
+
 fn ProtoWriter::release_scratch(self : ProtoWriter, buffer : ProtoWriter) -> Unit {
   buffer.len = 0
   self.scratch.push(buffer)

@@ -535,24 +535,75 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   groups
 }
 
+// Whether every span shares the same resource (by reference) and the same
+// scope name and version, so the whole batch forms one ResourceSpans with one
+// ScopeSpans. This is the common case and lets `encode_trace_request` skip
+// building the grouping structures.
+///|
+fn is_uniform_batch(spans : Array[@sdk.SpanData]) -> Bool {
+  let len = spans.length()
+  if len == 0 {
+    return false
+  }
+  let first = spans.unsafe_get(0)
+  let mut i = 1
+  while i < len {
+    let data = spans.unsafe_get(i)
+    if !physical_equal(data.resource, first.resource) ||
+      data.scope_name != first.scope_name ||
+      data.scope_version != first.scope_version {
+      return false
+    }
+    i = i + 1
+  }
+  true
+}
+
 // Encode spans as an `ExportTraceServiceRequest` protobuf message.
 
 ///|
 pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
   // Initial capacity estimate: 160 bytes per span plus the message header.
   let writer = ProtoWriter::with_capacity(288 + spans.length() * 160)
-  for group in group_spans(spans) {
-    let resource_spans = writer.take_scratch()
-    encode_resource(resource_spans, group.resource)
-    for scope in group.scopes {
-      let scope_spans = resource_spans.take_scratch()
-      encode_scope(scope_spans, scope.scope_name, scope.scope_version)
-      for span in scope.spans {
-        encode_span(scope_spans, span)
-      }
-      resource_spans.append_message(2, scope_spans)
+  if is_uniform_batch(spans) {
+    let first = spans.unsafe_get(0)
+    // Size the nested writers up front so their buffers do not have to be
+    // grown (and copied) while the spans are encoded.
+    let resource_spans = writer.take_scratch_with_capacity(
+      288 + spans.length() * 320,
+    )
+    encode_resource(resource_spans, first.resource)
+    let scope_spans = resource_spans.take_scratch_with_capacity(
+      288 + spans.length() * 320,
+    )
+    encode_scope(scope_spans, first.scope_name, first.scope_version)
+    for span in spans {
+      encode_span(scope_spans, span)
     }
+    resource_spans.append_message(2, scope_spans)
     writer.append_message(1, resource_spans)
+  } else {
+    for group in group_spans(spans) {
+      let mut group_span_count = 0
+      for scope in group.scopes {
+        group_span_count = group_span_count + scope.spans.length()
+      }
+      let resource_spans = writer.take_scratch_with_capacity(
+        288 + group_span_count * 320,
+      )
+      encode_resource(resource_spans, group.resource)
+      for scope in group.scopes {
+        let scope_spans = resource_spans.take_scratch_with_capacity(
+          288 + scope.spans.length() * 320,
+        )
+        encode_scope(scope_spans, scope.scope_name, scope.scope_version)
+        for span in scope.spans {
+          encode_span(scope_spans, span)
+        }
+        resource_spans.append_message(2, scope_spans)
+      }
+      writer.append_message(1, resource_spans)
+    }
   }
   writer.to_bytes()
 }
