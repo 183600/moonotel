@@ -269,8 +269,6 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
 //
 // The chain is walked once, collecting the innermost value of every key.
 pub fn context_baggage_header(context : @context.Context) -> String? {
-  // The entries array is allocated only when the chain actually carries a
-  // visible value; a context without baggage costs no allocation here.
   let mut entries : Array[(String, String)]? = None
   let mut seen : Map[String, Bool]? = None
   let mut cursor : @context.Context? = Some(context)

@@ -422,10 +422,7 @@ pub fn parse_tracestate(value : String) -> String? {
   if value == "" {
     return None
   }
-  // Duplicate keys are rejected; at most 32 members are accepted. The first
-  // key is held in a slot and the array is only allocated from the second
-  // member on, so validating the common single-member header allocates
-  // nothing here.
+  // Duplicate keys are rejected; at most 32 members are accepted.
   let mut first_key : StringView? = None
   let mut seen : Array[StringView]? = None
   let mut member_count = 0

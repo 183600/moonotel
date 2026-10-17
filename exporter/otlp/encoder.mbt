@@ -101,9 +101,7 @@ fn encode_attributes(
     kv.write_string_field(1, key)
     match value {
       @sdk.StringValue(text) => {
-        // Encode the nested `AnyValue { string_value: text }` in place: its
-        // length is known once ASCII-ness is checked, so no scratch writer or
-        // intermediate copy is needed.
+        // Encode the nested `AnyValue { string_value: text }`.
         kv.write_tag(2, 2)
         if is_ascii(text) {
           let payload_len = text.length()
@@ -129,7 +127,6 @@ fn encode_attributes(
         encode_any_value(any_value, value)
         kv.append_message(2, any_value)
       }
-      // Fixed-size scalar `AnyValue`s are written in place.
       @sdk.BoolValue(flag) => {
         kv.write_tag(2, 2)
         kv.write_varint(2)
@@ -263,10 +260,7 @@ fn encode_span(writer : ProtoWriter, data : @sdk.SpanData) -> Unit {
   writer.append_message(2, span)
 }
 
-// Canonical key for grouping spans that share a resource.
-
-// Append the decimal digits of a non-negative integer without allocating an
-// intermediate string.
+// Append the decimal digits of a non-negative integer.
 ///|
 fn write_decimal(sb : StringBuilder, value : Int) -> Unit {
   if value >= 10 {
@@ -330,6 +324,7 @@ fn resource_key_value(sb : StringBuilder, value : @sdk.AttributeValue) -> Unit {
   }
 }
 
+// Canonical key for grouping spans that share a resource.
 ///|
 fn resource_key(resource : Map[String, @sdk.AttributeValue]) -> String {
   let keys : Array[String] = []
@@ -395,9 +390,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   // Whether the key of `groups[last_index]` has not been registered in
   // `resource_index` yet.
   let mut unindexed = false
-  // Consecutive spans usually share their instrumentation scope, so the last
-  // match is remembered to keep the common case O(1) instead of scanning the
-  // scope list of the resource group for every span.
+  // Scope group of the last matched span.
   let mut cached_group_index = -1
   let mut cached_scope : ScopeGroup? = None
   for data in spans {
