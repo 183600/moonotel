@@ -90,8 +90,6 @@ pub fn Context::value(self : Context, key : String) -> String? {
 
 // Whether the chain carries at least one visible baggage value. Keys removed
 // with `without_value` do not count.
-//
-// The `seen` table is only needed once a key has been removed.
 pub fn Context::has_baggage(self : Context) -> Bool {
   let mut seen : Map[String, Bool]? = None
   let mut cursor : Context? = Some(self)

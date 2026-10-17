@@ -100,8 +100,6 @@ fn encode_attributes(
     let kv = writer.take_scratch()
     kv.write_string_field(1, key)
     match value {
-      // Strings and arrays are encoded into a scratch writer so that the
-      // `AnyValue` length prefix is known without pre-scanning the value.
       @sdk.StringValue(text) => {
         let any_value = kv.take_scratch()
         any_value.write_string_field(1, text)
@@ -340,7 +338,6 @@ priv struct ResourceGroup {
 ///|
 fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   let groups : Array[ResourceGroup] = []
-  // The index is only needed once a second distinct resource shows up.
   let mut resource_index : Map[String, Int32]? = None
   let mut last_resource : Map[String, @sdk.AttributeValue]? = None
   // Index of the group for `last_resource`.
@@ -364,8 +361,6 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
           index_map.set(resource_key(groups[last_index].resource), last_index)
           unindexed = false
         }
-        // The first resource of a batch can never already be indexed, so its
-        // key is only computed when (and if) a second resource shows up.
         let resolved = match last_resource {
           None => {
             let created : ResourceGroup = {

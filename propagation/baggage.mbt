@@ -239,8 +239,7 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
 // the context carries no (valid) baggage. Keys are emitted in sorted order for
 // a deterministic header.
 //
-// The chain is walked once, collecting the innermost value of every key; the
-// duplicate-tracking table is only needed once a key is seen.
+// The chain is walked once, collecting the innermost value of every key.
 pub fn context_baggage_header(context : @context.Context) -> String? {
   let entries : Array[(String, String)] = []
   let mut seen : Map[String, Bool]? = None

@@ -291,8 +291,6 @@ fn SpanSdk::set_attribute_limited(
   value : AttributeValue,
 ) -> Unit {
   let attributes = self.mutable_attributes()
-  // While the map has room the key can be set without checking whether it
-  // already exists; only a full map needs the extra lookup.
   if within_limit(attributes.length(), self.limits.attribute_count_limit) {
     attributes.set(
       key,
