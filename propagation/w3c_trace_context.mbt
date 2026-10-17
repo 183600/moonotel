@@ -20,10 +20,6 @@ pub fn tracestate_header_name() -> String {
   "tracestate"
 }
 
-fn is_hex_digit(c : Char) -> Bool {
-  (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-}
-
 fn is_trim_char(c : Char) -> Bool {
   c == ' ' || c == '\t' || c == '\n' || c == '\r'
 }
@@ -63,15 +59,47 @@ fn find_code_unit(view : StringView, needle : UInt16, start : Int) -> Int {
   len
 }
 
+// ASCII code unit of every hex digit 0-9a-f, indexed by the digit value.
+let hex_ascii : FixedArray[Byte] = build_hex_ascii()
+
+fn build_hex_ascii() -> FixedArray[Byte] {
+  let table : FixedArray[Byte] = FixedArray::make(16, b'0')
+  let mut i = 0
+  while i < 16 {
+    table.unsafe_set(
+      i,
+      if i < 10 { (i + 48).to_byte() } else { (i + 87).to_byte() },
+    )
+    i = i + 1
+  }
+  table
+}
+
+// Reverse table: the 0-15 value of each ASCII hex digit, -1 for every other
+// code unit below 128.
+let hex_value : FixedArray[Int] = build_hex_value()
+
+fn build_hex_value() -> FixedArray[Int] {
+  let table : FixedArray[Int] = FixedArray::make(128, -1)
+  let mut i = 0
+  while i < 10 {
+    table.unsafe_set(48 + i, i)
+    i = i + 1
+  }
+  let mut j = 0
+  while j < 6 {
+    table.unsafe_set(65 + j, 10 + j)
+    table.unsafe_set(97 + j, 10 + j)
+    j = j + 1
+  }
+  table
+}
+
 // Value of a hex digit, or -1 when the character is not a hex digit.
 fn hex_digit_value(c : Char) -> Int {
   let code = c.to_int()
-  if code >= 48 && code <= 57 {
-    code - 48
-  } else if code >= 97 && code <= 102 {
-    code - 87
-  } else if code >= 65 && code <= 70 {
-    code - 55
+  if code >= 0 && code < 128 {
+    hex_value.unsafe_get(code)
   } else {
     -1
   }
@@ -95,10 +123,8 @@ fn decode_hex(value : String, start : Int, byte_count : Int) -> Array[Int]? {
 }
 
 fn nibble_to_hex_byte(value : Int) -> Byte {
-  if value >= 0 && value < 10 {
-    (value + 48).to_byte()
-  } else if value >= 10 && value < 16 {
-    (value + 87).to_byte()
+  if value >= 0 && value < 16 {
+    hex_ascii.unsafe_get(value)
   } else {
     b'0'
   }
@@ -116,8 +142,13 @@ fn write_hex(
   let mut i = 0
   while i < byte_count {
     let b = bytes.unsafe_get(i)
-    out.unsafe_set((start + i * 2) * 2, nibble_to_hex_byte(b >> 4))
-    out.unsafe_set((start + i * 2 + 1) * 2, nibble_to_hex_byte(b & 0x0F))
+    let pos = (start + i * 2) * 2
+    let hi = b >> 4
+    out.unsafe_set(
+      pos,
+      if hi >= 0 && hi < 16 { hex_ascii.unsafe_get(hi) } else { b'0' },
+    )
+    out.unsafe_set(pos + 2, hex_ascii.unsafe_get(b & 0x0F))
     i = i + 1
   }
 }
@@ -163,11 +194,12 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
   }
   let version_hi = value.unsafe_get(0).unsafe_to_char()
   let version_lo = value.unsafe_get(1).unsafe_to_char()
-  if !is_hex_digit(version_hi) || !is_hex_digit(version_lo) {
+  let version_hi_value = hex_digit_value(version_hi)
+  let version_lo_value = hex_digit_value(version_lo)
+  if version_hi_value < 0 || version_lo_value < 0 {
     return None
   }
-  if (version_hi == 'f' || version_hi == 'F') &&
-    (version_lo == 'f' || version_lo == 'F') {
+  if version_hi_value == 15 && version_lo_value == 15 {
     // `ff` is a reserved invalid version.
     return None
   }

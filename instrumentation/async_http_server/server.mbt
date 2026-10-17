@@ -83,30 +83,38 @@ fn split_path_query(path : String) -> (String, String) {
   }
 }
 
-// Copy request headers into a text-map carrier so that the propagation
-// package can process them.
-
-///|
-fn headers_carrier(
-  headers : Map[@http.CaseInsensitiveString, String],
-) -> @propagation.TextMapCarrier {
-  let carrier = @propagation.TextMapCarrier::new()
-  for entry in headers.iter() {
-    let (key, value) = entry
-    carrier.set(key.to_string(), value)
-  }
-  carrier
-}
-
 // Parse the incoming W3C context of a request: `traceparent` (with a valid
 // `tracestate`) and `baggage`. Request headers are already keyed
-// case-insensitively.
+// case-insensitively; only the headers the propagation package reads are
+// copied into the carrier, and requests without trace context or baggage
+// skip the carrier altogether.
 
 ///|
 fn extract_context_with_baggage(
   headers : Map[@http.CaseInsensitiveString, String],
 ) -> (@context.Context, Bool) {
-  let context = @propagation.extract_context(headers_carrier(headers))
+  let traceparent_name = @propagation.traceparent_header_name()
+  let tracestate_name = @propagation.tracestate_header_name()
+  let baggage_name = @propagation.baggage_header_name()
+  let traceparent = headers.get(@http.CaseInsensitiveString(traceparent_name))
+  let baggage = headers.get(@http.CaseInsensitiveString(baggage_name))
+  if traceparent is None && baggage is None {
+    return (@context.Context::root(), false)
+  }
+  let carrier = @propagation.TextMapCarrier::new()
+  match traceparent {
+    Some(value) => carrier.set(traceparent_name, value)
+    None => ()
+  }
+  match headers.get(@http.CaseInsensitiveString(tracestate_name)) {
+    Some(value) => carrier.set(tracestate_name, value)
+    None => ()
+  }
+  match baggage {
+    Some(value) => carrier.set(baggage_name, value)
+    None => ()
+  }
+  let context = @propagation.extract_context(carrier)
   (context, context.has_baggage())
 }
 

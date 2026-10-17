@@ -14,14 +14,30 @@ pub struct TracerProviderSdk {
 // Version reported as `telemetry.sdk.version` in the resource.
 pub const SDK_VERSION : String = "0.1.0"
 
+// Reverse table: the 0-15 value of each ASCII hex digit, -1 for every other
+// code unit below 128.
+let hex_value : FixedArray[Int] = build_hex_value()
+
+fn build_hex_value() -> FixedArray[Int] {
+  let table : FixedArray[Int] = FixedArray::make(128, -1)
+  let mut i = 0
+  while i < 10 {
+    table.unsafe_set(48 + i, i)
+    i = i + 1
+  }
+  let mut j = 0
+  while j < 6 {
+    table.unsafe_set(65 + j, 10 + j)
+    table.unsafe_set(97 + j, 10 + j)
+    j = j + 1
+  }
+  table
+}
+
 fn hex_digit_value(c : Char) -> Int {
   let code = c.to_int()
-  if code >= 48 && code <= 57 {
-    code - 48
-  } else if code >= 97 && code <= 102 {
-    code - 87
-  } else if code >= 65 && code <= 70 {
-    code - 55
+  if code >= 0 && code < 128 {
+    hex_value.unsafe_get(code)
   } else {
     -1
   }

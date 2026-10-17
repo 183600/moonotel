@@ -335,6 +335,23 @@ priv struct ResourceGroup {
   scopes : Array[ScopeGroup]
 }
 
+// Find the scope group with the given name and version inside a resource
+// group. Scope groups are unique per resource group, so the first match is the
+// only match.
+///|
+fn find_scope_group(
+  group : ResourceGroup,
+  scope_name : String,
+  scope_version : String,
+) -> ScopeGroup? {
+  for scope in group.scopes {
+    if scope.scope_name == scope_name && scope.scope_version == scope_version {
+      return Some(scope)
+    }
+  }
+  None
+}
+
 ///|
 fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   let groups : Array[ResourceGroup] = []
@@ -345,6 +362,11 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   // Whether the key of `groups[last_index]` has not been registered in
   // `resource_index` yet.
   let mut unindexed = false
+  // Consecutive spans usually share their instrumentation scope, so the last
+  // match is remembered to keep the common case O(1) instead of scanning the
+  // scope list of the resource group for every span.
+  let mut cached_group_index = -1
+  let mut cached_scope : ScopeGroup? = None
   for data in spans {
     let index = match last_resource {
       Some(resource) if physical_equal(resource, data.resource) => last_index
@@ -397,25 +419,34 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
       }
     }
     let target = groups[index]
-    let mut scope_group : ScopeGroup? = None
-    for scope in target.scopes {
-      if scope.scope_name == data.scope_name &&
-        scope.scope_version == data.scope_version {
-        scope_group = Some(scope)
-        // Scope groups are unique per resource group, so the first match is
-        // the only match.
-        break
-      }
+    let cached_hit = match cached_scope {
+      Some(scope) =>
+        cached_group_index == index &&
+        scope.scope_name == data.scope_name &&
+        scope.scope_version == data.scope_version
+      None => false
+    }
+    let scope_group : ScopeGroup? = if cached_hit {
+      cached_scope
+    } else {
+      find_scope_group(target, data.scope_name, data.scope_version)
     }
     match scope_group {
-      Some(scope) => scope.spans.push(data)
+      Some(scope) => {
+        scope.spans.push(data)
+        cached_scope = Some(scope)
+        cached_group_index = index
+      }
       None => {
         let spans_for_scope : Array[@sdk.SpanData] = [data]
-        target.scopes.push({
+        let created : ScopeGroup = {
           scope_name: data.scope_name,
           scope_version: data.scope_version,
           spans: spans_for_scope,
-        })
+        }
+        target.scopes.push(created)
+        cached_scope = Some(created)
+        cached_group_index = index
       }
     }
   }

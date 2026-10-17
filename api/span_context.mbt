@@ -89,14 +89,40 @@ let hex_digits : Array[String] = [
   "8", "9", "a", "b", "c", "d", "e", "f",
 ]
 
-fn nibble_to_hex_byte(val : Int) -> Byte {
-  if val >= 0 && val < 10 {
-    (val + 48).to_byte()
-  } else if val >= 10 && val < 16 {
-    (val + 87).to_byte()
-  } else {
-    b'0'
+// ASCII code unit of every hex digit 0-9a-f, indexed by the digit value.
+let hex_ascii : FixedArray[Byte] = build_hex_ascii()
+
+fn build_hex_ascii() -> FixedArray[Byte] {
+  let table : FixedArray[Byte] = FixedArray::make(16, b'0')
+  let mut i = 0
+  while i < 16 {
+    table.unsafe_set(
+      i,
+      if i < 10 { (i + 48).to_byte() } else { (i + 87).to_byte() },
+    )
+    i = i + 1
   }
+  table
+}
+
+// Reverse table: the 0-15 value of each ASCII hex digit, -1 for every other
+// code unit below 128.
+let hex_value : FixedArray[Int] = build_hex_value()
+
+fn build_hex_value() -> FixedArray[Int] {
+  let table : FixedArray[Int] = FixedArray::make(128, -1)
+  let mut i = 0
+  while i < 10 {
+    table.unsafe_set(48 + i, i)
+    i = i + 1
+  }
+  let mut j = 0
+  while j < 6 {
+    table.unsafe_set(65 + j, 10 + j)
+    table.unsafe_set(97 + j, 10 + j)
+    j = j + 1
+  }
+  table
 }
 
 // Helper: convert bytes to hex string
@@ -108,8 +134,13 @@ pub fn bytes_to_hex(bytes : Array[Int]) -> String {
   let mut i = 0
   while i < len {
     let b = bytes.unsafe_get(i)
-    out.unsafe_set(i * 4, nibble_to_hex_byte(b >> 4))
-    out.unsafe_set(i * 4 + 2, nibble_to_hex_byte(b & 0x0F))
+    let pos = i * 4
+    let hi = b >> 4
+    out.unsafe_set(
+      pos,
+      if hi >= 0 && hi < 16 { hex_ascii.unsafe_get(hi) } else { b'0' },
+    )
+    out.unsafe_set(pos + 2, hex_ascii.unsafe_get(b & 0x0F))
     i = i + 1
   }
   out.unsafe_reinterpret_as_bytes().to_unchecked_string()
@@ -158,12 +189,8 @@ pub fn SpanContext::span_id_view(self : SpanContext) -> Array[Int] {
 // is not a hex digit.
 fn hex_char_value(c : Char) -> Int {
   let code = c.to_int()
-  if code >= 48 && code <= 57 {
-    code - 48
-  } else if code >= 97 && code <= 102 {
-    code - 87
-  } else if code >= 65 && code <= 70 {
-    code - 55
+  if code >= 0 && code < 128 {
+    hex_value.unsafe_get(code)
   } else {
     -1
   }

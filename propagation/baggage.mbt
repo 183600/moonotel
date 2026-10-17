@@ -47,11 +47,25 @@ fn is_baggage_value_char(code : Int) -> Bool {
   (code >= 0x5D && code <= 0x7E)
 }
 
+// Upper-case ASCII code unit of every hex digit 0-9A-F.
+let hex_ascii_upper : FixedArray[Char] = build_hex_ascii_upper()
+
+fn build_hex_ascii_upper() -> FixedArray[Char] {
+  let table : FixedArray[Char] = FixedArray::make(16, '0')
+  let mut i = 0
+  while i < 16 {
+    table.unsafe_set(
+      i,
+      if i < 10 { (i + 48).unsafe_to_char() } else { (i + 55).unsafe_to_char() },
+    )
+    i = i + 1
+  }
+  table
+}
+
 fn upper_hex_digit(value : Int) -> Char {
-  if value >= 0 && value < 10 {
-    (value + 48).unsafe_to_char()
-  } else if value >= 10 && value < 16 {
-    (value + 55).unsafe_to_char()
+  if value >= 0 && value < 16 {
+    hex_ascii_upper.unsafe_get(value)
   } else {
     '0'
   }
@@ -241,7 +255,9 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
 //
 // The chain is walked once, collecting the innermost value of every key.
 pub fn context_baggage_header(context : @context.Context) -> String? {
-  let entries : Array[(String, String)] = []
+  // The entries array is allocated only when the chain actually carries a
+  // visible value; a context without baggage costs no allocation here.
+  let mut entries : Array[(String, String)]? = None
   let mut seen : Map[String, Bool]? = None
   let mut cursor : @context.Context? = Some(context)
   while true {
@@ -254,7 +270,11 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
                 if keys.get(key) is None {
                   keys.set(key, true)
                   match node.value {
-                    Some(value) => entries.push((key, value))
+                    Some(value) =>
+                      match entries {
+                        Some(list) => list.push((key, value))
+                        None => entries = Some([(key, value)])
+                      }
                     None => ()
                   }
                 }
@@ -263,7 +283,7 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
                 keys.set(key, true)
                 seen = Some(keys)
                 match node.value {
-                  Some(value) => entries.push((key, value))
+                  Some(value) => entries = Some([(key, value)])
                   None => ()
                 }
               }
@@ -275,8 +295,9 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
       None => break
     }
   }
-  if entries.length() == 0 {
-    return None
+  let entries = match entries {
+    Some(list) => list
+    None => return None
   }
   entries.sort_by(fn(a, b) { a.0.compare(b.0) })
   let formatted = format_baggage(entries)
