@@ -58,6 +58,8 @@ pub using @propagation {
   type TextMapCarrier,
   inject,
   extract,
+  inject_context,
+  extract_context,
   format_traceparent,
   parse_traceparent,
   extract_tracestate,

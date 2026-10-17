@@ -83,6 +83,21 @@ fn split_path_query(path : String) -> (String, String) {
   }
 }
 
+// Copy request headers into a text-map carrier so that the propagation
+// package can process them.
+
+///|
+fn headers_carrier(
+  headers : Map[@http.CaseInsensitiveString, String],
+) -> @propagation.TextMapCarrier {
+  let carrier = @propagation.TextMapCarrier::new()
+  for entry in headers.iter() {
+    let (key, value) = entry
+    carrier.set(key.to_string(), value)
+  }
+  carrier
+}
+
 // Parse the incoming W3C context of a request: `traceparent` (with a valid
 // `tracestate`) and `baggage`. Request headers are already keyed
 // case-insensitively.
@@ -91,45 +106,8 @@ fn split_path_query(path : String) -> (String, String) {
 fn extract_context_with_baggage(
   headers : Map[@http.CaseInsensitiveString, String],
 ) -> (@context.Context, Bool) {
-  let mut context = @context.Context::root()
-  match
-    headers.get(
-      @http.CaseInsensitiveString(@propagation.traceparent_header_name()),
-    ) {
-    Some(value) =>
-      match @propagation.parse_traceparent(value) {
-        Some(parsed) => {
-          let mut span_context = parsed
-          match
-            headers.get(
-              @http.CaseInsensitiveString(@propagation.tracestate_header_name()),
-            ) {
-            Some(state) =>
-              match @propagation.parse_tracestate(state) {
-                Some(normalized) =>
-                  span_context = span_context.with_tracestate(normalized)
-                None => ()
-              }
-            None => ()
-          }
-          context = context.with_span(span_context)
-        }
-        None => ()
-      }
-    None => ()
-  }
-  let mut has_baggage = false
-  match
-    headers.get(@http.CaseInsensitiveString(@propagation.baggage_header_name())) {
-    Some(value) =>
-      for entry in @propagation.parse_baggage(value) {
-        has_baggage = true
-        let (key, item_value) = entry
-        context = context.with_value(key, item_value)
-      }
-    None => ()
-  }
-  (context, has_baggage)
+  let context = @propagation.extract_context(headers_carrier(headers))
+  (context, context.has_baggage())
 }
 
 ///|
@@ -386,6 +364,7 @@ pub async fn run_server_on(
             @sdk.HTTP_REQUEST_METHOD,
             @sdk.StringValue(method_name),
           )
+          server_span.set_attribute(@sdk.URL_SCHEME, @sdk.StringValue("http"))
           let (path, query) = split_path_query(request.path)
           server_span.set_attribute(@sdk.URL_PATH, @sdk.StringValue(path))
           if query != "" {
@@ -396,6 +375,15 @@ pub async fn run_server_on(
             @sdk.StringValue(connection.client_addr().to_string()),
           )
           record_host_attributes(server_span, request.headers)
+          match
+            request.headers.get(@http.CaseInsensitiveString("user-agent")) {
+            Some(agent) =>
+              server_span.set_attribute(
+                @sdk.USER_AGENT_ORIGINAL,
+                @sdk.StringValue(agent),
+              )
+            None => ()
+          }
         }
         None => ()
       }

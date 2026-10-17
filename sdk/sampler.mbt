@@ -36,8 +36,12 @@ fn trace_id_fraction(trace_id : Array[Int]) -> UInt64 {
   value
 }
 
+// The threshold is `ratio * 2^63` and the trace ID is shifted right by one bit
+// before the comparison, keeping the arithmetic within the 63 bits of integer
+// precision of a double. This matches the algorithm used by the OpenTelemetry
+// SDKs in other languages, so the same trace ID is sampled everywhere.
 fn ratio_threshold(ratio : Double) -> UInt64 {
-  (ratio * 18446744073709551615.0).to_uint64()
+  (ratio * 9223372036854775808.0).to_uint64()
 }
 
 // A Sampler is a function from (parent SpanContext?, trace ID) to a decision.
@@ -82,7 +86,7 @@ pub fn Sampler::trace_id_ratio_based(ratio : Double) -> Sampler {
         sampling_decision_drop()
       } else if ratio >= 1.0 {
         sampling_decision_record_and_sample()
-      } else if trace_id_fraction(trace_id) < threshold {
+      } else if (trace_id_fraction(trace_id) >> 1) < threshold {
         sampling_decision_record_and_sample()
       } else {
         sampling_decision_drop()
