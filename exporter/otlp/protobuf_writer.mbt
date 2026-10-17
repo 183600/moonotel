@@ -14,18 +14,19 @@ fn ProtoWriter::with_capacity(size_hint : Int) -> ProtoWriter {
   { buf: FixedArray::make(capacity, b'\x00'), len: 0, scratch: [] }
 }
 
-// Ensure room for `extra` more bytes, doubling the capacity as needed.
+// Grow the buffer to fit `extra` more bytes, doubling the capacity as needed.
+// Call sites check `len + extra <= buf.length()` inline before calling this,
+// so this is the cold path.
 fn ProtoWriter::reserve(self : ProtoWriter, extra : Int) -> Unit {
   let required = self.len + extra
-  if required <= self.buf.length() {
-    return
-  }
   let doubled = self.buf.length() * 2
   let capacity = if doubled > required { doubled } else { required }
   let grown : FixedArray[Byte] = FixedArray::make(capacity, b'\x00')
   grown.unsafe_blit(0, self.buf, 0, self.len)
   self.buf = grown
 }
+
+
 
 fn ProtoWriter::take_scratch(self : ProtoWriter) -> ProtoWriter {
   match self.scratch.pop() {
@@ -44,8 +45,19 @@ fn ProtoWriter::to_bytes(self : ProtoWriter) -> Bytes {
 }
 
 fn ProtoWriter::write_varint(self : ProtoWriter, value : UInt64) -> Unit {
+  // Fast path: values below 0x80 (lengths, small integers) are one byte.
+  if value < 0x80 {
+    if self.len + 1 > self.buf.length() {
+      self.reserve(1)
+    }
+    self.buf.unsafe_set(self.len, value.to_byte())
+    self.len = self.len + 1
+    return
+  }
   // A 64-bit varint is at most 10 bytes.
-  self.reserve(10)
+  if self.len + 10 > self.buf.length() {
+    self.reserve(10)
+  }
   let buf = self.buf
   let mut v = value
   let mut i = self.len
@@ -59,7 +71,17 @@ fn ProtoWriter::write_varint(self : ProtoWriter, value : UInt64) -> Unit {
 }
 
 fn ProtoWriter::write_tag(self : ProtoWriter, field : Int, wire_type : Int) -> Unit {
-  self.write_varint(((field << 3) | wire_type).to_uint64())
+  let tag = (field << 3) | wire_type
+  // Fast path: almost every field tag fits in one byte.
+  if tag >= 0 && tag < 0x80 {
+    if self.len + 1 > self.buf.length() {
+      self.reserve(1)
+    }
+    self.buf.unsafe_set(self.len, tag.to_byte())
+    self.len = self.len + 1
+    return
+  }
+  self.write_varint(tag.to_uint64())
 }
 
 fn ProtoWriter::write_varint_field(self : ProtoWriter, field : Int, value : UInt64) -> Unit {
@@ -73,7 +95,9 @@ fn ProtoWriter::write_bool_field(self : ProtoWriter, field : Int, value : Bool) 
 
 fn ProtoWriter::write_fixed64_field(self : ProtoWriter, field : Int, value : UInt64) -> Unit {
   self.write_tag(field, 1)
-  self.reserve(8)
+  if self.len + 8 > self.buf.length() {
+    self.reserve(8)
+  }
   self.buf.unsafe_write_uint64_le(self.len, value)
   self.len = self.len + 8
 }
@@ -84,16 +108,21 @@ fn ProtoWriter::write_double_field(self : ProtoWriter, field : Int, value : Doub
 
 fn ProtoWriter::write_fixed32_field(self : ProtoWriter, field : Int, value : UInt) -> Unit {
   self.write_tag(field, 5)
-  self.reserve(4)
+  if self.len + 4 > self.buf.length() {
+    self.reserve(4)
+  }
   self.buf.unsafe_write_uint32_le(self.len, value)
   self.len = self.len + 4
 }
 
 fn ProtoWriter::write_bytes(self : ProtoWriter, value : Bytes) -> Unit {
-  self.write_varint(value.length().to_uint64())
-  self.reserve(value.length())
-  self.buf.blit_from_bytes(self.len, value, 0, value.length())
-  self.len = self.len + value.length()
+  let len = value.length()
+  self.write_varint(len.to_uint64())
+  if self.len + len > self.buf.length() {
+    self.reserve(len)
+  }
+  self.buf.blit_from_bytes(self.len, value, 0, len)
+  self.len = self.len + len
 }
 
 // Write a length-delimited bytes field from an array of byte values, masking
@@ -106,10 +135,22 @@ fn ProtoWriter::write_bytes_from_int_array(
   self.write_tag(field, 2)
   let len = values.length()
   self.write_varint(len.to_uint64())
-  self.reserve(len)
+  if self.len + len > self.buf.length() {
+    self.reserve(len)
+  }
   let buf = self.buf
   let mut pos = self.len
   let mut i = 0
+  // Pack four bytes into one 32-bit store while a full word remains.
+  while i + 4 <= len {
+    let word = ((values.unsafe_get(i) & 0xFF) |
+      ((values.unsafe_get(i + 1) & 0xFF) << 8) |
+      ((values.unsafe_get(i + 2) & 0xFF) << 16) |
+      ((values.unsafe_get(i + 3) & 0xFF) << 24)).to_uint()
+    buf.unsafe_write_uint32_le(pos, word)
+    pos = pos + 4
+    i = i + 4
+  }
   while i < len {
     buf.unsafe_set(pos, (values.unsafe_get(i) & 0xFF).to_byte())
     pos = pos + 1
@@ -124,7 +165,9 @@ fn ProtoWriter::write_string_field(self : ProtoWriter, field : Int, value : Stri
   let len = value.length()
   let start = self.len
   self.write_varint(len.to_uint64())
-  self.reserve(len)
+  if self.len + len > self.buf.length() {
+    self.reserve(len)
+  }
   let buf = self.buf
   let mut pos = self.len
   let mut i = 0
@@ -160,7 +203,9 @@ fn is_ascii(value : String) -> Bool {
 // Write the bytes of an ASCII string without a tag or length prefix.
 fn ProtoWriter::write_ascii_raw(self : ProtoWriter, value : String) -> Unit {
   let len = value.length()
-  self.reserve(len)
+  if self.len + len > self.buf.length() {
+    self.reserve(len)
+  }
   let buf = self.buf
   let mut pos = self.len
   let mut i = 0
@@ -176,10 +221,13 @@ fn ProtoWriter::write_ascii_raw(self : ProtoWriter, value : String) -> Unit {
 // the writer that produced it.
 fn ProtoWriter::append_message(self : ProtoWriter, field : Int, inner : ProtoWriter) -> Unit {
   self.write_tag(field, 2)
-  self.write_varint(inner.len.to_uint64())
-  self.reserve(inner.len)
-  self.buf.unsafe_blit(self.len, inner.buf, 0, inner.len)
-  self.len = self.len + inner.len
+  let len = inner.len
+  self.write_varint(len.to_uint64())
+  if self.len + len > self.buf.length() {
+    self.reserve(len)
+  }
+  self.buf.unsafe_blit(self.len, inner.buf, 0, len)
+  self.len = self.len + len
   self.release_scratch(inner)
 }
 

@@ -124,6 +124,24 @@ fn build_hex_ascii() -> FixedArray[Byte] {
   table
 }
 
+// Precomputed UTF-16LE code unit pairs for every byte value: entry `b` holds
+// the two hex characters of `b` packed into one 32-bit word (low byte first).
+let hex_pairs : FixedArray[UInt] = build_hex_pairs()
+
+fn build_hex_pairs() -> FixedArray[UInt] {
+  let table : FixedArray[UInt] = FixedArray::make(256, 0U)
+  let mut b = 0
+  while b < 256 {
+    let hi = b >> 4
+    let lo = b & 0x0F
+    let hi_char = if hi < 10 { hi + 48 } else { hi + 87 }
+    let lo_char = if lo < 10 { lo + 48 } else { lo + 87 }
+    table.unsafe_set(b, (hi_char | (lo_char << 16)).to_uint())
+    b = b + 1
+  }
+  table
+}
+
 // Reverse table: the 0-15 value of each ASCII hex digit, -1 for every other
 // code unit below 128.
 let hex_value : FixedArray[Int] = build_hex_value()
@@ -153,6 +171,12 @@ pub fn bytes_to_hex(bytes : Array[Int]) -> String {
   let mut i = 0
   while i < len {
     let b = bytes.unsafe_get(i)
+    if b >= 0 && b < 256 {
+      // One 32-bit store writes both hex characters of the byte.
+      out.unsafe_write_uint32_le(i * 4, hex_pairs.unsafe_get(b))
+      i = i + 1
+      continue
+    }
     let pos = i * 4
     let hi = b >> 4
     out.unsafe_set(
