@@ -422,8 +422,13 @@ pub fn parse_tracestate(value : String) -> String? {
   if value == "" {
     return None
   }
-  // Duplicate keys are rejected; at most 32 members are accepted.
-  let seen : Array[StringView] = []
+  // Duplicate keys are rejected; at most 32 members are accepted. The first
+  // key is held in a slot and the array is only allocated from the second
+  // member on, so validating the common single-member header allocates
+  // nothing here.
+  let mut first_key : StringView? = None
+  let mut seen : Array[StringView]? = None
+  let mut member_count = 0
   let view = value[:]
   let len = view.length()
   let mut start = 0
@@ -431,7 +436,7 @@ pub fn parse_tracestate(value : String) -> String? {
   // normalized form and can be returned as-is.
   let mut unchanged = true
   while true {
-    if seen.length() >= 32 {
+    if member_count >= 32 {
       return None
     }
     let end = find_code_unit(view, ',', start)
@@ -457,12 +462,28 @@ pub fn parse_tracestate(value : String) -> String? {
     if !is_valid_tracestate_key(key) || !is_valid_tracestate_value(member_value) {
       return None
     }
-    for existing in seen {
-      if existing == key {
-        return None
+    match seen {
+      Some(keys) => {
+        for existing in keys {
+          if existing == key {
+            return None
+          }
+        }
+        keys.push(key)
       }
+      None =>
+        match first_key {
+          None => first_key = Some(key)
+          Some(existing) =>
+            if existing == key {
+              return None
+            } else {
+              let keys : Array[StringView] = [existing, key]
+              seen = Some(keys)
+            }
+        }
     }
-    seen.push(key)
+    member_count = member_count + 1
     if end == len {
       break
     }

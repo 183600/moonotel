@@ -101,9 +101,25 @@ fn encode_attributes(
     kv.write_string_field(1, key)
     match value {
       @sdk.StringValue(text) => {
-        let any_value = kv.take_scratch()
-        any_value.write_string_field(1, text)
-        kv.append_message(2, any_value)
+        // Encode the nested `AnyValue { string_value: text }` in place: its
+        // length is known once ASCII-ness is checked, so no scratch writer or
+        // intermediate copy is needed.
+        kv.write_tag(2, 2)
+        if is_ascii(text) {
+          let payload_len = text.length()
+          let inner_len = 1 + varint_size(payload_len.to_uint64()) + payload_len
+          kv.write_varint(inner_len.to_uint64())
+          kv.write_tag(1, 2)
+          kv.write_varint(payload_len.to_uint64())
+          kv.write_ascii_raw(text)
+        } else {
+          let encoded = @utf8.encode(text)
+          let payload_len = encoded.length()
+          let inner_len = 1 + varint_size(payload_len.to_uint64()) + payload_len
+          kv.write_varint(inner_len.to_uint64())
+          kv.write_tag(1, 2)
+          kv.write_bytes(encoded)
+        }
       }
       @sdk.StringArrayValue(_)
       | @sdk.BoolArrayValue(_)
@@ -249,53 +265,67 @@ fn encode_span(writer : ProtoWriter, data : @sdk.SpanData) -> Unit {
 
 // Canonical key for grouping spans that share a resource.
 
+// Append the decimal digits of a non-negative integer without allocating an
+// intermediate string.
 ///|
-fn resource_key_value(value : @sdk.AttributeValue) -> String {
+fn write_decimal(sb : StringBuilder, value : Int) -> Unit {
+  if value >= 10 {
+    write_decimal(sb, value / 10)
+  }
+  sb.write_char((0x30 + value % 10).unsafe_to_char())
+}
+
+///|
+fn resource_key_value(sb : StringBuilder, value : @sdk.AttributeValue) -> Unit {
   match value {
-    @sdk.StringValue(text) => "s" + text.length().to_string() + ":" + text
-    @sdk.BoolValue(flag) => if flag { "b1" } else { "b0" }
-    @sdk.IntValue(number) => "i" + number.to_string() + ";"
-    @sdk.DoubleValue(number) =>
-      "d" + number.reinterpret_as_uint64().to_string() + ";"
+    @sdk.StringValue(text) => {
+      sb.write_char('s')
+      write_decimal(sb, text.length())
+      sb.write_char(':')
+      sb.write_string(text)
+    }
+    @sdk.BoolValue(flag) => sb.write_string(if flag { "b1" } else { "b0" })
+    @sdk.IntValue(number) => {
+      sb.write_char('i')
+      sb.write_string(number.to_string())
+      sb.write_char(';')
+    }
+    @sdk.DoubleValue(number) => {
+      sb.write_char('d')
+      sb.write_string(number.reinterpret_as_uint64().to_string())
+      sb.write_char(';')
+    }
     @sdk.StringArrayValue(items) => {
-      let sb = StringBuilder()
-      sb.write_char('a')
-      sb.write_string(items.length().to_string())
+      sb.write_string("a")
+      write_decimal(sb, items.length())
       sb.write_char(':')
       for item in items {
-        sb.write_string(item.length().to_string())
+        write_decimal(sb, item.length())
         sb.write_char(':')
         sb.write_string(item)
       }
-      sb.to_string()
     }
     @sdk.BoolArrayValue(items) => {
-      let sb = StringBuilder()
       sb.write_string("ab")
-      sb.write_string(items.length().to_string())
+      write_decimal(sb, items.length())
       sb.write_char(':')
       for item in items {
         sb.write_char(if item { '1' } else { '0' })
       }
-      sb.to_string()
     }
     @sdk.IntArrayValue(items) => {
-      let sb = StringBuilder()
       sb.write_string("ai")
       for item in items {
         sb.write_string(item.to_string())
         sb.write_char(';')
       }
-      sb.to_string()
     }
     @sdk.DoubleArrayValue(items) => {
-      let sb = StringBuilder()
       sb.write_string("ad")
       for item in items {
         sb.write_string(item.reinterpret_as_uint64().to_string())
         sb.write_char(';')
       }
-      sb.to_string()
     }
   }
 }
@@ -309,15 +339,16 @@ fn resource_key(resource : Map[String, @sdk.AttributeValue]) -> String {
   keys.sort()
   let sb = StringBuilder()
   for key in keys {
-    let value_text = match resource.get(key) {
-      Some(value) => resource_key_value(value)
-      None => ""
+    match resource.get(key) {
+      Some(value) => {
+        write_decimal(sb, key.length())
+        sb.write_char(':')
+        sb.write_string(key)
+        sb.write_char('=')
+        resource_key_value(sb, value)
+      }
+      None => ()
     }
-    sb.write_string(key.length().to_string())
-    sb.write_char(':')
-    sb.write_string(key)
-    sb.write_char('=')
-    sb.write_string(value_text)
   }
   sb.to_string()
 }
@@ -359,6 +390,8 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   let mut last_resource : Map[String, @sdk.AttributeValue]? = None
   // Index of the group for `last_resource`.
   let mut last_index = -1
+  // Canonical key of `groups[last_index]` when it has already been computed.
+  let mut last_resource_key : String? = None
   // Whether the key of `groups[last_index]` has not been registered in
   // `resource_index` yet.
   let mut unindexed = false
@@ -380,7 +413,11 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
               map
             }
           }
-          index_map.set(resource_key(groups[last_index].resource), last_index)
+          let key = match last_resource_key {
+            Some(key) => key
+            None => resource_key(groups[last_index].resource)
+          }
+          index_map.set(key, last_index)
           unindexed = false
         }
         let resolved = match last_resource {
@@ -391,6 +428,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
             }
             groups.push(created)
             unindexed = true
+            last_resource_key = None
             groups.length() - 1
           }
           Some(_) => {
@@ -408,6 +446,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
                 }
                 groups.push(created)
                 unindexed = true
+                last_resource_key = Some(key)
                 groups.length() - 1
               }
             }

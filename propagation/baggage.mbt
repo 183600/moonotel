@@ -202,13 +202,27 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
     let end = find_code_unit(view, ',', start)
     let item = trim_ows(view.view(start_offset=start, end_offset=end))
     if item.length() > 0 {
-      let semi = find_code_unit(item, ';', 0)
-      let pair_text = if semi < item.length() { item[:semi] } else { item }
-      let eq = find_code_unit(pair_text, '=', 0)
-      if eq < pair_text.length() {
-        let key_view = trim_ows(pair_text[:eq])
+      // Locate the first `;` (which starts the properties) and the first `=`
+      // before it in a single pass.
+      let item_len = item.length()
+      let mut semi = item_len
+      let mut eq = -1
+      let mut i = 0
+      while i < item_len {
+        let c = item.unsafe_get(i).unsafe_to_char()
+        if c == ';' {
+          semi = i
+          break
+        }
+        if c == '=' && eq < 0 {
+          eq = i
+        }
+        i = i + 1
+      }
+      if eq >= 0 {
+        let key_view = trim_ows(item[:eq])
         if is_valid_baggage_key(key_view) {
-          match percent_decode_view(trim_ows(pair_text[eq + 1:])) {
+          match percent_decode_view(trim_ows(item[eq + 1:semi])) {
             Some(decoded) => entries.push((key_view.to_owned(), decoded))
             None => ()
           }
