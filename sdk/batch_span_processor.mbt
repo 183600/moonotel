@@ -211,9 +211,9 @@ pub impl SpanProcessor for BatchSpanProcessor with on_end(self, data) {
   }
   self.push_span(data)
   if self.live_count() >= self.max_export_batch_size {
-    self.flush_batch()
+    self.flush_batch_at(current_millis())
   } else if self.flush_interval_millis > 0 {
-    let now = @env.now()
+    let now = current_millis()
     if now - self.last_flush_time_millis >=
       self.flush_interval_millis.to_uint64() {
       self.flush_batch_at(now)

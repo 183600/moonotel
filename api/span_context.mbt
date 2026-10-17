@@ -244,7 +244,8 @@ pub fn bytes_from_hex(hex : String) -> Array[Int]? {
   if len % 2 != 0 {
     return None
   }
-  let out : Array[Int] = Array::make(len / 2, 0)
+  // Every element is written before the function returns.
+  let out : Array[Int] = Array::unsafe_make_uninit(len / 2)
   let mut i = 0
   while i < len {
     let hi = hex_char_value(hex.unsafe_get(i).unsafe_to_char())

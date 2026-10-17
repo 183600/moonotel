@@ -126,7 +126,8 @@ fn hex_digit_value(c : Char) -> Int {
 // Decode `byte_count` hex byte pairs starting at `start`, validating as it
 // goes. Returns None when any character is not a hex digit.
 fn decode_hex(value : String, start : Int, byte_count : Int) -> Array[Int]? {
-  let out : Array[Int] = Array::make(byte_count, 0)
+  // Every element is written before `Some` is returned.
+  let out : Array[Int] = Array::unsafe_make_uninit(byte_count)
   let mut i = 0
   while i < byte_count {
     let hi = hex_digit_value(value.unsafe_get(start + i * 2).unsafe_to_char())

@@ -107,10 +107,22 @@ pub fn Sampler::parent_based(
   local_parent_sampled? : Sampler,
   local_parent_not_sampled? : Sampler
 ) -> Sampler {
-  let remote_sampled = remote_parent_sampled.unwrap_or(Sampler::always_on())
-  let remote_not_sampled = remote_parent_not_sampled.unwrap_or(Sampler::always_off())
-  let local_sampled = local_parent_sampled.unwrap_or(Sampler::always_on())
-  let local_not_sampled = local_parent_not_sampled.unwrap_or(Sampler::always_off())
+  let remote_sampled = match remote_parent_sampled {
+    Some(value) => value
+    None => Sampler::always_on()
+  }
+  let remote_not_sampled = match remote_parent_not_sampled {
+    Some(value) => value
+    None => Sampler::always_off()
+  }
+  let local_sampled = match local_parent_sampled {
+    Some(value) => value
+    None => Sampler::always_on()
+  }
+  let local_not_sampled = match local_parent_not_sampled {
+    Some(value) => value
+    None => Sampler::always_off()
+  }
   {
     sample: fn(parent, trace_id) {
       match parent {

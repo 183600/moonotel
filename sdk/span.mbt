@@ -84,6 +84,29 @@ fn unix_nano_now() -> Int64 {
   (@env.now() * 1000000).reinterpret_as_int64()
 }
 
+// Wall-clock milliseconds read by the span `end` call that is currently
+// notifying processors. `end_clock_fresh` is set only for the duration of that
+// notification, so processors can reuse the clock value instead of reading it
+// again; when it is false the clock has to be read normally.
+
+///|
+let end_clock_millis : Ref[UInt64] = Ref(0)
+
+///|
+let end_clock_fresh : Ref[Bool] = Ref(false)
+
+// The current wall-clock milliseconds. Reuses the just-read value when called
+// from the processor notification of a span `end` that read the clock.
+
+///|
+fn current_millis() -> UInt64 {
+  if end_clock_fresh.val {
+    end_clock_millis.val
+  } else {
+    @env.now()
+  }
+}
+
 // A recording span. Non-recording spans (sampler decision DROP) discard
 // attributes and events and are never exported.
 
@@ -270,7 +293,13 @@ fn limited_attributes(
   count_limit : Int,
   value_length_limit : Int
 ) -> (Map[String, AttributeValue], Int) {
-  let kept : Map[String, AttributeValue] = Map([])
+  let total = attributes.length()
+  let capacity = if count_limit < 0 || count_limit > total {
+    total
+  } else {
+    count_limit
+  }
+  let kept : Map[String, AttributeValue] = Map([], capacity=capacity)
   let mut dropped = 0
   attributes.each(fn(key, value) {
     if within_limit(kept.length(), count_limit) {
@@ -648,14 +677,29 @@ pub fn SpanSdk::end(self : SpanSdk, end_time_unix_nano? : Int64) -> Unit {
     return
   }
   self.ended = true
-  self.end_time_unix_nano = match end_time_unix_nano {
-    Some(value) => value
-    None => unix_nano_now()
+  let mut clock_millis : UInt64 = 0
+  let read_clock = match end_time_unix_nano {
+    Some(value) => {
+      self.end_time_unix_nano = value
+      false
+    }
+    None => {
+      clock_millis = @env.now()
+      self.end_time_unix_nano = (clock_millis * 1000000).reinterpret_as_int64()
+      true
+    }
   }
   if self.recording && self.processors.length() > 0 {
+    if read_clock {
+      end_clock_millis.val = clock_millis
+      end_clock_fresh.val = true
+    }
     let data = SpanData::from_span(self)
     for processor in self.processors {
       processor.on_end(data)
+    }
+    if read_clock {
+      end_clock_fresh.val = false
     }
   }
 }
