@@ -52,8 +52,20 @@ test "format_traceparent_masks_out_of_range_bytes" {
 test "parse_tracestate_rejects_overlong_member_value" {
   let sb = StringBuilder()
   sb.write_string("a=")
-  for i = 0; i < 256; i = i + 1 {
+  for i = 0; i < 257; i = i + 1 {
     sb.write_char('x')
   }
   assert_true(@propagation.parse_tracestate(sb.to_string()) is None)
+  assert_true(@propagation.Tracestate::parse(sb.to_string()) is None)
+}
+
+test "parse_tracestate_accepts_max_length_member_value" {
+  let sb = StringBuilder()
+  sb.write_string("a=")
+  for i = 0; i < 256; i = i + 1 {
+    sb.write_char('x')
+  }
+  let value = sb.to_string()
+  assert_eq(@propagation.parse_tracestate(value), Some(value))
+  assert_true(@propagation.Tracestate::parse(value) is Some(_))
 }
