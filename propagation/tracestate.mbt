@@ -29,9 +29,8 @@ pub fn Tracestate::empty() -> Tracestate {
   { members: [] }
 }
 
-// Validate one member. In addition to the shared key/value rules, an empty
-// value is rejected because W3C requires a value to end with a non-blank
-// character.
+// Validate one member with the shared key/value rules; values must not be
+// empty because W3C requires a value to end with a non-blank character.
 fn is_valid_tracestate_member(key : StringView, value : StringView) -> Bool {
   is_valid_tracestate_key(key) &&
   is_valid_tracestate_value(value) &&

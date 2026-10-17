@@ -375,11 +375,12 @@ fn is_valid_tracestate_key(key : StringView) -> Bool {
 }
 
 // Validate a `tracestate` value: printable ASCII without `,` or `=`. The
-// grammar is `value = 0*255(chr) nblk-chr`, so a value holds at most 256
-// characters.
+// grammar is `value = 0*255(chr) nblk-chr`, so a value holds 1 to 256
+// characters: empty values are rejected. Callers trim optional whitespace
+// around the value before validating it.
 fn is_valid_tracestate_value(value : StringView) -> Bool {
   let len = value.length()
-  if len > 256 {
+  if len == 0 || len > 256 {
     return false
   }
   let mut i = 0

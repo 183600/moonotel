@@ -254,10 +254,14 @@ fn traced_headers(
     )
     let tracestate = span_context.tracestate()
     if tracestate != "" {
-      out.set(
-        @http.CaseInsensitiveString(@propagation.tracestate_header_name()),
-        tracestate,
-      )
+      match @propagation.parse_tracestate(tracestate) {
+        Some(normalized) =>
+          out.set(
+            @http.CaseInsensitiveString(@propagation.tracestate_header_name()),
+            normalized,
+          )
+        None => ()
+      }
     }
   }
   match @propagation.context_baggage_header(context) {
