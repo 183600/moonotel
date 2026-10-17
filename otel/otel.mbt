@@ -61,6 +61,8 @@ pub using @propagation {
   type TextMapCarrier,
   type Tracestate,
   TRACESTATE_MAX_MEMBERS,
+  BAGGAGE_MAX_MEMBERS,
+  BAGGAGE_MAX_BYTES,
   inject,
   extract,
   inject_context,

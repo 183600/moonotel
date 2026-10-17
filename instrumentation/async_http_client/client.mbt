@@ -191,6 +191,43 @@ pub fn split_url(url : String) -> (String, Int) {
   (host, port)
 }
 
+// Remove the `userinfo` (credentials) component from an absolute URL, as
+// required by the HTTP semantic conventions for the `url.full` attribute.
+// URLs without an authority or without userinfo are returned unchanged;
+// `@` outside the authority (in a path, query or fragment) is preserved.
+pub fn redact_url(url : String) -> String {
+  let scheme_end = match url.find("://") {
+    Some(index) => index + 3
+    None => return url
+  }
+  let rest = url[scheme_end:]
+  // The authority ends at the first `/` (path), `?` (query) or `#` (fragment).
+  let mut authority_end = rest.length()
+  match rest.find("/") {
+    Some(index) => authority_end = index
+    None => ()
+  }
+  match rest.find("?") {
+    Some(index) => if index < authority_end { authority_end = index }
+    None => ()
+  }
+  match rest.find("#") {
+    Some(index) => if index < authority_end { authority_end = index }
+    None => ()
+  }
+  let authority = rest[:authority_end]
+  match authority.rev_find("@") {
+    Some(at) => {
+      let sb = StringBuilder(size_hint=url.length())
+      sb.write_stringview(url[:scheme_end])
+      sb.write_stringview(authority[at + 1:])
+      sb.write_stringview(rest[authority_end:])
+      sb.to_string()
+    }
+    None => url
+  }
+}
+
 fn plain_headers(
   headers : Map[String, String]?
 ) -> Map[@http.CaseInsensitiveString, String] {
@@ -272,7 +309,8 @@ pub async fn request(
         @sdk.HTTP_REQUEST_METHOD,
         method_attribute_value(request_method),
       )
-      span.set_attribute(@sdk.URL_FULL, @sdk.StringValue(url))
+      // `url.full` must not leak credentials: strip the userinfo component.
+      span.set_attribute(@sdk.URL_FULL, @sdk.StringValue(redact_url(url)))
       span.set_attribute(@sdk.NETWORK_PROTOCOL_NAME, protocol_name_http)
       // `moonbitlang/async/http` speaks HTTP/1.1 only.
       span.set_attribute(

@@ -14,6 +14,16 @@ pub fn baggage_header_name() -> String {
   "baggage"
 }
 
+// Maximum number of members propagated in one `baggage` header. The W3C
+// Baggage specification requires a platform to propagate at most 64 members;
+// beyond that limit members may be dropped.
+pub const BAGGAGE_MAX_MEMBERS : Int = 64
+
+// Maximum size in bytes of a `baggage` header. The W3C Baggage specification
+// requires a platform to propagate at most 8192 bytes; beyond that limit
+// members may be dropped.
+pub const BAGGAGE_MAX_BYTES : Int = 8192
+
 fn is_token_char(c : Char) -> Bool {
   match c {
     '!' | '#' | '$' | '%' | '&' | '\'' | '*' | '+' | '-' | '.' | '^' | '_' |
@@ -230,14 +240,65 @@ pub fn percent_encode(value : String) -> String {
   sb.to_string()
 }
 
+// Number of bytes the percent-encoded form of `value` occupies in a `baggage`
+// header. The encoded form is ASCII, so the length equals the byte count; a
+// character outside the allowed set costs three bytes (`%XX`).
+pub fn percent_encoded_length(value : String) -> Int {
+  let len = value.length()
+  let mut ascii = true
+  let mut i = 0
+  while i < len {
+    if value.unsafe_get(i).to_int() >= 0x80 {
+      ascii = false
+      break
+    }
+    i = i + 1
+  }
+  let mut total = 0
+  if ascii {
+    let mut j = 0
+    while j < len {
+      if is_baggage_value_char(value.unsafe_get(j).to_int()) {
+        total = total + 1
+      } else {
+        total = total + 3
+      }
+      j = j + 1
+    }
+  } else {
+    for byte in @utf8.encode(value) {
+      if is_baggage_value_char(byte.to_int() & 0xFF) {
+        total = total + 1
+      } else {
+        total = total + 3
+      }
+    }
+  }
+  total
+}
+
 // Parse a `baggage` header value into an ordered list of key/value pairs.
 // Members that are malformed are skipped; properties are ignored.
+//
+// Following the W3C Baggage specification, at most `BAGGAGE_MAX_MEMBERS`
+// members and `BAGGAGE_MAX_BYTES` bytes are kept; once a member would exceed
+// either limit it and every following member are dropped.
 pub fn parse_baggage(value : String) -> Array[(String, String)] {
   let entries : Array[(String, String)] = []
+  // Size of the normalized header built from `entries` so far.
+  let mut bytes = 0
   let view = value[:]
   let len = view.length()
   let mut start = 0
   while start <= len {
+    if entries.length() >= BAGGAGE_MAX_MEMBERS {
+      break
+    }
+    // Accepted members are ASCII, so a member starting past the byte budget
+    // can never fit; this also bounds the work spent on over-long headers.
+    if start >= BAGGAGE_MAX_BYTES {
+      break
+    }
     let end = find_code_unit(view, ',', start)
     let item = trim_ows(view.view(start_offset=start, end_offset=end))
     if item.length() > 0 {
@@ -262,7 +323,19 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
         let key_view = trim_ows(item[:eq])
         if is_valid_baggage_key(key_view) {
           match percent_decode_view(trim_ows(item[eq + 1:semi])) {
-            Some(decoded) => entries.push((key_view.to_owned(), decoded))
+            Some(decoded) => {
+              let key = key_view.to_owned()
+              let separator = if entries.length() > 0 { 1 } else { 0 }
+              let size = key.length() +
+                1 +
+                percent_encoded_length(decoded) +
+                separator
+              if bytes + size > BAGGAGE_MAX_BYTES {
+                break
+              }
+              entries.push((key, decoded))
+              bytes = bytes + size
+            }
             None => ()
           }
         }
@@ -278,24 +351,42 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
 
 // Format an ordered list of key/value pairs as a `baggage` header value.
 // Pairs with an invalid key are skipped.
+//
+// Following the W3C Baggage specification, at most `BAGGAGE_MAX_MEMBERS`
+// members and `BAGGAGE_MAX_BYTES` bytes are emitted; once a member would
+// exceed either limit it and every following member are dropped.
 pub fn format_baggage(entries : Array[(String, String)]) -> String {
   // Approximate output size: key, value and the `key=` separator per member.
   let mut size_hint = 0
   for entry in entries {
     let (key, value) = entry
     size_hint = size_hint + key.length() + value.length() + 2
+    if size_hint >= BAGGAGE_MAX_BYTES {
+      size_hint = BAGGAGE_MAX_BYTES
+      break
+    }
   }
-  let sb = StringBuilder(size_hint=size_hint * 2)
+  let sb = StringBuilder(size_hint=size_hint)
   let mut count = 0
+  let mut bytes = 0
   for entry in entries {
+    if count >= BAGGAGE_MAX_MEMBERS {
+      break
+    }
     let (key, value) = entry
     if is_valid_baggage_key(key) {
+      let separator = if count > 0 { 1 } else { 0 }
+      let size = key.length() + 1 + percent_encoded_length(value) + separator
+      if bytes + size > BAGGAGE_MAX_BYTES {
+        break
+      }
       if count > 0 {
         sb.write_char(',')
       }
       sb.write_string(key)
       sb.write_char('=')
       write_percent_encode(sb, value)
+      bytes = bytes + size
       count = count + 1
     }
   }
