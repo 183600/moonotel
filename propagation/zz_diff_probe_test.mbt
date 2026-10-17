@@ -1,9 +1,3 @@
-// Differential probes for the recent performance rewrites:
-// - the `percent_decode` public path (ASCII fast path in
-//   `percent_decode_escaped`) vs a straightforward reference decoder
-// - `@propagation.context_baggage_header` first-key fast path vs the original
-//   dedup-map implementation
-
 fn diff_rand(state : Ref[Int], bound : Int) -> Int {
   state.val = (state.val * 25173 + 13849) & 0xFFFF
   state.val % bound

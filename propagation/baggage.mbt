@@ -72,11 +72,6 @@ fn upper_hex_digit(value : Int) -> Char {
 }
 
 // Decode the body of a baggage value that contains at least one `%`.
-//
-// The first pass validates the input, counts the decoded characters and notes
-// whether every decoded byte is ASCII. Real-world baggage values decode to
-// ASCII, and those are materialized directly into a UTF-16 string without the
-// intermediate byte buffer and UTF-8 decoding.
 fn percent_decode_escaped(value : StringView) -> String? {
   let len = value.length()
   let mut decoded_len = 0
@@ -108,8 +103,6 @@ fn percent_decode_escaped(value : StringView) -> String? {
     }
   }
   if ascii {
-    // Each decoded byte is below 0x80, so it maps to the identical UTF-16
-    // code unit (low byte first, high byte zero for ASCII).
     let out = FixedArray::make(decoded_len * 2, b'\x00')
     let mut j = 0
     let mut pos = 0
@@ -317,8 +310,6 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
 pub fn context_baggage_header(context : @context.Context) -> String? {
   let mut entries : Array[(String, String)]? = None
   let mut seen : Map[String, Bool]? = None
-  // The first key is kept on its own so that the common single-key context
-  // does not have to allocate the dedup map.
   let mut first_key : String? = None
   let mut cursor : @context.Context? = Some(context)
   while true {

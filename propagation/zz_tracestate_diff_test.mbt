@@ -1,7 +1,3 @@
-// Differential probe for the `parse_tracestate` first-key rewrite: the old
-// implementation (from before the perf commit) is copied verbatim below and
-// compared against the public function on a fuzz corpus.
-
 fn ts_rand(state : Ref[Int], bound : Int) -> Int {
   state.val = (state.val * 25173 + 13849) & 0xFFFF
   state.val % bound

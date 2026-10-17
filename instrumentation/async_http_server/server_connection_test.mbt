@@ -1,4 +1,4 @@
-// Regression tests for HTTP/1.1 connection handling and the network protocol
+// Tests for HTTP/1.1 connection handling and the network protocol
 // semantic-convention attributes of the server instrumentation.
 
 struct ProtocolRecordingExporter {
@@ -31,8 +31,8 @@ async test "Connection: close closes the socket after the response" {
     connection.write(
       "GET /bye HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n",
     )
-    // `read_all` only returns at EOF, so the timeout guards against a
-    // regression where the server forgets to close the connection.
+    // `read_all` only returns at EOF, so the timeout guards against the
+    // connection staying open.
     let response = @async.with_timeout(5000, () => {
       connection.read_all().text()
     })

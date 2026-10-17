@@ -1,6 +1,3 @@
-// Probe tests: error string forms consumed by `record_exception`, span time
-// accessors, tracer scope metadata and provider shutdown state.
-
 suberror ScratchErr {
   ScratchErr(String)
 } derive(@debug.Debug)

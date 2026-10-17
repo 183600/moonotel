@@ -465,9 +465,6 @@ pub fn SpanSdk::set_attributes(
   attributes : Map[String, AttributeValue],
 ) -> Unit {
   if self.recording && !self.ended {
-    // Allocate the span's map once with room for the incoming attributes so
-    // that a batch of attributes does not trigger repeated rehashing. Only the
-    // attributes that can actually be kept (count limit) are budgeted for.
     if self.attributes is None && attributes.length() > 0 {
       let limit = self.limits.attribute_count_limit
       let budget = if limit >= 0 && limit < attributes.length() {
