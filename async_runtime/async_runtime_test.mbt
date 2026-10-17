@@ -208,3 +208,30 @@ async test "setup builds a global provider that exports spans" {
   }
   @sdk.shutdown_global_tracer_provider()
 }
+
+async test "setup accepts a prebuilt resource" {
+  @async.with_task_group() <| group => {
+    let resource = @sdk.Resource::new(
+      attributes=Map([
+        (@sdk.SERVICE_NAME, @sdk.StringValue("async-resource")),
+        ("deployment.environment", @sdk.StringValue("staging")),
+      ]),
+    )
+    let provider = @async_runtime.setup(
+      group,
+      resource=resource,
+      resource_attributes=Map([
+        ("deployment.environment", @sdk.StringValue("production")),
+      ]),
+    )
+    assert_eq(
+      provider.resource().get(@sdk.SERVICE_NAME),
+      Some(@sdk.StringValue("async-resource")),
+    )
+    assert_eq(
+      provider.resource().get("deployment.environment"),
+      Some(@sdk.StringValue("production")),
+    )
+  }
+  @sdk.shutdown_global_tracer_provider()
+}

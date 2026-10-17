@@ -25,6 +25,7 @@ pub using @sdk {
   type Sampler,
   type SpanLimits,
   type IdGenerator,
+  type Resource,
   type SpanSdk,
   type Tracer,
   type TracerProviderSdk,
@@ -95,9 +96,10 @@ pub using @otlp {
 // process-wide provider.
 //
 // `endpoint` and `headers` override the values read from the
-// OTEL_EXPORTER_OTLP_* environment variables. `resource_attributes` are
-// merged into the resource built from the environment, and `span_limits`
-// replaces the limits read from the OTEL_SPAN_* environment variables.
+// OTEL_EXPORTER_OTLP_* environment variables. `resource` replaces the
+// resource built from the environment, `resource_attributes` are merged into
+// it, and `span_limits` replaces the limits read from the OTEL_SPAN_*
+// environment variables.
 //
 // Spans are exported through a batch processor unless `use_batch` is false.
 // `batch` overrides the queue size, export batch size and flush interval read
@@ -106,6 +108,7 @@ pub using @otlp {
 ///|
 pub fn setup(
   service_name? : String,
+  resource? : @sdk.Resource,
   resource_attributes? : Map[String, @sdk.AttributeValue],
   endpoint? : String,
   headers? : Map[String, String],
@@ -116,6 +119,10 @@ pub fn setup(
   batch? : @sdk.BatchConfig,
 ) -> @sdk.TracerProviderSdk {
   let mut provider = @sdk.TracerProviderSdk::new(service_name?)
+  match resource {
+    Some(value) => provider = provider.with_resource(value)
+    None => ()
+  }
   match resource_attributes {
     Some(values) => provider = provider.with_resource_attributes(values)
     None => ()
@@ -129,42 +136,47 @@ pub fn setup(
     None => ()
   }
   match transport {
-    Some(send) => {
-      let base = @otlp.OtlpHttpConfig::from_env()
-      let config : @otlp.OtlpHttpConfig = {
-        ..base,
-        endpoint: endpoint.unwrap_or(base.endpoint),
-        traces_endpoint: match endpoint {
-          Some(_) => None
-          None => base.traces_endpoint
-        },
-        headers: headers.unwrap_or(base.headers),
-      }
-      let exporter = @otlp.OtlpHttpExporter::new(config, send)
-      let processor : &@sdk.SpanProcessor = match batch {
-        // An explicit configuration always uses the batch processor.
-        Some(config) => {
-          let value : &@sdk.SpanProcessor = @sdk.BatchSpanProcessor::with_config(
-            exporter, config,
-          )
-          value
+    Some(send) =>
+      if @sdk.traces_exporter_disabled() {
+        // `OTEL_TRACES_EXPORTER=none` disables the automatically configured
+        // exporter, matching the native async `setup`.
+        ()
+      } else {
+        let base = @otlp.OtlpHttpConfig::from_env()
+        let config : @otlp.OtlpHttpConfig = {
+          ..base,
+          endpoint: endpoint.unwrap_or(base.endpoint),
+          traces_endpoint: match endpoint {
+            Some(_) => None
+            None => base.traces_endpoint
+          },
+          headers: headers.unwrap_or(base.headers),
         }
-        None =>
-          if use_batch.unwrap_or(true) {
-            // Queue/batch/interval defaults come from the OTEL_BSP_* variables.
-            let value : &@sdk.SpanProcessor = @sdk.BatchSpanProcessor::from_env(
-              exporter,
-            )
-            value
-          } else {
-            let value : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
-              exporter,
+        let exporter = @otlp.OtlpHttpExporter::new(config, send)
+        let processor : &@sdk.SpanProcessor = match batch {
+          // An explicit configuration always uses the batch processor.
+          Some(config) => {
+            let value : &@sdk.SpanProcessor = @sdk.BatchSpanProcessor::with_config(
+              exporter, config,
             )
             value
           }
+          None =>
+            if use_batch.unwrap_or(true) {
+              // Queue/batch/interval defaults come from the OTEL_BSP_* variables.
+              let value : &@sdk.SpanProcessor = @sdk.BatchSpanProcessor::from_env(
+                exporter,
+              )
+              value
+            } else {
+              let value : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
+                exporter,
+              )
+              value
+            }
+        }
+        provider = provider.with_span_processor(processor)
       }
-      provider = provider.with_span_processor(processor)
-    }
     None => ()
   }
   @sdk.set_global_tracer_provider(provider)

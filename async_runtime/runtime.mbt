@@ -94,14 +94,16 @@ pub fn[G, X] spawn(
 // spans are recorded but not exported.
 //
 // `endpoint` and `headers` override the values read from the
-// OTEL_EXPORTER_OTLP_* environment variables, `resource_attributes` are
-// merged into the resource built from the environment, and `span_limits`
-// replaces the limits read from the OTEL_SPAN_* environment variables. Spans
-// are handed to the background task when they end and sent in coalesced
-// batches; pending spans are drained when the task group exits.
+// OTEL_EXPORTER_OTLP_* environment variables, `resource` replaces the
+// resource built from the environment, `resource_attributes` are merged into
+// it, and `span_limits` replaces the limits read from the OTEL_SPAN_*
+// environment variables. Spans are handed to the background task when they
+// end and sent in coalesced batches; pending spans are drained when the task
+// group exits.
 pub fn[G] setup(
   group : @async.TaskGroup[G],
   service_name? : String,
+  resource? : @sdk.Resource,
   resource_attributes? : Map[String, @sdk.AttributeValue],
   endpoint? : String,
   headers? : Map[String, String],
@@ -120,6 +122,10 @@ pub fn[G] setup(
     headers: headers.unwrap_or(base.headers),
   }
   let mut provider = @sdk.TracerProviderSdk::new(service_name?=service_name)
+  match resource {
+    Some(value) => provider = provider.with_resource(value)
+    None => ()
+  }
   match resource_attributes {
     Some(values) => provider = provider.with_resource_attributes(values)
     None => ()

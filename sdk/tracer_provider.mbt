@@ -3,7 +3,7 @@
 // with `set_global_tracer_provider`.
 
 pub struct TracerProviderSdk {
-  resource : Map[String, AttributeValue]
+  resource : Resource
   sampler : Sampler
   id_generator : IdGenerator
   span_limits : SpanLimits
@@ -13,99 +13,6 @@ pub struct TracerProviderSdk {
 
 // Version reported as `telemetry.sdk.version` in the resource.
 pub const SDK_VERSION : String = "0.1.0"
-
-// Reverse table: the 0-15 value of each ASCII hex digit, -1 for every other
-// code unit below 128.
-let hex_value : FixedArray[Int] = build_hex_value()
-
-fn build_hex_value() -> FixedArray[Int] {
-  let table : FixedArray[Int] = FixedArray::make(128, -1)
-  let mut i = 0
-  while i < 10 {
-    table.unsafe_set(48 + i, i)
-    i = i + 1
-  }
-  let mut j = 0
-  while j < 6 {
-    table.unsafe_set(65 + j, 10 + j)
-    table.unsafe_set(97 + j, 10 + j)
-    j = j + 1
-  }
-  table
-}
-
-fn hex_digit_value(c : Char) -> Int {
-  let code = c.to_int()
-  if code >= 0 && code < 128 {
-    hex_value.unsafe_get(code)
-  } else {
-    -1
-  }
-}
-
-// Decode the `%XX` sequences used by `OTEL_RESOURCE_ATTRIBUTES` values.
-// Invalid sequences are kept verbatim.
-fn decode_percent(value : StringView) -> String {
-  if value.find("%") is None {
-    return value.to_owned()
-  }
-  let len = value.length()
-  let bytes : Array[Byte] = Array(capacity=len)
-  let mut i = 0
-  while i < len {
-    let c = value.unsafe_get(i).unsafe_to_char()
-    if c == '%' && i + 2 < len {
-      let hi = hex_digit_value(value.unsafe_get(i + 1).unsafe_to_char())
-      let lo = hex_digit_value(value.unsafe_get(i + 2).unsafe_to_char())
-      if hi >= 0 && lo >= 0 {
-        bytes.push((hi * 16 + lo).to_byte())
-        i = i + 3
-        continue
-      }
-    }
-    let code = c.to_int()
-    if code < 0x80 {
-      // ASCII characters encode to a single UTF-8 byte.
-      bytes.push(code.to_byte())
-      i = i + 1
-    } else {
-      // Encode a whole run of non-ASCII code units together so that surrogate
-      // pairs are encoded as one character.
-      let run_start = i
-      let mut j = i
-      while j < len {
-        if value.unsafe_get(j).to_int() < 0x80 {
-          break
-        }
-        j = j + 1
-      }
-      for byte in @utf8.encode(value.view(start_offset=run_start, end_offset=j)) {
-        bytes.push(byte)
-      }
-      i = j
-    }
-  }
-  @utf8.decode_lossy(Bytes::from_array(bytes).exact_view())
-}
-
-// Parse the `key=value,key2=value2` format of `OTEL_RESOURCE_ATTRIBUTES`.
-// Both keys and values are percent-decoded, as required by the specification.
-fn parse_resource_attributes(
-  value : String,
-  resource : Map[String, AttributeValue]
-) -> Unit {
-  for pair in value.split(",") {
-    match pair.trim().split_once("=") {
-      Some((key, raw_value)) => {
-        let name = decode_percent(key.trim())
-        if name != "" {
-          resource.set(name, StringValue(decode_percent(raw_value.trim())))
-        }
-      }
-      None => ()
-    }
-  }
-}
 
 // Whether `OTEL_SDK_DISABLED` requests a disabled SDK.
 fn sdk_disabled() -> Bool {
@@ -125,37 +32,6 @@ pub fn traces_exporter_disabled() -> Bool {
   }
 }
 
-// Resolve the service name from the explicit argument, `OTEL_SERVICE_NAME`
-// and the `service.name` resource attribute, in that order. Blank values are
-// treated as unset, as required by the OpenTelemetry specification.
-fn resolve_service_name(
-  service_name : String?,
-  resource : Map[String, AttributeValue]
-) -> String {
-  match service_name {
-    Some(value) =>
-      if value.trim() != "" {
-        return value
-      }
-    None => ()
-  }
-  match @env.get_env_var("OTEL_SERVICE_NAME") {
-    Some(value) =>
-      if value.trim() != "" {
-        return value
-      }
-    None => ()
-  }
-  match resource.get(SERVICE_NAME) {
-    Some(StringValue(existing)) =>
-      if existing.trim() != "" {
-        return existing
-      }
-    _ => ()
-  }
-  "unknown_service"
-}
-
 // Create a provider. The service name defaults to `OTEL_SERVICE_NAME`, then
 // to `service.name` from `OTEL_RESOURCE_ATTRIBUTES`, and finally to
 // `unknown_service`; blank values are skipped. The resource also carries the
@@ -164,18 +40,8 @@ fn resolve_service_name(
 // `OTEL_SDK_DISABLED=true`, in which case nothing is recorded or exported.
 // The default ID generator produces random IDs.
 pub fn TracerProviderSdk::new(service_name? : String) -> TracerProviderSdk {
-  let resource = Map([])
-  match @env.get_env_var("OTEL_RESOURCE_ATTRIBUTES") {
-    Some(value) => parse_resource_attributes(value, resource)
-    None => ()
-  }
-  let name = resolve_service_name(service_name, resource)
-  resource.set(SERVICE_NAME, StringValue(name))
-  resource.set(TELEMETRY_SDK_NAME, StringValue("opentelemetry"))
-  resource.set(TELEMETRY_SDK_LANGUAGE, StringValue("moonbit"))
-  resource.set(TELEMETRY_SDK_VERSION, StringValue(SDK_VERSION))
   {
-    resource,
+    resource: Resource::from_env(service_name?),
     sampler: if sdk_disabled() {
       Sampler::always_off()
     } else {
@@ -188,18 +54,23 @@ pub fn TracerProviderSdk::new(service_name? : String) -> TracerProviderSdk {
   }
 }
 
+// Replace the whole resource of this provider, for example with one built by
+// `Resource::from_env` and extended via `Resource::merge` or
+// `Resource::with_attribute`.
+pub fn TracerProviderSdk::with_resource(
+  self : TracerProviderSdk,
+  resource : Resource
+) -> TracerProviderSdk {
+  { ..self, resource, }
+}
+
 // Add a resource attribute (e.g. `service.version`).
 pub fn TracerProviderSdk::with_resource_attribute(
   self : TracerProviderSdk,
   key : String,
   value : AttributeValue
 ) -> TracerProviderSdk {
-  let resource = Map([])
-  self.resource.each(fn(existing_key, existing_value) {
-    resource.set(existing_key, existing_value)
-  })
-  resource.set(key, value)
-  { ..self, resource }
+  { ..self, resource: self.resource.with_attribute(key, value) }
 }
 
 // Add several resource attributes at once.
@@ -207,12 +78,7 @@ pub fn TracerProviderSdk::with_resource_attributes(
   self : TracerProviderSdk,
   values : Map[String, AttributeValue]
 ) -> TracerProviderSdk {
-  let resource = Map([])
-  self.resource.each(fn(existing_key, existing_value) {
-    resource.set(existing_key, existing_value)
-  })
-  values.each(fn(key, value) { resource.set(key, value) })
-  { ..self, resource }
+  { ..self, resource: self.resource.merge(Resource::new(attributes=values)) }
 }
 
 // Use a custom sampler.
@@ -251,8 +117,17 @@ pub fn TracerProviderSdk::with_span_processor(
   { ..self, processors }
 }
 
-// The resource attributes of this provider.
-pub fn TracerProviderSdk::resource(self : TracerProviderSdk) -> Map[String, AttributeValue] {
+// The resource attributes of this provider, as a fresh copy.
+pub fn TracerProviderSdk::resource(
+  self : TracerProviderSdk
+) -> Map[String, AttributeValue] {
+  self.resource.attributes()
+}
+
+// The resource of this provider.
+pub fn TracerProviderSdk::resource_object(
+  self : TracerProviderSdk
+) -> Resource {
   self.resource
 }
 

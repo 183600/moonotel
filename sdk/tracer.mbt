@@ -71,7 +71,7 @@ pub fn Tracer::start_span(
     span_links,
     self.provider.span_limits(),
     self.provider.processors,
-    self.provider.resource,
+    self.provider.resource.attributes_shared(),
     self.scope_name,
     self.scope_version,
   )
