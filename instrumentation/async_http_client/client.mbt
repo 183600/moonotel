@@ -361,3 +361,61 @@ pub async fn delete(
     context?=context,
   )
 }
+
+// Traced `HEAD` request (no request body).
+pub async fn head(
+  url : String,
+  headers? : Map[String, String],
+  tracer? : @sdk.Tracer,
+  span_name? : String,
+  context? : @context.Context
+) -> (@http.Response, &@io.Data) {
+  request(
+    url,
+    @http.RequestMethod::Head,
+    b"",
+    headers?=headers,
+    tracer?=tracer,
+    span_name?=span_name,
+    context?=context,
+  )
+}
+
+// Traced `PATCH` request.
+pub async fn patch(
+  url : String,
+  body : &@io.Data,
+  headers? : Map[String, String],
+  tracer? : @sdk.Tracer,
+  span_name? : String,
+  context? : @context.Context
+) -> (@http.Response, &@io.Data) {
+  request(
+    url,
+    @http.RequestMethod::Patch,
+    body,
+    headers?=headers,
+    tracer?=tracer,
+    span_name?=span_name,
+    context?=context,
+  )
+}
+
+// Traced `OPTIONS` request (no request body).
+pub async fn options(
+  url : String,
+  headers? : Map[String, String],
+  tracer? : @sdk.Tracer,
+  span_name? : String,
+  context? : @context.Context
+) -> (@http.Response, &@io.Data) {
+  request(
+    url,
+    @http.RequestMethod::Options,
+    b"",
+    headers?=headers,
+    tracer?=tracer,
+    span_name?=span_name,
+    context?=context,
+  )
+}

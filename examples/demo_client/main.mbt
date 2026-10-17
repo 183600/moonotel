@@ -6,28 +6,14 @@
 //
 // The client injects the W3C `traceparent`/`tracestate` and `baggage` headers,
 // so the server span joins the same trace. In a real deployment, replace
-// `StdoutExporter` with `@otlp.OtlpHttpExporter` to ship spans to a collector.
-
-struct StdoutExporter {
-}
-
-pub impl @sdk.SpanExporter for StdoutExporter with export_spans(self, spans) {
-  let _ = self
-  for span in spans {
-    println(
-      "span name=\{span.name} trace_id=\{span.span_context.trace_id_hex()} span_id=\{span.span_context.span_id_hex()} status=\{span.status.to_string()}",
-    )
-  }
-  @sdk.ExportSuccess
-}
-
-pub impl @sdk.SpanExporter for StdoutExporter with shutdown(self) {
-  let _ = self
-}
+// `@sdk.ConsoleSpanExporter` with `@otlp.OtlpHttpExporter` to ship spans to a
+// collector.
 
 async fn main {
   let provider = @sdk.TracerProviderSdk::new(service_name="demo-client")
-    .with_span_processor(@sdk.SimpleSpanProcessor::new(StdoutExporter::{}))
+    .with_span_processor(
+      @sdk.SimpleSpanProcessor::new(@sdk.ConsoleSpanExporter::new()),
+    )
   let tracer = provider.get_tracer("demo-client")
   let previous = @context.attach(
     @context.Context::root().with_value("user.id", "demo-user"),

@@ -136,7 +136,7 @@ fn build_hex_pairs() -> FixedArray[UInt] {
     let lo = b & 0x0F
     let hi_char = if hi < 10 { hi + 48 } else { hi + 87 }
     let lo_char = if lo < 10 { lo + 48 } else { lo + 87 }
-    table.unsafe_set(b, (hi_char | (lo_char << 16)).to_uint())
+    table.unsafe_set(b, (hi_char | (lo_char << 16)).reinterpret_as_uint())
     b = b + 1
   }
   table

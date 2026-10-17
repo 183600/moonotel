@@ -142,7 +142,7 @@ fn ProtoWriter::write_bytes_from_int_array(
     let word = ((values.unsafe_get(i) & 0xFF) |
       ((values.unsafe_get(i + 1) & 0xFF) << 8) |
       ((values.unsafe_get(i + 2) & 0xFF) << 16) |
-      ((values.unsafe_get(i + 3) & 0xFF) << 24)).to_uint()
+      ((values.unsafe_get(i + 3) & 0xFF) << 24)).reinterpret_as_uint()
     buf.unsafe_write_uint32_le(pos, word)
     pos = pos + 4
     i = i + 4

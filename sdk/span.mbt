@@ -510,6 +510,54 @@ pub fn SpanSdk::set_attributes(
   }
 }
 
+// Set a string attribute. Equivalent to `set_attribute(key, StringValue(...))`
+// and subject to the same count and value length limits.
+
+///|
+pub fn SpanSdk::set_string_attribute(
+  self : SpanSdk,
+  key : String,
+  value : String,
+) -> Unit {
+  self.set_attribute(key, StringValue(value))
+}
+
+// Set a boolean attribute. Equivalent to
+// `set_attribute(key, BoolValue(...))`.
+
+///|
+pub fn SpanSdk::set_bool_attribute(
+  self : SpanSdk,
+  key : String,
+  value : Bool,
+) -> Unit {
+  self.set_attribute(key, BoolValue(value))
+}
+
+// Set a 64-bit integer attribute. Equivalent to
+// `set_attribute(key, IntValue(...))`.
+
+///|
+pub fn SpanSdk::set_int_attribute(
+  self : SpanSdk,
+  key : String,
+  value : Int64,
+) -> Unit {
+  self.set_attribute(key, IntValue(value))
+}
+
+// Set a double attribute. Equivalent to
+// `set_attribute(key, DoubleValue(...))`.
+
+///|
+pub fn SpanSdk::set_double_attribute(
+  self : SpanSdk,
+  key : String,
+  value : Double,
+) -> Unit {
+  self.set_attribute(key, DoubleValue(value))
+}
+
 // Add an event to the span. No-op for non-recording or ended spans. When the
 // event count limit is reached the event is dropped and counted; attributes
 // beyond the event attribute count limit are dropped and counted on the

@@ -2,29 +2,14 @@
 // spans. Run with `moon run examples/demo_server --target native`, then call
 // it from the instrumented client (or `curl`) and watch the spans appear.
 //
-// In a real deployment, replace `StdoutExporter` with
+// In a real deployment, replace `@sdk.ConsoleSpanExporter` with
 // `@otlp.OtlpHttpExporter` / `@otlp_async` to ship spans to a collector.
-
-struct StdoutExporter {
-}
-
-pub impl @sdk.SpanExporter for StdoutExporter with export_spans(self, spans) {
-  let _ = self
-  for span in spans {
-    println(
-      "span name=\{span.name} trace_id=\{span.span_context.trace_id_hex()} span_id=\{span.span_context.span_id_hex()} status=\{span.status.to_string()}",
-    )
-  }
-  @sdk.ExportSuccess
-}
-
-pub impl @sdk.SpanExporter for StdoutExporter with shutdown(self) {
-  let _ = self
-}
 
 async fn main {
   let provider = @sdk.TracerProviderSdk::new(service_name="demo-server")
-    .with_span_processor(@sdk.SimpleSpanProcessor::new(StdoutExporter::{}))
+    .with_span_processor(
+      @sdk.SimpleSpanProcessor::new(@sdk.ConsoleSpanExporter::new()),
+    )
   let addr = @socket.Addr::parse("127.0.0.1:8080")
   println("listening on http://127.0.0.1:8080")
   @server.run_server(

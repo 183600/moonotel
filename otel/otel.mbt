@@ -30,6 +30,9 @@ pub using @sdk {
   type TracerProviderSdk,
   type SimpleSpanProcessor,
   type BatchSpanProcessor,
+  type BatchConfig,
+  type InMemorySpanExporter,
+  type ConsoleSpanExporter,
   trait SpanProcessor,
   trait SpanExporter,
   global_tracer,
@@ -93,6 +96,10 @@ pub using @otlp {
 // OTEL_EXPORTER_OTLP_* environment variables. `resource_attributes` are
 // merged into the resource built from the environment, and `span_limits`
 // replaces the limits read from the OTEL_SPAN_* environment variables.
+//
+// Spans are exported through a batch processor unless `use_batch` is false.
+// `batch` overrides the queue size, export batch size and flush interval read
+// from the OTEL_BSP_* environment variables.
 
 ///|
 pub fn setup(
@@ -104,6 +111,7 @@ pub fn setup(
   span_limits? : @sdk.SpanLimits,
   transport? : @otlp.Transport,
   use_batch? : Bool,
+  batch? : @sdk.BatchConfig,
 ) -> @sdk.TracerProviderSdk {
   let mut provider = @sdk.TracerProviderSdk::new(service_name?)
   match resource_attributes {
@@ -131,18 +139,27 @@ pub fn setup(
         headers: headers.unwrap_or(base.headers),
       }
       let exporter = @otlp.OtlpHttpExporter::new(config, send)
-      let batch = use_batch.unwrap_or(true)
-      let processor : &@sdk.SpanProcessor = if batch {
-        // Queue/batch/interval defaults come from the OTEL_BSP_* variables.
-        let value : &@sdk.SpanProcessor = @sdk.BatchSpanProcessor::from_env(
-          exporter,
-        )
-        value
-      } else {
-        let value : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
-          exporter,
-        )
-        value
+      let processor : &@sdk.SpanProcessor = match batch {
+        // An explicit configuration always uses the batch processor.
+        Some(config) => {
+          let value : &@sdk.SpanProcessor = @sdk.BatchSpanProcessor::with_config(
+            exporter, config,
+          )
+          value
+        }
+        None =>
+          if use_batch.unwrap_or(true) {
+            // Queue/batch/interval defaults come from the OTEL_BSP_* variables.
+            let value : &@sdk.SpanProcessor = @sdk.BatchSpanProcessor::from_env(
+              exporter,
+            )
+            value
+          } else {
+            let value : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
+              exporter,
+            )
+            value
+          }
       }
       provider = provider.with_span_processor(processor)
     }

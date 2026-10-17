@@ -132,7 +132,7 @@ pub fn[G] setup(
     Some(value) => provider = provider.with_span_limits(value)
     None => ()
   }
-  if not(@sdk.traces_exporter_disabled()) {
+  if !(@sdk.traces_exporter_disabled()) {
     let exporter = OtlpHttpAsyncSpanExporter::new(
       config,
       group,
