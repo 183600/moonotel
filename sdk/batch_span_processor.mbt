@@ -17,8 +17,7 @@ pub struct BatchSpanProcessor {
   flush_interval_millis : Int
   // Fixed-capacity ring buffer: `head` is the index of the oldest buffered
   // span and `count` is how many spans are live. Once full, the oldest span is
-  // overwritten in place; consumed slots are reset to `empty_slot` so exported
-  // spans are not kept alive by the buffer.
+  // overwritten in place; consumed slots are reset to `empty_slot`.
   queue : Array[SpanData]
   empty_slot : SpanData
   mut head : Int
@@ -28,8 +27,7 @@ pub struct BatchSpanProcessor {
   mut dropped_spans : UInt64
 }
 
-// Placeholder written over consumed queue slots so the ring buffer does not
-// keep exported spans (and their attribute maps) reachable.
+// Placeholder written over consumed queue slots.
 fn empty_span_data() -> SpanData {
   {
     name: "",

@@ -537,8 +537,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
 
 // Whether every span shares the same resource (by reference) and the same
 // scope name and version, so the whole batch forms one ResourceSpans with one
-// ScopeSpans. This is the common case and lets `encode_trace_request` skip
-// building the grouping structures.
+// ScopeSpans.
 ///|
 fn is_uniform_batch(spans : Array[@sdk.SpanData]) -> Bool {
   let len = spans.length()
@@ -567,8 +566,6 @@ pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
   let writer = ProtoWriter::with_capacity(288 + spans.length() * 160)
   if is_uniform_batch(spans) {
     let first = spans.unsafe_get(0)
-    // Size the nested writers up front so their buffers do not have to be
-    // grown (and copied) while the spans are encoded.
     let resource_spans = writer.take_scratch_with_capacity(
       288 + spans.length() * 320,
     )

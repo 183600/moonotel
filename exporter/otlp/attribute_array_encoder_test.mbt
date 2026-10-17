@@ -1,6 +1,48 @@
 // Wire-format tests for the non-string array attribute types.
 
 ///|
+fn probe_span_with(
+  resource : Map[String, @sdk.AttributeValue],
+) -> @sdk.SpanData {
+  {
+    name: "probe",
+    span_context: @api.span_context(
+      @api.bytes_from_hex("4bf92f359d1e75b7618a2d1f3c4e5a6b").unwrap(),
+      @api.bytes_from_hex("00f067aa0ba902b7").unwrap(),
+      1,
+    ),
+    parent_span_id: [],
+    kind: @api.SpanKind::Internal,
+    start_time_unix_nano: 1L,
+    end_time_unix_nano: 2L,
+    attributes: Map::new(),
+    events: [],
+    links: [],
+    dropped_attributes_count: 0,
+    dropped_events_count: 0,
+    dropped_links_count: 0,
+    status: @api.StatusCode::Unset,
+    status_description: "",
+    resource,
+    scope_name: "scope",
+    scope_version: "",
+  }
+}
+
+///|
+fn probe_resource_group_count(
+  r1 : Map[String, @sdk.AttributeValue],
+  r2 : Map[String, @sdk.AttributeValue],
+) -> Int32 {
+  let encoded = @otlp.encode_trace_request([
+    probe_span_with(r1),
+    probe_span_with(r2),
+  ])
+  let request = parse_fields(encoded.exact_view())
+  fields_of(request, 1).length()
+}
+
+///|
 fn array_value_elements(
   span_fields : Array[Field],
   key : String,

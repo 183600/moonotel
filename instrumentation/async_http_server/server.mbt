@@ -13,8 +13,7 @@
 ///|
 const INSTRUMENTATION_SCOPE : String = "yourname/otel/instrumentation/async_http_server"
 
-// Immutable attribute values reused by every request so that the constant
-// semantic-convention attributes do not allocate per request.
+// Constant semantic-convention attribute values.
 let protocol_name_http : @sdk.AttributeValue = @sdk.StringValue("http")
 let protocol_version_http_1_1 : @sdk.AttributeValue = @sdk.StringValue("1.1")
 let url_scheme_http : @sdk.AttributeValue = @sdk.StringValue("http")
@@ -307,7 +306,7 @@ fn is_close_token_at(value : String, start : Int) -> Bool {
 
 // Whether a comma-separated `Connection` header value contains the token
 // `close` (case-insensitive, optional whitespace ignored). Equivalent to
-// `value.split(",")` plus `trim`/`to_lower`, without the allocations.
+// `value.split(",")` plus `trim`/`to_lower`.
 ///|
 fn has_close_token(value : String) -> Bool {
   let len = value.length()

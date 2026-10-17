@@ -1,5 +1,63 @@
 // Tests for `BatchConfig` and `BatchSpanProcessor::with_config`.
 
+///|
+struct ProbeExporter {
+  names : Array[String]
+}
+
+///|
+pub impl @sdk.SpanExporter for ProbeExporter with fn export_spans(self, spans) {
+  for data in spans {
+    self.names.push(data.name)
+  }
+  @sdk.ExportSuccess
+}
+
+///|
+pub impl @sdk.SpanExporter for ProbeExporter with fn shutdown(self) {
+  let _ = self
+}
+
+///|
+fn probe_span(name : String) -> @sdk.SpanData {
+  {
+    name,
+    span_context: @api.span_context(
+      @api.bytes_from_hex("4bf92f359d1e75b7618a2d1f3c4e5a6b").unwrap(),
+      @api.bytes_from_hex("00f067aa0ba902b7").unwrap(),
+      1,
+    ),
+    parent_span_id: [],
+    kind: @api.SpanKind::Internal,
+    start_time_unix_nano: 1L,
+    end_time_unix_nano: 2L,
+    attributes: Map::new(),
+    events: [],
+    links: [],
+    dropped_attributes_count: 0,
+    dropped_events_count: 0,
+    dropped_links_count: 0,
+    status: @api.StatusCode::Unset,
+    status_description: "",
+    resource: Map::new(),
+    scope_name: "scope",
+    scope_version: "",
+  }
+}
+
+///|
+fn probe_names_equal(a : Array[String], b : Array[String]) -> Bool {
+  if a.length() != b.length() {
+    return false
+  }
+  for i = 0; i < a.length(); i = i + 1 {
+    if a[i] != b[i] {
+      return false
+    }
+  }
+  true
+}
+
 test "batch_config_defaults" {
   let config = @sdk.BatchConfig::default()
   assert_eq(config.max_queue_size, 2048)

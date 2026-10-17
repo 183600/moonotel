@@ -295,7 +295,7 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
       break
     }
     // Accepted members are ASCII, so a member starting past the byte budget
-    // can never fit; this also bounds the work spent on over-long headers.
+    // can never fit.
     if start >= BAGGAGE_MAX_BYTES {
       break
     }

@@ -429,9 +429,7 @@ pub fn parse_tracestate(value : String) -> String? {
   if value == "" {
     return None
   }
-  // Duplicate keys are rejected; at most 32 members are accepted. The first
-  // key is kept in a plain field (with `have_first`) instead of an option so
-  // the common one- and two-member cases need no boxing.
+  // Duplicate keys are rejected; at most 32 members are accepted.
   let mut first_key : StringView = ""
   let mut have_first = false
   let mut seen : Array[StringView]? = None

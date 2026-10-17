@@ -11,8 +11,7 @@
 
 const INSTRUMENTATION_SCOPE : String = "yourname/otel/instrumentation/async_http_client"
 
-// Immutable attribute values reused by every request so that the constant
-// semantic-convention attributes do not allocate per request.
+// Constant semantic-convention attribute values.
 let protocol_name_http : @sdk.AttributeValue = @sdk.StringValue("http")
 let protocol_version_http_1_1 : @sdk.AttributeValue = @sdk.StringValue("1.1")
 let method_get : @sdk.AttributeValue = @sdk.StringValue("GET")
