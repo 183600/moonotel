@@ -114,31 +114,61 @@ fn sdk_disabled() -> Bool {
   }
 }
 
+// Whether `OTEL_TRACES_EXPORTER` requests that no trace exporter be
+// installed (the value `none`). Every other value, including an unset
+// variable, selects the default OTLP exporter.
+pub fn traces_exporter_disabled() -> Bool {
+  match @env.get_env_var("OTEL_TRACES_EXPORTER") {
+    Some(value) => value.trim().to_lower() == "none"
+    None => false
+  }
+}
+
+// Resolve the service name from the explicit argument, `OTEL_SERVICE_NAME`
+// and the `service.name` resource attribute, in that order. Blank values are
+// treated as unset, as required by the OpenTelemetry specification.
+fn resolve_service_name(
+  service_name : String?,
+  resource : Map[String, AttributeValue]
+) -> String {
+  match service_name {
+    Some(value) =>
+      if value.trim() != "" {
+        return value
+      }
+    None => ()
+  }
+  match @env.get_env_var("OTEL_SERVICE_NAME") {
+    Some(value) =>
+      if value.trim() != "" {
+        return value
+      }
+    None => ()
+  }
+  match resource.get(SERVICE_NAME) {
+    Some(StringValue(existing)) =>
+      if existing.trim() != "" {
+        return existing
+      }
+    _ => ()
+  }
+  "unknown_service"
+}
+
 // Create a provider. The service name defaults to `OTEL_SERVICE_NAME`, then
 // to `service.name` from `OTEL_RESOURCE_ATTRIBUTES`, and finally to
-// `unknown_service`. The resource also carries the `telemetry.sdk.*`
-// attributes. The default sampler follows `OTEL_TRACES_SAMPLER`
-// (`parentbased_always_on` when unset), except when `OTEL_SDK_DISABLED=true`,
-// in which case nothing is recorded or exported. The default ID generator
-// produces random IDs.
+// `unknown_service`; blank values are skipped. The resource also carries the
+// `telemetry.sdk.*` attributes. The default sampler follows
+// `OTEL_TRACES_SAMPLER` (`parentbased_always_on` when unset), except when
+// `OTEL_SDK_DISABLED=true`, in which case nothing is recorded or exported.
+// The default ID generator produces random IDs.
 pub fn TracerProviderSdk::new(service_name? : String) -> TracerProviderSdk {
   let resource = Map([])
   match @env.get_env_var("OTEL_RESOURCE_ATTRIBUTES") {
     Some(value) => parse_resource_attributes(value, resource)
     None => ()
   }
-  let name = match service_name {
-    Some(value) => value
-    None =>
-      match @env.get_env_var("OTEL_SERVICE_NAME") {
-        Some(value) => value
-        None =>
-          match resource.get(SERVICE_NAME) {
-            Some(StringValue(existing)) => existing
-            _ => "unknown_service"
-          }
-      }
-  }
+  let name = resolve_service_name(service_name, resource)
   resource.set(SERVICE_NAME, StringValue(name))
   resource.set(TELEMETRY_SDK_NAME, StringValue("opentelemetry"))
   resource.set(TELEMETRY_SDK_LANGUAGE, StringValue("moonbit"))

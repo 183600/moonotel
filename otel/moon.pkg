@@ -6,4 +6,8 @@ import {
   "yourname/otel/exporter/otlp" @otlp,
 }
 
+import {
+  "moonbitlang/core/env",
+} for "test"
+
 pkgtype(kind: "library")

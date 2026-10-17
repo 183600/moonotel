@@ -10,6 +10,7 @@ import {
 import {
   "moonbitlang/async/http" @http,
   "moonbitlang/async/socket" @socket,
+  "moonbitlang/core/env",
   "yourname/otel/api" @api,
 } for "test"
 

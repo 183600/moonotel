@@ -62,9 +62,36 @@ pub fn[G] spawn_bg(
   )
 }
 
+// Spawn a task that starts with `context` (the current context when omitted)
+// installed as the ambient context, and restores the previous context when it
+// finishes. Unlike `spawn_bg`, the returned task is joined through `group`
+// and its result can be collected with `Task::wait`.
+pub fn[G, X] spawn(
+  group : @async.TaskGroup[G],
+  f : async () -> X,
+  context? : @context.Context,
+  no_wait? : Bool,
+  allow_failure? : Bool
+) -> @async.Task[X] {
+  let carried = match context {
+    Some(value) => value
+    None => @context.current_context()
+  }
+  group.spawn(
+    () => {
+      let previous = @context.attach(carried)
+      defer @context.detach(previous)
+      f()
+    },
+    no_wait?=no_wait,
+    allow_failure?=allow_failure,
+  )
+}
+
 // One-call native setup: build a TracerProvider that exports over OTLP/HTTP
 // through a background task in `group`, and install it as the process-wide
-// provider.
+// provider. When `OTEL_TRACES_EXPORTER=none`, no exporter is installed and
+// spans are recorded but not exported.
 //
 // `endpoint` and `headers` override the values read from the
 // OTEL_EXPORTER_OTLP_* environment variables, `resource_attributes` are
@@ -92,11 +119,6 @@ pub fn[G] setup(
     },
     headers: headers.unwrap_or(base.headers),
   }
-  let exporter = OtlpHttpAsyncSpanExporter::new(
-    config,
-    group,
-    max_queue_size?=max_queue_size,
-  )
   let mut provider = @sdk.TracerProviderSdk::new(service_name?=service_name)
   match resource_attributes {
     Some(values) => provider = provider.with_resource_attributes(values)
@@ -110,7 +132,16 @@ pub fn[G] setup(
     Some(value) => provider = provider.with_span_limits(value)
     None => ()
   }
-  provider = provider.with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+  if not(@sdk.traces_exporter_disabled()) {
+    let exporter = OtlpHttpAsyncSpanExporter::new(
+      config,
+      group,
+      max_queue_size?=max_queue_size,
+    )
+    provider = provider.with_span_processor(
+      @sdk.SimpleSpanProcessor::new(exporter),
+    )
+  }
   @sdk.set_global_tracer_provider(provider)
   provider
 }

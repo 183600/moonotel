@@ -95,19 +95,35 @@ pub fn Sampler::trace_id_ratio_based(ratio : Double) -> Sampler {
   }
 }
 
-// Delegate to `root` only when there is no valid parent; otherwise follow the
-// parent's sampled flag.
-pub fn Sampler::parent_based(root : Sampler) -> Sampler {
+// Delegate to `root` only when there is no valid parent; otherwise delegate
+// to the sampler selected by the parent's origin and sampled flag. The
+// optional delegates default to the OpenTelemetry specification values:
+// always-on for sampled parents and always-off for unsampled parents, for
+// both remote and local parents.
+pub fn Sampler::parent_based(
+  root : Sampler,
+  remote_parent_sampled? : Sampler,
+  remote_parent_not_sampled? : Sampler,
+  local_parent_sampled? : Sampler,
+  local_parent_not_sampled? : Sampler
+) -> Sampler {
+  let remote_sampled = remote_parent_sampled.unwrap_or(Sampler::always_on())
+  let remote_not_sampled = remote_parent_not_sampled.unwrap_or(Sampler::always_off())
+  let local_sampled = local_parent_sampled.unwrap_or(Sampler::always_on())
+  let local_not_sampled = local_parent_not_sampled.unwrap_or(Sampler::always_off())
   {
     sample: fn(parent, trace_id) {
       match parent {
         Some(ctx) =>
           if ctx.is_valid() {
-            if ctx.is_sampled() {
-              sampling_decision_record_and_sample()
+            let delegate = if ctx.is_remote() {
+              if ctx.is_sampled() { remote_sampled } else { remote_not_sampled }
+            } else if ctx.is_sampled() {
+              local_sampled
             } else {
-              sampling_decision_drop()
+              local_not_sampled
             }
+            delegate.should_sample(Some(ctx), trace_id)
           } else {
             root.should_sample(None, trace_id)
           }
