@@ -56,6 +56,8 @@ pub using @context {
 ///|
 pub using @propagation {
   type TextMapCarrier,
+  type Tracestate,
+  TRACESTATE_MAX_MEMBERS,
   inject,
   extract,
   inject_context,

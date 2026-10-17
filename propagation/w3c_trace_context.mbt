@@ -227,7 +227,12 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
     None => return None
   }
   let flags = flags_hi * 16 + flags_lo
-  let sc = @api.span_context(trace_id, span_id, flags & @api.TRACE_FLAGS_SAMPLED)
+  let sc = @api.span_context(
+    trace_id,
+    span_id,
+    flags & @api.TRACE_FLAGS_SAMPLED,
+    is_remote=true,
+  )
   if sc.is_valid() {
     Some(sc)
   } else {

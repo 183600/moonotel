@@ -5,6 +5,7 @@ pub struct SpanContext {
   trace_flags : Int
   tracestate : String
   is_valid : Bool
+  is_remote : Bool
 }
 
 // Create an invalid SpanContext
@@ -14,6 +15,7 @@ let invalid_context : SpanContext = {
   trace_flags: 0,
   tracestate: "",
   is_valid: false,
+  is_remote: false,
 }
 
 pub fn invalid_span_context() -> SpanContext {
@@ -22,11 +24,13 @@ pub fn invalid_span_context() -> SpanContext {
 
 // Create a valid SpanContext with given IDs. `tracestate` is the raw W3C
 // `tracestate` header value associated with the context ("" when absent).
+// `is_remote` must be `true` for contexts received through a propagator.
 pub fn span_context(
   trace_id : Array[Int],
   span_id : Array[Int],
   trace_flags : Int,
-  tracestate? : String
+  tracestate? : String,
+  is_remote? : Bool
 ) -> SpanContext {
   let is_valid = trace_id.length() == 16 && span_id.length() == 8 && !is_zero(trace_id) && !is_zero(span_id)
   {
@@ -35,6 +39,7 @@ pub fn span_context(
     trace_flags: trace_flags,
     tracestate: tracestate.unwrap_or(""),
     is_valid: is_valid,
+    is_remote: is_remote.unwrap_or(false),
   }
 }
 
@@ -49,6 +54,20 @@ pub fn SpanContext::with_tracestate(
   tracestate : String
 ) -> SpanContext {
   { ..self, tracestate }
+}
+
+// Whether this context was received from a remote parent (through a
+// propagator). All-zero contexts and contexts created locally return `false`.
+pub fn SpanContext::is_remote(self : SpanContext) -> Bool {
+  self.is_remote
+}
+
+// Derive a copy of this context with the given `is_remote` flag.
+pub fn SpanContext::with_remote(
+  self : SpanContext,
+  is_remote : Bool
+) -> SpanContext {
+  { ..self, is_remote }
 }
 
 // Check if SpanContext is valid
