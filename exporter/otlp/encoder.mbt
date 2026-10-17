@@ -89,6 +89,98 @@ fn varint_size(value : UInt64) -> Int32 {
   }
 }
 
+// Append the KeyValue and AnyValue headers for an attribute whose encoded
+// AnyValue payload is `any_size` bytes, reserving room for the whole
+// attribute (key and payload included). `key_len` is the key length in code
+// units; it equals the byte length when the key is ASCII.
+fn write_scalar_attribute_header(
+  writer : ProtoWriter,
+  field : Int,
+  key_len : Int,
+  any_size : Int,
+) -> Unit {
+  let key_size = 1 + varint_size(key_len.to_uint64()) + key_len
+  let kv_size = key_size + 1 + varint_size(any_size.to_uint64()) + any_size
+  let total = 1 + varint_size(kv_size.to_uint64()) + kv_size
+  if writer.len + total > writer.buf.length() {
+    writer.reserve(total)
+  }
+  writer.write_tag(field, 2)
+  writer.write_varint(kv_size.to_uint64())
+  writer.write_tag(1, 2)
+  writer.write_varint(key_len.to_uint64())
+}
+
+// Encode one scalar attribute directly into `writer`, skipping the KeyValue
+// scratch buffer. Strings are assumed to be ASCII (one byte per code unit);
+// when a non-ASCII code unit shows up the partial write is rolled back and
+// false is returned so the caller can use the generic path.
+fn try_encode_scalar_attribute(
+  writer : ProtoWriter,
+  field : Int,
+  key : String,
+  value : @sdk.AttributeValue,
+) -> Bool {
+  let key_len = key.length()
+  let mark = writer.len
+  match value {
+    @sdk.StringValue(text) => {
+      let value_len = text.length()
+      let any_size = 1 + varint_size(value_len.to_uint64()) + value_len
+      write_scalar_attribute_header(writer, field, key_len, any_size)
+      if !writer.try_write_ascii_raw(key) {
+        writer.len = mark
+        return false
+      }
+      writer.write_tag(2, 2)
+      writer.write_varint(any_size.to_uint64())
+      writer.write_tag(1, 2)
+      writer.write_varint(value_len.to_uint64())
+      if !writer.try_write_ascii_raw(text) {
+        writer.len = mark
+        return false
+      }
+      true
+    }
+    @sdk.BoolValue(flag) => {
+      write_scalar_attribute_header(writer, field, key_len, 2)
+      if !writer.try_write_ascii_raw(key) {
+        writer.len = mark
+        return false
+      }
+      writer.write_tag(2, 2)
+      writer.write_varint(2)
+      writer.write_bool_field(2, flag)
+      true
+    }
+    @sdk.IntValue(number) => {
+      let bits = number.reinterpret_as_uint64()
+      let any_size = 1 + varint_size(bits)
+      write_scalar_attribute_header(writer, field, key_len, any_size)
+      if !writer.try_write_ascii_raw(key) {
+        writer.len = mark
+        return false
+      }
+      writer.write_tag(2, 2)
+      writer.write_varint(any_size.to_uint64())
+      writer.write_varint_field(3, bits)
+      true
+    }
+    @sdk.DoubleValue(number) => {
+      write_scalar_attribute_header(writer, field, key_len, 9)
+      if !writer.try_write_ascii_raw(key) {
+        writer.len = mark
+        return false
+      }
+      writer.write_tag(2, 2)
+      writer.write_varint(9)
+      writer.write_fixed64_field(4, number.reinterpret_as_uint64())
+      true
+    }
+    _ => false
+  }
+}
+
 ///|
 fn encode_attributes(
   writer : ProtoWriter,
@@ -96,55 +188,14 @@ fn encode_attributes(
   attributes : Map[String, @sdk.AttributeValue],
 ) -> Unit {
   attributes.each(fn(key, value) {
-    let kv = writer.take_scratch()
-    kv.write_string_field(1, key)
-    match value {
-      @sdk.StringValue(text) => {
-        // Encode the nested `AnyValue { string_value: text }`. Assume ASCII
-        // (one byte per code unit); when a non-ASCII code unit shows up the
-        // partial write is rolled back and the UTF-8 encoding is emitted.
-        kv.write_tag(2, 2)
-        let mark = kv.len
-        let payload_len = text.length()
-        let inner_len = 1 + varint_size(payload_len.to_uint64()) + payload_len
-        kv.write_varint(inner_len.to_uint64())
-        kv.write_tag(1, 2)
-        kv.write_varint(payload_len.to_uint64())
-        if !kv.try_write_ascii_raw(text) {
-          kv.len = mark
-          let encoded = @utf8.encode(text)
-          let encoded_len = encoded.length()
-          let inner_len = 1 + varint_size(encoded_len.to_uint64()) + encoded_len
-          kv.write_varint(inner_len.to_uint64())
-          kv.write_tag(1, 2)
-          kv.write_bytes(encoded)
-        }
-      }
-      @sdk.StringArrayValue(_)
-      | @sdk.BoolArrayValue(_)
-      | @sdk.IntArrayValue(_)
-      | @sdk.DoubleArrayValue(_) => {
-        let any_value = kv.take_scratch()
-        encode_any_value(any_value, value)
-        kv.append_message(2, any_value)
-      }
-      @sdk.BoolValue(flag) => {
-        kv.write_tag(2, 2)
-        kv.write_varint(2)
-        kv.write_bool_field(2, flag)
-      }
-      @sdk.IntValue(number) => {
-        kv.write_tag(2, 2)
-        kv.write_varint((1 + varint_size(number.reinterpret_as_uint64())).to_uint64())
-        kv.write_varint_field(3, number.reinterpret_as_uint64())
-      }
-      @sdk.DoubleValue(number) => {
-        kv.write_tag(2, 2)
-        kv.write_varint(9)
-        kv.write_double_field(4, number)
-      }
+    if !try_encode_scalar_attribute(writer, field, key, value) {
+      let kv = writer.take_scratch()
+      kv.write_string_field(1, key)
+      let any_value = kv.take_scratch()
+      encode_any_value(any_value, value)
+      kv.append_message(2, any_value)
+      writer.append_message(field, kv)
     }
-    writer.append_message(field, kv)
   })
 }
 
