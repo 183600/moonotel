@@ -89,6 +89,7 @@ fn decode_percent(value : StringView) -> String {
 }
 
 // Parse the `key=value,key2=value2` format of `OTEL_RESOURCE_ATTRIBUTES`.
+// Both keys and values are percent-decoded, as required by the specification.
 fn parse_resource_attributes(
   value : String,
   resource : Map[String, AttributeValue]
@@ -96,7 +97,7 @@ fn parse_resource_attributes(
   for pair in value.split(",") {
     match pair.trim().split_once("=") {
       Some((key, raw_value)) => {
-        let name = key.trim().to_owned()
+        let name = decode_percent(key.trim())
         if name != "" {
           resource.set(name, StringValue(decode_percent(raw_value.trim())))
         }

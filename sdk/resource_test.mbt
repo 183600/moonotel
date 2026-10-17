@@ -43,6 +43,15 @@ test "resource_attributes_decode_percent_with_surrogate_pair" {
   )
 }
 
+test "resource_attributes_decode_percent_in_keys" {
+  @env.set_env_var("OTEL_RESOURCE_ATTRIBUTES", "a%2Cb=1,k%3Dv=2")
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
+  @env.unset_env_var("OTEL_RESOURCE_ATTRIBUTES")
+  let resource = provider.resource()
+  assert_eq(resource.get("a,b"), Some(@sdk.StringValue("1")))
+  assert_eq(resource.get("k=v"), Some(@sdk.StringValue("2")))
+}
+
 test "service_name_falls_back_to_resource_attributes" {
   @env.set_env_var("OTEL_RESOURCE_ATTRIBUTES", "service.name=from-resource")
   let provider = @sdk.TracerProviderSdk::new()
