@@ -184,11 +184,12 @@ pub fn SpanSdk::context(self : SpanSdk) -> @api.SpanContext {
   self.context
 }
 
-// Whether the span records attributes and events.
+// Whether the span records attributes and events. Following the
+// specification, an ended span is no longer recording.
 
 ///|
 pub fn SpanSdk::is_recording(self : SpanSdk) -> Bool {
-  self.recording
+  self.recording && !self.ended
 }
 
 // Whether the span has already ended.

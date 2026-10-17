@@ -261,3 +261,29 @@ test "provider_resource_and_sampler_accessors" {
   let decision = provider.sampler().should_sample(None, @api.bytes_from_hex("0102030405060708090a0b0c0d0e0f10").unwrap())
   assert_true(decision.is_sampled)
 }
+
+test "span_stops_recording_once_ended" {
+  let exporter = recording_exporter()
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
+    .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+    .with_sampler(@sdk.Sampler::always_on())
+  let tracer = provider.get_tracer("t")
+  let span = tracer.start_root_span("op")
+  assert_true(span.is_recording())
+  span.end(end_time_unix_nano=100L)
+  assert_false(span.is_recording())
+  assert_true(span.is_ended())
+}
+
+test "span_stays_non_recording_after_second_end" {
+  let exporter = recording_exporter()
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
+    .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+    .with_sampler(@sdk.Sampler::always_off())
+  let span = provider.get_tracer("t").start_root_span("op")
+  assert_false(span.is_recording())
+  span.end(end_time_unix_nano=1L)
+  span.end(end_time_unix_nano=2L)
+  assert_false(span.is_recording())
+  assert_eq(exporter.spans.length(), 0)
+}
