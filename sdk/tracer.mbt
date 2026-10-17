@@ -76,7 +76,7 @@ pub fn Tracer::start_span(
     self.scope_name,
     self.scope_version,
   )
-  if span.is_recording() {
+  if span.recording {
     for processor in self.provider.processors {
       processor.on_start(span)
     }

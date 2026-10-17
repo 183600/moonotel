@@ -72,33 +72,79 @@ fn upper_hex_digit(value : Int) -> Char {
 }
 
 // Decode the body of a baggage value that contains at least one `%`.
+//
+// The first pass validates the input, counts the decoded characters and notes
+// whether every decoded byte is ASCII. Real-world baggage values decode to
+// ASCII, and those are materialized directly into a UTF-16 string without the
+// intermediate byte buffer and UTF-8 decoding.
 fn percent_decode_escaped(value : StringView) -> String? {
   let len = value.length()
-  let bytes : Array[Byte] = Array(capacity=len)
-  let mut j = 0
-  while j < len {
-    let c = value.unsafe_get(j).unsafe_to_char()
+  let mut decoded_len = 0
+  let mut ascii = true
+  let mut i = 0
+  while i < len {
+    let c = value.unsafe_get(i).unsafe_to_char()
     if c == '%' {
-      if j + 2 >= len {
+      if i + 2 >= len {
         return None
       }
-      let hi = hex_digit_value(value.unsafe_get(j + 1).unsafe_to_char())
-      let lo = hex_digit_value(value.unsafe_get(j + 2).unsafe_to_char())
+      let hi = hex_digit_value(value.unsafe_get(i + 1).unsafe_to_char())
+      let lo = hex_digit_value(value.unsafe_get(i + 2).unsafe_to_char())
       if hi < 0 || lo < 0 {
         return None
       }
-      bytes.push((hi * 16 + lo).to_byte())
-      j = j + 3
+      if hi * 16 + lo >= 0x80 {
+        ascii = false
+      }
+      decoded_len = decoded_len + 1
+      i = i + 3
     } else {
       let code = c.to_int()
       if !is_baggage_value_char(code) {
         return None
       }
-      bytes.push(code.to_byte())
-      j = j + 1
+      decoded_len = decoded_len + 1
+      i = i + 1
     }
   }
-  Some(@utf8.decode_lossy(Bytes::from_array(bytes).exact_view()))
+  if ascii {
+    // Each decoded byte is below 0x80, so it maps to the identical UTF-16
+    // code unit (low byte first, high byte zero for ASCII).
+    let out = FixedArray::make(decoded_len * 2, b'\x00')
+    let mut j = 0
+    let mut pos = 0
+    while j < len {
+      let c = value.unsafe_get(j).unsafe_to_char()
+      if c == '%' {
+        let hi = hex_digit_value(value.unsafe_get(j + 1).unsafe_to_char())
+        let lo = hex_digit_value(value.unsafe_get(j + 2).unsafe_to_char())
+        out.unsafe_set(pos * 2, (hi * 16 + lo).to_byte())
+        pos = pos + 1
+        j = j + 3
+      } else {
+        out.unsafe_set(pos * 2, c.to_int().to_byte())
+        pos = pos + 1
+        j = j + 1
+      }
+    }
+    Some(out.unsafe_reinterpret_as_bytes().to_unchecked_string())
+  } else {
+    let bytes : Array[Byte] = Array(capacity=decoded_len)
+    let mut j = 0
+    while j < len {
+      let c = value.unsafe_get(j).unsafe_to_char()
+      if c == '%' {
+        let hi = hex_digit_value(value.unsafe_get(j + 1).unsafe_to_char())
+        let lo = hex_digit_value(value.unsafe_get(j + 2).unsafe_to_char())
+        bytes.push((hi * 16 + lo).to_byte())
+        j = j + 3
+      } else {
+        bytes.push(c.to_int().to_byte())
+        j = j + 1
+      }
+    }
+    Some(@utf8.decode_lossy(Bytes::from_array(bytes).exact_view()))
+  }
 }
 
 // Percent-decode a baggage value held as a view. Returns None when a `%`
@@ -271,6 +317,9 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
 pub fn context_baggage_header(context : @context.Context) -> String? {
   let mut entries : Array[(String, String)]? = None
   let mut seen : Map[String, Bool]? = None
+  // The first key is kept on its own so that the common single-key context
+  // does not have to allocate the dedup map.
+  let mut first_key : String? = None
   let mut cursor : @context.Context? = Some(context)
   while true {
     match cursor {
@@ -290,15 +339,31 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
                     None => ()
                   }
                 }
-              None => {
-                let keys : Map[String, Bool] = Map([])
-                keys.set(key, true)
-                seen = Some(keys)
-                match node.value {
-                  Some(value) => entries = Some([(key, value)])
-                  None => ()
+              None =>
+                match first_key {
+                  Some(existing) =>
+                    if existing != key {
+                      let keys : Map[String, Bool] = Map([])
+                      keys.set(existing, true)
+                      keys.set(key, true)
+                      seen = Some(keys)
+                      match node.value {
+                        Some(value) =>
+                          match entries {
+                            Some(list) => list.push((key, value))
+                            None => entries = Some([(key, value)])
+                          }
+                        None => ()
+                      }
+                    }
+                  None => {
+                    first_key = Some(key)
+                    match node.value {
+                      Some(value) => entries = Some([(key, value)])
+                      None => ()
+                    }
+                  }
                 }
-              }
             }
           None => ()
         }

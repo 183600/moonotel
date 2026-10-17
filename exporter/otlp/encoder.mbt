@@ -490,7 +490,9 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
 ///|
 pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
   // Initial capacity estimate: 160 bytes per span plus the message header.
-  let writer = ProtoWriter::with_capacity(64 + spans.length() * 160)
+  // The base also covers the resource, scope and span envelope of a small
+  // batch (the common single-span export), so those never trigger a regrow.
+  let writer = ProtoWriter::with_capacity(288 + spans.length() * 160)
   for group in group_spans(spans) {
     let resource_spans = writer.take_scratch()
     encode_resource(resource_spans, group.resource)
