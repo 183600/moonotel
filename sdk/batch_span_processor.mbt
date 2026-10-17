@@ -222,15 +222,23 @@ pub impl SpanProcessor for BatchSpanProcessor with on_end(self, data) {
 }
 
 pub impl SpanProcessor for BatchSpanProcessor with force_flush(self) {
-  while self.live_count() > 0 {
-    self.flush_batch()
+  if self.live_count() > 0 {
+    // One clock read for the whole drain; every batch in it is stamped with
+    // the same time.
+    let now = @env.now()
+    while self.live_count() > 0 {
+      self.flush_batch_at(now)
+    }
   }
 }
 
 pub impl SpanProcessor for BatchSpanProcessor with shutdown(self) {
   if !self.shutdown_called {
-    while self.live_count() > 0 {
-      self.flush_batch()
+    if self.live_count() > 0 {
+      let now = @env.now()
+      while self.live_count() > 0 {
+        self.flush_batch_at(now)
+      }
     }
     self.shutdown_called = true
     self.exporter.shutdown()

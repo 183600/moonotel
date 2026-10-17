@@ -88,9 +88,9 @@ pub struct SpanSdk {
   mut end_time_unix_nano : Int64
   mut ended : Bool
   recording : Bool
-  attributes : Map[String, AttributeValue]
-  events : Array[SpanEvent]
-  links : Array[SpanLink]
+  mut attributes : Map[String, AttributeValue]?
+  mut events : Array[SpanEvent]?
+  mut links : Array[SpanLink]?
   mut status : @api.StatusCode
   mut status_description : String
   processors : Array[&SpanProcessor]
@@ -107,7 +107,7 @@ fn create_span(
   kind : @api.SpanKind,
   start_time_unix_nano : Int64,
   recording : Bool,
-  links : Array[SpanLink],
+  links : Array[SpanLink]?,
   processors : Array[&SpanProcessor],
   resource : Map[String, AttributeValue],
   scope_name : String,
@@ -122,8 +122,8 @@ fn create_span(
     end_time_unix_nano: 0,
     ended: false,
     recording,
-    attributes: Map([]),
-    events: [],
+    attributes: None,
+    events: None,
     links,
     status: @api.StatusCode::Unset,
     status_description: "",
@@ -131,6 +131,49 @@ fn create_span(
     resource,
     scope_name,
     scope_version,
+  }
+}
+
+// Allocate the attribute map on first use, so spans that never record an
+// attribute (including non-recording spans) pay nothing.
+
+///|
+fn SpanSdk::mutable_attributes(self : SpanSdk) -> Map[String, AttributeValue] {
+  match self.attributes {
+    Some(attributes) => attributes
+    None => {
+      let attributes : Map[String, AttributeValue] = Map([])
+      self.attributes = Some(attributes)
+      attributes
+    }
+  }
+}
+
+// Allocate the event array on first use.
+
+///|
+fn SpanSdk::mutable_events(self : SpanSdk) -> Array[SpanEvent] {
+  match self.events {
+    Some(events) => events
+    None => {
+      let events : Array[SpanEvent] = []
+      self.events = Some(events)
+      events
+    }
+  }
+}
+
+// Allocate the link array on first use.
+
+///|
+fn SpanSdk::mutable_links(self : SpanSdk) -> Array[SpanLink] {
+  match self.links {
+    Some(links) => links
+    None => {
+      let links : Array[SpanLink] = []
+      self.links = Some(links)
+      links
+    }
   }
 }
 
@@ -194,21 +237,21 @@ pub fn SpanSdk::parent_span_id(self : SpanSdk) -> Array[Int32] {
 
 ///|
 pub fn SpanSdk::attributes(self : SpanSdk) -> Map[String, AttributeValue] {
-  self.attributes
+  self.mutable_attributes()
 }
 
 // The recorded events (empty for non-recording spans).
 
 ///|
 pub fn SpanSdk::events(self : SpanSdk) -> Array[SpanEvent] {
-  self.events
+  self.mutable_events()
 }
 
 // The links of this span.
 
 ///|
 pub fn SpanSdk::links(self : SpanSdk) -> Array[SpanLink] {
-  self.links
+  self.mutable_links()
 }
 
 // The current span status.
@@ -243,7 +286,7 @@ pub fn SpanSdk::set_attribute(
   value : AttributeValue,
 ) -> Unit {
   if self.recording && !self.ended {
-    self.attributes.set(key, value)
+    self.mutable_attributes().set(key, value)
   }
 }
 
@@ -255,9 +298,10 @@ pub fn SpanSdk::set_attributes(
   attributes : Map[String, AttributeValue],
 ) -> Unit {
   if self.recording && !self.ended {
+    let target = self.mutable_attributes()
     for entry in attributes.iter() {
       let (key, value) = entry
-      self.attributes.set(key, value)
+      target.set(key, value)
     }
   }
 }
@@ -280,7 +324,7 @@ pub fn SpanSdk::add_event(
       Some(map) => map
       None => Map([])
     }
-    self.events.push({
+    self.mutable_events().push({
       name,
       time_unix_nano: timestamp,
       attributes: event_attributes,
@@ -294,7 +338,7 @@ pub fn SpanSdk::add_event(
 ///|
 pub fn SpanSdk::add_link(self : SpanSdk, link : SpanLink) -> Unit {
   if self.recording && !self.ended && link.span_context.is_valid() {
-    self.links.push(link)
+    self.mutable_links().push(link)
   }
 }
 
@@ -362,9 +406,9 @@ fn SpanData::from_span(span : SpanSdk) -> SpanData {
     kind: span.kind,
     start_time_unix_nano: span.start_time_unix_nano,
     end_time_unix_nano: span.end_time_unix_nano,
-    attributes: span.attributes,
-    events: span.events,
-    links: span.links,
+    attributes: span.mutable_attributes(),
+    events: span.mutable_events(),
+    links: span.mutable_links(),
     status: span.status,
     status_description: span.status_description,
     resource: span.resource,

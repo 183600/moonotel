@@ -26,7 +26,7 @@ pub fn Tracer::scope_version(self : Tracer) -> String {
 // as required by the specification.
 
 ///|
-fn valid_links(links : Array[SpanLink]?) -> Array[SpanLink] {
+fn valid_links(links : Array[SpanLink]?) -> Array[SpanLink]? {
   match links {
     Some(values) => {
       let out : Array[SpanLink] = []
@@ -35,9 +35,13 @@ fn valid_links(links : Array[SpanLink]?) -> Array[SpanLink] {
           out.push(link)
         }
       }
-      out
+      if out.length() == 0 {
+        None
+      } else {
+        Some(out)
+      }
     }
-    None => []
+    None => None
   }
 }
 
@@ -73,7 +77,11 @@ pub fn Tracer::start_span(
     None => unix_nano_now()
   }
   // Non-recording spans (DROP) keep no links, matching the SDK spec.
-  let span_links = if decision.is_recorded { valid_links(links) } else { [] }
+  let span_links : Array[SpanLink]? = if decision.is_recorded {
+    valid_links(links)
+  } else {
+    None
+  }
   let span = create_span(
     name,
     span_context,

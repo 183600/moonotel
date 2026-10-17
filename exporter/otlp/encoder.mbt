@@ -392,10 +392,18 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   let mut last_resource : Map[String, @sdk.AttributeValue]? = None
   // Index of the group for `last_resource`.
   let mut last_index = -1
+  // Whether the key of `groups[last_index]` has not been registered in
+  // `resource_index` yet. Batches commonly contain a single resource, in which
+  // case the (comparatively expensive) key is never needed.
+  let mut unindexed = false
   for data in spans {
     let index = match last_resource {
       Some(resource) if physical_equal(resource, data.resource) => last_index
       _ => {
+        if unindexed {
+          resource_index.set(resource_key(groups[last_index].resource), last_index)
+          unindexed = false
+        }
         let key = resource_key(data.resource)
         last_resource = Some(data.resource)
         let resolved = match resource_index.get(key) {
@@ -405,8 +413,8 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
               resource: data.resource,
               scopes: [],
             }
-            resource_index.set(key, groups.length())
             groups.push(created)
+            unindexed = true
             groups.length() - 1
           }
         }

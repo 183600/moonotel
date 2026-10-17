@@ -354,46 +354,18 @@ fn is_valid_tracestate_value(value : StringView) -> Bool {
   true
 }
 
-// Validate and normalize a `tracestate` header value.
-//
-// The result is the list of members joined by `,` with optional whitespace
-// trimmed. Returns None when the value is empty, has more than 32 members,
-// contains a malformed or duplicate key, or has an invalid value.
-pub fn parse_tracestate(value : String) -> String? {
-  if value == "" {
-    return None
-  }
-  let sb = StringBuilder(size_hint=value.length() * 2)
-  // Duplicate keys are rejected; at most 32 members are accepted.
-  let seen : Array[StringView] = []
-  let view = value[:]
-  let len = view.length()
+// Write the normalized form of an already validated `tracestate` value: the
+// members joined by `,` with optional whitespace trimmed.
+fn write_normalized_tracestate(view : StringView, len : Int) -> String {
+  let sb = StringBuilder(size_hint=len * 2)
   let mut count = 0
   let mut start = 0
   while true {
-    if count >= 32 {
-      return None
-    }
     let end = find_code_unit(view, ',', start)
     let item = trim_ows(view.view(start_offset=start, end_offset=end))
-    if item.length() == 0 {
-      return None
-    }
     let eq = find_code_unit(item, '=', 0)
-    if eq >= item.length() {
-      return None
-    }
     let key = trim_ows(item[:eq])
     let member_value = trim_ows(item[eq + 1:])
-    if !is_valid_tracestate_key(key) || !is_valid_tracestate_value(member_value) {
-      return None
-    }
-    for existing in seen {
-      if existing == key {
-        return None
-      }
-    }
-    seen.push(key)
     if count > 0 {
       sb.write_char(',')
     }
@@ -406,5 +378,67 @@ pub fn parse_tracestate(value : String) -> String? {
     }
     start = end + 1
   }
-  Some(sb.to_string())
+  sb.to_string()
+}
+
+// Validate and normalize a `tracestate` header value.
+//
+// The result is the list of members joined by `,` with optional whitespace
+// trimmed. Returns None when the value is empty, has more than 32 members,
+// contains a malformed or duplicate key, or has an invalid value.
+pub fn parse_tracestate(value : String) -> String? {
+  if value == "" {
+    return None
+  }
+  // Duplicate keys are rejected; at most 32 members are accepted.
+  let seen : Array[StringView] = []
+  let view = value[:]
+  let len = view.length()
+  let mut start = 0
+  // When no optional whitespace has to be trimmed, the input is already in
+  // normalized form and can be returned as-is, avoiding the rebuild below.
+  let mut unchanged = true
+  while true {
+    if seen.length() >= 32 {
+      return None
+    }
+    let end = find_code_unit(view, ',', start)
+    let raw_item = view.view(start_offset=start, end_offset=end)
+    let item = trim_ows(raw_item)
+    if item.length() == 0 {
+      return None
+    }
+    if item.length() != raw_item.length() {
+      unchanged = false
+    }
+    let eq = find_code_unit(item, '=', 0)
+    if eq >= item.length() {
+      return None
+    }
+    let raw_key = item[:eq]
+    let key = trim_ows(raw_key)
+    let raw_value = item[eq + 1:]
+    let member_value = trim_ows(raw_value)
+    if key.length() != raw_key.length() || member_value.length() != raw_value.length() {
+      unchanged = false
+    }
+    if !is_valid_tracestate_key(key) || !is_valid_tracestate_value(member_value) {
+      return None
+    }
+    for existing in seen {
+      if existing == key {
+        return None
+      }
+    }
+    seen.push(key)
+    if end == len {
+      break
+    }
+    start = end + 1
+  }
+  if unchanged {
+    Some(value)
+  } else {
+    Some(write_normalized_tracestate(view, len))
+  }
 }

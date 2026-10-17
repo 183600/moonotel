@@ -120,11 +120,7 @@ async fn OtlpHttpAsyncSpanExporter::export_available(
       _ => None
     }
     match next {
-      Some(items) => {
-        for data in items {
-          batch.push(data)
-        }
-      }
+      Some(items) => batch.append(items[:])
       None => break
     }
   }

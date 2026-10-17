@@ -30,7 +30,7 @@ fn ProtoWriter::reserve(self : ProtoWriter, extra : Int) -> Unit {
 fn ProtoWriter::take_scratch(self : ProtoWriter) -> ProtoWriter {
   match self.scratch.pop() {
     Some(buffer) => buffer
-    None => ProtoWriter::with_capacity(32)
+    None => ProtoWriter::with_capacity(128)
   }
 }
 
