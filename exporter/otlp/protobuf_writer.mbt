@@ -185,6 +185,23 @@ fn ProtoWriter::write_string_field(self : ProtoWriter, field : Int, value : Stri
   let buf = self.buf
   let mut pos = self.len
   let mut i = 0
+  // Pack four ASCII code units per 32-bit store; bail out to the generic
+  // path as soon as a non-ASCII code unit shows up.
+  while i + 4 <= len {
+    let c0 = value.unsafe_get(i).to_int()
+    let c1 = value.unsafe_get(i + 1).to_int()
+    let c2 = value.unsafe_get(i + 2).to_int()
+    let c3 = value.unsafe_get(i + 3).to_int()
+    if (c0 | c1 | c2 | c3) >= 0x80 {
+      break
+    }
+    buf.unsafe_write_uint32_le(
+      pos,
+      (c0 | (c1 << 8) | (c2 << 16) | (c3 << 24)).reinterpret_as_uint(),
+    )
+    pos = pos + 4
+    i = i + 4
+  }
   while i < len {
     let code = value.unsafe_get(i).to_int()
     if code >= 0x80 {
@@ -211,6 +228,21 @@ fn ProtoWriter::try_write_ascii_raw(self : ProtoWriter, value : String) -> Bool 
   let buf = self.buf
   let mut pos = self.len
   let mut i = 0
+  while i + 4 <= len {
+    let c0 = value.unsafe_get(i).to_int()
+    let c1 = value.unsafe_get(i + 1).to_int()
+    let c2 = value.unsafe_get(i + 2).to_int()
+    let c3 = value.unsafe_get(i + 3).to_int()
+    if (c0 | c1 | c2 | c3) >= 0x80 {
+      return false
+    }
+    buf.unsafe_write_uint32_le(
+      pos,
+      (c0 | (c1 << 8) | (c2 << 16) | (c3 << 24)).reinterpret_as_uint(),
+    )
+    pos = pos + 4
+    i = i + 4
+  }
   while i < len {
     let code = value.unsafe_get(i).to_int()
     if code >= 0x80 {
