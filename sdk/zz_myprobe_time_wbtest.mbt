@@ -1,5 +1,3 @@
-// Probe: cost of the wall clock the SDK uses for span timestamps.
-
 ///|
 test "zz_myprobe_time_wb" (b : @bench.T) {
   b.bench(fn() {

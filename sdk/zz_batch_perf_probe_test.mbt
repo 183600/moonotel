@@ -1,6 +1,3 @@
-// Probe: spans handed to a full BatchSpanProcessor with no timed flush due.
-// The processor should not need a second wall-clock read for every span end.
-
 ///|
 test "zz_batch_on_end_clock" (b : @bench.T) {
   let exporter = NullExporter::{ }

@@ -1,5 +1,3 @@
-// Probe: encoded size of the bulk span set used by the benches.
-
 ///|
 test "zz_myprobe_size_wb" {
   let trace_id = @api.span_context(

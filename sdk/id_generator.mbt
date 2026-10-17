@@ -48,8 +48,7 @@ fn pseudo_random_bytes(n : Int, state : Ref[UInt64]) -> Array[Int] {
   out
 }
 
-// Bytes requested from the entropy source per draw (enough for 80 trace IDs
-// plus their span IDs).
+// Bytes requested from the entropy source per draw.
 const RANDOM_DRAW_BYTES : Int = 1920
 
 // Consume `n` bytes from the buffered draw, if enough remain.

@@ -1,5 +1,3 @@
-// Bulk encoder probe: cost contribution of attributes and events per span.
-
 ///|
 fn probe_spans64(
   trace_id : @api.SpanContext,

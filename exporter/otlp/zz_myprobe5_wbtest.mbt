@@ -1,5 +1,3 @@
-// Probe: true Map iteration cost with non-eliminable side effects.
-
 ///|
 test "zz_myprobe_map_wb" (b : @bench.T) {
   let attrs : Map[String, @sdk.AttributeValue] = Map([

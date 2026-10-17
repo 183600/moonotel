@@ -434,8 +434,7 @@ pub fn parse_tracestate(value : String) -> String? {
   let view = value[:]
   let len = view.length()
   let mut start = 0
-  // When no optional whitespace has to be trimmed, the input is already in
-  // normalized form and can be returned as-is.
+  // Set when any item needed optional whitespace trimmed.
   let mut unchanged = true
   while true {
     if member_count >= 32 {

@@ -1,6 +1,3 @@
-// Probe: cost of the two clock wrappers used by the SDK (results are
-// loop-carried so the calls cannot be optimized away).
-
 ///|
 test "zz_myprobe_ffi_wb" (b : @bench.T) {
   let mut acc = 0

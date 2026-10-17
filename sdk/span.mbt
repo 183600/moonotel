@@ -85,9 +85,8 @@ fn unix_nano_now() -> Int64 {
 }
 
 // Wall-clock milliseconds read by the span `end` call that is currently
-// notifying processors. `end_clock_fresh` is set only for the duration of that
-// notification, so processors can reuse the clock value instead of reading it
-// again; when it is false the clock has to be read normally.
+// notifying processors. `end_clock_fresh` is true only while that
+// notification runs.
 
 ///|
 let end_clock_millis : Ref[UInt64] = Ref(0)
@@ -95,8 +94,7 @@ let end_clock_millis : Ref[UInt64] = Ref(0)
 ///|
 let end_clock_fresh : Ref[Bool] = Ref(false)
 
-// The current wall-clock milliseconds. Reuses the just-read value when called
-// from the processor notification of a span `end` that read the clock.
+// The current wall-clock milliseconds.
 
 ///|
 fn current_millis() -> UInt64 {

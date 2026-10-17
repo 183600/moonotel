@@ -111,10 +111,10 @@ fn write_scalar_attribute_header(
   writer.write_varint(key_len.to_uint64())
 }
 
-// Encode one scalar attribute directly into `writer`, skipping the KeyValue
-// scratch buffer. Strings are assumed to be ASCII (one byte per code unit);
-// when a non-ASCII code unit shows up the partial write is rolled back and
-// false is returned so the caller can use the generic path.
+// Encode one scalar attribute directly into `writer`. Strings are assumed to
+// be ASCII (one byte per code unit); when a non-ASCII code unit shows up the
+// partial write is rolled back and false is returned so the caller can use
+// the generic path.
 fn try_encode_scalar_attribute(
   writer : ProtoWriter,
   field : Int,
