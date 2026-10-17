@@ -272,14 +272,13 @@ fn limited_attributes(
 ) -> (Map[String, AttributeValue], Int) {
   let kept : Map[String, AttributeValue] = Map([])
   let mut dropped = 0
-  for entry in attributes.iter() {
-    let (key, value) = entry
+  attributes.each(fn(key, value) {
     if within_limit(kept.length(), count_limit) {
       kept.set(key, truncate_attribute_value(value, value_length_limit))
     } else {
       dropped = dropped + 1
     }
-  }
+  })
   (kept, dropped)
 }
 
@@ -476,10 +475,9 @@ pub fn SpanSdk::set_attributes(
         self.attributes = Some(Map([], capacity=budget * 2))
       }
     }
-    for entry in attributes.iter() {
-      let (key, value) = entry
+    attributes.each(fn(key, value) {
       self.set_attribute_limited(key, value)
-    }
+    })
   }
 }
 

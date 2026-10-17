@@ -184,10 +184,7 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
   match @env.get_env_var("OTEL_EXPORTER_OTLP_TRACES_HEADERS") {
     Some(value) => {
       let specific = parse_headers(value)
-      for entry in specific.iter() {
-        let (key, header_value) = entry
-        headers.set(key, header_value)
-      }
+      specific.each(fn(key, header_value) { headers.set(key, header_value) })
     }
     None => ()
   }
@@ -312,10 +309,7 @@ pub fn OtlpHttpExporter::config(self : OtlpHttpExporter) -> OtlpHttpConfig {
 ///|
 fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
   let headers = Map([])
-  for entry in config.headers.iter() {
-    let (key, value) = entry
-    headers.set(key, value)
-  }
+  config.headers.each(fn(key, value) { headers.set(key, value) })
   headers.set("content-type", "application/x-protobuf")
   headers
 }

@@ -186,22 +186,10 @@ fn ProtoWriter::write_string_field(self : ProtoWriter, field : Int, value : Stri
   self.len = pos
 }
 
-// Whether every code unit of `value` is ASCII, in which case its UTF-8
-// encoding is one byte per code unit.
-fn is_ascii(value : String) -> Bool {
-  let len = value.length()
-  let mut i = 0
-  while i < len {
-    if value.unsafe_get(i).to_int() >= 0x80 {
-      return false
-    }
-    i = i + 1
-  }
-  true
-}
-
-// Write the bytes of an ASCII string without a tag or length prefix.
-fn ProtoWriter::write_ascii_raw(self : ProtoWriter, value : String) -> Unit {
+// Write the bytes of an ASCII string without a tag or length prefix. On the
+// first non-ASCII code unit nothing is committed (`len` is left unchanged)
+// and `false` is returned, so the caller can fall back to UTF-8 encoding.
+fn ProtoWriter::try_write_ascii_raw(self : ProtoWriter, value : String) -> Bool {
   let len = value.length()
   if self.len + len > self.buf.length() {
     self.reserve(len)
@@ -210,11 +198,16 @@ fn ProtoWriter::write_ascii_raw(self : ProtoWriter, value : String) -> Unit {
   let mut pos = self.len
   let mut i = 0
   while i < len {
-    buf.unsafe_set(pos, value.unsafe_get(i).to_int().to_byte())
+    let code = value.unsafe_get(i).to_int()
+    if code >= 0x80 {
+      return false
+    }
+    buf.unsafe_set(pos, code.to_byte())
     pos = pos + 1
     i = i + 1
   }
   self.len = pos
+  true
 }
 
 // Append an already encoded nested message with a length prefix, releasing

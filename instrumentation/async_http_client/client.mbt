@@ -163,10 +163,9 @@ fn plain_headers(
   let out = Map([])
   match headers {
     Some(values) =>
-      for entry in values.iter() {
-        let (key, value) = entry
+      values.each(fn(key, value) {
         out.set(@http.CaseInsensitiveString(key), value)
-      }
+      })
     None => ()
   }
   out

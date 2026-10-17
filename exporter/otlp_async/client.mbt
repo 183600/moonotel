@@ -23,10 +23,9 @@ fn request_headers(
   gzip : Bool,
 ) -> Map[@http.CaseInsensitiveString, String] {
   let headers = Map([])
-  for entry in config.headers.iter() {
-    let (key, value) = entry
+  config.headers.each(fn(key, value) {
     headers.set(@http.CaseInsensitiveString(key), value)
-  }
+  })
   headers.set(
     @http.CaseInsensitiveString("content-type"),
     "application/x-protobuf",

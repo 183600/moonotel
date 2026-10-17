@@ -95,25 +95,26 @@ fn encode_attributes(
   field : Int32,
   attributes : Map[String, @sdk.AttributeValue],
 ) -> Unit {
-  for entry in attributes.iter() {
-    let (key, value) = entry
+  attributes.each(fn(key, value) {
     let kv = writer.take_scratch()
     kv.write_string_field(1, key)
     match value {
       @sdk.StringValue(text) => {
-        // Encode the nested `AnyValue { string_value: text }`.
+        // Encode the nested `AnyValue { string_value: text }`. Assume ASCII
+        // (one byte per code unit); when a non-ASCII code unit shows up the
+        // partial write is rolled back and the UTF-8 encoding is emitted.
         kv.write_tag(2, 2)
-        if is_ascii(text) {
-          let payload_len = text.length()
-          let inner_len = 1 + varint_size(payload_len.to_uint64()) + payload_len
-          kv.write_varint(inner_len.to_uint64())
-          kv.write_tag(1, 2)
-          kv.write_varint(payload_len.to_uint64())
-          kv.write_ascii_raw(text)
-        } else {
+        let mark = kv.len
+        let payload_len = text.length()
+        let inner_len = 1 + varint_size(payload_len.to_uint64()) + payload_len
+        kv.write_varint(inner_len.to_uint64())
+        kv.write_tag(1, 2)
+        kv.write_varint(payload_len.to_uint64())
+        if !kv.try_write_ascii_raw(text) {
+          kv.len = mark
           let encoded = @utf8.encode(text)
-          let payload_len = encoded.length()
-          let inner_len = 1 + varint_size(payload_len.to_uint64()) + payload_len
+          let encoded_len = encoded.length()
+          let inner_len = 1 + varint_size(encoded_len.to_uint64()) + encoded_len
           kv.write_varint(inner_len.to_uint64())
           kv.write_tag(1, 2)
           kv.write_bytes(encoded)
@@ -144,7 +145,7 @@ fn encode_attributes(
       }
     }
     writer.append_message(field, kv)
-  }
+  })
 }
 
 ///|
@@ -328,9 +329,7 @@ fn resource_key_value(sb : StringBuilder, value : @sdk.AttributeValue) -> Unit {
 ///|
 fn resource_key(resource : Map[String, @sdk.AttributeValue]) -> String {
   let keys : Array[String] = []
-  for entry in resource.iter() {
-    keys.push(entry.0)
-  }
+  resource.each(fn(key, _value) { keys.push(key) })
   keys.sort()
   let sb = StringBuilder()
   for key in keys {

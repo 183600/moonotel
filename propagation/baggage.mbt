@@ -309,53 +309,55 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
 // The chain is walked once, collecting the innermost value of every key.
 pub fn context_baggage_header(context : @context.Context) -> String? {
   let mut entries : Array[(String, String)]? = None
-  let mut seen : Map[String, Bool]? = None
+  let mut seen : Array[String]? = None
   let mut first_key : String? = None
   let mut cursor : @context.Context? = Some(context)
   while true {
     match cursor {
       Some(node) => {
         match node.key {
-          Some(key) =>
+          Some(key) => {
+            // `insert` stays true when this is the first (innermost) occurrence
+            // of `key` in the chain; later occurrences are hidden.
+            let mut insert = true
             match seen {
-              Some(keys) =>
-                if keys.get(key) is None {
-                  keys.set(key, true)
-                  match node.value {
-                    Some(value) =>
-                      match entries {
-                        Some(list) => list.push((key, value))
-                        None => entries = Some([(key, value)])
-                      }
-                    None => ()
+              Some(keys) => {
+                let mut i = 0
+                let n = keys.length()
+                while i < n {
+                  if keys.unsafe_get(i) == key {
+                    insert = false
+                    break
                   }
+                  i = i + 1
                 }
+                if insert {
+                  keys.push(key)
+                }
+              }
               None =>
                 match first_key {
                   Some(existing) =>
-                    if existing != key {
-                      let keys : Map[String, Bool] = Map([])
-                      keys.set(existing, true)
-                      keys.set(key, true)
+                    if existing == key {
+                      insert = false
+                    } else {
+                      let keys : Array[String] = [existing, key]
                       seen = Some(keys)
-                      match node.value {
-                        Some(value) =>
-                          match entries {
-                            Some(list) => list.push((key, value))
-                            None => entries = Some([(key, value)])
-                          }
-                        None => ()
-                      }
                     }
-                  None => {
-                    first_key = Some(key)
-                    match node.value {
-                      Some(value) => entries = Some([(key, value)])
-                      None => ()
-                    }
-                  }
+                  None => first_key = Some(key)
                 }
             }
+            if insert {
+              match node.value {
+                Some(value) =>
+                  match entries {
+                    Some(list) => list.push((key, value))
+                    None => entries = Some([(key, value)])
+                  }
+                None => ()
+              }
+            }
+          }
           None => ()
         }
         cursor = node.parent
@@ -367,7 +369,9 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
     Some(list) => list
     None => return None
   }
-  entries.sort_by(fn(a, b) { a.0.compare(b.0) })
+  if entries.length() > 1 {
+    entries.sort_by(fn(a, b) { a.0.compare(b.0) })
+  }
   let formatted = format_baggage(entries)
   if formatted == "" {
     None

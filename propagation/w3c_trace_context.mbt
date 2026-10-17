@@ -342,30 +342,24 @@ fn is_valid_tracestate_key(key : StringView) -> Bool {
   if len == 0 || len > 256 {
     return false
   }
+  // Validate the character set and locate the (at most one) `@` in one pass.
   let mut at = -1
   let mut i = 0
   while i < len {
-    if key.unsafe_get(i).unsafe_to_char() == '@' {
+    let c = key.unsafe_get(i).unsafe_to_char()
+    if c == '@' {
       if at >= 0 {
         // At most one `@` per key.
         return false
       }
       at = i
+    } else if !is_tracestate_key_tail(c) {
+      return false
     }
     i = i + 1
   }
   if at < 0 {
-    if !is_lcalpha(key.unsafe_get(0).unsafe_to_char()) {
-      return false
-    }
-    let mut j = 1
-    while j < len {
-      if !is_tracestate_key_tail(key.unsafe_get(j).unsafe_to_char()) {
-        return false
-      }
-      j = j + 1
-    }
-    true
+    is_lcalpha(key.unsafe_get(0).unsafe_to_char())
   } else {
     let tenant_len = at
     let system_len = len - at - 1
@@ -376,24 +370,7 @@ fn is_valid_tracestate_key(key : StringView) -> Bool {
     if !is_lcalpha(first) && !is_digit_char(first) {
       return false
     }
-    let mut j = 1
-    while j < at {
-      if !is_tracestate_key_tail(key.unsafe_get(j).unsafe_to_char()) {
-        return false
-      }
-      j = j + 1
-    }
-    if !is_lcalpha(key.unsafe_get(at + 1).unsafe_to_char()) {
-      return false
-    }
-    let mut k = at + 2
-    while k < len {
-      if !is_tracestate_key_tail(key.unsafe_get(k).unsafe_to_char()) {
-        return false
-      }
-      k = k + 1
-    }
-    true
+    is_lcalpha(key.unsafe_get(at + 1).unsafe_to_char())
   }
 }
 
