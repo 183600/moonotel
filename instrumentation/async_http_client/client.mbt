@@ -93,9 +93,9 @@ fn is_alpha(c : Char) -> Bool {
   (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
 }
 
-// Split an absolute URL into (scheme, host, port) in a single pass. The scheme
-// is "" when the URL has no valid scheme; the port falls back to the scheme
-// default when it is not explicit; malformed URLs yield `(host, -1)`.
+// Split an absolute URL into (scheme, host, port). The scheme is "" when the
+// URL has no valid scheme; the port falls back to the scheme default when it
+// is not explicit; malformed URLs yield `(host, -1)`.
 fn split_url_parts(url : String) -> (String, String, Int) {
   let scheme_index = url.find("://")
   let scheme = match scheme_index {

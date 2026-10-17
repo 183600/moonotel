@@ -209,9 +209,8 @@ fn write_percent_encoded(sb : StringBuilder, code : Int) -> Unit {
 // Append the percent-encoded form of `value` to `sb`.
 fn write_percent_encode(sb : StringBuilder, value : String) -> Unit {
   let len = value.length()
-  // ASCII text is encoded from its code units in a single pass; when a
-  // non-ASCII code unit shows up the already-written ASCII prefix is a valid
-  // UTF-8 prefix, so only the remainder is encoded as UTF-8.
+  // ASCII text is encoded from its code units; once a non-ASCII code unit is
+  // found the remainder is encoded as UTF-8.
   let mut i = 0
   while i < len {
     let code = value.unsafe_get(i).to_int()
@@ -246,8 +245,8 @@ pub fn percent_encoded_length(value : String) -> Int {
   let len = value.length()
   let mut total = 0
   let mut i = 0
-  // ASCII text is measured in a single pass; non-ASCII text is measured on
-  // its UTF-8 bytes from the start.
+  // ASCII text is measured from its code units; non-ASCII text on its UTF-8
+  // bytes.
   while i < len {
     let code = value.unsafe_get(i).to_int()
     if code >= 0x80 {
@@ -294,7 +293,7 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
       break
     }
     // Find the member end (the next `,`) together with the first `;` (which
-    // starts the properties) and the first `=` before it in a single pass.
+    // starts the properties) and the first `=` before it.
     let mut end = start
     let mut eq = -1
     let mut semi = -1

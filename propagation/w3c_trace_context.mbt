@@ -342,7 +342,7 @@ fn is_valid_tracestate_key(key : StringView) -> Bool {
   if len == 0 || len > 256 {
     return false
   }
-  // Validate the character set and locate the (at most one) `@` in one pass.
+  // Validate the character set and locate the (at most one) `@`.
   let mut at = -1
   let mut i = 0
   while i < len {
@@ -444,8 +444,7 @@ pub fn parse_tracestate(value : String) -> String? {
     if member_count >= 32 {
       return None
     }
-    // Find the member end (the next `,`) together with the first `=` in a
-    // single pass.
+    // Find the member end (the next `,`) together with the first `=`.
     let mut end = start
     let mut eq = -1
     while end < len {

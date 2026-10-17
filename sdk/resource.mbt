@@ -170,8 +170,8 @@ pub fn Resource::attributes(
   copy_attributes(self.attributes)
 }
 
-// The attribute map backing this resource, shared with the caller. Spans
-// attach it without copying; callers must not mutate it.
+// The attribute map backing this resource, shared with the caller. Callers
+// must not mutate it.
 fn Resource::attributes_shared(
   self : Resource
 ) -> Map[String, AttributeValue] {

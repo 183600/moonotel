@@ -114,9 +114,8 @@ fn split_path_query(path : String) -> (String, String) {
 
 // Parse the incoming W3C context of a request: `traceparent` (with a valid
 // `tracestate`) and `baggage`. Request headers are already keyed
-// case-insensitively; the headers are parsed directly instead of being copied
-// into a carrier, and requests without trace context or baggage skip the
-// parsing altogether.
+// case-insensitively; a request without trace context or baggage yields the
+// root context.
 
 ///|
 fn extract_context_with_baggage(

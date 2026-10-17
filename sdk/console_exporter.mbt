@@ -28,7 +28,7 @@ fn hex_nibble_char(value : Int) -> Char {
 }
 
 // Append the hex form of an `Int32` byte array, matching `@api.bytes_to_hex`
-// (which takes `Array[Int]`) without copying the array first.
+// (which takes `Array[Int]`).
 fn write_int32_hex(out : StringBuilder, bytes : Array[Int32]) -> Unit {
   for byte in bytes {
     let value = byte & 0xFF
