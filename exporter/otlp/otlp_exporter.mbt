@@ -167,8 +167,16 @@ fn parse_headers(value : String) -> Map[String, String] {
 
 ///|
 pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
-  let traces_endpoint = @env.get_env_var("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
-  let generic_endpoint = @env.get_env_var("OTEL_EXPORTER_OTLP_ENDPOINT")
+  // An empty (or blank) environment variable is treated as unset.
+  let traces_endpoint = match
+    @env.get_env_var("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") {
+    Some(value) => if value.trim() != "" { Some(value) } else { None }
+    None => None
+  }
+  let generic_endpoint = match @env.get_env_var("OTEL_EXPORTER_OTLP_ENDPOINT") {
+    Some(value) => if value.trim() != "" { Some(value) } else { None }
+    None => None
+  }
   let endpoint = match generic_endpoint {
     Some(value) => value
     None =>
@@ -246,7 +254,7 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
 
 ///|
 fn parse_timeout(value : String) -> Int32 {
-  let parsed = @string.parse_int(value) catch { _ => 0 }
+  let parsed = @string.parse_int(value.trim()) catch { _ => 0 }
   if parsed > 0 {
     parsed
   } else {

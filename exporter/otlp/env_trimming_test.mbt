@@ -33,6 +33,46 @@ test "blank_generic_protocol_falls_back_to_default" {
   assert_eq(config.protocol, "http/protobuf")
 }
 
+test "blank_endpoints_fall_back_to_default" {
+  unset_otlp_env()
+  @env.set_env_var("OTEL_EXPORTER_OTLP_ENDPOINT", "   ")
+  @env.set_env_var("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "\t")
+  let config = @otlp.OtlpHttpConfig::from_env()
+  unset_otlp_env()
+  assert_eq(config.endpoint, "http://localhost:4318")
+  assert_eq(config.traces_endpoint, None)
+  assert_eq(config.traces_url(), "http://localhost:4318/v1/traces")
+}
+
+test "blank_generic_endpoint_keeps_traces_endpoint" {
+  unset_otlp_env()
+  @env.set_env_var("OTEL_EXPORTER_OTLP_ENDPOINT", " ")
+  @env.set_env_var(
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    "http://specific:4318/custom/traces",
+  )
+  let config = @otlp.OtlpHttpConfig::from_env()
+  unset_otlp_env()
+  assert_eq(config.traces_endpoint, Some("http://specific:4318/custom/traces"))
+  assert_eq(config.traces_url(), "http://specific:4318/custom/traces")
+}
+
+test "timeout_is_trimmed_before_parsing" {
+  unset_otlp_env()
+  @env.set_env_var("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", " 2500 ")
+  let config = @otlp.OtlpHttpConfig::from_env()
+  unset_otlp_env()
+  assert_eq(config.timeout_millis, 2500)
+}
+
+test "blank_timeout_falls_back_to_default" {
+  unset_otlp_env()
+  @env.set_env_var("OTEL_EXPORTER_OTLP_TIMEOUT", "  ")
+  let config = @otlp.OtlpHttpConfig::from_env()
+  unset_otlp_env()
+  assert_eq(config.timeout_millis, 10000)
+}
+
 test "header_without_equals_is_skipped" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_HEADERS", "novalue,x=1")
