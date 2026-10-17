@@ -13,6 +13,36 @@
 ///|
 const INSTRUMENTATION_SCOPE : String = "yourname/otel/instrumentation/async_http_server"
 
+// Immutable attribute values reused by every request so that the constant
+// semantic-convention attributes do not allocate per request.
+let protocol_name_http : @sdk.AttributeValue = @sdk.StringValue("http")
+let protocol_version_http_1_1 : @sdk.AttributeValue = @sdk.StringValue("1.1")
+let url_scheme_http : @sdk.AttributeValue = @sdk.StringValue("http")
+let method_get : @sdk.AttributeValue = @sdk.StringValue("GET")
+let method_head : @sdk.AttributeValue = @sdk.StringValue("HEAD")
+let method_post : @sdk.AttributeValue = @sdk.StringValue("POST")
+let method_put : @sdk.AttributeValue = @sdk.StringValue("PUT")
+let method_delete : @sdk.AttributeValue = @sdk.StringValue("DELETE")
+let method_connect : @sdk.AttributeValue = @sdk.StringValue("CONNECT")
+let method_options : @sdk.AttributeValue = @sdk.StringValue("OPTIONS")
+let method_trace : @sdk.AttributeValue = @sdk.StringValue("TRACE")
+let method_patch : @sdk.AttributeValue = @sdk.StringValue("PATCH")
+
+///|
+fn method_attribute_value(request_method : @http.RequestMethod) -> @sdk.AttributeValue {
+  match request_method {
+    Get => method_get
+    Head => method_head
+    Post => method_post
+    Put => method_put
+    Delete => method_delete
+    Connect => method_connect
+    Options => method_options
+    Trace => method_trace
+    Patch => method_patch
+  }
+}
+
 ///|
 fn default_tracer() -> @sdk.Tracer? {
   match @sdk.global_tracer_provider() {
@@ -260,6 +290,55 @@ pub fn ServerCall::start_span(
   }
 }
 
+///|
+fn is_http_ows(c : Char) -> Bool {
+  c == ' ' || c == '\t' || c == '\n' || c == '\r'
+}
+
+// Whether the five code units at `start` spell `close` ignoring ASCII case.
+///|
+fn is_close_token_at(value : String, start : Int) -> Bool {
+  (value.unsafe_get(start).to_int() | 32) == 99 &&
+  (value.unsafe_get(start + 1).to_int() | 32) == 108 &&
+  (value.unsafe_get(start + 2).to_int() | 32) == 111 &&
+  (value.unsafe_get(start + 3).to_int() | 32) == 115 &&
+  (value.unsafe_get(start + 4).to_int() | 32) == 101
+}
+
+// Whether a comma-separated `Connection` header value contains the token
+// `close` (case-insensitive, optional whitespace ignored). Equivalent to
+// `value.split(",")` plus `trim`/`to_lower`, without the allocations.
+///|
+fn has_close_token(value : String) -> Bool {
+  let len = value.length()
+  let mut start = 0
+  while start <= len {
+    let mut token_start = start
+    while token_start < len &&
+      is_http_ows(value.unsafe_get(token_start).unsafe_to_char()) {
+      token_start = token_start + 1
+    }
+    let mut end = token_start
+    while end < len && value.unsafe_get(end).unsafe_to_char() != ',' {
+      end = end + 1
+    }
+    let mut token_end = end
+    while token_end > token_start &&
+      is_http_ows(value.unsafe_get(token_end - 1).unsafe_to_char()) {
+      token_end = token_end - 1
+    }
+    if token_end - token_start == 5 &&
+      is_close_token_at(value, token_start) {
+      return true
+    }
+    if end >= len {
+      return false
+    }
+    start = end + 1
+  }
+  false
+}
+
 // Whether the request asked for the connection to be closed once the
 // response has been sent (`Connection: close`). Handlers that bypass
 // `respond` can use this to decide whether to call
@@ -268,14 +347,7 @@ pub fn ServerCall::start_span(
 ///|
 pub fn ServerCall::connection_close_requested(self : ServerCall) -> Bool {
   match self.request.headers.get(@http.CaseInsensitiveString("connection")) {
-    Some(value) => {
-      for token in value.split(",") {
-        if token.trim().to_lower() == "close" {
-          return true
-        }
-      }
-      false
-    }
+    Some(value) => has_close_token(value)
     None => false
   }
 }
@@ -408,17 +480,17 @@ pub async fn run_server_on(
         Some(server_span) => {
           server_span.set_attribute(
             @sdk.HTTP_REQUEST_METHOD,
-            @sdk.StringValue(method_name),
+            method_attribute_value(request.meth),
           )
-          server_span.set_attribute(@sdk.URL_SCHEME, @sdk.StringValue("http"))
+          server_span.set_attribute(@sdk.URL_SCHEME, url_scheme_http)
           server_span.set_attribute(
             @sdk.NETWORK_PROTOCOL_NAME,
-            @sdk.StringValue("http"),
+            protocol_name_http,
           )
           // `moonbitlang/async/http` speaks HTTP/1.1 only.
           server_span.set_attribute(
             @sdk.NETWORK_PROTOCOL_VERSION,
-            @sdk.StringValue("1.1"),
+            protocol_version_http_1_1,
           )
           let (path, query) = split_path_query(request.path)
           server_span.set_attribute(@sdk.URL_PATH, @sdk.StringValue(path))

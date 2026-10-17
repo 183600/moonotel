@@ -29,7 +29,10 @@ test "tick_flushes_after_interval_elapsed" {
     flush_interval_millis=1,
   )
   processor.on_end(probe_span("s0"))
-  assert_eq(exporter.names.length(), 0)
+  // With a 1ms interval the span may already have been exported by `on_end`
+  // when the interval elapsed between construction and the call; either way
+  // exactly one copy must be pending or exported, never lost or duplicated.
+  assert_eq(processor.queue_size() + exporter.names.length(), 1)
   wait_millis(5)
   processor.tick()
   assert_eq(processor.queue_size(), 0)

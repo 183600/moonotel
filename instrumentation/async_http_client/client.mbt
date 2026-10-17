@@ -11,6 +11,34 @@
 
 const INSTRUMENTATION_SCOPE : String = "yourname/otel/instrumentation/async_http_client"
 
+// Immutable attribute values reused by every request so that the constant
+// semantic-convention attributes do not allocate per request.
+let protocol_name_http : @sdk.AttributeValue = @sdk.StringValue("http")
+let protocol_version_http_1_1 : @sdk.AttributeValue = @sdk.StringValue("1.1")
+let method_get : @sdk.AttributeValue = @sdk.StringValue("GET")
+let method_head : @sdk.AttributeValue = @sdk.StringValue("HEAD")
+let method_post : @sdk.AttributeValue = @sdk.StringValue("POST")
+let method_put : @sdk.AttributeValue = @sdk.StringValue("PUT")
+let method_delete : @sdk.AttributeValue = @sdk.StringValue("DELETE")
+let method_connect : @sdk.AttributeValue = @sdk.StringValue("CONNECT")
+let method_options : @sdk.AttributeValue = @sdk.StringValue("OPTIONS")
+let method_trace : @sdk.AttributeValue = @sdk.StringValue("TRACE")
+let method_patch : @sdk.AttributeValue = @sdk.StringValue("PATCH")
+
+fn method_attribute_value(request_method : @http.RequestMethod) -> @sdk.AttributeValue {
+  match request_method {
+    Get => method_get
+    Head => method_head
+    Post => method_post
+    Put => method_put
+    Delete => method_delete
+    Connect => method_connect
+    Options => method_options
+    Trace => method_trace
+    Patch => method_patch
+  }
+}
+
 fn default_tracer() -> @sdk.Tracer? {
   match @sdk.global_tracer_provider() {
     Some(provider) => Some(provider.get_tracer(INSTRUMENTATION_SCOPE))
@@ -109,11 +137,17 @@ fn split_url_parts(url : String) -> (String, String, Int) {
   let default_port = if scheme == "https" { 443 } else { 80 }
   // The authority ends at the first `/` (path), `?` (query) or `#` (fragment).
   let mut authority_end = after_scheme.length()
-  for delimiter in ["/", "?", "#"] {
-    match after_scheme.find(delimiter) {
-      Some(index) => if index < authority_end { authority_end = index }
-      None => ()
-    }
+  match after_scheme.find("/") {
+    Some(index) => authority_end = index
+    None => ()
+  }
+  match after_scheme.find("?") {
+    Some(index) => if index < authority_end { authority_end = index }
+    None => ()
+  }
+  match after_scheme.find("#") {
+    Some(index) => if index < authority_end { authority_end = index }
+    None => ()
   }
   let authority = after_scheme[:authority_end]
   let host_port = match authority.rev_find("@") {
@@ -234,11 +268,17 @@ pub async fn request(
         parent?=request_context.span_context(),
       )
       defer span.end()
-      span.set_attribute(@sdk.HTTP_REQUEST_METHOD, @sdk.StringValue(method_name))
+      span.set_attribute(
+        @sdk.HTTP_REQUEST_METHOD,
+        method_attribute_value(request_method),
+      )
       span.set_attribute(@sdk.URL_FULL, @sdk.StringValue(url))
-      span.set_attribute(@sdk.NETWORK_PROTOCOL_NAME, @sdk.StringValue("http"))
+      span.set_attribute(@sdk.NETWORK_PROTOCOL_NAME, protocol_name_http)
       // `moonbitlang/async/http` speaks HTTP/1.1 only.
-      span.set_attribute(@sdk.NETWORK_PROTOCOL_VERSION, @sdk.StringValue("1.1"))
+      span.set_attribute(
+        @sdk.NETWORK_PROTOCOL_VERSION,
+        protocol_version_http_1_1,
+      )
       let (scheme, host, port) = split_url_parts(url)
       if scheme != "" {
         span.set_attribute(@sdk.URL_SCHEME, @sdk.StringValue(scheme))

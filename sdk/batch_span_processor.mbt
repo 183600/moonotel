@@ -17,13 +17,39 @@ pub struct BatchSpanProcessor {
   flush_interval_millis : Int
   // Fixed-capacity ring buffer: `head` is the index of the oldest buffered
   // span and `count` is how many spans are live. Once full, the oldest span is
-  // overwritten in place.
+  // overwritten in place; consumed slots are reset to `empty_slot` so exported
+  // spans are not kept alive by the buffer.
   queue : Array[SpanData]
+  empty_slot : SpanData
   mut head : Int
   mut count : Int
   mut last_flush_time_millis : UInt64
   mut shutdown_called : Bool
   mut dropped_spans : UInt64
+}
+
+// Placeholder written over consumed queue slots so the ring buffer does not
+// keep exported spans (and their attribute maps) reachable.
+fn empty_span_data() -> SpanData {
+  {
+    name: "",
+    span_context: @api.invalid_span_context(),
+    parent_span_id: [],
+    kind: @api.SpanKind::Internal,
+    start_time_unix_nano: 0L,
+    end_time_unix_nano: 0L,
+    attributes: Map([]),
+    events: [],
+    links: [],
+    dropped_attributes_count: 0,
+    dropped_events_count: 0,
+    dropped_links_count: 0,
+    status: @api.StatusCode::Unset,
+    status_description: "",
+    resource: Map([]),
+    scope_name: "",
+    scope_version: "",
+  }
 }
 
 // Create a batch processor. Defaults: queue size 2048, batch size 512,
@@ -43,6 +69,7 @@ pub fn BatchSpanProcessor::new(
     max_export_batch_size: if batch_size < 1 { 1 } else { batch_size },
     flush_interval_millis: if interval < 0 { 0 } else { interval },
     queue: [],
+    empty_slot: empty_span_data(),
     head: 0,
     count: 0,
     last_flush_time_millis: @env.now(),
@@ -143,11 +170,13 @@ fn BatchSpanProcessor::flush_batch_at(
   }
   let capacity = self.max_queue_size
   let queue = self.queue
-  let batch : Array[SpanData] = Array(capacity=n)
+  let empty = self.empty_slot
+  let batch : Array[SpanData] = Array::unsafe_make_uninit(n)
   let mut index = self.head
   let mut i = 0
   while i < n {
-    batch.push(queue.unsafe_get(index))
+    batch.unsafe_set(i, queue.unsafe_get(index))
+    queue.unsafe_set(index, empty)
     index = index + 1
     if index >= capacity {
       index = 0

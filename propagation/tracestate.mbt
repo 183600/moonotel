@@ -122,7 +122,11 @@ pub fn Tracestate::entries(self : Tracestate) -> Array[(String, String)] {
 
 // Render the list as a `tracestate` header value. The empty list yields "".
 pub fn Tracestate::to_header(self : Tracestate) -> String {
-  let sb = StringBuilder()
+  let mut size_hint = 0
+  for entry in self.members {
+    size_hint = size_hint + entry.0.length() + entry.1.length() + 1
+  }
+  let sb = StringBuilder(size_hint=size_hint)
   let mut count = 0
   for entry in self.members {
     if count > 0 {
