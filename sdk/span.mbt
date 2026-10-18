@@ -247,23 +247,34 @@ fn truncate_string(value : String, limit : Int32) -> String {
   if len <= limit {
     return value
   }
-  let end = if limit <= 0 {
-    0
-  } else {
-    let last = value.unsafe_get(limit - 1).to_int()
-    if last >= 0xD800 && last <= 0xDBFF {
-      // The character at `limit` is a high surrogate: keep the whole pair
-      // when its low surrogate follows, otherwise drop the lone surrogate.
-      if limit < len &&
-        value.unsafe_get(limit).to_int() >= 0xDC00 &&
-        value.unsafe_get(limit).to_int() <= 0xDFFF {
-        limit + 1
-      } else {
-        limit - 1
-      }
+  if limit == 0 {
+    return ""
+  }
+  // Walk `limit` characters, keeping a surrogate pair together so the cut
+  // never splits one.
+  let mut end = 0
+  let mut count : Int32 = 0
+  while count < limit && end < len {
+    let unit = value.unsafe_get(end).to_int()
+    if unit >= 0xD800 &&
+      unit <= 0xDBFF &&
+      end + 1 < len &&
+      value.unsafe_get(end + 1).to_int() >= 0xDC00 &&
+      value.unsafe_get(end + 1).to_int() <= 0xDFFF {
+      end = end + 2
     } else {
-      limit
+      end = end + 1
     }
+    count = count + 1
+  }
+  if end >= len {
+    return value
+  }
+  let last = value.unsafe_get(end - 1).to_int()
+  if last >= 0xD800 && last <= 0xDBFF {
+    // The value ends on a lone high surrogate: drop it instead of keeping
+    // half of a pair.
+    end = end - 1
   }
   value[:end].to_owned()
 }

@@ -227,6 +227,20 @@ test "attribute_value_length_limit_never_splits_a_surrogate_pair" {
 }
 
 ///|
+test "attribute_value_length_limit_counts_code_points" {
+  let span = limit_test_span(
+    @sdk.SpanLimits::new(attribute_value_length_limit=3),
+  )
+  span.set_attribute("fits", @sdk.StringValue("a😀b"))
+  span.set_attribute("truncated", @sdk.StringValue("a😀bc"))
+  assert_eq(span.attributes().get("fits"), Some(@sdk.StringValue("a😀b")))
+  assert_eq(
+    span.attributes().get("truncated"),
+    Some(@sdk.StringValue("a😀b")),
+  )
+}
+
+///|
 test "zero_attribute_value_length_limit_produces_empty_strings" {
   let span = limit_test_span(
     @sdk.SpanLimits::new(attribute_value_length_limit=0),

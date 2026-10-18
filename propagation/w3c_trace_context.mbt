@@ -462,7 +462,10 @@ fn build_tracestate_value_char_table() -> FixedArray[Bool] {
   let table : FixedArray[Bool] = FixedArray::make(128, false)
   let mut code = 0
   while code < 128 {
-    table.unsafe_set(code, code >= 0x20 && code <= 0x7E && code != 0x2C && code != 0x3D)
+    table.unsafe_set(
+      code,
+      code >= 0x20 && code <= 0x7E && code != 0x2C && code != 0x3D,
+    )
     code = code + 1
   }
   table
