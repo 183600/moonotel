@@ -124,10 +124,17 @@ fn hex_digit_value(c : Char) -> Int {
 }
 
 // Decode `byte_count` hex byte pairs starting at `start`, validating as it
-// goes. Returns None when any character is not a hex digit.
-fn decode_hex(value : String, start : Int, byte_count : Int) -> Array[Int]? {
+// goes and tracking whether any byte is non-zero. Returns None when any
+// character is not a hex digit or when every decoded byte is zero, so the
+// caller never needs a second pass over the decoded ID.
+fn decode_hex_nonzero(
+  value : String,
+  start : Int,
+  byte_count : Int
+) -> Array[Int]? {
   // Every element is written before `Some` is returned.
   let out : Array[Int] = Array::unsafe_make_uninit(byte_count)
+  let mut acc = 0
   let mut i = 0
   while i < byte_count {
     let hi = hex_digit_value(value.unsafe_get(start + i * 2).unsafe_to_char())
@@ -135,8 +142,13 @@ fn decode_hex(value : String, start : Int, byte_count : Int) -> Array[Int]? {
     if hi < 0 || lo < 0 {
       return None
     }
-    out.unsafe_set(i, hi * 16 + lo)
+    let byte = hi * 16 + lo
+    acc = acc | byte
+    out.unsafe_set(i, byte)
     i = i + 1
+  }
+  if acc == 0 {
+    return None
   }
   Some(out)
 }
@@ -265,26 +277,25 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
     // Version 00 does not allow additional fields.
     return None
   }
-  let trace_id = match decode_hex(value, 3, 16) {
+  let trace_id = match decode_hex_nonzero(value, 3, 16) {
     Some(bytes) => bytes
     None => return None
   }
-  let span_id = match decode_hex(value, 36, 8) {
+  let span_id = match decode_hex_nonzero(value, 36, 8) {
     Some(bytes) => bytes
     None => return None
   }
   let flags = flags_hi * 16 + flags_lo
-  let sc = @api.span_context(
-    trace_id,
-    span_id,
-    flags & @api.TRACE_FLAGS_SAMPLED,
-    is_remote=true,
+  // Both IDs are known to be 16/8 bytes and non-zero, so the resulting
+  // context is always valid.
+  Some(
+    @api.span_context(
+      trace_id,
+      span_id,
+      flags & @api.TRACE_FLAGS_SAMPLED,
+      is_remote=true,
+    ),
   )
-  if sc.is_valid() {
-    Some(sc)
-  } else {
-    None
-  }
 }
 
 // Inject a SpanContext into the carrier as a `traceparent` header, plus a

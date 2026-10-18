@@ -23,12 +23,21 @@ fn json_hex_digit(nibble : Int) -> Char {
 
 // Append `value` as a JSON string literal, escaping the characters required by
 // RFC 8259. Non-ASCII text is emitted verbatim (JSON documents are UTF-8).
+// Runs of characters that need no escaping are appended in one slice.
 fn json_write_escaped(sb : StringBuilder, value : String) -> Unit {
   sb.write_char('"')
   let len = value.length()
   let mut i = 0
+  let mut run_start = 0
   while i < len {
     let code = value.unsafe_get(i).to_int()
+    if code >= 0x20 && code != 0x22 && code != 0x5C {
+      i = i + 1
+      continue
+    }
+    if run_start < i {
+      sb.write_stringview(value.view(start_offset=run_start, end_offset=i))
+    }
     if code == 0x22 {
       sb.write_string("\\\"")
     } else if code == 0x5C {
@@ -43,14 +52,16 @@ fn json_write_escaped(sb : StringBuilder, value : String) -> Unit {
       sb.write_string("\\r")
     } else if code == 0x09 {
       sb.write_string("\\t")
-    } else if code < 0x20 {
+    } else {
       sb.write_string("\\u00")
       sb.write_char(json_hex_digit(code >> 4))
       sb.write_char(json_hex_digit(code & 0x0F))
-    } else {
-      sb.write_char(code.unsafe_to_char())
     }
     i = i + 1
+    run_start = i
+  }
+  if run_start < len {
+    sb.write_stringview(value.view(start_offset=run_start, end_offset=len))
   }
   sb.write_char('"')
 }

@@ -106,13 +106,15 @@ fn write_scalar_attribute_header(
       if writer.len + total > writer.buf.length() {
         writer.reserve(total)
       }
-      let buf = writer.buf
-      let pos = writer.len
-      buf.unsafe_set(pos, ((field << 3) | 2).to_byte())
-      buf.unsafe_set(pos + 1, kv_size.to_byte())
-      buf.unsafe_set(pos + 2, b'\x0A')
-      buf.unsafe_set(pos + 3, key_len.to_byte())
-      writer.len = pos + 4
+      // The whole 4-byte header fits in one little-endian word.
+      writer.buf.unsafe_write_uint32_le(
+        writer.len,
+        ((field << 3) | 2).reinterpret_as_uint() |
+        (kv_size.reinterpret_as_uint() << 8) |
+        ((0x0A : UInt) << 16) |
+        (key_len.reinterpret_as_uint() << 24),
+      )
+      writer.len = writer.len + 4
       return
     }
   }
@@ -152,13 +154,14 @@ fn try_encode_scalar_attribute(
       if any_size < 0x80 {
         // The header reserved room for the whole attribute, and both the
         // AnyValue size and the value length fit in one varint byte.
-        let buf = writer.buf
-        let pos = writer.len
-        buf.unsafe_set(pos, b'\x12')
-        buf.unsafe_set(pos + 1, any_size.to_byte())
-        buf.unsafe_set(pos + 2, b'\x0A')
-        buf.unsafe_set(pos + 3, value_len.to_byte())
-        writer.len = pos + 4
+        writer.buf.unsafe_write_uint32_le(
+          writer.len,
+          ((0x12 : UInt) |
+            (any_size.reinterpret_as_uint() << 8) |
+            ((0x0A : UInt) << 16) |
+            (value_len.reinterpret_as_uint() << 24)),
+        )
+        writer.len = writer.len + 4
       } else {
         writer.write_tag(2, 2)
         writer.write_varint(any_size.to_uint64())
@@ -177,13 +180,14 @@ fn try_encode_scalar_attribute(
         writer.len = mark
         return false
       }
-      let buf = writer.buf
-      let pos = writer.len
-      buf.unsafe_set(pos, b'\x12')
-      buf.unsafe_set(pos + 1, b'\x02')
-      buf.unsafe_set(pos + 2, b'\x10')
-      buf.unsafe_set(pos + 3, (if flag { b'\x01' } else { b'\x00' }))
-      writer.len = pos + 4
+      writer.buf.unsafe_write_uint32_le(
+        writer.len,
+        ((0x12 : UInt) |
+          (0x02U << 8) |
+          ((0x10 : UInt) << 16) |
+          ((if flag { 0x01U } else { 0x00U }) << 24)),
+      )
+      writer.len = writer.len + 4
       true
     }
     @sdk.IntValue(number) => {
@@ -195,13 +199,14 @@ fn try_encode_scalar_attribute(
         return false
       }
       if bits < 0x80 {
-        let buf = writer.buf
-        let pos = writer.len
-        buf.unsafe_set(pos, b'\x12')
-        buf.unsafe_set(pos + 1, b'\x02')
-        buf.unsafe_set(pos + 2, b'\x18')
-        buf.unsafe_set(pos + 3, bits.to_byte())
-        writer.len = pos + 4
+        writer.buf.unsafe_write_uint32_le(
+          writer.len,
+          ((0x12 : UInt) |
+            (0x02U << 8) |
+            ((0x18 : UInt) << 16) |
+            (bits.to_uint() << 24)),
+        )
+        writer.len = writer.len + 4
       } else {
         writer.write_tag(2, 2)
         writer.write_varint(any_size.to_uint64())
@@ -215,13 +220,15 @@ fn try_encode_scalar_attribute(
         writer.len = mark
         return false
       }
-      let buf = writer.buf
-      let pos = writer.len
-      buf.unsafe_set(pos, b'\x12')
-      buf.unsafe_set(pos + 1, b'\x09')
-      buf.unsafe_set(pos + 2, b'\x21')
-      buf.unsafe_write_uint64_le(pos + 3, number.reinterpret_as_uint64())
-      writer.len = pos + 11
+      writer.buf.unsafe_write_uint32_le(
+        writer.len,
+        ((0x12 : UInt) | (0x09U << 8) | ((0x21 : UInt) << 16)),
+      )
+      writer.buf.unsafe_write_uint64_le(
+        writer.len + 3,
+        number.reinterpret_as_uint64(),
+      )
+      writer.len = writer.len + 11
       true
     }
     _ => false

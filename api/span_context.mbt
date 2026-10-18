@@ -291,13 +291,25 @@ pub fn span_context_from_hex(
   if trace_id_hex.length() != 32 || span_id_hex.length() != 16 {
     return invalid_span_context()
   }
-  match (bytes_from_hex(trace_id_hex), bytes_from_hex(span_id_hex)) {
-    (Some(trace_id), Some(span_id)) =>
-      if trace_id.length() == 16 && span_id.length() == 8 {
-        span_context(trace_id, span_id, trace_flags)
-      } else {
-        invalid_span_context()
-      }
-    _ => invalid_span_context()
+  let trace_id = match bytes_from_hex(trace_id_hex) {
+    Some(bytes) => bytes
+    None => return invalid_span_context()
+  }
+  let span_id = match bytes_from_hex(span_id_hex) {
+    Some(bytes) => bytes
+    None => return invalid_span_context()
+  }
+  // Decoding even-length hex already guarantees the 16/8-byte lengths; only
+  // the all-zero rule of `span_context` remains to be checked.
+  if is_zero(trace_id) || is_zero(span_id) {
+    return invalid_span_context()
+  }
+  {
+    trace_id,
+    span_id,
+    trace_flags,
+    tracestate: "",
+    is_valid: true,
+    is_remote: false,
   }
 }

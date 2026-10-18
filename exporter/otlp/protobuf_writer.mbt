@@ -119,7 +119,39 @@ fn ProtoWriter::write_tag(self : ProtoWriter, field : Int, wire_type : Int) -> U
   self.write_varint(tag.to_uint64())
 }
 
+// Write the tag and length prefix of a length-delimited field. The fast path
+// covers the common case of a one-byte tag and a one-byte length, which is
+// what most OTLP fields need.
+fn ProtoWriter::write_message_header(self : ProtoWriter, field : Int, len : Int) -> Unit {
+  let tag = (field << 3) | 2
+  if tag >= 0 && tag < 0x80 && len < 0x80 {
+    if self.len + 2 > self.buf.length() {
+      self.reserve(2)
+    }
+    self.buf.unsafe_write_uint16_le(
+      self.len,
+      tag.to_uint16() | (len.to_uint16() << 8),
+    )
+    self.len = self.len + 2
+    return
+  }
+  self.write_tag(field, 2)
+  self.write_varint(len.to_uint64())
+}
+
 fn ProtoWriter::write_varint_field(self : ProtoWriter, field : Int, value : UInt64) -> Unit {
+  let tag = field << 3
+  if tag >= 0 && tag < 0x80 && value < 0x80 {
+    if self.len + 2 > self.buf.length() {
+      self.reserve(2)
+    }
+    self.buf.unsafe_write_uint16_le(
+      self.len,
+      tag.to_uint16() | (value.to_uint16() << 8),
+    )
+    self.len = self.len + 2
+    return
+  }
   self.write_tag(field, 0)
   self.write_varint(value)
 }
@@ -129,6 +161,18 @@ fn ProtoWriter::write_bool_field(self : ProtoWriter, field : Int, value : Bool) 
 }
 
 fn ProtoWriter::write_fixed64_field(self : ProtoWriter, field : Int, value : UInt64) -> Unit {
+  let tag = (field << 3) | 1
+  if tag >= 0 && tag < 0x80 {
+    if self.len + 9 > self.buf.length() {
+      self.reserve(9)
+    }
+    let buf = self.buf
+    let pos = self.len
+    buf.unsafe_set(pos, tag.to_byte())
+    buf.unsafe_write_uint64_le(pos + 1, value)
+    self.len = pos + 9
+    return
+  }
   self.write_tag(field, 1)
   if self.len + 8 > self.buf.length() {
     self.reserve(8)
@@ -142,6 +186,18 @@ fn ProtoWriter::write_double_field(self : ProtoWriter, field : Int, value : Doub
 }
 
 fn ProtoWriter::write_fixed32_field(self : ProtoWriter, field : Int, value : UInt) -> Unit {
+  let tag = (field << 3) | 5
+  if tag >= 0 && tag < 0x80 {
+    if self.len + 5 > self.buf.length() {
+      self.reserve(5)
+    }
+    let buf = self.buf
+    let pos = self.len
+    buf.unsafe_set(pos, tag.to_byte())
+    buf.unsafe_write_uint32_le(pos + 1, value)
+    self.len = pos + 5
+    return
+  }
   self.write_tag(field, 5)
   if self.len + 4 > self.buf.length() {
     self.reserve(4)
@@ -167,37 +223,16 @@ fn ProtoWriter::write_bytes_from_int_array(
   field : Int,
   values : Array[Int]
 ) -> Unit {
-  self.write_tag(field, 2)
   let len = values.length()
-  self.write_varint(len.to_uint64())
+  self.write_message_header(field, len)
   if self.len + len > self.buf.length() {
     self.reserve(len)
   }
   let buf = self.buf
   let mut pos = self.len
   let mut i = 0
-  while i + 8 <= len {
-    let word = (values.unsafe_get(i) & 0xFF).to_uint64() |
-      ((values.unsafe_get(i + 1) & 0xFF).to_uint64() << 8) |
-      ((values.unsafe_get(i + 2) & 0xFF).to_uint64() << 16) |
-      ((values.unsafe_get(i + 3) & 0xFF).to_uint64() << 24) |
-      ((values.unsafe_get(i + 4) & 0xFF).to_uint64() << 32) |
-      ((values.unsafe_get(i + 5) & 0xFF).to_uint64() << 40) |
-      ((values.unsafe_get(i + 6) & 0xFF).to_uint64() << 48) |
-      ((values.unsafe_get(i + 7) & 0xFF).to_uint64() << 56)
-    buf.unsafe_write_uint64_le(pos, word)
-    pos = pos + 8
-    i = i + 8
-  }
-  while i + 4 <= len {
-    let word = ((values.unsafe_get(i) & 0xFF) |
-      ((values.unsafe_get(i + 1) & 0xFF) << 8) |
-      ((values.unsafe_get(i + 2) & 0xFF) << 16) |
-      ((values.unsafe_get(i + 3) & 0xFF) << 24)).reinterpret_as_uint()
-    buf.unsafe_write_uint32_le(pos, word)
-    pos = pos + 4
-    i = i + 4
-  }
+  // Trace and span IDs are 8 or 16 bytes; storing byte by byte beats packing
+  // words for these short lengths.
   while i < len {
     buf.unsafe_set(pos, (values.unsafe_get(i) & 0xFF).to_byte())
     pos = pos + 1
@@ -208,10 +243,27 @@ fn ProtoWriter::write_bytes_from_int_array(
 
 // Write a length-delimited string field, encoding non-ASCII text as UTF-8.
 fn ProtoWriter::write_string_field(self : ProtoWriter, field : Int, value : String) -> Unit {
-  self.write_tag(field, 2)
   let len = value.length()
-  let start = self.len
-  self.write_varint(len.to_uint64())
+  let tag = (field << 3) | 2
+  let start = if tag >= 0 && tag < 0x80 && len < 0x80 {
+    if self.len + 2 > self.buf.length() {
+      self.reserve(2)
+    }
+    let pos = self.len
+    self.buf.unsafe_write_uint16_le(
+      pos,
+      tag.to_uint16() | (len.to_uint16() << 8),
+    )
+    self.len = pos + 2
+    // Rollback keeps the tag: non-ASCII text is re-encoded as UTF-8 with a
+    // fresh length below.
+    pos + 1
+  } else {
+    self.write_tag(field, 2)
+    let header_start = self.len
+    self.write_varint(len.to_uint64())
+    header_start
+  }
   if self.len + len > self.buf.length() {
     self.reserve(len)
   }
@@ -291,9 +343,8 @@ fn ProtoWriter::try_write_ascii_raw(self : ProtoWriter, value : String) -> Bool 
 // Append an already encoded nested message with a length prefix, releasing
 // the writer that produced it.
 fn ProtoWriter::append_message(self : ProtoWriter, field : Int, inner : ProtoWriter) -> Unit {
-  self.write_tag(field, 2)
   let len = inner.len
-  self.write_varint(len.to_uint64())
+  self.write_message_header(field, len)
   if self.len + len > self.buf.length() {
     self.reserve(len)
   }
