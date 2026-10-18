@@ -92,8 +92,14 @@ pub using @otlp {
   type OtlpHttpExporter,
   type Transport,
   type TransportResponse,
+  OTLP_HTTP_PROTOBUF_PROTOCOL,
+  OTLP_HTTP_JSON_PROTOCOL,
+  is_supported_protocol,
+  content_type_for_protocol,
   decode_export_response,
+  decode_export_response_json,
   encode_trace_request,
+  encode_trace_request_json,
 }
 
 // One-call setup: build a TracerProvider, optionally wire an OTLP/HTTP

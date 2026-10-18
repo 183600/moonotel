@@ -1,6 +1,7 @@
 // OTLP/HTTP trace exporter.
 //
-// The exporter encodes spans as an `ExportTraceServiceRequest` protobuf body
+// The exporter encodes spans as an `ExportTraceServiceRequest` body — binary
+// protobuf by default, or the JSON mapping when `protocol` is `http/json` —
 // and POSTs it to `<endpoint>/v1/traces`. HTTP transport is injected, so the
 // exporter works on any target and can be wired to `moonbitlang/async/http`,
 // a test double, or any other client.
@@ -33,10 +34,35 @@ pub(all) struct OtlpHttpConfig {
   max_retries : Int32
 }
 
-// The only protocol supported by this exporter.
+// The default OTLP/HTTP protocol: binary protobuf.
 
 ///|
 pub const OTLP_HTTP_PROTOBUF_PROTOCOL : String = "http/protobuf"
+
+// The JSON OTLP/HTTP protocol.
+
+///|
+pub const OTLP_HTTP_JSON_PROTOCOL : String = "http/json"
+
+// Whether `protocol` is one of the OTLP/HTTP encodings supported by this
+// exporter (`http/protobuf` and `http/json`). Other values (for example
+// `grpc`) are rejected at export time.
+
+///|
+pub fn is_supported_protocol(protocol : String) -> Bool {
+  protocol == OTLP_HTTP_PROTOBUF_PROTOCOL || protocol == OTLP_HTTP_JSON_PROTOCOL
+}
+
+// The `Content-Type` of an OTLP/HTTP request for `protocol`.
+
+///|
+pub fn content_type_for_protocol(protocol : String) -> String {
+  if protocol == OTLP_HTTP_JSON_PROTOCOL {
+    "application/json"
+  } else {
+    "application/x-protobuf"
+  }
+}
 
 // Create a configuration with sensible defaults
 // (endpoint `http://localhost:4318`, no compression, `http/protobuf`, 10s
@@ -321,7 +347,7 @@ fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
     capacity=(config.headers.length() + 1) * 2,
   )
   config.headers.each(fn(key, value) { headers.set(key, value) })
-  headers.set("content-type", "application/x-protobuf")
+  headers.set("content-type", content_type_for_protocol(config.protocol))
   headers
 }
 
@@ -329,7 +355,8 @@ fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
 // success and is never retried; the response body is decoded so that a
 // `partial_success` is surfaced as an export failure. Retryable status codes
 // are retried up to `max_retries` times. Unsupported protocols and the gzip
-// compression setting are rejected at encode time.
+// compression setting are rejected at encode time; `http/json` bodies are
+// encoded with the OTLP JSON mapping.
 
 ///|
 pub fn OtlpHttpExporter::export_spans_http(
@@ -339,7 +366,7 @@ pub fn OtlpHttpExporter::export_spans_http(
   if spans.length() == 0 {
     return @sdk.ExportSuccess
   }
-  if self.config.protocol != OTLP_HTTP_PROTOBUF_PROTOCOL {
+  if !is_supported_protocol(self.config.protocol) {
     return @sdk.ExportFailure(
       "unsupported OTLP protocol: " + self.config.protocol,
     )
@@ -349,7 +376,12 @@ pub fn OtlpHttpExporter::export_spans_http(
       "unsupported OTLP compression: " + self.config.compression,
     )
   }
-  let body = encode_trace_request(spans)
+  let json = self.config.protocol == OTLP_HTTP_JSON_PROTOCOL
+  let body = if json {
+    encode_trace_request_json(spans)
+  } else {
+    encode_trace_request(spans)
+  }
   let url = self.url
   let headers = exporter_headers(self.config)
   let mut attempt = 0
@@ -357,7 +389,11 @@ pub fn OtlpHttpExporter::export_spans_http(
   while attempt <= self.config.max_retries {
     let response = (self.transport)(url, headers, body)
     if response.status_code == 200 {
-      return decode_export_response(response.body)
+      if json {
+        return decode_export_response_json(response.body)
+      } else {
+        return decode_export_response(response.body)
+      }
     }
     last_failure = "OTLP export failed with HTTP status " +
       response.status_code.to_string()

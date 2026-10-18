@@ -2,8 +2,9 @@
 //
 // This is the production transport counterpart of the injectable `Transport`
 // used by `@otlp.OtlpHttpExporter`: it POSTs an encoded
-// `ExportTraceServiceRequest` to `<endpoint>/v1/traces` with
-// `Content-Type: application/x-protobuf`, decodes the response (including
+// `ExportTraceServiceRequest` to `<endpoint>/v1/traces`, with
+// `Content-Type: application/x-protobuf` (`http/protobuf`) or
+// `application/json` (`http/json`), decodes the response (including
 // `partial_success`) and retries only retryable HTTP statuses. Each attempt
 // is bounded by `config.timeout_millis`.
 //
@@ -31,7 +32,7 @@ fn request_headers(
   })
   headers.set(
     @http.CaseInsensitiveString("content-type"),
-    "application/x-protobuf",
+    @otlp.content_type_for_protocol(config.protocol),
   )
   if gzip {
     headers.set(@http.CaseInsensitiveString("content-encoding"), "gzip")
@@ -54,19 +55,22 @@ async fn gzip_compress(data : Bytes) -> Bytes {
 }
 
 // POST an already encoded `ExportTraceServiceRequest` body to the configured
-// trace endpoint and interpret the response. Network errors and retryable
-// statuses (429, 502, 503, 504) are retried up to `config.max_retries` times
-// with a short linear backoff. When `config.compression` is `gzip` the body is
-// compressed once and sent with `Content-Encoding: gzip`.
+// trace endpoint and interpret the response. Both `http/protobuf` and
+// `http/json` bodies are supported; the response is decoded with the matching
+// encoding. Network errors and retryable statuses (429, 502, 503, 504) are
+// retried up to `config.max_retries` times with a short linear backoff. When
+// `config.compression` is `gzip` the body is compressed once and sent with
+// `Content-Encoding: gzip`.
 
 ///|
 pub async fn post_trace_request(
   config : @otlp.OtlpHttpConfig,
   body : Bytes,
 ) -> @sdk.ExportResult {
-  if config.protocol != @otlp.OTLP_HTTP_PROTOBUF_PROTOCOL {
+  if !@otlp.is_supported_protocol(config.protocol) {
     return @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol)
   }
+  let json = config.protocol == @otlp.OTLP_HTTP_JSON_PROTOCOL
   let gzip = config.compression == "gzip"
   if !gzip && config.compression != "none" {
     return @sdk.ExportFailure(
@@ -114,7 +118,11 @@ pub async fn post_trace_request(
     match outcome {
       Some((response, response_body)) => {
         if response.code == 200 {
-          return @otlp.decode_export_response(response_body.binary())
+          if json {
+            return @otlp.decode_export_response_json(response_body.binary())
+          } else {
+            return @otlp.decode_export_response(response_body.binary())
+          }
         }
         last_failure = "OTLP export failed with HTTP status " +
           response.code.to_string()
@@ -129,8 +137,8 @@ pub async fn post_trace_request(
   @sdk.ExportFailure(last_failure)
 }
 
-// Encode and export the given spans over OTLP/HTTP. Exporting an empty array
-// is a no-op success.
+// Encode and export the given spans over OTLP/HTTP, using the encoding
+// selected by `config.protocol`. Exporting an empty array is a no-op success.
 
 ///|
 pub async fn export_spans(
@@ -140,7 +148,12 @@ pub async fn export_spans(
   if spans.length() == 0 {
     return @sdk.ExportSuccess
   }
-  post_trace_request(config, @otlp.encode_trace_request(spans))
+  let body = if config.protocol == @otlp.OTLP_HTTP_JSON_PROTOCOL {
+    @otlp.encode_trace_request_json(spans)
+  } else {
+    @otlp.encode_trace_request(spans)
+  }
+  post_trace_request(config, body)
 }
 
 // An async span exporter over OTLP/HTTP. Use it with an async flush loop
