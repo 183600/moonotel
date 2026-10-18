@@ -45,6 +45,13 @@ pub const OTLP_HTTP_PROTOBUF_PROTOCOL : String = "http/protobuf"
 ///|
 pub const OTLP_HTTP_JSON_PROTOCOL : String = "http/json"
 
+// Number of retries used when `max_retries` is not set explicitly. OTLP
+// requires transient errors (429/502/503/504 and transport failures) to be
+// retried, so retries are enabled by default.
+
+///|
+const DEFAULT_MAX_RETRIES : Int32 = 3
+
 // Whether `protocol` is one of the OTLP/HTTP encodings supported by this
 // exporter (`http/protobuf` and `http/json`). Other values (for example
 // `grpc`) are rejected at export time.
@@ -67,8 +74,9 @@ pub fn content_type_for_protocol(protocol : String) -> String {
 
 // Create a configuration with sensible defaults
 // (endpoint `http://localhost:4318`, no compression, `http/protobuf`, 10s
-// timeout). When `traces_endpoint` is given it is the full trace URL and is
-// used verbatim, taking precedence over `endpoint`.
+// timeout, 3 retries for retryable statuses). When `traces_endpoint` is given
+// it is the full trace URL and is used verbatim, taking precedence over
+// `endpoint`.
 
 ///|
 pub fn OtlpHttpConfig::new(
