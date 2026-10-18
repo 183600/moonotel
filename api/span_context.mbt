@@ -124,8 +124,8 @@ fn build_hex_ascii() -> FixedArray[Byte] {
   table
 }
 
-// Precomputed UTF-16LE code unit pairs for every byte value: entry `b` holds
-// the two hex characters of `b` packed into one 32-bit word (low byte first).
+// UTF-16LE code unit pairs for every byte value: entry `b` holds the two hex
+// characters of `b` packed into one 32-bit word (low byte first).
 let hex_pairs : FixedArray[UInt] = build_hex_pairs()
 
 fn build_hex_pairs() -> FixedArray[UInt] {

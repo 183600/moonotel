@@ -168,9 +168,7 @@ pub fn Sampler::should_sample(
 }
 
 // The ratio configured through `OTEL_TRACES_SAMPLER_ARG`, or 1.0 when the
-// variable is absent, not a number, NaN, or outside the `[0..1]` range. The
-// specification requires that invalid input is ignored, i.e. the sampler
-// behaves as if the variable was unset and uses the default ratio of 1.0.
+// variable is absent, not a number, NaN, or outside the `[0..1]` range.
 fn sampler_ratio_from_env() -> Double {
   match @env.get_env_var("OTEL_TRACES_SAMPLER_ARG") {
     Some(value) => {
