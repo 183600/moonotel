@@ -223,6 +223,11 @@ pub(all) struct ServerCall {
   // Lazily computed `(path, query)` split of the request target, shared by
   // `path` and `query` so that the request line is parsed at most once.
   mut path_query : (String, String)?
+  // Whether `respond` has completely sent a response for this request.
+  mut responded : Bool
+  // Whether the connection was closed by `respond` (`Connection: close`) or
+  // by `close_connection`.
+  mut connection_closed : Bool
 }
 
 // Upper-case HTTP method of the request.
@@ -387,6 +392,7 @@ pub fn ServerCall::connection_close_requested(self : ServerCall) -> Bool {
 ///|
 pub fn ServerCall::close_connection(self : ServerCall) -> Unit {
   self.connection.close()
+  self.connection_closed = true
 }
 
 // Number of UTF-8 bytes a string encodes to.
@@ -468,8 +474,10 @@ pub async fn ServerCall::respond(
     None => ()
   }
   self.connection.end_response()
+  self.responded = true
   if close_requested {
     self.connection.close()
+    self.connection_closed = true
   }
   match self.span {
     Some(span) => {
@@ -522,99 +530,228 @@ pub async fn run_server_on(
   }
   server.run_forever(
     async fn(request, body, connection) {
-      let (parent_context, parent_has_baggage) = extract_context_with_baggage(
-        request.headers,
-      )
-      let parent = parent_context.span_context()
-      let method_name = http_method_name(request.meth)
-      let span = match active_tracer {
-        Some(tracer) =>
-          Some(
-            tracer.start_span(method_name, kind=@api.SpanKind::Server, parent?),
-          )
-        None => None
-      }
-      let call : ServerCall = {
+      let _ = serve_call(
         request,
         body,
         connection,
-        span,
-        tracer: active_tracer,
-        path_query: None,
-      }
-      match span {
-        Some(server_span) => {
-          server_span.set_attribute(
-            @sdk.HTTP_REQUEST_METHOD,
-            method_attribute_value(request.meth),
-          )
-          server_span.set_attribute(@sdk.URL_SCHEME, url_scheme_http)
-          server_span.set_attribute(
-            @sdk.NETWORK_PROTOCOL_NAME,
-            protocol_name_http,
-          )
-          // `moonbitlang/async/http` speaks HTTP/1.1 only.
-          server_span.set_attribute(
-            @sdk.NETWORK_PROTOCOL_VERSION,
-            protocol_version_http_1_1,
-          )
-          let path = call.path()
-          let query = call.query()
-          server_span.set_attribute(@sdk.URL_PATH, @sdk.StringValue(path))
-          if query != "" {
-            server_span.set_attribute(@sdk.URL_QUERY, @sdk.StringValue(query))
-          }
-          record_host_attributes(server_span, request.headers)
-          match request.headers.get(@http.CaseInsensitiveString("user-agent")) {
-            Some(agent) =>
-              server_span.set_attribute(
-                @sdk.USER_AGENT_ORIGINAL,
-                @sdk.StringValue(agent),
-              )
-            None => ()
-          }
-        }
-        None => ()
-      }
-      let attached : @context.Context? = match span {
-        Some(server_span) =>
-          Some(@context.attach(parent_context.with_span(server_span.context())))
-        None =>
-          if parent_has_baggage {
-            Some(@context.attach(parent_context))
-          } else {
-            None
-          }
-      }
-      defer (match attached {
-        Some(previous) => @context.detach(previous)
-        None => ()
-      })
-      defer end_span(span)
-      let outcome = Ok(handler(call)) catch { error => Err(error) }
-      match outcome {
-        Ok(_) => ()
-        Err(error) => {
-          match span {
-            Some(server_span) => {
-              let type_name = error.to_string()
-              server_span.set_attribute(
-                @sdk.ERROR_TYPE,
-                @sdk.StringValue(type_name),
-              )
-              server_span.set_status(
-                @api.StatusCode::Error,
-                description=type_name,
-              )
-              server_span.record_exception(error)
-            }
-            None => ()
-          }
-          raise error
-        }
-      }
+        active_tracer,
+        handler,
+        None,
+        None,
+      )
     },
     allow_failure?,
     max_connections?,
   )
+}
+
+// Serve one request: start the SERVER span (recording the peer address as
+// `client.address`/`client.port` when the connection's peer is known), install
+// the extracted context while the handler runs, end the span afterwards, and
+// return the `ServerCall` so the caller can inspect how the handler responded.
+
+///|
+async fn serve_call(
+  request : @http.Request,
+  body : &@io.Reader,
+  connection : @http.ServerConnection,
+  active_tracer : @sdk.Tracer?,
+  handler : async (ServerCall) -> Unit,
+  client_address : String?,
+  client_port : Int32?,
+) -> ServerCall {
+  let (parent_context, parent_has_baggage) = extract_context_with_baggage(
+    request.headers,
+  )
+  let parent = parent_context.span_context()
+  let method_name = http_method_name(request.meth)
+  let span = match active_tracer {
+    Some(tracer) =>
+      Some(tracer.start_span(method_name, kind=@api.SpanKind::Server, parent?))
+    None => None
+  }
+  let call : ServerCall = {
+    request,
+    body,
+    connection,
+    span,
+    tracer: active_tracer,
+    path_query: None,
+    responded: false,
+    connection_closed: false,
+  }
+  match span {
+    Some(server_span) => {
+      server_span.set_attribute(
+        @sdk.HTTP_REQUEST_METHOD,
+        method_attribute_value(request.meth),
+      )
+      server_span.set_attribute(@sdk.URL_SCHEME, url_scheme_http)
+      server_span.set_attribute(@sdk.NETWORK_PROTOCOL_NAME, protocol_name_http)
+      // `moonbitlang/async/http` speaks HTTP/1.1 only.
+      server_span.set_attribute(
+        @sdk.NETWORK_PROTOCOL_VERSION,
+        protocol_version_http_1_1,
+      )
+      let path = call.path()
+      let query = call.query()
+      server_span.set_attribute(@sdk.URL_PATH, @sdk.StringValue(path))
+      if query != "" {
+        server_span.set_attribute(@sdk.URL_QUERY, @sdk.StringValue(query))
+      }
+      record_host_attributes(server_span, request.headers)
+      match client_address {
+        Some(address) =>
+          server_span.set_attribute(
+            @sdk.CLIENT_ADDRESS,
+            @sdk.StringValue(address),
+          )
+        None => ()
+      }
+      match client_port {
+        Some(port) =>
+          server_span.set_attribute(
+            @sdk.CLIENT_PORT,
+            @sdk.IntValue(port.to_int64()),
+          )
+        None => ()
+      }
+      match request.headers.get(@http.CaseInsensitiveString("user-agent")) {
+        Some(agent) =>
+          server_span.set_attribute(
+            @sdk.USER_AGENT_ORIGINAL,
+            @sdk.StringValue(agent),
+          )
+        None => ()
+      }
+    }
+    None => ()
+  }
+  let attached : @context.Context? = match span {
+    Some(server_span) =>
+      Some(@context.attach(parent_context.with_span(server_span.context())))
+    None =>
+      if parent_has_baggage {
+        Some(@context.attach(parent_context))
+      } else {
+        None
+      }
+  }
+  defer (match attached {
+    Some(previous) => @context.detach(previous)
+    None => ()
+  })
+  defer end_span(span)
+  let outcome = Ok(handler(call)) catch { error => Err(error) }
+  match outcome {
+    Ok(_) => call
+    Err(error) => {
+      match span {
+        Some(server_span) => {
+          let type_name = error.to_string()
+          server_span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(type_name))
+          server_span.set_status(@api.StatusCode::Error, description=type_name)
+          server_span.record_exception(error)
+        }
+        None => ()
+      }
+      raise error
+    }
+  }
+}
+
+// Host part of a socket address, without the port and without the IPv6
+// brackets, for the `client.address` attribute.
+
+///|
+fn client_host_string(addr : @socket.Addr) -> String {
+  let text = addr.to_string()
+  if addr.is_ipv6() {
+    match text.find("]") {
+      Some(close) =>
+        if text.length() > 0 && text.unsafe_get(0).unsafe_to_char() == '[' {
+          text[1:close].to_owned()
+        } else {
+          text
+        }
+      None => text
+    }
+  } else {
+    match text.rev_find(":") {
+      Some(colon) => text[:colon].to_owned()
+      None => text
+    }
+  }
+}
+
+// Like `run_server`, but the address of the peer of each TCP connection is
+// recorded as `client.address` and `client.port` on the SERVER span.
+//
+// `@http.Server::run_forever` does not expose the peer address of a
+// connection, so this entry point drives the connection loop itself with
+// `@socket.TcpServer`. The handler must send exactly one response per request
+// (usually via `ServerCall::respond`); when it returns without having
+// responded, the connection is closed so that a half-written response is
+// never followed by another request.
+
+///|
+pub async fn run_server_with_client_address(
+  addr : @socket.Addr,
+  handler : async (ServerCall) -> Unit,
+  tracer? : @sdk.Tracer,
+  allow_failure? : Bool,
+  max_connections? : Int32,
+) -> Unit {
+  let server = @socket.TcpServer(addr)
+  run_server_with_client_address_on(
+    server,
+    handler,
+    tracer?,
+    allow_failure?,
+    max_connections?,
+  )
+}
+
+// Like `run_server_with_client_address`, but on an already constructed TCP
+// server (for example one bound to port 0 whose actual port was read from
+// `server.addr`). The server is closed when `run_forever` returns.
+
+///|
+pub async fn run_server_with_client_address_on(
+  server : @socket.TcpServer,
+  handler : async (ServerCall) -> Unit,
+  tracer? : @sdk.Tracer,
+  allow_failure? : Bool,
+  max_connections? : Int32,
+) -> Unit {
+  let active_tracer : @sdk.Tracer? = match tracer {
+    Some(value) => Some(value)
+    None => default_tracer()
+  }
+  server.run_forever(allow_failure?, max_connections?) <| (tcp, peer_addr) => {
+    let connection = @http.ServerConnection::new(tcp)
+    let client_address = client_host_string(peer_addr)
+    let client_port = peer_addr.port()
+    for ;; {
+      let request = connection.read_request()
+      let call = serve_call(
+        request,
+        connection,
+        connection,
+        active_tracer,
+        handler,
+        Some(client_address),
+        Some(client_port),
+      )
+      if call.connection_closed {
+        break
+      }
+      if !call.responded {
+        // The handler returned without finishing a response: close the
+        // connection instead of leaving a partial response on the wire.
+        connection.close()
+        break
+      }
+    }
+  }
 }

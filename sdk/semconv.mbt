@@ -38,6 +38,9 @@ pub const SERVER_PORT : String = "server.port"
 pub const CLIENT_ADDRESS : String = "client.address"
 
 ///|
+pub const CLIENT_PORT : String = "client.port"
+
+///|
 pub const USER_AGENT_ORIGINAL : String = "user_agent.original"
 
 ///|
