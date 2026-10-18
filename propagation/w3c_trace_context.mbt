@@ -555,8 +555,16 @@ fn write_normalized_tracestate(view : StringView, len : Int32) -> String {
     let end = find_code_unit(view, ',', start)
     let item = trim_ows(view.view(start_offset=start, end_offset=end))
     let eq = find_code_unit(item, '=', 0)
-    let key = trim_ows(item[:eq])
-    let member_value = trim_ows(item[eq + 1:])
+    let key_src = item[:eq]
+    let key = trim_ows(key_src)
+    // Blanks after `=` belong to the value unless the member also has
+    // whitespace before `=` (`key = value`).
+    let value_src = item[eq + 1:]
+    let member_value = if key_src.length() == key.length() {
+      value_src
+    } else {
+      trim_ows(value_src)
+    }
     if count > 0 {
       sb.write_char(',')
     }
@@ -634,14 +642,14 @@ pub fn parse_tracestate(value : String) -> String? {
       unchanged = false
     }
     let key = view.view(start_offset=item_start, end_offset=key_end)
-    // Trim optional whitespace after the `=`; trailing whitespace was already
-    // removed by the member trim above.
+    // Blanks after the `=` belong to the value; they are trimmed only when the
+    // member also has whitespace before `=` (`key = value`). Trailing
+    // whitespace was already removed by the member trim above.
     let mut value_start = eq + 1
-    while value_start < item_end && is_ows_code(view.unsafe_get(value_start)) {
-      value_start = value_start + 1
-    }
-    if value_start != eq + 1 {
-      unchanged = false
+    if key_end != eq {
+      while value_start < item_end && is_ows_code(view.unsafe_get(value_start)) {
+        value_start = value_start + 1
+      }
     }
     let member_value = view.view(start_offset=value_start, end_offset=item_end)
     if !is_valid_tracestate_key(key) || !is_valid_tracestate_value(member_value) {

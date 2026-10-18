@@ -45,8 +45,8 @@ fn is_valid_tracestate_member(key : StringView, value : StringView) -> Bool {
 
 // Parse a `tracestate` header value. Returns None when the value is empty,
 // has more than 32 members, contains a malformed or duplicate member, or has
-// an empty value. Optional whitespace around members, keys and values is
-// ignored.
+// an empty value. Optional whitespace around members is ignored, and
+// `key = value` is accepted; blanks directly after `=` belong to the value.
 
 ///|
 pub fn Tracestate::parse(value : String) -> Tracestate? {
@@ -70,8 +70,16 @@ pub fn Tracestate::parse(value : String) -> Tracestate? {
     if eq >= item.length() {
       return None
     }
-    let key = trim_ows(item[:eq]).to_owned()
-    let member_value = trim_ows(item[eq + 1:]).to_owned()
+    let key_view = item[:eq]
+    let key = trim_ows(key_view).to_owned()
+    // A blank after `=` is part of the value (W3C `value` includes `%x20`); it
+    // is only trimmed together with whitespace before `=` in `key = value`.
+    let value_view = item[eq + 1:]
+    let member_value = if key_view.length() == key.length() {
+      value_view.to_owned()
+    } else {
+      trim_ows(value_view).to_owned()
+    }
     if !is_valid_tracestate_member(key[:], member_value[:]) {
       return None
     }

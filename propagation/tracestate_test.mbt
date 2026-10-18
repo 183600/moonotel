@@ -78,6 +78,22 @@ test "tracestate_mutations_reject_trailing_blank_values" {
 }
 
 ///|
+test "parse_preserves_blanks_after_equals" {
+  assert_eq(@propagation.parse_tracestate("a=1,b= v"), Some("a=1,b= v"))
+  assert_eq(@propagation.parse_tracestate(" a=1,b= v "), Some("a=1,b= v"))
+  assert_eq(@propagation.parse_tracestate("a = v"), Some("a=v"))
+  let ts = @propagation.Tracestate::parse("b= v").unwrap()
+  assert_eq(ts.get("b"), Some(" v"))
+  assert_eq(ts.add("z", " v").to_header(), "z= v,b= v")
+  assert_eq(
+    @propagation.Tracestate::parse(ts.add("z", " v").to_header())
+      .unwrap()
+      .get("z"),
+    Some(" v"),
+  )
+}
+
+///|
 test "inject_writes_tracestate_from_span_context" {
   let sc = tracestate_test_context().with_tracestate("congo=t61rcWkgMzE")
   let carrier = @propagation.TextMapCarrier::new()
