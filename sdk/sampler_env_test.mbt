@@ -56,6 +56,39 @@ test "sampler_from_env_invalid_ratio_falls_back_to_one" {
   assert_true(sampler.should_sample(None, env_trace_id(255)).is_sampled)
 }
 
+test "sampler_from_env_ratio_out_of_range_falls_back_to_one" {
+  clear_sampler_env()
+  @env.set_env_var("OTEL_TRACES_SAMPLER", "traceidratio")
+  @env.set_env_var("OTEL_TRACES_SAMPLER_ARG", "-0.5")
+  let negative = @sdk.Sampler::from_env()
+  @env.set_env_var("OTEL_TRACES_SAMPLER_ARG", "1.5")
+  let large = @sdk.Sampler::from_env()
+  clear_sampler_env()
+  assert_true(negative.should_sample(None, env_trace_id(255)).is_sampled)
+  assert_true(large.should_sample(None, env_trace_id(255)).is_sampled)
+}
+
+test "sampler_from_env_argument_ignored_for_other_samplers" {
+  clear_sampler_env()
+  @env.set_env_var("OTEL_TRACES_SAMPLER", "always_on")
+  @env.set_env_var("OTEL_TRACES_SAMPLER_ARG", "0.0")
+  let sampler = @sdk.Sampler::from_env()
+  clear_sampler_env()
+  assert_true(sampler.should_sample(None, env_trace_id(255)).is_sampled)
+}
+
+test "sampler_from_env_name_is_case_insensitive" {
+  clear_sampler_env()
+  @env.set_env_var("OTEL_TRACES_SAMPLER", " Always_Off ")
+  let off = @sdk.Sampler::from_env()
+  @env.set_env_var("OTEL_TRACES_SAMPLER", "TRACEIDRATIO")
+  @env.set_env_var("OTEL_TRACES_SAMPLER_ARG", "1.0")
+  let ratio = @sdk.Sampler::from_env()
+  clear_sampler_env()
+  assert_false(off.should_sample(None, env_trace_id(255)).is_sampled)
+  assert_true(ratio.should_sample(None, env_trace_id(255)).is_sampled)
+}
+
 test "sampler_from_env_parentbased_traceidratio_follows_parent" {
   clear_sampler_env()
   @env.set_env_var("OTEL_TRACES_SAMPLER", "parentbased_traceidratio")

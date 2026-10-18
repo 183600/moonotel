@@ -168,7 +168,9 @@ pub fn Sampler::should_sample(
 }
 
 // The ratio configured through `OTEL_TRACES_SAMPLER_ARG`, or 1.0 when the
-// variable is absent, not a number, or NaN.
+// variable is absent, not a number, NaN, or outside the `[0..1]` range. The
+// specification requires that invalid input is ignored, i.e. the sampler
+// behaves as if the variable was unset and uses the default ratio of 1.0.
 fn sampler_ratio_from_env() -> Double {
   match @env.get_env_var("OTEL_TRACES_SAMPLER_ARG") {
     Some(value) => {
@@ -177,7 +179,7 @@ fn sampler_ratio_from_env() -> Double {
       } catch {
         _ => 1.0
       }
-      if ratio.is_nan() {
+      if ratio.is_nan() || ratio < 0.0 || ratio > 1.0 {
         1.0
       } else {
         ratio
@@ -194,11 +196,12 @@ fn sampler_ratio_from_env() -> Double {
 // - `traceidratio`, `parentbased_traceidratio` (ratio argument)
 // - `parentbased_always_on` (the default), `parentbased_always_off`
 //
+// The sampler name is an enum value and is matched case-insensitively.
 // Unknown values fall back to the default `parentbased_always_on` sampler,
 // as required by the OpenTelemetry specification.
 pub fn Sampler::from_env() -> Sampler {
   let name = match @env.get_env_var("OTEL_TRACES_SAMPLER") {
-    Some(value) => value.trim()
+    Some(value) => value.trim().to_lower()
     None => ""
   }
   match name {
