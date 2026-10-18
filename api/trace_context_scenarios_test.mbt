@@ -1,9 +1,10 @@
 // Additional trace context scenario tests
 
+///|
 test "span_context_trace_flags_bitmask" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
-  
+
   // Test each bit in trace_flags
   let mut i = 0
   while i < 8 {
@@ -20,6 +21,7 @@ test "span_context_trace_flags_bitmask" {
   }
 }
 
+///|
 test "trace_id_with_alternating_bytes" {
   let tid = [0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255]
   let sid = Array::make(8, 1)
@@ -29,6 +31,7 @@ test "trace_id_with_alternating_bytes" {
   assert_eq(hex, "00ff00ff00ff00ff00ff00ff00ff00ff")
 }
 
+///|
 test "span_id_with_incrementing_bytes" {
   let tid = Array::make(16, 1)
   let sid = [0, 1, 2, 3, 4, 5, 6, 7]
@@ -38,36 +41,38 @@ test "span_id_with_incrementing_bytes" {
   assert_eq(hex, "0001020304050607")
 }
 
+///|
 test "multiple_span_contexts_same_trace" {
   let tid = Array::make(16, 1)
   let sid1 = Array::make(8, 1)
   let sid2 = Array::make(8, 2)
   let sid3 = Array::make(8, 3)
-  
+
   let sc1 = @api.span_context(tid, sid1, 0)
   let sc2 = @api.span_context(tid, sid2, 0)
   let sc3 = @api.span_context(tid, sid3, 0)
-  
+
   // All should have same trace ID
   assert_eq(sc1.trace_id_hex(), sc2.trace_id_hex())
   assert_eq(sc2.trace_id_hex(), sc3.trace_id_hex())
-  
+
   // All should have different span IDs
   assert_false(sc1.span_id_hex() == sc2.span_id_hex())
   assert_false(sc2.span_id_hex() == sc3.span_id_hex())
   assert_false(sc1.span_id_hex() == sc3.span_id_hex())
 }
 
+///|
 test "trace_flags_combined_bits" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
-  
+
   // Test combinations with sampling bit (bit 0)
   assert_true(@api.span_context(tid, sid, 1).is_sampled())
   assert_true(@api.span_context(tid, sid, 3).is_sampled())
   assert_true(@api.span_context(tid, sid, 5).is_sampled())
   assert_true(@api.span_context(tid, sid, 7).is_sampled())
-  
+
   // Without sampling bit
   assert_false(@api.span_context(tid, sid, 0).is_sampled())
   assert_false(@api.span_context(tid, sid, 2).is_sampled())
@@ -75,9 +80,10 @@ test "trace_flags_combined_bits" {
   assert_false(@api.span_context(tid, sid, 6).is_sampled())
 }
 
+///|
 test "trace_id_first_byte_boundary" {
   let sid = Array::make(8, 1)
-  
+
   let mut i = 1
   while i < 256 {
     let tid = Array::make(16, 0)
@@ -88,9 +94,10 @@ test "trace_id_first_byte_boundary" {
   }
 }
 
+///|
 test "span_id_first_byte_boundary" {
   let tid = Array::make(16, 1)
-  
+
   let mut i = 1
   while i < 256 {
     let sid = Array::make(8, 0)
@@ -101,6 +108,7 @@ test "span_id_first_byte_boundary" {
   }
 }
 
+///|
 test "hex_encoding_all_values" {
   assert_eq(byte_to_hex_char(0), "0")
   assert_eq(byte_to_hex_char(1), "1")
@@ -120,6 +128,7 @@ test "hex_encoding_all_values" {
   assert_eq(byte_to_hex_char(15), "f")
 }
 
+///|
 test "bytes_to_hex_single_byte_variations" {
   let mut i = 0
   while i < 256 {
@@ -131,6 +140,7 @@ test "bytes_to_hex_single_byte_variations" {
   }
 }
 
+///|
 test "invalid_span_context_properties" {
   let invalid = @api.invalid_span_context()
   assert_false(invalid.is_valid())
@@ -140,61 +150,65 @@ test "invalid_span_context_properties" {
   assert_eq(invalid.span_id_hex(), "0000000000000000")
 }
 
+///|
 test "trace_id_with_single_byte_variations" {
   let sid = Array::make(8, 1)
-  
+
   let mut pos = 0
   while pos < 16 {
     let tid = Array::make(16, 0)
     tid[pos] = 42
     let sc = @api.span_context(tid, sid, 0)
     assert_true(sc.is_valid())
-    
+
     let hex = sc.trace_id_hex()
     assert_eq(hex.length(), 32)
-    
+
     pos = pos + 1
   }
 }
 
+///|
 test "span_id_with_single_byte_variations" {
   let tid = Array::make(16, 1)
-  
+
   let mut pos = 0
   while pos < 8 {
     let sid = Array::make(8, 0)
     sid[pos] = 99
     let sc = @api.span_context(tid, sid, 0)
     assert_true(sc.is_valid())
-    
+
     let hex = sc.span_id_hex()
     assert_eq(hex.length(), 16)
-    
+
     pos = pos + 1
   }
 }
 
+///|
 test "is_zero_with_special_patterns" {
   // All zeros
   assert_true(@api.is_zero([0, 0, 0, 0]))
-  
+
   // First byte non-zero
   assert_false(@api.is_zero([1, 0, 0, 0]))
-  
+
   // Last byte non-zero
   assert_false(@api.is_zero([0, 0, 0, 1]))
-  
+
   // Middle byte non-zero
   assert_false(@api.is_zero([0, 1, 0, 0]))
-  
+
   // All non-zero
   assert_false(@api.is_zero([1, 2, 3, 4]))
 }
 
+///|
 test "span_context_trace_flags_preservation" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
-  
+
   let mut flags = 0
   while flags < 256 {
     let sc = @api.span_context(tid, sid, flags)
@@ -203,12 +217,13 @@ test "span_context_trace_flags_preservation" {
   }
 }
 
+///|
 test "bytes_to_hex_empty_and_small_arrays" {
   // Single byte patterns
   assert_eq(bytes_to_hex([0]), "00")
   assert_eq(bytes_to_hex([255]), "ff")
   assert_eq(bytes_to_hex([128]), "80")
-  
+
   // Two byte patterns
   assert_eq(bytes_to_hex([0, 0]), "0000")
   assert_eq(bytes_to_hex([255, 255]), "ffff")

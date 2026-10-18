@@ -8,19 +8,23 @@
 ///|
 pub struct InMemorySpanExporter {
   batches : Array[Array[SpanData]]
-  mut span_total : Int
+  mut span_total : Int32
   mut shutdown_called : Bool
 }
 
 // Create an empty in-memory exporter.
+
+///|
 pub fn InMemorySpanExporter::new() -> InMemorySpanExporter {
-  { batches: [], span_total: 0, shutdown_called: false }
+  { batches: [], span_total: 0, shutdown_called: false, }
 }
 
 // The exported batches, in arrival order. Batches are copied so callers cannot
 // mutate the exporter's state.
+
+///|
 pub fn InMemorySpanExporter::exported_batches(
-  self : InMemorySpanExporter
+  self : InMemorySpanExporter,
 ) -> Array[Array[SpanData]] {
   let out : Array[Array[SpanData]] = Array(capacity=self.batches.length())
   for batch in self.batches {
@@ -30,8 +34,10 @@ pub fn InMemorySpanExporter::exported_batches(
 }
 
 // Every exported span, flattened in arrival order.
+
+///|
 pub fn InMemorySpanExporter::exported_spans(
-  self : InMemorySpanExporter
+  self : InMemorySpanExporter,
 ) -> Array[SpanData] {
   let out : Array[SpanData] = Array(capacity=self.span_total)
   for batch in self.batches {
@@ -43,13 +49,17 @@ pub fn InMemorySpanExporter::exported_spans(
 }
 
 // Number of spans exported so far.
-pub fn InMemorySpanExporter::span_count(self : InMemorySpanExporter) -> Int {
+
+///|
+pub fn InMemorySpanExporter::span_count(self : InMemorySpanExporter) -> Int32 {
   self.span_total
 }
 
 // Return every exported span and forget it, leaving the exporter empty.
+
+///|
 pub fn InMemorySpanExporter::take_spans(
-  self : InMemorySpanExporter
+  self : InMemorySpanExporter,
 ) -> Array[SpanData] {
   let out = self.exported_spans()
   self.batches.clear()
@@ -58,6 +68,8 @@ pub fn InMemorySpanExporter::take_spans(
 }
 
 // Drop every exported span. The shutdown state is unchanged.
+
+///|
 pub fn InMemorySpanExporter::clear(self : InMemorySpanExporter) -> Unit {
   self.batches.clear()
   self.span_total = 0
@@ -65,11 +77,14 @@ pub fn InMemorySpanExporter::clear(self : InMemorySpanExporter) -> Unit {
 
 // Whether `shutdown` has been called. A shut-down exporter rejects further
 // exports.
+
+///|
 pub fn InMemorySpanExporter::is_shutdown(self : InMemorySpanExporter) -> Bool {
   self.shutdown_called
 }
 
-pub impl SpanExporter for InMemorySpanExporter with export_spans(self, spans) {
+///|
+pub impl SpanExporter for InMemorySpanExporter with fn export_spans(self, spans) {
   if self.shutdown_called {
     ExportFailure("in-memory exporter is shut down")
   } else if spans.length() == 0 {
@@ -81,8 +96,10 @@ pub impl SpanExporter for InMemorySpanExporter with export_spans(self, spans) {
   }
 }
 
-pub impl SpanExporter for InMemorySpanExporter with shutdown(self) {
+///|
+pub impl SpanExporter for InMemorySpanExporter with fn shutdown(self) {
   self.shutdown_called = true
 }
 
+///|
 pub extend InMemorySpanExporter with SpanExporter::{export_spans, shutdown}

@@ -1,5 +1,6 @@
 // Tests for the typed attribute setters on `SpanSdk`.
 
+///|
 test "typed_attribute_helpers_record_values" {
   let exporter = @sdk.InMemorySpanExporter::new()
   let provider = @sdk.TracerProviderSdk::new(service_name="typed-attrs")
@@ -18,6 +19,7 @@ test "typed_attribute_helpers_record_values" {
   assert_eq(data.attributes.get("d"), Some(@sdk.DoubleValue(1.5)))
 }
 
+///|
 test "typed_attribute_helpers_are_noops_on_ended_spans" {
   let exporter = @sdk.InMemorySpanExporter::new()
   let provider = @sdk.TracerProviderSdk::new(service_name="typed-attrs-late")
@@ -33,6 +35,7 @@ test "typed_attribute_helpers_are_noops_on_ended_spans" {
   assert_eq(data.attributes.length(), 0)
 }
 
+///|
 test "typed_attribute_helpers_obey_value_length_limits" {
   let exporter = @sdk.InMemorySpanExporter::new()
   let provider = @sdk.TracerProviderSdk::new(service_name="typed-attrs-limit")
@@ -46,6 +49,7 @@ test "typed_attribute_helpers_obey_value_length_limits" {
   assert_eq(data.attributes.get("s"), Some(@sdk.StringValue("abc")))
 }
 
+///|
 test "typed_attribute_helpers_are_noops_for_non_recording_spans" {
   let exporter = @sdk.InMemorySpanExporter::new()
   let provider = @sdk.TracerProviderSdk::new(service_name="typed-attrs-off")

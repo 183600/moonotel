@@ -1,23 +1,27 @@
 // Blackbox smoke tests for the facade package.
 
+///|
 struct CapturingTransport {
   urls : Array[String]
   bodies : Array[Bytes]
-  status : Int
+  status : Int32
 }
 
+///|
 fn capturing_transport() -> CapturingTransport {
-  { urls: [], bodies: [], status: 200 }
+  { urls: [], bodies: [], status: 200, }
 }
 
+///|
 fn CapturingTransport::send(self : CapturingTransport) -> @otlp.Transport {
   fn(url, _headers, body) {
     self.urls.push(url)
     self.bodies.push(body)
-    { status_code: self.status, body: b"" }
+    { status_code: self.status, body: b"", }
   }
 }
 
+///|
 test "setup_end_to_end_with_transport" {
   @otel.shutdown_global_tracer_provider()
   let capture = capturing_transport()
@@ -34,14 +38,12 @@ test "setup_end_to_end_with_transport" {
   assert_eq(capture.urls.length(), 1)
   assert_eq(capture.urls[0], "http://collector:4318/v1/traces")
   assert_true(capture.bodies[0].length() > 0)
-  assert_eq(
-    @otel.decode_export_response(b""),
-    @sdk.ExportSuccess,
-  )
+  assert_eq(@otel.decode_export_response(b""), @sdk.ExportSuccess)
   provider.shutdown()
   @otel.shutdown_global_tracer_provider()
 }
 
+///|
 test "facade_without_transport_creates_provider" {
   @otel.shutdown_global_tracer_provider()
   let provider = @otel.setup(service_name="no-export")
@@ -53,6 +55,7 @@ test "facade_without_transport_creates_provider" {
   @otel.shutdown_global_tracer_provider()
 }
 
+///|
 test "facade_propagation_round_trip" {
   let sc = @otel.span_context(
     @otel.bytes_from_hex("4bf92f359d1e75b7618a2d1f3c4e5a6b").unwrap(),
@@ -70,6 +73,7 @@ test "facade_propagation_round_trip" {
   assert_eq(reparsed.unwrap().trace_flags(), sc.trace_flags())
 }
 
+///|
 test "tracer_start_span_with_context_parents_into_trace" {
   @otel.shutdown_global_tracer_provider()
   let provider = @otel.setup(service_name="ctx-test")
@@ -87,6 +91,7 @@ test "tracer_start_span_with_context_parents_into_trace" {
   @otel.shutdown_global_tracer_provider()
 }
 
+///|
 test "tracer_explicit_context_overrides_current" {
   @otel.shutdown_global_tracer_provider()
   let provider = @otel.setup(service_name="ctx-explicit-test")
@@ -111,11 +116,13 @@ test "tracer_explicit_context_overrides_current" {
   @otel.shutdown_global_tracer_provider()
 }
 
+///|
 test "facade_encode_trace_request_smoke" {
   let encoded = @otel.encode_trace_request([])
   assert_eq(encoded.length(), 0)
 }
 
+///|
 test "setup_merges_resource_attributes" {
   @otel.shutdown_global_tracer_provider()
   let attributes : Map[String, @otel.AttributeValue] = Map([])
@@ -137,6 +144,7 @@ test "setup_merges_resource_attributes" {
   @otel.shutdown_global_tracer_provider()
 }
 
+///|
 test "setup_applies_span_limits" {
   @otel.shutdown_global_tracer_provider()
   let provider = @otel.setup(
@@ -154,6 +162,7 @@ test "setup_applies_span_limits" {
   @otel.shutdown_global_tracer_provider()
 }
 
+///|
 test "facade_baggage_round_trip" {
   let context = @otel.Context::root().with_value("user.id", "42")
   let carrier = @otel.TextMapCarrier::new()

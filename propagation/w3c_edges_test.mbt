@@ -1,5 +1,6 @@
 // Edge cases of traceparent/tracestate parsing and injection.
 
+///|
 fn w3c_edge_context() -> @api.SpanContext {
   @api.span_context(
     @api.bytes_from_hex("4bf92f359d1e75b7618a2d1f3c4e5a6b").unwrap(),
@@ -8,16 +9,19 @@ fn w3c_edge_context() -> @api.SpanContext {
   )
 }
 
+///|
 test "parse_rejects_non_hex_version" {
   let value = "zz-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01"
   assert_true(@propagation.parse_traceparent(value) is None)
 }
 
+///|
 test "parse_rejects_invalid_span_id_hex" {
   let value = "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-zzzzzzzzzzzzzzzz-01"
   assert_true(@propagation.parse_traceparent(value) is None)
 }
 
+///|
 test "inject_without_tracestate_writes_no_tracestate_header" {
   let carrier = @propagation.TextMapCarrier::new()
   @propagation.inject_with_tracestate(w3c_edge_context(), None, carrier)
@@ -25,15 +29,18 @@ test "inject_without_tracestate_writes_no_tracestate_header" {
   assert_eq(@propagation.extract_tracestate(carrier), None)
 }
 
+///|
 test "parse_tracestate_rejects_duplicate_third_member" {
   assert_true(@propagation.parse_tracestate("a=1,b=2,c=3,b=4") is None)
 }
 
+///|
 test "parse_rejects_non_ascii_version" {
   let value = "é0-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01"
   assert_true(@propagation.parse_traceparent(value) is None)
 }
 
+///|
 test "format_traceparent_masks_out_of_range_bytes" {
   let sc = @api.span_context(Array::make(16, 999), Array::make(8, -1), 1)
   let sb = StringBuilder()
@@ -49,6 +56,7 @@ test "format_traceparent_masks_out_of_range_bytes" {
   assert_eq(@propagation.format_traceparent(sc), sb.to_string())
 }
 
+///|
 test "parse_tracestate_rejects_overlong_member_value" {
   let sb = StringBuilder()
   sb.write_string("a=")
@@ -59,6 +67,7 @@ test "parse_tracestate_rejects_overlong_member_value" {
   assert_true(@propagation.Tracestate::parse(sb.to_string()) is None)
 }
 
+///|
 test "parse_tracestate_accepts_max_length_member_value" {
   let sb = StringBuilder()
   sb.write_string("a=")

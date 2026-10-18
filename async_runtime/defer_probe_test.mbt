@@ -3,6 +3,7 @@
 // `async_runtime.spawn`, ...) rely on to end spans and restore the previous
 // context on the error path.
 
+///|
 async fn scoped_runner(f : async () -> Unit) -> Unit {
   let previous = @context.attach(
     @context.Context::root().with_value("scoped_runner", "on"),
@@ -11,14 +12,13 @@ async fn scoped_runner(f : async () -> Unit) -> Unit {
   f()
 }
 
+///|
 async test "defer runs when an awaited async call raises" {
   let caught : Ref[Bool] = Ref(false)
-  try {
-    scoped_runner(() => {
-      @async.sleep(1)
-      fail("boom")
-    })
-  } catch {
+  scoped_runner(() => {
+    @async.sleep(1)
+    fail("boom")
+  }) catch {
     _ => caught.val = true
   }
   assert_true(caught.val)

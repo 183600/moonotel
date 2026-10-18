@@ -10,6 +10,8 @@
 // propagates the key/value pairs.
 
 // Name of the `baggage` header
+
+///|
 pub fn baggage_header_name() -> String {
   "baggage"
 }
@@ -17,16 +19,23 @@ pub fn baggage_header_name() -> String {
 // Maximum number of members propagated in one `baggage` header. The W3C
 // Baggage specification requires a platform to propagate at most 64 members;
 // beyond that limit members may be dropped.
-pub const BAGGAGE_MAX_MEMBERS : Int = 64
+
+///|
+pub const BAGGAGE_MAX_MEMBERS : Int32 = 64
 
 // Maximum size in bytes of a `baggage` header. The W3C Baggage specification
 // requires a platform to propagate at most 8192 bytes; beyond that limit
 // members may be dropped.
-pub const BAGGAGE_MAX_BYTES : Int = 8192
+
+///|
+pub const BAGGAGE_MAX_BYTES : Int32 = 8192
 
 // Whether each ASCII code unit (0-127) is an HTTP token character.
+
+///|
 let token_char_table : FixedArray[Bool] = build_token_char_table()
 
+///|
 fn build_token_char_table() -> FixedArray[Bool] {
   let table : FixedArray[Bool] = FixedArray::make(128, false)
   let mut code = 0
@@ -37,8 +46,21 @@ fn build_token_char_table() -> FixedArray[Bool] {
       true
     } else {
       match code {
-        0x21 | 0x23 | 0x24 | 0x25 | 0x26 | 0x27 | 0x2A | 0x2B | 0x2D | 0x2E
-        | 0x5E | 0x5F | 0x60 | 0x7C | 0x7E => true
+        0x21
+        | 0x23
+        | 0x24
+        | 0x25
+        | 0x26
+        | 0x27
+        | 0x2A
+        | 0x2B
+        | 0x2D
+        | 0x2E
+        | 0x5E
+        | 0x5F
+        | 0x60
+        | 0x7C
+        | 0x7E => true
         _ => false
       }
     }
@@ -48,11 +70,13 @@ fn build_token_char_table() -> FixedArray[Bool] {
   table
 }
 
+///|
 fn is_token_char(c : Char) -> Bool {
   let code = c.to_int()
   code >= 0 && code < 128 && token_char_table.unsafe_get(code)
 }
 
+///|
 fn is_valid_baggage_key(key : StringView) -> Bool {
   let len = key.length()
   if len == 0 {
@@ -71,13 +95,16 @@ fn is_valid_baggage_key(key : StringView) -> Bool {
 // Whether each ASCII code unit (0-127) may appear literally in a baggage
 // value. Percent-encoding is required for everything else (including `"`,
 // `%`, `,`, `;` and `\`).
+
+///|
 let baggage_value_char_table : FixedArray[Bool] = build_baggage_value_char_table()
 
+///|
 fn build_baggage_value_char_table() -> FixedArray[Bool] {
   let table : FixedArray[Bool] = FixedArray::make(128, false)
   let mut code = 0
   while code < 128 {
-    let allowed = (code == 0x21) ||
+    let allowed = code == 0x21 ||
       (code >= 0x23 && code <= 0x2B && code != 0x25) ||
       (code >= 0x2D && code <= 0x3A) ||
       (code >= 0x3C && code <= 0x5B) ||
@@ -89,27 +116,37 @@ fn build_baggage_value_char_table() -> FixedArray[Bool] {
 }
 
 // Whether a byte may appear literally in a baggage value.
-fn is_baggage_value_char(code : Int) -> Bool {
+
+///|
+fn is_baggage_value_char(code : Int32) -> Bool {
   code >= 0 && code < 128 && baggage_value_char_table.unsafe_get(code)
 }
 
 // Upper-case ASCII code unit of every hex digit 0-9A-F.
+
+///|
 let hex_ascii_upper : FixedArray[Char] = build_hex_ascii_upper()
 
+///|
 fn build_hex_ascii_upper() -> FixedArray[Char] {
   let table : FixedArray[Char] = FixedArray::make(16, '0')
   let mut i = 0
   while i < 16 {
     table.unsafe_set(
       i,
-      if i < 10 { (i + 48).unsafe_to_char() } else { (i + 55).unsafe_to_char() },
+      if i < 10 {
+        (i + 48).unsafe_to_char()
+      } else {
+        (i + 55).unsafe_to_char()
+      },
     )
     i = i + 1
   }
   table
 }
 
-fn upper_hex_digit(value : Int) -> Char {
+///|
+fn upper_hex_digit(value : Int32) -> Char {
   if value >= 0 && value < 16 {
     hex_ascii_upper.unsafe_get(value)
   } else {
@@ -118,6 +155,8 @@ fn upper_hex_digit(value : Int) -> Char {
 }
 
 // Decode the body of a baggage value that contains at least one `%`.
+
+///|
 fn percent_decode_escaped(value : StringView) -> String? {
   let len = value.length()
   let mut decoded_len = 0
@@ -193,6 +232,8 @@ fn percent_decode_escaped(value : StringView) -> String? {
 // sequence is truncated or not followed by two hex digits. The second element
 // of the pair is `false` when the input had no `%`, in which case the decoded
 // value is a plain copy whose characters all percent-encode to themselves.
+
+///|
 fn percent_decode_view(value : StringView) -> (String, Bool)? {
   let len = value.length()
   // A value without `%` decodes to itself; its characters still need
@@ -219,6 +260,8 @@ fn percent_decode_view(value : StringView) -> (String, Bool)? {
 
 // Percent-decode a baggage value. Returns None when a `%` sequence is
 // truncated or not followed by two hex digits.
+
+///|
 pub fn percent_decode(value : String) -> String? {
   let len = value.length()
   // A value without `%` decodes to itself; its characters still need
@@ -242,7 +285,9 @@ pub fn percent_decode(value : String) -> String? {
 
 // Append the percent-encoded form of one byte value and return the number of
 // characters written (1 for a literal character, 3 for `%XX`).
-fn write_percent_encoded(sb : StringBuilder, code : Int) -> Int {
+
+///|
+fn write_percent_encoded(sb : StringBuilder, code : Int32) -> Int32 {
   if is_baggage_value_char(code) {
     sb.write_char(code.unsafe_to_char())
     1
@@ -255,6 +300,8 @@ fn write_percent_encoded(sb : StringBuilder, code : Int) -> Int {
 }
 
 // Append the percent-encoded form of `value` to `sb`.
+
+///|
 fn write_percent_encode(sb : StringBuilder, value : String) -> Unit {
   let len = value.length()
   // ASCII text is encoded from its code units; once a non-ASCII code unit is
@@ -275,7 +322,9 @@ fn write_percent_encode(sb : StringBuilder, value : String) -> Unit {
 
 // Like `write_percent_encode`, but also returns the number of encoded bytes
 // (characters) written.
-fn write_percent_encode_counted(sb : StringBuilder, value : String) -> Int {
+
+///|
+fn write_percent_encode_counted(sb : StringBuilder, value : String) -> Int32 {
   let len = value.length()
   let mut total = 0
   let mut i = 0
@@ -295,6 +344,8 @@ fn write_percent_encode_counted(sb : StringBuilder, value : String) -> Int {
 
 // Percent-encode a baggage value, leaving the characters allowed by the
 // specification untouched and encoding everything else as `%XX` (UTF-8).
+
+///|
 pub fn percent_encode(value : String) -> String {
   if value == "" {
     return ""
@@ -305,6 +356,8 @@ pub fn percent_encode(value : String) -> String {
 }
 
 // Whether a code unit is HTTP optional whitespace (space, tab, CR, LF).
+
+///|
 fn is_ows_code(c : UInt16) -> Bool {
   c == 0x20 || c == 0x09 || c == 0x0A || c == 0x0D
 }
@@ -312,7 +365,9 @@ fn is_ows_code(c : UInt16) -> Bool {
 // Number of bytes the percent-encoded form of `value` occupies in a `baggage`
 // header. The encoded form is ASCII, so the length equals the byte count; a
 // character outside the allowed set costs three bytes (`%XX`).
-pub fn percent_encoded_length(value : String) -> Int {
+
+///|
+pub fn percent_encoded_length(value : String) -> Int32 {
   let len = value.length()
   let mut total = 0
   let mut i = 0
@@ -346,6 +401,8 @@ pub fn percent_encoded_length(value : String) -> Int {
 // Following the W3C Baggage specification, at most `BAGGAGE_MAX_MEMBERS`
 // members and `BAGGAGE_MAX_BYTES` bytes are kept; once a member would exceed
 // either limit it and every following member are dropped.
+
+///|
 pub fn parse_baggage(value : String) -> Array[(String, String)] {
   let entries : Array[(String, String)] = []
   // Size of the normalized header built from `entries` so far.
@@ -404,12 +461,12 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
         let value_limit = if semi >= 0 { semi } else { item_end }
         let mut value_start = eq + 1
         while value_start < value_limit &&
-          is_ows_code(view.unsafe_get(value_start)) {
+              is_ows_code(view.unsafe_get(value_start)) {
           value_start = value_start + 1
         }
         let mut value_end = value_limit
         while value_end > value_start &&
-          is_ows_code(view.unsafe_get(value_end - 1)) {
+              is_ows_code(view.unsafe_get(value_end - 1)) {
           value_end = value_end - 1
         }
         match
@@ -451,6 +508,8 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
 // Following the W3C Baggage specification, at most `BAGGAGE_MAX_MEMBERS`
 // members and `BAGGAGE_MAX_BYTES` bytes are emitted; once a member would
 // exceed either limit it and every following member are dropped.
+
+///|
 pub fn format_baggage(entries : Array[(String, String)]) -> String {
   if entries.length() == 0 {
     return ""
@@ -510,6 +569,8 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
 // a deterministic header.
 //
 // The chain is walked once, collecting the innermost value of every key.
+
+///|
 pub fn context_baggage_header(context : @context.Context) -> String? {
   let mut entries : Array[(String, String)]? = None
   let mut seen : Array[String]? = None
@@ -585,7 +646,12 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
 
 // Inject the baggage of `context` into the carrier as a `baggage` header.
 // Does nothing when the context carries no baggage.
-pub fn inject_baggage(context : @context.Context, carrier : TextMapCarrier) -> Unit {
+
+///|
+pub fn inject_baggage(
+  context : @context.Context,
+  carrier : TextMapCarrier,
+) -> Unit {
   match context_baggage_header(context) {
     Some(formatted) => carrier.set(baggage_header_name(), formatted)
     None => ()
@@ -593,6 +659,8 @@ pub fn inject_baggage(context : @context.Context, carrier : TextMapCarrier) -> U
 }
 
 // Extract the baggage of a carrier as an ordered list of key/value pairs.
+
+///|
 pub fn extract_baggage(carrier : TextMapCarrier) -> Array[(String, String)] {
   match carrier.get(baggage_header_name()) {
     Some(value) => parse_baggage(value)
@@ -601,6 +669,8 @@ pub fn extract_baggage(carrier : TextMapCarrier) -> Array[(String, String)] {
 }
 
 // Extract the baggage of a carrier as a Context carrying each pair.
+
+///|
 pub fn extract_baggage_context(carrier : TextMapCarrier) -> @context.Context {
   let mut context = @context.Context::root()
   for entry in extract_baggage(carrier) {

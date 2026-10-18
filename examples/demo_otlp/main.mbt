@@ -13,6 +13,7 @@
 // are ignored and the process exits; an unreachable endpoint is not an
 // error for the application.
 
+///|
 async fn main {
   @async.with_task_group(group => {
     let provider = @async_runtime.setup(group, service_name="demo-otlp")
@@ -24,17 +25,16 @@ async fn main {
         server,
         call => {
           match call.path() {
-            "/hello" =>
-              call.respond(200, body="hello from the OTLP demo")
+            "/hello" => call.respond(200, body="hello from the OTLP demo")
             _ => call.respond(404, body="not found")
           }
         },
-        tracer=tracer,
+        tracer~,
       )
     }
     let (response, body) = @client.get(
       "http://127.0.0.1:\{port}/hello",
-      tracer=tracer,
+      tracer~,
     )
     println("GET /hello -> \{response.code}: \{body.text()}")
   })

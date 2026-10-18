@@ -1,26 +1,34 @@
 // Blackbox tests for the network protocol semantic-convention attributes
 // recorded by the client instrumentation.
 
+///|
 struct ClientProtocolExporter {
   spans : Ref[Array[@sdk.SpanData]]
 }
 
-pub impl @sdk.SpanExporter for ClientProtocolExporter with export_spans(self, spans) {
+///|
+pub impl @sdk.SpanExporter for ClientProtocolExporter with fn export_spans(
+  self,
+  spans,
+) {
   for data in spans {
     self.spans.val.push(data)
   }
   @sdk.ExportSuccess
 }
 
-pub impl @sdk.SpanExporter for ClientProtocolExporter with shutdown(self) {
+///|
+pub impl @sdk.SpanExporter for ClientProtocolExporter with fn shutdown(self) {
   let _ = self
 }
 
+///|
 async test "client spans carry the network protocol attributes" {
-  let exporter : ClientProtocolExporter = { spans: Ref([]) }
+  let exporter : ClientProtocolExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
-  let provider = @sdk.TracerProviderSdk::new(service_name="client-protocol")
-    .with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="client-protocol").with_span_processor(
+    processor,
+  )
   let tracer = provider.get_tracer("client-protocol")
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -30,7 +38,10 @@ async test "client spans carry the network protocol attributes" {
         conn.send_response(200, "OK")
       })
     }
-    let (response, _body) = @async_http_client.get("http://127.0.0.1:\{port}/protocol", tracer=tracer)
+    let (response, _body) = @async_http_client.get(
+      "http://127.0.0.1:\{port}/protocol",
+      tracer~,
+    )
     assert_eq(response.code, 200)
     assert_eq(exporter.spans.val.length(), 1)
     let data = exporter.spans.val[0]

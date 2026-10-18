@@ -64,13 +64,11 @@ fn json_array_value(value : Json) -> Array[Json] {
 
 ///|
 fn encode_json(spans : Array[@sdk.SpanData]) -> Json {
-  parse_json_text(
-    @utf8.decode_lossy(@otlp.encode_trace_request_json(spans)),
-  )
+  parse_json_text(@utf8.decode_lossy(@otlp.encode_trace_request_json(spans)))
 }
 
 ///|
-fn json_span_of(group : Json, index : Int) -> Json {
+fn json_span_of(group : Json, index : Int32) -> Json {
   let scope = json_array_value(json_member(group, "scopeSpans"))[0]
   json_array_value(json_member(scope, "spans"))[index]
 }
@@ -182,10 +180,7 @@ test "json_encoder_span_fields" {
     json_string_value(json_member(span, "endTimeUnixNano")),
     "2000000000",
   )
-  assert_eq(
-    json_number_value(json_member(span, "droppedAttributesCount")),
-    1.0,
-  )
+  assert_eq(json_number_value(json_member(span, "droppedAttributesCount")), 1.0)
   assert_eq(json_number_value(json_member(span, "droppedEventsCount")), 2.0)
   assert_eq(json_number_value(json_member(span, "droppedLinksCount")), 3.0)
   assert_eq(json_number_value(json_member(span, "flags")), 1.0)
@@ -252,10 +247,7 @@ test "json_encoder_events_and_links" {
     "1500000000",
   )
   let event_type = json_attribute(events[0], "exception.type").unwrap()
-  assert_eq(
-    json_string_value(json_member(event_type, "stringValue")),
-    "Boom",
-  )
+  assert_eq(json_string_value(json_member(event_type, "stringValue")), "Boom")
   let links = json_array_value(json_member(span, "links"))
   assert_eq(links.length(), 1)
   assert_eq(
@@ -306,7 +298,7 @@ test "json_encoder_omits_empty_optional_fields" {
 ///|
 test "json_encoder_escapes_strings" {
   let name = "quote\" back\\ newline\n tab\t ctrl\u{0001} slash/ end"
-  let span : @sdk.SpanData = { ..json_test_span(), name }
+  let span : @sdk.SpanData = { ..json_test_span(), name, }
   let root = encode_json([span])
   let parsed = json_span_of(
     json_array_value(json_member(root, "resourceSpans"))[0],
@@ -330,7 +322,7 @@ test "json_encoder_writes_non_finite_doubles_as_strings" {
     "neg_inf",
     @sdk.DoubleValue(0xFFF0000000000000L.reinterpret_as_double()),
   )
-  let span : @sdk.SpanData = { ..json_test_span(), attributes }
+  let span : @sdk.SpanData = { ..json_test_span(), attributes, }
   let root = encode_json([span])
   let parsed = json_span_of(
     json_array_value(json_member(root, "resourceSpans"))[0],
@@ -360,7 +352,7 @@ test "json_encoder_writes_non_finite_doubles_as_strings" {
 test "json_encoder_groups_by_resource_and_scope" {
   let second_resource : Map[String, @sdk.AttributeValue] = Map([])
   second_resource.set(@sdk.SERVICE_NAME, @sdk.StringValue("other-service"))
-  let first : @sdk.SpanData = { ..json_test_span(), name: "one" }
+  let first : @sdk.SpanData = { ..json_test_span(), name: "one", }
   let second : @sdk.SpanData = {
     ..json_test_span(),
     name: "two",

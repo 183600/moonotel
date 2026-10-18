@@ -1,6 +1,6 @@
 import {
-  "yourname/otel/api" @api,
-  "yourname/otel/context" @context,
+  "yourname/otel/api",
+  "yourname/otel/context",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",
 }

@@ -118,21 +118,13 @@ test "json_decode_tolerates_whitespace" {
 
 ///|
 test "json_decode_malformed_bodies_fail" {
-  for body in [
-    "{",
-    "}",
-    "not json",
-    "false",
-    "{\"partialSuccess\":",
-    "{\"partialSuccess\":{\"errorMessage\":",
-    "{\"partialSuccess\":{\"rejectedSpans\":}}",
-    "{\"partialSuccess\":{\"rejectedSpans\":\"1\"}",
-    "{\"partialSuccess\":{\"rejectedSpans\":\"1\"}}}",
-    "{} trailing",
-    "{\"partialSuccess\":{\"rejectedSpans\":\"x\"}}",
-    "{\"partialSuccess\":{\"rejectedSpans\":\"-1\"}}",
-    "{\"partialSuccess\":{\"errorMessage\":\"unterminated}}",
-  ] {
+  for
+    body in [
+      "{", "}", "not json", "false", "{\"partialSuccess\":", "{\"partialSuccess\":{\"errorMessage\":",
+      "{\"partialSuccess\":{\"rejectedSpans\":}}", "{\"partialSuccess\":{\"rejectedSpans\":\"1\"}",
+      "{\"partialSuccess\":{\"rejectedSpans\":\"1\"}}}", "{} trailing", "{\"partialSuccess\":{\"rejectedSpans\":\"x\"}}",
+      "{\"partialSuccess\":{\"rejectedSpans\":\"-1\"}}", "{\"partialSuccess\":{\"errorMessage\":\"unterminated}}",
+    ] {
     assert_false(decode_json_body(body).is_success())
   }
 }

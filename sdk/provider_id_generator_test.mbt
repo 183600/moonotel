@@ -1,8 +1,10 @@
 // The ID generator installed on the provider must drive the IDs of new spans.
 
+///|
 test "with_id_generator_is_used_by_the_tracer" {
-  let provider = @sdk.TracerProviderSdk::new(service_name="ids")
-    .with_id_generator(@sdk.IdGenerator::deterministic(42))
+  let provider = @sdk.TracerProviderSdk::new(service_name="ids").with_id_generator(
+    @sdk.IdGenerator::deterministic(42),
+  )
   let tracer = provider.get_tracer("ids")
   let span = tracer.start_root_span("op")
   let expected = @sdk.IdGenerator::deterministic(42)

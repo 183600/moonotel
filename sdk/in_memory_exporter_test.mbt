@@ -1,5 +1,6 @@
 // Tests for the in-memory span exporter.
 
+///|
 test "in_memory_exporter_captures_exported_spans" {
   let exporter = @sdk.InMemorySpanExporter::new()
   let provider = @sdk.TracerProviderSdk::new(service_name="mem")
@@ -19,12 +20,10 @@ test "in_memory_exporter_captures_exported_spans" {
   assert_eq(spans[0].name, "op")
   assert_eq(spans[0].scope_name, "mem-scope")
   assert_eq(spans[0].scope_version, "1.0")
-  assert_eq(
-    spans[0].attributes.get("k"),
-    Some(@sdk.StringValue("v")),
-  )
+  assert_eq(spans[0].attributes.get("k"), Some(@sdk.StringValue("v")))
 }
 
+///|
 test "in_memory_exporter_receives_only_sampled_spans" {
   let exporter = @sdk.InMemorySpanExporter::new()
   let provider = @sdk.TracerProviderSdk::new(service_name="mem-drop")
@@ -36,6 +35,7 @@ test "in_memory_exporter_receives_only_sampled_spans" {
   assert_eq(exporter.span_count(), 0)
 }
 
+///|
 test "in_memory_exporter_take_and_clear" {
   let exporter = @sdk.InMemorySpanExporter::new()
   let provider = @sdk.TracerProviderSdk::new(service_name="mem-take")
@@ -56,12 +56,14 @@ test "in_memory_exporter_take_and_clear" {
   assert_eq(exporter.span_count(), 0)
 }
 
+///|
 test "in_memory_exporter_empty_export_is_a_success" {
   let exporter = @sdk.InMemorySpanExporter::new()
   assert_eq(exporter.export_spans([]), @sdk.ExportSuccess)
   assert_eq(exporter.span_count(), 0)
 }
 
+///|
 test "in_memory_exporter_rejects_exports_after_shutdown" {
   let exporter = @sdk.InMemorySpanExporter::new()
   let provider = @sdk.TracerProviderSdk::new(service_name="mem-shutdown")
@@ -78,6 +80,7 @@ test "in_memory_exporter_rejects_exports_after_shutdown" {
   assert_eq(exporter.span_count(), 0)
 }
 
+///|
 test "in_memory_exporter_returned_batches_are_copies" {
   let exporter = @sdk.InMemorySpanExporter::new()
   let provider = @sdk.TracerProviderSdk::new(service_name="mem-copy")

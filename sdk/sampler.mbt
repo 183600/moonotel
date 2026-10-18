@@ -5,29 +5,39 @@
 // sampled flag is propagated downstream).
 
 // Result of a sampling decision.
+
+///|
 pub(all) struct SamplingDecision {
   is_recorded : Bool
   is_sampled : Bool
 } derive(Eq, @debug.Debug)
 
 // Record and export the span (RECORD_AND_SAMPLE)
+
+///|
 pub fn sampling_decision_record_and_sample() -> SamplingDecision {
-  { is_recorded: true, is_sampled: true }
+  { is_recorded: true, is_sampled: true, }
 }
 
 // Record locally but do not export (RECORD_ONLY)
+
+///|
 pub fn sampling_decision_record_only() -> SamplingDecision {
-  { is_recorded: true, is_sampled: false }
+  { is_recorded: true, is_sampled: false, }
 }
 
 // Do not record and do not export (DROP)
+
+///|
 pub fn sampling_decision_drop() -> SamplingDecision {
-  { is_recorded: false, is_sampled: false }
+  { is_recorded: false, is_sampled: false, }
 }
 
 // Compose the trace ID's leading 8 bytes into an unsigned 64-bit integer.
 // This is the value used by ratio-based sampling (consistent across SDKs).
-fn trace_id_fraction(trace_id : Array[Int]) -> UInt64 {
+
+///|
+fn trace_id_fraction(trace_id : Array[Int32]) -> UInt64 {
   let mut value : UInt64 = 0
   let n = if trace_id.length() < 8 { trace_id.length() } else { 8 }
   let mut i = 0
@@ -50,44 +60,44 @@ fn trace_id_fraction(trace_id : Array[Int]) -> UInt64 {
 // before the comparison, keeping the arithmetic within the 63 bits of integer
 // precision of a double. This matches the algorithm used by the OpenTelemetry
 // SDKs in other languages, so the same trace ID is sampled everywhere.
+
+///|
 fn ratio_threshold(ratio : Double) -> UInt64 {
   (ratio * 9223372036854775808.0).to_uint64()
 }
 
 // A Sampler is a function from (parent SpanContext?, trace ID) to a decision.
+
+///|
 pub struct Sampler {
-  sample : (@api.SpanContext?, Array[Int]) -> SamplingDecision
+  sample : (@api.SpanContext?, Array[Int32]) -> SamplingDecision
 }
 
 // Always sample every span.
+
+///|
 pub fn Sampler::always_on() -> Sampler {
-  {
-    sample: fn(_parent, _trace_id) {
-      sampling_decision_record_and_sample()
-    },
-  }
+  { sample: fn(_parent, _trace_id) { sampling_decision_record_and_sample() }, }
 }
 
 // Never sample any span.
+
+///|
 pub fn Sampler::always_off() -> Sampler {
-  {
-    sample: fn(_parent, _trace_id) {
-      sampling_decision_drop()
-    },
-  }
+  { sample: fn(_parent, _trace_id) { sampling_decision_drop() }, }
 }
 
 // Record every span locally but never sample (never export).
+
+///|
 pub fn Sampler::record_only() -> Sampler {
-  {
-    sample: fn(_parent, _trace_id) {
-      sampling_decision_record_only()
-    },
-  }
+  { sample: fn(_parent, _trace_id) { sampling_decision_record_only() }, }
 }
 
 // Sample a deterministic fraction of traces based on the trace ID.
 // `ratio` is clamped: values <= 0 never sample, values >= 1 always sample.
+
+///|
 pub fn Sampler::trace_id_ratio_based(ratio : Double) -> Sampler {
   if ratio <= 0.0 {
     return Sampler::always_off()
@@ -98,7 +108,7 @@ pub fn Sampler::trace_id_ratio_based(ratio : Double) -> Sampler {
   let threshold = ratio_threshold(ratio)
   {
     sample: fn(_parent, trace_id) {
-      if (trace_id_fraction(trace_id) >> 1) < threshold {
+      if trace_id_fraction(trace_id) >> 1 < threshold {
         sampling_decision_record_and_sample()
       } else {
         sampling_decision_drop()
@@ -112,12 +122,14 @@ pub fn Sampler::trace_id_ratio_based(ratio : Double) -> Sampler {
 // optional delegates default to the OpenTelemetry specification values:
 // always-on for sampled parents and always-off for unsampled parents, for
 // both remote and local parents.
+
+///|
 pub fn Sampler::parent_based(
   root : Sampler,
   remote_parent_sampled? : Sampler,
   remote_parent_not_sampled? : Sampler,
   local_parent_sampled? : Sampler,
-  local_parent_not_sampled? : Sampler
+  local_parent_not_sampled? : Sampler,
 ) -> Sampler {
   let remote_sampled = match remote_parent_sampled {
     Some(value) => value
@@ -142,7 +154,11 @@ pub fn Sampler::parent_based(
           if ctx.is_valid() {
             let sampled = (ctx.trace_flags() & 1) != 0
             let delegate = if ctx.is_remote() {
-              if sampled { remote_sampled } else { remote_not_sampled }
+              if sampled {
+                remote_sampled
+              } else {
+                remote_not_sampled
+              }
             } else if sampled {
               local_sampled
             } else {
@@ -159,24 +175,24 @@ pub fn Sampler::parent_based(
 }
 
 // Run the sampler for the given parent context and trace ID.
+
+///|
 pub fn Sampler::should_sample(
   self : Sampler,
   parent : @api.SpanContext?,
-  trace_id : Array[Int]
+  trace_id : Array[Int32],
 ) -> SamplingDecision {
   (self.sample)(parent, trace_id)
 }
 
 // The ratio configured through `OTEL_TRACES_SAMPLER_ARG`, or 1.0 when the
 // variable is absent, not a number, NaN, or outside the `[0..1]` range.
+
+///|
 fn sampler_ratio_from_env() -> Double {
   match @env.get_env_var("OTEL_TRACES_SAMPLER_ARG") {
     Some(value) => {
-      let ratio = try {
-        @string.parse_double(value.trim())
-      } catch {
-        _ => 1.0
-      }
+      let ratio = @string.parse_double(value.trim()) catch { _ => 1.0 }
       if ratio.is_nan() || ratio < 0.0 || ratio > 1.0 {
         1.0
       } else {
@@ -197,6 +213,8 @@ fn sampler_ratio_from_env() -> Double {
 // The sampler name is an enum value and is matched case-insensitively.
 // Unknown values fall back to the default `parentbased_always_on` sampler,
 // as required by the OpenTelemetry specification.
+
+///|
 pub fn Sampler::from_env() -> Sampler {
   let name = match @env.get_env_var("OTEL_TRACES_SAMPLER") {
     Some(value) => value.trim().to_lower()
@@ -216,5 +234,8 @@ pub fn Sampler::from_env() -> Sampler {
   }
 }
 
+///|
 pub extend SamplingDecision with Eq::{not_equal, equal}
+
+///|
 pub extend SamplingDecision with @debug.Debug::{to_repr}

@@ -1,15 +1,17 @@
 // Tests for `BatchSpanProcessor::from_env` (OTEL_BSP_* configuration) and for
 // the dropped-span accounting when the queue overflows.
 
+///|
 fn clear_bsp_env() -> Unit {
   @env.unset_env_var("OTEL_BSP_MAX_QUEUE_SIZE")
   @env.unset_env_var("OTEL_BSP_MAX_EXPORT_BATCH_SIZE")
   @env.unset_env_var("OTEL_BSP_SCHEDULE_DELAY")
 }
 
+///|
 test "batch_processor_from_env_defaults" {
   clear_bsp_env()
-  let exporter : ProbeExporter = { names: [] }
+  let exporter : ProbeExporter = { names: [], }
   let processor = @sdk.BatchSpanProcessor::from_env(exporter)
   assert_eq(processor.flush_interval_millis(), 5000)
   assert_eq(processor.dropped_spans(), 0UL)
@@ -17,12 +19,13 @@ test "batch_processor_from_env_defaults" {
   assert_eq(processor.queue_size(), 1)
 }
 
+///|
 test "batch_processor_from_env_reads_configuration" {
   clear_bsp_env()
   @env.set_env_var("OTEL_BSP_MAX_QUEUE_SIZE", "3")
   @env.set_env_var("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", "10")
   @env.set_env_var("OTEL_BSP_SCHEDULE_DELAY", "250")
-  let exporter : ProbeExporter = { names: [] }
+  let exporter : ProbeExporter = { names: [], }
   let processor = @sdk.BatchSpanProcessor::from_env(exporter)
   clear_bsp_env()
   assert_eq(processor.flush_interval_millis(), 250)
@@ -35,22 +38,24 @@ test "batch_processor_from_env_reads_configuration" {
   assert_eq(processor.queue_size(), 0)
 }
 
+///|
 test "batch_processor_from_env_ignores_malformed_values" {
   clear_bsp_env()
   @env.set_env_var("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", "not-a-number")
   @env.set_env_var("OTEL_BSP_SCHEDULE_DELAY", "  ")
-  let exporter : ProbeExporter = { names: [] }
+  let exporter : ProbeExporter = { names: [], }
   let processor = @sdk.BatchSpanProcessor::from_env(exporter)
   clear_bsp_env()
   assert_eq(processor.flush_interval_millis(), 5000)
 }
 
+///|
 test "batch_processor_from_env_ignores_non_positive_values" {
   clear_bsp_env()
   @env.set_env_var("OTEL_BSP_MAX_QUEUE_SIZE", "-4")
   @env.set_env_var("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", "0")
   @env.set_env_var("OTEL_BSP_SCHEDULE_DELAY", "-1")
-  let exporter : ProbeExporter = { names: [] }
+  let exporter : ProbeExporter = { names: [], }
   let processor = @sdk.BatchSpanProcessor::from_env(exporter)
   clear_bsp_env()
   assert_eq(processor.flush_interval_millis(), 5000)
@@ -61,8 +66,9 @@ test "batch_processor_from_env_ignores_non_positive_values" {
   assert_eq(processor.dropped_spans(), 0UL)
 }
 
+///|
 test "batch_processor_counts_dropped_spans_when_full" {
-  let exporter : ProbeExporter = { names: [] }
+  let exporter : ProbeExporter = { names: [], }
   let processor = @sdk.BatchSpanProcessor::new(
     exporter,
     max_queue_size=2,

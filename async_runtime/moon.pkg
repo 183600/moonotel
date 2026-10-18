@@ -1,17 +1,17 @@
 import {
-  "moonbitlang/async" @async,
-  "moonbitlang/async/aqueue" @aqueue,
-  "yourname/otel/context" @context,
-  "yourname/otel/exporter/otlp" @otlp,
-  "yourname/otel/exporter/otlp_async" @otlp_async,
-  "yourname/otel/sdk" @sdk,
+  "moonbitlang/async",
+  "moonbitlang/async/aqueue",
+  "yourname/otel/context",
+  "yourname/otel/exporter/otlp",
+  "yourname/otel/exporter/otlp_async",
+  "yourname/otel/sdk",
 }
 
 import {
-  "moonbitlang/async/http" @http,
-  "moonbitlang/async/socket" @socket,
+  "moonbitlang/async/http",
+  "moonbitlang/async/socket",
   "moonbitlang/core/env",
-  "yourname/otel/api" @api,
+  "yourname/otel/api",
 } for "test"
 
 pkgtype(kind: "library")

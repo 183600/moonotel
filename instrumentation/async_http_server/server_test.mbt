@@ -1,22 +1,29 @@
 // Integration tests for the async HTTP server instrumentation.
 
+///|
 struct RecordingExporter {
   spans : Ref[Array[@sdk.SpanData]]
 }
 
-pub impl @sdk.SpanExporter for RecordingExporter with export_spans(self, spans) {
+///|
+pub impl @sdk.SpanExporter for RecordingExporter with fn export_spans(
+  self,
+  spans,
+) {
   for data in spans {
     self.spans.val.push(data)
   }
   @sdk.ExportSuccess
 }
 
-pub impl @sdk.SpanExporter for RecordingExporter with shutdown(self) {
+///|
+pub impl @sdk.SpanExporter for RecordingExporter with fn shutdown(self) {
   let _ = self
 }
 
+///|
 fn test_tracer(scope : String) -> (@sdk.Tracer, RecordingExporter) {
-  let exporter : RecordingExporter = { spans: Ref([]) }
+  let exporter : RecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
   let provider = @sdk.TracerProviderSdk::new(
     service_name="instrumentation-test",
@@ -24,10 +31,8 @@ fn test_tracer(scope : String) -> (@sdk.Tracer, RecordingExporter) {
   (provider.get_tracer(scope), exporter)
 }
 
-fn find_span(
-  spans : Array[@sdk.SpanData],
-  name : String
-) -> @sdk.SpanData? {
+///|
+fn find_span(spans : Array[@sdk.SpanData], name : String) -> @sdk.SpanData? {
   for data in spans {
     if data.name == name {
       return Some(data)
@@ -36,10 +41,12 @@ fn find_span(
   None
 }
 
+///|
 suberror HandlerBoom {
   HandlerBoom(String)
 } derive(@debug.Debug)
 
+///|
 async test "server span continues the propagated trace" {
   let (tracer, exporter) = test_tracer("server-test")
   @async.with_task_group() <| group => {
@@ -48,10 +55,8 @@ async test "server span continues the propagated trace" {
     group.spawn_bg(no_wait=true) <| () => {
       @async_http_server.run_server_on(
         server,
-        call => {
-          call.respond(200, body="ok")
-        },
-        tracer=tracer,
+        call => call.respond(200, body="ok"),
+        tracer~,
       )
     }
     let parent = @api.span_context(
@@ -60,10 +65,9 @@ async test "server span continues the propagated trace" {
       @api.TRACE_FLAGS_SAMPLED,
     )
     let traceparent = @propagation.format_traceparent(parent)
-    let (response, body) = @http.get(
-      "http://127.0.0.1:\{port}/items?q=1",
-      headers={ "traceparent": traceparent },
-    )
+    let (response, body) = @http.get("http://127.0.0.1:\{port}/items?q=1", headers={
+      "traceparent": traceparent,
+    })
     assert_eq(response.code, 200)
     assert_eq(body.text(), "ok")
     @async.sleep(50)
@@ -93,6 +97,7 @@ async test "server span continues the propagated trace" {
   }
 }
 
+///|
 async test "ServerCall::start_span parents children to the request" {
   let (tracer, exporter) = test_tracer("server-test-children")
   @async.with_task_group() <| group => {
@@ -104,17 +109,14 @@ async test "ServerCall::start_span parents children to the request" {
         call => {
           match call.start_span("db.query") {
             Some(span) => {
-              span.set_attribute(
-                "db.system",
-                @sdk.StringValue("testdb"),
-              )
+              span.set_attribute("db.system", @sdk.StringValue("testdb"))
               span.end()
             }
             None => ()
           }
           call.respond(200)
         },
-        tracer=tracer,
+        tracer~,
       )
     }
     let (response, _body) = @http.get("http://127.0.0.1:\{port}/children")
@@ -136,6 +138,7 @@ async test "ServerCall::start_span parents children to the request" {
   }
 }
 
+///|
 async test "5xx responses set the server span status to Error" {
   let (tracer, exporter) = test_tracer("server-test-error")
   @async.with_task_group() <| group => {
@@ -144,10 +147,8 @@ async test "5xx responses set the server span status to Error" {
     group.spawn_bg(no_wait=true) <| () => {
       @async_http_server.run_server_on(
         server,
-        call => {
-          call.respond(500, body="oops")
-        },
-        tracer=tracer,
+        call => call.respond(500, body="oops"),
+        tracer~,
       )
     }
     let (response, _body) = @http.get("http://127.0.0.1:\{port}/fail")
@@ -166,6 +167,7 @@ async test "5xx responses set the server span status to Error" {
   }
 }
 
+///|
 async test "handler exceptions are recorded and end the span" {
   let (tracer, exporter) = test_tracer("server-test-exception")
   @async.with_task_group() <| group => {
@@ -178,7 +180,7 @@ async test "handler exceptions are recorded and end the span" {
           let _ = call
           raise HandlerBoom("boom")
         },
-        tracer=tracer,
+        tracer~,
       )
     }
     let outcome = try {
@@ -201,6 +203,7 @@ async test "handler exceptions are recorded and end the span" {
   }
 }
 
+///|
 test "extract_context parses traceparent, tracestate and baggage" {
   let parent = @api.span_context(
     Array::make(16, 21),
@@ -213,10 +216,7 @@ test "extract_context parses traceparent, tracestate and baggage" {
     @propagation.format_traceparent(parent),
   )
   headers.set(@http.CaseInsensitiveString("tracestate"), "congo=t61rcWkgMzE")
-  headers.set(
-    @http.CaseInsensitiveString("baggage"),
-    "user.id=42,note=a%2Cb",
-  )
+  headers.set(@http.CaseInsensitiveString("baggage"), "user.id=42,note=a%2Cb")
   let context = @async_http_server.extract_context(headers)
   let span_context = context.span_context().unwrap()
   assert_eq(span_context.trace_id_hex(), parent.trace_id_hex())
@@ -226,6 +226,7 @@ test "extract_context parses traceparent, tracestate and baggage" {
   assert_eq(context.value("note"), Some("a,b"))
 }
 
+///|
 test "extract_context ignores an invalid tracestate" {
   let parent = @api.span_context(
     Array::make(16, 31),
@@ -242,6 +243,7 @@ test "extract_context ignores an invalid tracestate" {
   assert_eq(context.span_context().unwrap().tracestate(), "")
 }
 
+///|
 test "extract_context is empty without headers" {
   let headers : Map[@http.CaseInsensitiveString, String] = Map([])
   let context = @async_http_server.extract_context(headers)
@@ -249,6 +251,7 @@ test "extract_context is empty without headers" {
   assert_eq(context.baggage().length(), 0)
 }
 
+///|
 async test "server propagates tracestate and baggage headers" {
   let (tracer, exporter) = test_tracer("server-test-state")
   @async.with_task_group() <| group => {
@@ -257,10 +260,8 @@ async test "server propagates tracestate and baggage headers" {
     group.spawn_bg(no_wait=true) <| () => {
       @async_http_server.run_server_on(
         server,
-        call => {
-          call.respond(200)
-        },
-        tracer=tracer,
+        call => call.respond(200),
+        tracer~,
       )
     }
     let parent = @api.span_context(
@@ -268,14 +269,11 @@ async test "server propagates tracestate and baggage headers" {
       Array::make(8, 22),
       @api.TRACE_FLAGS_SAMPLED,
     )
-    let (response, _body) = @http.get(
-      "http://127.0.0.1:\{port}/state",
-      headers={
-        "traceparent": @propagation.format_traceparent(parent),
-        "tracestate": "congo=t61rcWkgMzE",
-        "baggage": "user.id=42,note=a%2Cb",
-      },
-    )
+    let (response, _body) = @http.get("http://127.0.0.1:\{port}/state", headers={
+      "traceparent": @propagation.format_traceparent(parent),
+      "tracestate": "congo=t61rcWkgMzE",
+      "baggage": "user.id=42,note=a%2Cb",
+    })
     assert_eq(response.code, 200)
     @async.sleep(50)
     let data = exporter.spans.val[0]
@@ -285,6 +283,7 @@ async test "server propagates tracestate and baggage headers" {
   }
 }
 
+///|
 async test "ServerCall::set_route records http.route and renames the span" {
   let (tracer, exporter) = test_tracer("server-test-route")
   @async.with_task_group() <| group => {
@@ -297,7 +296,7 @@ async test "ServerCall::set_route records http.route and renames the span" {
           assert_true(call.set_route("/items/:id"))
           call.respond(200)
         },
-        tracer=tracer,
+        tracer~,
       )
     }
     let (response, _body) = @http.get("http://127.0.0.1:\{port}/items/42")
@@ -313,6 +312,7 @@ async test "ServerCall::set_route records http.route and renames the span" {
   }
 }
 
+///|
 async test "ServerCall::set_route is a no-op without tracing" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -328,14 +328,13 @@ async test "ServerCall::set_route is a no-op without tracing" {
   }
 }
 
+///|
 async test "server runs untraced when no tracer is available" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      @async_http_server.run_server_on(server, call => {
-        call.respond(204)
-      })
+      @async_http_server.run_server_on(server, call => call.respond(204))
     }
     let (response, _body) = @http.get("http://127.0.0.1:\{port}/plain")
     assert_eq(response.code, 204)

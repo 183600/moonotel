@@ -1,5 +1,6 @@
 // The `is_remote` flag must not leak into locally created child spans.
 
+///|
 fn remote_parent_context() -> @context.Context {
   let parent = @api.span_context(
     Array::make(16, 1),
@@ -11,6 +12,7 @@ fn remote_parent_context() -> @context.Context {
   @context.Context::root().with_span(parent)
 }
 
+///|
 test "child of a remote parent is local" {
   let provider = @sdk.TracerProviderSdk::new()
   let tracer = provider.get_tracer("remote-parent")
@@ -22,6 +24,7 @@ test "child of a remote parent is local" {
   assert_true(span.context().is_valid())
 }
 
+///|
 test "child of a remote parent keeps its tracestate" {
   let provider = @sdk.TracerProviderSdk::new()
   let tracer = provider.get_tracer("remote-parent")

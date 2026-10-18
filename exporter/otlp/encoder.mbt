@@ -3,6 +3,7 @@
 
 // Encode one typed array element into its `AnyValue` form (field 5 of the
 // enclosing `AnyValue` holds the repeated elements).
+
 ///|
 fn encode_string_array(writer : ProtoWriter, items : Array[String]) -> Unit {
   let array = writer.take_scratch()
@@ -93,11 +94,13 @@ fn varint_size(value : UInt64) -> Int32 {
 // AnyValue payload is `any_size` bytes, reserving room for the whole
 // attribute (key and payload included). `key_len` is the key length in code
 // units; it equals the byte length when the key is ASCII.
+
+///|
 fn write_scalar_attribute_header(
   writer : ProtoWriter,
-  field : Int,
-  key_len : Int,
-  any_size : Int,
+  field : Int32,
+  key_len : Int32,
+  any_size : Int32,
 ) -> Unit {
   if field < 16 && key_len < 0x80 && any_size < 0x80 {
     let kv_size = key_len + any_size + 4
@@ -111,7 +114,7 @@ fn write_scalar_attribute_header(
         writer.len,
         ((field << 3) | 2).reinterpret_as_uint() |
         (kv_size.reinterpret_as_uint() << 8) |
-        ((0x0A : UInt) << 16) |
+        ((0x0A : UInt32) << 16) |
         (key_len.reinterpret_as_uint() << 24),
       )
       writer.len = writer.len + 4
@@ -134,9 +137,11 @@ fn write_scalar_attribute_header(
 // be ASCII (one byte per code unit); when a non-ASCII code unit shows up the
 // partial write is rolled back and false is returned so the caller can use
 // the generic path.
+
+///|
 fn try_encode_scalar_attribute(
   writer : ProtoWriter,
-  field : Int,
+  field : Int32,
   key : String,
   value : @sdk.AttributeValue,
 ) -> Bool {
@@ -156,10 +161,10 @@ fn try_encode_scalar_attribute(
         // AnyValue size and the value length fit in one varint byte.
         writer.buf.unsafe_write_uint32_le(
           writer.len,
-          ((0x12 : UInt) |
-            (any_size.reinterpret_as_uint() << 8) |
-            ((0x0A : UInt) << 16) |
-            (value_len.reinterpret_as_uint() << 24)),
+          (0x12 : UInt32) |
+          (any_size.reinterpret_as_uint() << 8) |
+          ((0x0A : UInt32) << 16) |
+          (value_len.reinterpret_as_uint() << 24),
         )
         writer.len = writer.len + 4
       } else {
@@ -182,10 +187,10 @@ fn try_encode_scalar_attribute(
       }
       writer.buf.unsafe_write_uint32_le(
         writer.len,
-        ((0x12 : UInt) |
-          (0x02U << 8) |
-          ((0x10 : UInt) << 16) |
-          ((if flag { 0x01U } else { 0x00U }) << 24)),
+        (0x12 : UInt32) |
+        (0x02U << 8) |
+        ((0x10 : UInt32) << 16) |
+        ((if flag { 0x01U } else { 0x00U }) << 24),
       )
       writer.len = writer.len + 4
       true
@@ -201,10 +206,10 @@ fn try_encode_scalar_attribute(
       if bits < 0x80 {
         writer.buf.unsafe_write_uint32_le(
           writer.len,
-          ((0x12 : UInt) |
-            (0x02U << 8) |
-            ((0x18 : UInt) << 16) |
-            (bits.to_uint() << 24)),
+          (0x12 : UInt32) |
+          (0x02U << 8) |
+          ((0x18 : UInt32) << 16) |
+          (bits.to_uint() << 24),
         )
         writer.len = writer.len + 4
       } else {
@@ -222,7 +227,7 @@ fn try_encode_scalar_attribute(
       }
       writer.buf.unsafe_write_uint32_le(
         writer.len,
-        ((0x12 : UInt) | (0x09U << 8) | ((0x21 : UInt) << 16)),
+        (0x12 : UInt32) | (0x09U << 8) | ((0x21 : UInt32) << 16),
       )
       writer.buf.unsafe_write_uint64_le(
         writer.len + 3,
@@ -370,8 +375,9 @@ fn encode_span(writer : ProtoWriter, data : @sdk.SpanData) -> Unit {
 }
 
 // Append the decimal digits of a non-negative integer.
+
 ///|
-fn write_decimal(sb : StringBuilder, value : Int) -> Unit {
+fn write_decimal(sb : StringBuilder, value : Int32) -> Unit {
   if value >= 10 {
     write_decimal(sb, value / 10)
   }
@@ -434,6 +440,7 @@ fn resource_key_value(sb : StringBuilder, value : @sdk.AttributeValue) -> Unit {
 }
 
 // Canonical key for grouping spans that share a resource.
+
 ///|
 fn resource_key(resource : Map[String, @sdk.AttributeValue]) -> String {
   let entries : Array[(String, @sdk.AttributeValue)] = Array(
@@ -460,19 +467,20 @@ priv struct ScopeGroup {
   scope_name : String
   scope_version : String
   spans : Array[@sdk.SpanData]
-  mut size_hint : Int
+  mut size_hint : Int32
 }
 
 ///|
 priv struct ResourceGroup {
   resource : Map[String, @sdk.AttributeValue]
   scopes : Array[ScopeGroup]
-  mut size_hint : Int
+  mut size_hint : Int32
 }
 
 // Find the scope group with the given name and version inside a resource
 // group. Scope groups are unique per resource group, so the first match is the
 // only match.
+
 ///|
 fn find_scope_group(
   group : ResourceGroup,
@@ -490,8 +498,9 @@ fn find_scope_group(
 // Rough encoded size of one span, used to size the scratch buffers. Attribute
 // values are approximated by their count; for spans with very long values the
 // estimate may be too small.
+
 ///|
-fn estimate_span_size(data : @sdk.SpanData) -> Int {
+fn estimate_span_size(data : @sdk.SpanData) -> Int32 {
   let mut size = 96 + data.name.length() + data.attributes.length() * 40
   for event in data.events {
     size = size + 64 + event.name.length() + event.attributes.length() * 40
@@ -618,8 +627,9 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
 // If every span shares the same resource (by reference) and the same scope
 // name and version, returning the total estimated encoded span size. The batch
 // can then be encoded as one ResourceSpans with one ScopeSpans.
+
 ///|
-fn uniform_batch_size_hint(spans : Array[@sdk.SpanData]) -> Int? {
+fn uniform_batch_size_hint(spans : Array[@sdk.SpanData]) -> Int32? {
   let len = spans.length()
   if len == 0 {
     return None
@@ -642,14 +652,18 @@ fn uniform_batch_size_hint(spans : Array[@sdk.SpanData]) -> Int? {
 
 // Estimate encoded size of resource attributes and of a scope group's
 // name/version plus span payloads.
+
 ///|
-fn resource_size_hint(resource : Map[String, @sdk.AttributeValue]) -> Int {
+fn resource_size_hint(resource : Map[String, @sdk.AttributeValue]) -> Int32 {
   16 + resource.length() * 48
 }
 
 ///|
-fn scope_size_hint(scope : ScopeGroup) -> Int {
-  32 + scope.scope_name.length() + scope.scope_version.length() + scope.size_hint
+fn scope_size_hint(scope : ScopeGroup) -> Int32 {
+  32 +
+  scope.scope_name.length() +
+  scope.scope_version.length() +
+  scope.size_hint
 }
 
 // Encode spans as an `ExportTraceServiceRequest` protobuf message.

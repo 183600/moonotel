@@ -1,9 +1,9 @@
 import {
-  "yourname/otel/api" @api,
-  "yourname/otel/context" @context,
-  "yourname/otel/propagation" @propagation,
-  "yourname/otel/sdk" @sdk,
-  "yourname/otel/exporter/otlp" @otlp,
+  "yourname/otel/api",
+  "yourname/otel/context",
+  "yourname/otel/propagation",
+  "yourname/otel/sdk",
+  "yourname/otel/exporter/otlp",
 }
 
 import {

@@ -1,11 +1,14 @@
 // Facade tests for the re-exported `Resource` type and for
 // `OTEL_TRACES_EXPORTER=none` on the automatic `setup`.
 
+///|
 test "facade_resource_flows_into_the_provider" {
   @env.unset_env_var("OTEL_SERVICE_NAME")
   @env.unset_env_var("OTEL_RESOURCE_ATTRIBUTES")
-  let resource = @otel.Resource::from_env(service_name="facade-resource")
-    .with_attribute("deployment.environment", @sdk.StringValue("test"))
+  let resource = @otel.Resource::from_env(service_name="facade-resource").with_attribute(
+    "deployment.environment",
+    @sdk.StringValue("test"),
+  )
   let provider = @otel.TracerProviderSdk::new().with_resource(resource)
   assert_eq(
     provider.resource().get("deployment.environment"),
@@ -18,6 +21,7 @@ test "facade_resource_flows_into_the_provider" {
   provider.shutdown()
 }
 
+///|
 test "setup_respects_traces_exporter_none" {
   @otel.shutdown_global_tracer_provider()
   @env.set_env_var("OTEL_TRACES_EXPORTER", "none")
@@ -37,6 +41,7 @@ test "setup_respects_traces_exporter_none" {
   @otel.shutdown_global_tracer_provider()
 }
 
+///|
 test "setup_accepts_a_prebuilt_resource" {
   @otel.shutdown_global_tracer_provider()
   @env.unset_env_var("OTEL_SERVICE_NAME")
@@ -49,7 +54,7 @@ test "setup_accepts_a_prebuilt_resource" {
   )
   let capture = capturing_transport()
   let provider = @otel.setup(
-    resource=resource,
+    resource~,
     resource_attributes=Map([
       ("deployment.environment", @sdk.StringValue("production")),
     ]),

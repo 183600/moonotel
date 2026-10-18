@@ -1,11 +1,13 @@
 // Tests for the W3C Baggage propagation limits: at most 64 members and
 // 8192 bytes are propagated; members beyond either limit are dropped whole.
 
+///|
 test "baggage_limit_constants_match_the_specification" {
   assert_eq(@propagation.BAGGAGE_MAX_MEMBERS, 64)
   assert_eq(@propagation.BAGGAGE_MAX_BYTES, 8192)
 }
 
+///|
 test "parse_baggage_keeps_at_most_64_members" {
   let sb = StringBuilder()
   let mut i = 0
@@ -24,6 +26,7 @@ test "parse_baggage_keeps_at_most_64_members" {
   assert_eq(entries[63], ("k63", "63"))
 }
 
+///|
 test "format_baggage_emits_at_most_64_members" {
   let entries : Array[(String, String)] = []
   let mut i = 0
@@ -38,6 +41,7 @@ test "format_baggage_emits_at_most_64_members" {
   assert_eq(reparsed[63], ("k63", "63"))
 }
 
+///|
 test "parse_baggage_drops_members_beyond_the_byte_budget" {
   let value = StringBuilder()
   let mut i = 0
@@ -68,6 +72,7 @@ test "parse_baggage_drops_members_beyond_the_byte_budget" {
   )
 }
 
+///|
 test "parse_baggage_drops_a_member_larger_than_the_byte_budget" {
   let value = StringBuilder()
   let mut i = 0
@@ -78,6 +83,7 @@ test "parse_baggage_drops_a_member_larger_than_the_byte_budget" {
   assert_eq(@propagation.parse_baggage("k=" + value.to_string()), [])
 }
 
+///|
 test "format_baggage_drops_a_member_larger_than_the_byte_budget" {
   let value = StringBuilder()
   let mut i = 0
@@ -88,6 +94,7 @@ test "format_baggage_drops_a_member_larger_than_the_byte_budget" {
   assert_eq(@propagation.format_baggage([("k", value.to_string())]), "")
 }
 
+///|
 test "format_baggage_keeps_a_member_that_exactly_fits" {
   // `k=` plus 8189 value characters is 8191 bytes, one byte below the limit.
   let value = StringBuilder()
@@ -100,6 +107,7 @@ test "format_baggage_keeps_a_member_that_exactly_fits" {
   assert_eq(header.length(), 8191)
 }
 
+///|
 test "context_baggage_header_respects_the_member_limit" {
   let mut context = @context.Context::root()
   let mut i = 0
@@ -116,6 +124,7 @@ test "context_baggage_header_respects_the_member_limit" {
   }
 }
 
+///|
 test "parse_baggage_keeps_valid_members_after_a_long_invalid_prefix" {
   // The invalid first member is longer than the byte budget but contributes
   // nothing to the normalized header, so `kept=1` still fits.
@@ -130,6 +139,7 @@ test "parse_baggage_keeps_valid_members_after_a_long_invalid_prefix" {
   assert_eq(@propagation.parse_baggage(sb.to_string()), [("kept", "1")])
 }
 
+///|
 test "percent_encoded_length_matches_percent_encode" {
   let cases : Array[String] = [
     "", "abc", "a b", "100%", "a,b;c", "Am\u{00e9}lie", "\u{1F600}",

@@ -1,6 +1,6 @@
 import {
-  "yourname/otel/api" @api,
-  "yourname/otel/context" @context,
+  "yourname/otel/api",
+  "yourname/otel/context",
   "moonbitlang/core/env",
   "moonbitlang/core/string",
   "moonbitlang/core/debug",
@@ -9,8 +9,8 @@ import {
 
 import {
   "moonbitlang/core/bench",
-  "yourname/otel/propagation" @propagation,
-  "yourname/otel/exporter/otlp" @otlp,
+  "yourname/otel/propagation",
+  "yourname/otel/exporter/otlp",
 } for "test"
 
 pkgtype(kind: "library")

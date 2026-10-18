@@ -13,8 +13,11 @@
 // not lose spans that were already accepted.
 
 // Most spans coalesced into a single OTLP request.
-const MAX_EXPORT_SPANS : Int = 512
 
+///|
+const MAX_EXPORT_SPANS : Int32 = 512
+
+///|
 pub struct OtlpHttpAsyncSpanExporter {
   config : @otlp.OtlpHttpConfig
   queue : @aqueue.Queue[Array[@sdk.SpanData]]
@@ -25,10 +28,12 @@ pub struct OtlpHttpAsyncSpanExporter {
 // Create an exporter and start its background sender in `group`. The queue
 // holds at most `max_queue_size` batches (default 256); when it is full the
 // oldest batch is discarded and counted by `dropped_batches`.
+
+///|
 pub fn[G] OtlpHttpAsyncSpanExporter::new(
   config : @otlp.OtlpHttpConfig,
   group : @async.TaskGroup[G],
-  max_queue_size? : Int
+  max_queue_size? : Int32,
 ) -> OtlpHttpAsyncSpanExporter {
   let size = match max_queue_size {
     Some(value) => if value < 1 { 1 } else { value }
@@ -45,40 +50,44 @@ pub fn[G] OtlpHttpAsyncSpanExporter::new(
 }
 
 // The exporter configuration.
+
+///|
 pub fn OtlpHttpAsyncSpanExporter::config(
-  self : OtlpHttpAsyncSpanExporter
+  self : OtlpHttpAsyncSpanExporter,
 ) -> @otlp.OtlpHttpConfig {
   self.config
 }
 
 // Number of batches discarded because the queue was full.
+
+///|
 pub fn OtlpHttpAsyncSpanExporter::dropped_batches(
-  self : OtlpHttpAsyncSpanExporter
+  self : OtlpHttpAsyncSpanExporter,
 ) -> UInt64 {
   self.dropped
 }
 
 // Whether `shutdown` has been called.
+
+///|
 pub fn OtlpHttpAsyncSpanExporter::is_shutdown(
-  self : OtlpHttpAsyncSpanExporter
+  self : OtlpHttpAsyncSpanExporter,
 ) -> Bool {
   self.shutdown_called
 }
 
 // Queue a batch for the background sender. Never blocks: when the queue is
 // full the oldest batch is dropped to make room.
+
+///|
 fn OtlpHttpAsyncSpanExporter::enqueue(
   self : OtlpHttpAsyncSpanExporter,
-  spans : Array[@sdk.SpanData]
+  spans : Array[@sdk.SpanData],
 ) -> @sdk.ExportResult {
   if self.shutdown_called {
     return @sdk.ExportFailure("OTLP async exporter is shut down")
   }
-  let accepted = try {
-    self.queue.try_put(spans)
-  } catch {
-    _ => false
-  }
+  let accepted = self.queue.try_put(spans) catch { _ => false }
   if accepted {
     return @sdk.ExportSuccess
   }
@@ -91,11 +100,7 @@ fn OtlpHttpAsyncSpanExporter::enqueue(
   } catch {
     _ => false
   }
-  let accepted = try {
-    self.queue.try_put(spans)
-  } catch {
-    _ => false
-  }
+  let accepted = self.queue.try_put(spans) catch { _ => false }
   if discarded {
     self.dropped = self.dropped + 1
   }
@@ -107,17 +112,15 @@ fn OtlpHttpAsyncSpanExporter::enqueue(
 }
 
 // Export `first` plus every batch that is already queued.
+
+///|
 async fn OtlpHttpAsyncSpanExporter::export_available(
   self : OtlpHttpAsyncSpanExporter,
-  first : Array[@sdk.SpanData]
+  first : Array[@sdk.SpanData],
 ) -> Unit {
   let batch = first
   while batch.length() < MAX_EXPORT_SPANS {
-    let next : Array[@sdk.SpanData]? = try {
-      self.queue.try_get()
-    } catch {
-      _ => None
-    }
+    let next : Array[@sdk.SpanData]? = self.queue.try_get() catch { _ => None }
     match next {
       Some(items) => batch.append(items)
       None => break
@@ -130,9 +133,11 @@ async fn OtlpHttpAsyncSpanExporter::export_available(
 // batch already taken from the queue is not lost when the task group exits
 // while a request is in flight; `timeout_millis` bounds how long shutdown can
 // be delayed by an unresponsive collector.
+
+///|
 async fn OtlpHttpAsyncSpanExporter::send(
   self : OtlpHttpAsyncSpanExporter,
-  batch : Array[@sdk.SpanData]
+  batch : Array[@sdk.SpanData],
 ) -> Unit {
   if batch.length() == 0 {
     return
@@ -140,14 +145,11 @@ async fn OtlpHttpAsyncSpanExporter::send(
   let timeout = self.config.timeout_millis
   let _ = @async.protect_from_cancel(() => {
     let outcome : @sdk.ExportResult? = if timeout > 0 {
-      try {
-        Some(
-          @async.with_timeout(
-            timeout,
-            () => @otlp_async.export_spans(self.config, batch),
-          ),
-        )
-      } catch {
+      Some(
+        @async.with_timeout(timeout, () => {
+          @otlp_async.export_spans(self.config, batch)
+        }),
+      ) catch {
         _ => None
       }
     } else {
@@ -158,15 +160,13 @@ async fn OtlpHttpAsyncSpanExporter::send(
 }
 
 // Drain and export everything left in the queue.
+
+///|
 async fn OtlpHttpAsyncSpanExporter::drain(
-  self : OtlpHttpAsyncSpanExporter
+  self : OtlpHttpAsyncSpanExporter,
 ) -> Unit {
   while true {
-    let next : Array[@sdk.SpanData]? = try {
-      self.queue.try_get()
-    } catch {
-      _ => None
-    }
+    let next : Array[@sdk.SpanData]? = self.queue.try_get() catch { _ => None }
     match next {
       Some(batch) => self.export_available(batch)
       None => break
@@ -176,16 +176,16 @@ async fn OtlpHttpAsyncSpanExporter::drain(
 
 // The background sender: export batches until the queue is closed or the task
 // is cancelled, then drain whatever remains.
+
+///|
 async fn OtlpHttpAsyncSpanExporter::run(
-  self : OtlpHttpAsyncSpanExporter
+  self : OtlpHttpAsyncSpanExporter,
 ) -> Unit {
   defer {
-    let _ = @async.protect_from_cancel(() => { self.drain() })
+    let _ = @async.protect_from_cancel(() => self.drain())
   }
   while true {
-    let next : Array[@sdk.SpanData]? = try {
-      Some(self.queue.get())
-    } catch {
+    let next : Array[@sdk.SpanData]? = Some(self.queue.get()) catch {
       _ => None
     }
     match next {
@@ -195,15 +195,24 @@ async fn OtlpHttpAsyncSpanExporter::run(
   }
 }
 
-pub impl @sdk.SpanExporter for OtlpHttpAsyncSpanExporter with export_spans(self, spans) {
+///|
+pub impl @sdk.SpanExporter for OtlpHttpAsyncSpanExporter with fn export_spans(
+  self,
+  spans,
+) {
   self.enqueue(spans)
 }
 
-pub impl @sdk.SpanExporter for OtlpHttpAsyncSpanExporter with shutdown(self) {
+///|
+pub impl @sdk.SpanExporter for OtlpHttpAsyncSpanExporter with fn shutdown(self) {
   if !self.shutdown_called {
     self.shutdown_called = true
     self.queue.close()
   }
 }
 
-pub extend OtlpHttpAsyncSpanExporter with @sdk.SpanExporter::{export_spans, shutdown}
+///|
+pub extend OtlpHttpAsyncSpanExporter with @sdk.SpanExporter::{
+  export_spans,
+  shutdown,
+}

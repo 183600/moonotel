@@ -1,6 +1,7 @@
 // `from_map` and `to_map` share the backing map; case-insensitive lookups can
 // still miss.
 
+///|
 test "text_map_carrier_from_map_shares_the_backing_map" {
   let entries : Map[String, String] = Map([])
   entries.set("traceparent", "value")
@@ -11,6 +12,7 @@ test "text_map_carrier_from_map_shares_the_backing_map" {
   assert_eq(carrier.to_map().get("traceparent"), Some("value"))
 }
 
+///|
 test "text_map_carrier_case_insensitive_lookup_misses" {
   let carrier = @propagation.TextMapCarrier::new()
   carrier.set("abc", "1")

@@ -1,5 +1,6 @@
 // Tests for case-insensitive header lookup on TextMapCarrier.
 
+///|
 test "get is case-insensitive" {
   let carrier = @propagation.TextMapCarrier::new()
   carrier.set("TraceParent", "00-abc")
@@ -8,6 +9,7 @@ test "get is case-insensitive" {
   assert_eq(carrier.get("TraceParent"), Some("00-abc"))
 }
 
+///|
 test "exact match wins over case-insensitive match" {
   let carrier = @propagation.TextMapCarrier::new()
   carrier.set("traceparent", "exact")
@@ -15,12 +17,14 @@ test "exact match wins over case-insensitive match" {
   assert_eq(carrier.get("traceparent"), Some("exact"))
 }
 
+///|
 test "missing headers stay missing" {
   let carrier = @propagation.TextMapCarrier::new()
   carrier.set("tracestate", "vendor=value")
   assert_eq(carrier.get("traceparent"), None)
 }
 
+///|
 test "remove deletes headers case-insensitively" {
   let carrier = @propagation.TextMapCarrier::new()
   carrier.set("TraceParent", "00-abc")
@@ -32,6 +36,7 @@ test "remove deletes headers case-insensitively" {
   assert_eq(carrier.length(), 0)
 }
 
+///|
 test "extract accepts differently cased traceparent headers" {
   let sc = @propagation.parse_traceparent(
     "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",

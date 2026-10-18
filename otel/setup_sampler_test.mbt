@@ -1,5 +1,6 @@
 // The `sampler` argument of the facade `setup` must override the environment.
 
+///|
 test "setup_with_sampler_option_uses_it" {
   @otel.shutdown_global_tracer_provider()
   let provider = @otel.setup(

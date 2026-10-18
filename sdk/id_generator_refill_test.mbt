@@ -1,5 +1,6 @@
 // Exhausting the buffered entropy draw must transparently refill it.
 
+///|
 test "random_generator_refills_after_exhausting_the_buffered_draw" {
   let generator = @sdk.IdGenerator::random()
   // The internal draw holds a whole number of trace IDs, so more than a

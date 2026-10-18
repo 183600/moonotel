@@ -1,21 +1,28 @@
 // Tests for HTTP/1.1 connection handling and the network protocol
 // semantic-convention attributes of the server instrumentation.
 
+///|
 struct ProtocolRecordingExporter {
   spans : Ref[Array[@sdk.SpanData]]
 }
 
-pub impl @sdk.SpanExporter for ProtocolRecordingExporter with export_spans(self, spans) {
+///|
+pub impl @sdk.SpanExporter for ProtocolRecordingExporter with fn export_spans(
+  self,
+  spans,
+) {
   for data in spans {
     self.spans.val.push(data)
   }
   @sdk.ExportSuccess
 }
 
-pub impl @sdk.SpanExporter for ProtocolRecordingExporter with shutdown(self) {
+///|
+pub impl @sdk.SpanExporter for ProtocolRecordingExporter with fn shutdown(self) {
   let _ = self
 }
 
+///|
 async test "Connection: close closes the socket after the response" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -33,9 +40,7 @@ async test "Connection: close closes the socket after the response" {
     )
     // `read_all` only returns at EOF, so the timeout guards against the
     // connection staying open.
-    let response = @async.with_timeout(5000, () => {
-      connection.read_all().text()
-    })
+    let response = @async.with_timeout(5000, () => connection.read_all().text())
     connection.close()
     assert_true(response.contains("200 OK"))
     assert_true(response.contains("connection: close"))
@@ -43,6 +48,7 @@ async test "Connection: close closes the socket after the response" {
   }
 }
 
+///|
 async test "keep-alive connections serve a second request" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -69,20 +75,20 @@ async test "keep-alive connections serve a second request" {
     connection.write(
       "GET /second HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n",
     )
-    let second = @async.with_timeout(5000, () => {
-      connection.read_all().text()
-    })
+    let second = @async.with_timeout(5000, () => connection.read_all().text())
     connection.close()
     assert_true(second.contains("200 OK"))
     assert_true(second.contains("/second"))
   }
 }
 
+///|
 async test "server spans carry the network protocol attributes" {
-  let exporter : ProtocolRecordingExporter = { spans: Ref([]) }
+  let exporter : ProtocolRecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
-  let provider = @sdk.TracerProviderSdk::new(service_name="protocol-test")
-    .with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="protocol-test").with_span_processor(
+    processor,
+  )
   let tracer = provider.get_tracer("protocol-test")
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -90,10 +96,8 @@ async test "server spans carry the network protocol attributes" {
     group.spawn_bg(no_wait=true) <| () => {
       @async_http_server.run_server_on(
         server,
-        call => {
-          call.respond(200, body="ok")
-        },
-        tracer=tracer,
+        call => call.respond(200, body="ok"),
+        tracer~,
       )
     }
     let (response, body) = @http.get("http://127.0.0.1:\{port}/protocol")

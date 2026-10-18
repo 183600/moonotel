@@ -5,11 +5,11 @@
 // In a real deployment, replace `@sdk.ConsoleSpanExporter` with
 // `@otlp.OtlpHttpExporter` / `@otlp_async` to ship spans to a collector.
 
+///|
 async fn main {
-  let provider = @sdk.TracerProviderSdk::new(service_name="demo-server")
-    .with_span_processor(
-      @sdk.SimpleSpanProcessor::new(@sdk.ConsoleSpanExporter::new()),
-    )
+  let provider = @sdk.TracerProviderSdk::new(service_name="demo-server").with_span_processor(
+    @sdk.SimpleSpanProcessor::new(@sdk.ConsoleSpanExporter::new()),
+  )
   let addr = @socket.Addr::parse("127.0.0.1:8080")
   println("listening on http://127.0.0.1:8080")
   @server.run_server(

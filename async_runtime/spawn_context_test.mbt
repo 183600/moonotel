@@ -1,6 +1,7 @@
 // Tests for the awaited, context-propagating `spawn` helper and for
 // `OTEL_TRACES_EXPORTER=none` in the one-call setup.
 
+///|
 async test "spawn carries the current context into the child" {
   let seen : Ref[String?] = Ref(None)
   @async.with_task_group() <| group => {
@@ -16,6 +17,7 @@ async test "spawn carries the current context into the child" {
   assert_eq(seen.val, Some("grace"))
 }
 
+///|
 async test "spawn returns the task result" {
   @async.with_task_group() <| group => {
     let task = @async_runtime.spawn(group, () => 21 * 2)
@@ -23,6 +25,7 @@ async test "spawn returns the task result" {
   }
 }
 
+///|
 async test "spawn carries the current span context" {
   let seen : Ref[Bool] = Ref(false)
   @async.with_task_group() <| group => {
@@ -47,12 +50,13 @@ async test "spawn carries the current span context" {
   assert_true(seen.val)
 }
 
+///|
 async test "spawn accepts an explicit context" {
   let seen : Ref[String?] = Ref(None)
   @async.with_task_group() <| group => {
     let task = @async_runtime.spawn(
       group,
-      () => { seen.val = @context.current_context().value("tenant") },
+      () => seen.val = @context.current_context().value("tenant"),
       context=@context.Context::root().with_value("tenant", "acme"),
     )
     task.wait()
@@ -60,6 +64,7 @@ async test "spawn accepts an explicit context" {
   assert_eq(seen.val, Some("acme"))
 }
 
+///|
 async test "setup_with_traces_exporter_none_installs_a_provider_without_exporter" {
   @env.set_env_var("OTEL_TRACES_EXPORTER", "none")
   @async.with_task_group() <| group => {

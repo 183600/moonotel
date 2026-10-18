@@ -1,26 +1,33 @@
 // Tests for the native async runtime helpers: the queue-backed OTLP exporter,
 // the batch flush loop, context-aware spawning and the one-call setup.
 
+///|
 struct CollectingExporter {
   spans : Ref[Array[@sdk.SpanData]]
 }
 
-pub impl @sdk.SpanExporter for CollectingExporter with export_spans(self, spans) {
+///|
+pub impl @sdk.SpanExporter for CollectingExporter with fn export_spans(
+  self,
+  spans,
+) {
   for data in spans {
     self.spans.val.push(data)
   }
   @sdk.ExportSuccess
 }
 
-pub impl @sdk.SpanExporter for CollectingExporter with shutdown(self) {
+///|
+pub impl @sdk.SpanExporter for CollectingExporter with fn shutdown(self) {
   let _ = self
 }
 
+///|
 async test "otlp async exporter delivers spans while the group runs" {
   @async.with_task_group() <| outer => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
-    let received : Ref[Int] = Ref(0)
+    let received : Ref[Int32] = Ref(0)
     outer.spawn_bg(no_wait=true) <| () => {
       server.run_forever() <| ((_request, body, conn) => {
         let _ = body.read_all()
@@ -30,9 +37,12 @@ async test "otlp async exporter delivers spans while the group runs" {
     }
     let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:\{port}")
     @async.with_task_group() <| group => {
-      let exporter = @async_runtime.OtlpHttpAsyncSpanExporter::new(config, group)
-      let provider = @sdk.TracerProviderSdk::new(service_name="async-runtime")
-        .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+      let exporter = @async_runtime.OtlpHttpAsyncSpanExporter::new(
+        config, group,
+      )
+      let provider = @sdk.TracerProviderSdk::new(service_name="async-runtime").with_span_processor(
+        @sdk.SimpleSpanProcessor::new(exporter),
+      )
       let tracer = provider.get_tracer("async-runtime")
       let span = tracer.start_root_span("delivered")
       span.end()
@@ -43,11 +53,12 @@ async test "otlp async exporter delivers spans while the group runs" {
   }
 }
 
+///|
 async test "otlp async exporter drains pending spans when the group exits" {
   @async.with_task_group() <| outer => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
-    let received : Ref[Int] = Ref(0)
+    let received : Ref[Int32] = Ref(0)
     outer.spawn_bg(no_wait=true) <| () => {
       server.run_forever() <| ((_request, body, conn) => {
         let _ = body.read_all()
@@ -57,9 +68,12 @@ async test "otlp async exporter drains pending spans when the group exits" {
     }
     let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:\{port}")
     @async.with_task_group() <| group => {
-      let exporter = @async_runtime.OtlpHttpAsyncSpanExporter::new(config, group)
-      let provider = @sdk.TracerProviderSdk::new(service_name="async-runtime")
-        .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+      let exporter = @async_runtime.OtlpHttpAsyncSpanExporter::new(
+        config, group,
+      )
+      let provider = @sdk.TracerProviderSdk::new(service_name="async-runtime").with_span_processor(
+        @sdk.SimpleSpanProcessor::new(exporter),
+      )
       let tracer = provider.get_tracer("async-runtime")
       let span = tracer.start_root_span("pending")
       span.end()
@@ -69,6 +83,7 @@ async test "otlp async exporter drains pending spans when the group exits" {
   }
 }
 
+///|
 async test "shutdown closes the queue and stops accepting spans" {
   @async.with_task_group() <| group => {
     let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:1")
@@ -82,6 +97,7 @@ async test "shutdown closes the queue and stops accepting spans" {
   }
 }
 
+///|
 async test "queue overflow discards only the batches that were evicted" {
   @async.with_task_group() <| group => {
     let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:1")
@@ -100,15 +116,17 @@ async test "queue overflow discards only the batches that were evicted" {
   }
 }
 
+///|
 async test "spawn_flush_loop exports spans within the interval" {
-  let exporter : CollectingExporter = { spans: Ref([]) }
+  let exporter : CollectingExporter = { spans: Ref([]), }
   let processor = @sdk.BatchSpanProcessor::new(
     exporter,
     max_export_batch_size=100,
     flush_interval_millis=50,
   )
-  let provider = @sdk.TracerProviderSdk::new(service_name="flush-loop")
-    .with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="flush-loop").with_span_processor(
+    processor,
+  )
   let tracer = provider.get_tracer("flush-loop")
   @async.with_task_group() <| group => {
     @async_runtime.spawn_flush_loop(group, processor)
@@ -119,15 +137,17 @@ async test "spawn_flush_loop exports spans within the interval" {
   }
 }
 
+///|
 async test "spawn_flush_loop flushes queued spans when the group exits" {
-  let exporter : CollectingExporter = { spans: Ref([]) }
+  let exporter : CollectingExporter = { spans: Ref([]), }
   let processor = @sdk.BatchSpanProcessor::new(
     exporter,
     max_export_batch_size=1000000,
     flush_interval_millis=600000,
   )
-  let provider = @sdk.TracerProviderSdk::new(service_name="flush-loop-exit")
-    .with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="flush-loop-exit").with_span_processor(
+    processor,
+  )
   let tracer = provider.get_tracer("flush-loop-exit")
   @async.with_task_group() <| group => {
     @async_runtime.spawn_flush_loop(group, processor)
@@ -138,6 +158,7 @@ async test "spawn_flush_loop flushes queued spans when the group exits" {
   assert_eq(exporter.spans.val[0].name, "flushed-on-exit")
 }
 
+///|
 async test "spawn_bg carries the current context into the child" {
   let baggage : Ref[String?] = Ref(None)
   let has_span : Ref[Bool] = Ref(false)
@@ -148,9 +169,9 @@ async test "spawn_bg carries the current context into the child" {
       @api.TRACE_FLAGS_SAMPLED,
     )
     let previous = @context.attach(
-      @context.Context::root().with_value("user.id", "ada").with_span(
-        span_context,
-      ),
+      @context.Context::root()
+      .with_value("user.id", "ada")
+      .with_span(span_context),
     )
     @async_runtime.spawn_bg(group) <| () => {
       baggage.val = @context.current_context().value("user.id")
@@ -165,23 +186,25 @@ async test "spawn_bg carries the current context into the child" {
   assert_true(has_span.val)
 }
 
+///|
 async test "spawn_bg accepts an explicit context" {
   let seen : Ref[String?] = Ref(None)
   @async.with_task_group() <| group => {
     @async_runtime.spawn_bg(
       group,
-      () => { seen.val = @context.current_context().value("tenant") },
+      () => seen.val = @context.current_context().value("tenant"),
       context=@context.Context::root().with_value("tenant", "acme"),
     )
   }
   assert_eq(seen.val, Some("acme"))
 }
 
+///|
 async test "setup builds a global provider that exports spans" {
   @async.with_task_group() <| outer => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
-    let received : Ref[Int] = Ref(0)
+    let received : Ref[Int32] = Ref(0)
     outer.spawn_bg(no_wait=true) <| () => {
       server.run_forever() <| ((_request, body, conn) => {
         let _ = body.read_all()
@@ -209,6 +232,7 @@ async test "setup builds a global provider that exports spans" {
   @sdk.shutdown_global_tracer_provider()
 }
 
+///|
 async test "setup accepts a prebuilt resource" {
   @async.with_task_group() <| group => {
     let resource = @sdk.Resource::new(
@@ -219,7 +243,7 @@ async test "setup accepts a prebuilt resource" {
     )
     let provider = @async_runtime.setup(
       group,
-      resource=resource,
+      resource~,
       resource_attributes=Map([
         ("deployment.environment", @sdk.StringValue("production")),
       ]),

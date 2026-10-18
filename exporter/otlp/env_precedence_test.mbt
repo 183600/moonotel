@@ -1,6 +1,7 @@
 // Tests for OTEL_EXPORTER_OTLP_* environment precedence and for surfacing
 // `partial_success` from the OTLP response body.
 
+///|
 fn unset_otlp_env() -> Unit {
   @env.unset_env_var("OTEL_EXPORTER_OTLP_ENDPOINT")
   @env.unset_env_var("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
@@ -14,28 +15,29 @@ fn unset_otlp_env() -> Unit {
   @env.unset_env_var("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT")
 }
 
+///|
 fn body_transport(body : Bytes) -> @otlp.Transport {
-  fn(_url, _headers, _payload) { { status_code: 200, body } }
+  fn(_url, _headers, _payload) { { status_code: 200, body, } }
 }
 
+///|
 test "traces_endpoint_takes_precedence_over_generic" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_ENDPOINT", "http://generic:4318")
   @env.set_env_var(
-    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
-    "http://specific:4318/custom/traces",
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://specific:4318/custom/traces",
   )
   let config = @otlp.OtlpHttpConfig::from_env()
   unset_otlp_env()
   assert_eq(config.traces_url(), "http://specific:4318/custom/traces")
 }
 
+///|
 test "generic_endpoint_stays_the_base_url_when_traces_endpoint_is_set" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_ENDPOINT", "http://generic:4318")
   @env.set_env_var(
-    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
-    "http://specific:4318/custom/traces",
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://specific:4318/custom/traces",
   )
   let config = @otlp.OtlpHttpConfig::from_env()
   unset_otlp_env()
@@ -44,6 +46,7 @@ test "generic_endpoint_stays_the_base_url_when_traces_endpoint_is_set" {
   assert_eq(config.traces_url(), "http://specific:4318/custom/traces")
 }
 
+///|
 test "generic_endpoint_is_used_when_traces_endpoint_is_absent" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_ENDPOINT", "http://generic:4318")
@@ -52,12 +55,12 @@ test "generic_endpoint_is_used_when_traces_endpoint_is_absent" {
   assert_eq(config.traces_url(), "http://generic:4318/v1/traces")
 }
 
+///|
 test "traces_headers_override_generic_headers" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_HEADERS", "x-generic=1,x-shared=generic")
   @env.set_env_var(
-    "OTEL_EXPORTER_OTLP_TRACES_HEADERS",
-    "x-shared=traces,x-traces=2",
+    "OTEL_EXPORTER_OTLP_TRACES_HEADERS", "x-shared=traces,x-traces=2",
   )
   let config = @otlp.OtlpHttpConfig::from_env()
   unset_otlp_env()
@@ -66,11 +69,11 @@ test "traces_headers_override_generic_headers" {
   assert_eq(config.headers.get("x-traces"), Some("2"))
 }
 
+///|
 test "header_values_are_percent_decoded" {
   unset_otlp_env()
   @env.set_env_var(
-    "OTEL_EXPORTER_OTLP_HEADERS",
-    "Authorization=Bearer%20abc%2Cdef,x-raw=100%25,x-mix=café%20%E2%98%95",
+    "OTEL_EXPORTER_OTLP_HEADERS", "Authorization=Bearer%20abc%2Cdef,x-raw=100%25,x-mix=café%20%E2%98%95",
   )
   let config = @otlp.OtlpHttpConfig::from_env()
   unset_otlp_env()
@@ -79,6 +82,7 @@ test "header_values_are_percent_decoded" {
   assert_eq(config.headers.get("x-mix"), Some("café ☕"))
 }
 
+///|
 test "header_keys_are_not_percent_decoded" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_HEADERS", "x%2Dkey=value")
@@ -88,6 +92,7 @@ test "header_keys_are_not_percent_decoded" {
   assert_eq(config.headers.get("x-key"), None)
 }
 
+///|
 test "invalid_header_value_escapes_are_kept_verbatim" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_HEADERS", "x-bad=%zz,x-short=%4")
@@ -97,6 +102,7 @@ test "invalid_header_value_escapes_are_kept_verbatim" {
   assert_eq(config.headers.get("x-short"), Some("%4"))
 }
 
+///|
 test "traces_compression_takes_precedence" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_COMPRESSION", "gzip")
@@ -106,6 +112,7 @@ test "traces_compression_takes_precedence" {
   assert_eq(config.compression, "none")
 }
 
+///|
 test "traces_timeout_takes_precedence" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_TIMEOUT", "5000")
@@ -115,6 +122,7 @@ test "traces_timeout_takes_precedence" {
   assert_eq(config.timeout_millis, 2500)
 }
 
+///|
 test "traces_protocol_takes_precedence" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
@@ -124,6 +132,7 @@ test "traces_protocol_takes_precedence" {
   assert_eq(config.protocol, "http/protobuf")
 }
 
+///|
 test "generic_protocol_is_used_when_traces_protocol_is_absent" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
@@ -132,6 +141,7 @@ test "generic_protocol_is_used_when_traces_protocol_is_absent" {
   assert_eq(config.protocol, "grpc")
 }
 
+///|
 test "protocol_defaults_to_http_protobuf" {
   unset_otlp_env()
   let config = @otlp.OtlpHttpConfig::from_env()
@@ -140,6 +150,7 @@ test "protocol_defaults_to_http_protobuf" {
   assert_eq(explicit.protocol, "http/protobuf")
 }
 
+///|
 test "unsupported_protocol_fails_export" {
   let config = @otlp.OtlpHttpConfig::new(
     endpoint="http://collector:4318",
@@ -150,6 +161,7 @@ test "unsupported_protocol_fails_export" {
   assert_false(result.is_success())
 }
 
+///|
 test "invalid_timeout_falls_back_to_default" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", "not-a-number")
@@ -158,6 +170,7 @@ test "invalid_timeout_falls_back_to_default" {
   assert_eq(config.timeout_millis, 10000)
 }
 
+///|
 test "export_surfaces_partial_success" {
   let config = @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318")
   let exporter = @otlp.OtlpHttpExporter::new(
@@ -168,13 +181,18 @@ test "export_surfaces_partial_success" {
   assert_false(result.is_success())
 }
 
+///|
 test "export_succeeds_on_empty_partial_success" {
   let config = @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318")
-  let exporter = @otlp.OtlpHttpExporter::new(config, body_transport(b"\x0A\x00"))
+  let exporter = @otlp.OtlpHttpExporter::new(
+    config,
+    body_transport(b"\x0A\x00"),
+  )
   let result = exporter.export_spans([test_span()])
   assert_true(result.is_success())
 }
 
+///|
 test "export_fails_on_malformed_response_body" {
   let config = @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318")
   let exporter = @otlp.OtlpHttpExporter::new(config, body_transport(b"\xFF"))

@@ -9,22 +9,48 @@
 // `@sdk.set_global_tracer_provider` / `yourname/otel` setup) or no tracer is
 // passed explicitly, requests are performed untraced.
 
+///|
 const INSTRUMENTATION_SCOPE : String = "yourname/otel/instrumentation/async_http_client"
 
 // Constant semantic-convention attribute values.
+
+///|
 let protocol_name_http : @sdk.AttributeValue = @sdk.StringValue("http")
+
+///|
 let protocol_version_http_1_1 : @sdk.AttributeValue = @sdk.StringValue("1.1")
+
+///|
 let method_get : @sdk.AttributeValue = @sdk.StringValue("GET")
+
+///|
 let method_head : @sdk.AttributeValue = @sdk.StringValue("HEAD")
+
+///|
 let method_post : @sdk.AttributeValue = @sdk.StringValue("POST")
+
+///|
 let method_put : @sdk.AttributeValue = @sdk.StringValue("PUT")
+
+///|
 let method_delete : @sdk.AttributeValue = @sdk.StringValue("DELETE")
+
+///|
 let method_connect : @sdk.AttributeValue = @sdk.StringValue("CONNECT")
+
+///|
 let method_options : @sdk.AttributeValue = @sdk.StringValue("OPTIONS")
+
+///|
 let method_trace : @sdk.AttributeValue = @sdk.StringValue("TRACE")
+
+///|
 let method_patch : @sdk.AttributeValue = @sdk.StringValue("PATCH")
 
-fn method_attribute_value(request_method : @http.RequestMethod) -> @sdk.AttributeValue {
+///|
+fn method_attribute_value(
+  request_method : @http.RequestMethod,
+) -> @sdk.AttributeValue {
   match request_method {
     Get => method_get
     Head => method_head
@@ -38,6 +64,7 @@ fn method_attribute_value(request_method : @http.RequestMethod) -> @sdk.Attribut
   }
 }
 
+///|
 fn default_tracer() -> @sdk.Tracer? {
   match @sdk.global_tracer_provider() {
     Some(provider) => Some(provider.get_tracer(INSTRUMENTATION_SCOPE))
@@ -47,6 +74,8 @@ fn default_tracer() -> @sdk.Tracer? {
 
 // Upper-case name of a request method, as required by the semantic
 // conventions (`http.request.method`).
+
+///|
 pub fn http_method_name(request_method : @http.RequestMethod) -> String {
   match request_method {
     Get => "GET"
@@ -61,14 +90,14 @@ pub fn http_method_name(request_method : @http.RequestMethod) -> String {
   }
 }
 
-fn parse_port(text : StringView) -> Int {
-  try {
-    @string.parse_int(text)
-  } catch {
+///|
+fn parse_port(text : StringView) -> Int32 {
+  @string.parse_int(text) catch {
     _ => -1
   }
 }
 
+///|
 fn ascii_to_lower(c : Char) -> Char {
   let code = c.to_int()
   if code >= 65 && code <= 90 {
@@ -78,6 +107,7 @@ fn ascii_to_lower(c : Char) -> Char {
   }
 }
 
+///|
 fn is_scheme_char(c : Char) -> Bool {
   let code = c.to_int()
   (code >= 48 && code <= 57) ||
@@ -88,6 +118,7 @@ fn is_scheme_char(c : Char) -> Bool {
   c == '.'
 }
 
+///|
 fn is_alpha(c : Char) -> Bool {
   let code = c.to_int()
   (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
@@ -95,7 +126,9 @@ fn is_alpha(c : Char) -> Bool {
 
 // The authority of an absolute URL ends at the first `/` (path), `?` (query)
 // or `#` (fragment), or at the end of the string.
-fn find_authority_end(text : StringView) -> Int {
+
+///|
+fn find_authority_end(text : StringView) -> Int32 {
   let len = text.length()
   let mut i = 0
   while i < len {
@@ -111,10 +144,12 @@ fn find_authority_end(text : StringView) -> Int {
 // Split an absolute URL into (scheme, host, port). The scheme is "" when the
 // URL has no valid scheme; the port falls back to the scheme default when it
 // is not explicit; malformed URLs yield `(host, -1)`.
-fn split_url_parts(url : String) -> (String, String, Int) {
+
+///|
+fn split_url_parts(url : String) -> (String, String, Int32) {
   let scheme_index = url.find("://")
   let scheme = match scheme_index {
-    Some(index) => {
+    Some(index) =>
       if index == 0 {
         ""
       } else {
@@ -141,7 +176,6 @@ fn split_url_parts(url : String) -> (String, String, Int) {
           }
         }
       }
-    }
     None => ""
   }
   let after_scheme = match scheme_index {
@@ -171,7 +205,11 @@ fn split_url_parts(url : String) -> (String, String, Int) {
   } else {
     match host_port.find(":") {
       Some(colon) =>
-        (scheme, host_port[:colon].to_owned(), parse_port(host_port[colon + 1:]))
+        (
+          scheme,
+          host_port[:colon].to_owned(),
+          parse_port(host_port[colon + 1:]),
+        )
       None => (scheme, host_port.to_owned(), default_port)
     }
   }
@@ -180,6 +218,8 @@ fn split_url_parts(url : String) -> (String, String, Int) {
 // Lower-case scheme of an absolute URL, without the `://` separator.
 // Returns "" when the URL has no scheme or the text before `://` is not a
 // valid scheme.
+
+///|
 pub fn split_scheme(url : String) -> String {
   split_url_parts(url).0
 }
@@ -187,7 +227,9 @@ pub fn split_scheme(url : String) -> String {
 // Best-effort split of an absolute URL into (host, port). The port falls back
 // to the scheme default when it is not explicit; malformed URLs yield
 // `(host, -1)` and are still traced.
-pub fn split_url(url : String) -> (String, Int) {
+
+///|
+pub fn split_url(url : String) -> (String, Int32) {
   let (_, host, port) = split_url_parts(url)
   (host, port)
 }
@@ -196,6 +238,8 @@ pub fn split_url(url : String) -> (String, Int) {
 // required by the HTTP semantic conventions for the `url.full` attribute.
 // URLs without an authority or without userinfo are returned unchanged;
 // `@` outside the authority (in a path, query or fragment) is preserved.
+
+///|
 pub fn redact_url(url : String) -> String {
   let scheme_end = match url.find("://") {
     Some(index) => index + 3
@@ -216,9 +260,10 @@ pub fn redact_url(url : String) -> String {
   }
 }
 
+///|
 fn plain_headers(
   headers : Map[String, String]?,
-  extra? : Int,
+  extra? : Int32,
 ) -> Map[@http.CaseInsensitiveString, String] {
   let extra = extra.unwrap_or(0)
   match headers {
@@ -234,10 +279,11 @@ fn plain_headers(
   }
 }
 
+///|
 fn traced_headers(
   headers : Map[String, String]?,
   span_context : @api.SpanContext,
-  context : @context.Context
+  context : @context.Context,
 ) -> Map[@http.CaseInsensitiveString, String] {
   let out = plain_headers(headers, extra=3)
   if span_context.is_valid() {
@@ -274,6 +320,8 @@ fn traced_headers(
 //
 // The parent span and baggage are taken from `context` when given, and from
 // the current context otherwise.
+
+///|
 pub async fn request(
   url : String,
   request_method : @http.RequestMethod,
@@ -281,7 +329,7 @@ pub async fn request(
   headers? : Map[String, String],
   tracer? : @sdk.Tracer,
   span_name? : String,
-  context? : @context.Context
+  context? : @context.Context,
 ) -> (@http.Response, &@io.Data) {
   let active_tracer : @sdk.Tracer? = match tracer {
     Some(value) => Some(value)
@@ -319,16 +367,14 @@ pub async fn request(
       }
       span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(host))
       span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
-      let outcome = try {
-        Ok(
-          @http.request(
-            url,
-            request_method,
-            traced_headers(headers, span.context(), request_context),
-            body,
-          ),
-        )
-      } catch {
+      let outcome = Ok(
+        @http.request(
+          url,
+          request_method,
+          traced_headers(headers, span.context(), request_context),
+          body,
+        ),
+      ) catch {
         error => Err(error)
       }
       let (response, response_body) = match outcome {
@@ -345,14 +391,8 @@ pub async fn request(
       )
       if response.code >= 400 {
         let status_text = response.code.to_string()
-        span.set_attribute(
-          @sdk.ERROR_TYPE,
-          @sdk.StringValue(status_text),
-        )
-        span.set_status(
-          @api.StatusCode::Error,
-          description=status_text,
-        )
+        span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(status_text))
+        span.set_status(@api.StatusCode::Error, description=status_text)
       }
       (response, response_body)
     }
@@ -360,137 +400,151 @@ pub async fn request(
 }
 
 // Traced `GET` request (no request body).
+
+///|
 pub async fn get(
   url : String,
   headers? : Map[String, String],
   tracer? : @sdk.Tracer,
   span_name? : String,
-  context? : @context.Context
+  context? : @context.Context,
 ) -> (@http.Response, &@io.Data) {
   request(
     url,
     @http.RequestMethod::Get,
     b"",
-    headers?=headers,
-    tracer?=tracer,
-    span_name?=span_name,
-    context?=context,
+    headers?,
+    tracer?,
+    span_name?,
+    context?,
   )
 }
 
 // Traced `POST` request.
+
+///|
 pub async fn post(
   url : String,
   body : &@io.Data,
   headers? : Map[String, String],
   tracer? : @sdk.Tracer,
   span_name? : String,
-  context? : @context.Context
+  context? : @context.Context,
 ) -> (@http.Response, &@io.Data) {
   request(
     url,
     @http.RequestMethod::Post,
     body,
-    headers?=headers,
-    tracer?=tracer,
-    span_name?=span_name,
-    context?=context,
+    headers?,
+    tracer?,
+    span_name?,
+    context?,
   )
 }
 
 // Traced `PUT` request.
+
+///|
 pub async fn put(
   url : String,
   body : &@io.Data,
   headers? : Map[String, String],
   tracer? : @sdk.Tracer,
   span_name? : String,
-  context? : @context.Context
+  context? : @context.Context,
 ) -> (@http.Response, &@io.Data) {
   request(
     url,
     @http.RequestMethod::Put,
     body,
-    headers?=headers,
-    tracer?=tracer,
-    span_name?=span_name,
-    context?=context,
+    headers?,
+    tracer?,
+    span_name?,
+    context?,
   )
 }
 
 // Traced `DELETE` request.
+
+///|
 pub async fn delete(
   url : String,
   headers? : Map[String, String],
   tracer? : @sdk.Tracer,
   span_name? : String,
-  context? : @context.Context
+  context? : @context.Context,
 ) -> (@http.Response, &@io.Data) {
   request(
     url,
     @http.RequestMethod::Delete,
     b"",
-    headers?=headers,
-    tracer?=tracer,
-    span_name?=span_name,
-    context?=context,
+    headers?,
+    tracer?,
+    span_name?,
+    context?,
   )
 }
 
 // Traced `HEAD` request (no request body).
+
+///|
 pub async fn head(
   url : String,
   headers? : Map[String, String],
   tracer? : @sdk.Tracer,
   span_name? : String,
-  context? : @context.Context
+  context? : @context.Context,
 ) -> (@http.Response, &@io.Data) {
   request(
     url,
     @http.RequestMethod::Head,
     b"",
-    headers?=headers,
-    tracer?=tracer,
-    span_name?=span_name,
-    context?=context,
+    headers?,
+    tracer?,
+    span_name?,
+    context?,
   )
 }
 
 // Traced `PATCH` request.
+
+///|
 pub async fn patch(
   url : String,
   body : &@io.Data,
   headers? : Map[String, String],
   tracer? : @sdk.Tracer,
   span_name? : String,
-  context? : @context.Context
+  context? : @context.Context,
 ) -> (@http.Response, &@io.Data) {
   request(
     url,
     @http.RequestMethod::Patch,
     body,
-    headers?=headers,
-    tracer?=tracer,
-    span_name?=span_name,
-    context?=context,
+    headers?,
+    tracer?,
+    span_name?,
+    context?,
   )
 }
 
 // Traced `OPTIONS` request (no request body).
+
+///|
 pub async fn options(
   url : String,
   headers? : Map[String, String],
   tracer? : @sdk.Tracer,
   span_name? : String,
-  context? : @context.Context
+  context? : @context.Context,
 ) -> (@http.Response, &@io.Data) {
   request(
     url,
     @http.RequestMethod::Options,
     b"",
-    headers?=headers,
-    tracer?=tracer,
-    span_name?=span_name,
-    context?=context,
+    headers?,
+    tracer?,
+    span_name?,
+    context?,
   )
 }

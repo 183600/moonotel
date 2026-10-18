@@ -14,21 +14,47 @@
 const INSTRUMENTATION_SCOPE : String = "yourname/otel/instrumentation/async_http_server"
 
 // Constant semantic-convention attribute values.
+
+///|
 let protocol_name_http : @sdk.AttributeValue = @sdk.StringValue("http")
+
+///|
 let protocol_version_http_1_1 : @sdk.AttributeValue = @sdk.StringValue("1.1")
+
+///|
 let url_scheme_http : @sdk.AttributeValue = @sdk.StringValue("http")
+
+///|
 let method_get : @sdk.AttributeValue = @sdk.StringValue("GET")
+
+///|
 let method_head : @sdk.AttributeValue = @sdk.StringValue("HEAD")
+
+///|
 let method_post : @sdk.AttributeValue = @sdk.StringValue("POST")
+
+///|
 let method_put : @sdk.AttributeValue = @sdk.StringValue("PUT")
+
+///|
 let method_delete : @sdk.AttributeValue = @sdk.StringValue("DELETE")
+
+///|
 let method_connect : @sdk.AttributeValue = @sdk.StringValue("CONNECT")
+
+///|
 let method_options : @sdk.AttributeValue = @sdk.StringValue("OPTIONS")
+
+///|
 let method_trace : @sdk.AttributeValue = @sdk.StringValue("TRACE")
+
+///|
 let method_patch : @sdk.AttributeValue = @sdk.StringValue("PATCH")
 
 ///|
-fn method_attribute_value(request_method : @http.RequestMethod) -> @sdk.AttributeValue {
+fn method_attribute_value(
+  request_method : @http.RequestMethod,
+) -> @sdk.AttributeValue {
   match request_method {
     Get => method_get
     Head => method_head
@@ -146,9 +172,7 @@ fn extract_context_with_baggage(
         Some(sc) => {
           let sc = match
             headers.get(
-              @http.CaseInsensitiveString(
-                @propagation.tracestate_header_name(),
-              ),
+              @http.CaseInsensitiveString(@propagation.tracestate_header_name()),
             ) {
             Some(state) =>
               match @propagation.parse_tracestate(state) {
@@ -314,8 +338,9 @@ fn is_http_ows(c : Char) -> Bool {
 }
 
 // Whether the five code units at `start` spell `close` ignoring ASCII case.
+
 ///|
-fn is_close_token_at(value : String, start : Int) -> Bool {
+fn is_close_token_at(value : String, start : Int32) -> Bool {
   (value.unsafe_get(start).to_int() | 32) == 99 &&
   (value.unsafe_get(start + 1).to_int() | 32) == 108 &&
   (value.unsafe_get(start + 2).to_int() | 32) == 111 &&
@@ -326,6 +351,7 @@ fn is_close_token_at(value : String, start : Int) -> Bool {
 // Whether a comma-separated `Connection` header value contains the token
 // `close` (case-insensitive, optional whitespace ignored). Equivalent to
 // `value.split(",")` plus `trim`/`to_lower`.
+
 ///|
 fn has_close_token(value : String) -> Bool {
   let len = value.length()
@@ -333,7 +359,7 @@ fn has_close_token(value : String) -> Bool {
   while start <= len {
     let mut token_start = start
     while token_start < len &&
-      is_http_ows(value.unsafe_get(token_start).unsafe_to_char()) {
+          is_http_ows(value.unsafe_get(token_start).unsafe_to_char()) {
       token_start = token_start + 1
     }
     let mut end = token_start
@@ -342,11 +368,10 @@ fn has_close_token(value : String) -> Bool {
     }
     let mut token_end = end
     while token_end > token_start &&
-      is_http_ows(value.unsafe_get(token_end - 1).unsafe_to_char()) {
+          is_http_ows(value.unsafe_get(token_end - 1).unsafe_to_char()) {
       token_end = token_end - 1
     }
-    if token_end - token_start == 5 &&
-      is_close_token_at(value, token_start) {
+    if token_end - token_start == 5 && is_close_token_at(value, token_start) {
       return true
     }
     if end >= len {
@@ -430,14 +455,8 @@ pub async fn ServerCall::respond(
       )
       if status_code >= 500 {
         let status_text = status_code.to_string()
-        span.set_attribute(
-          @sdk.ERROR_TYPE,
-          @sdk.StringValue(status_text),
-        )
-        span.set_status(
-          @api.StatusCode::Error,
-          description=status_text,
-        )
+        span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(status_text))
+        span.set_status(@api.StatusCode::Error, description=status_text)
       }
     }
     None => ()
@@ -520,8 +539,7 @@ pub async fn run_server_on(
             server_span.set_attribute(@sdk.URL_QUERY, @sdk.StringValue(query))
           }
           record_host_attributes(server_span, request.headers)
-          match
-            request.headers.get(@http.CaseInsensitiveString("user-agent")) {
+          match request.headers.get(@http.CaseInsensitiveString("user-agent")) {
             Some(agent) =>
               server_span.set_attribute(
                 @sdk.USER_AGENT_ORIGINAL,

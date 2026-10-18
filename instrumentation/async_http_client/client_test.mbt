@@ -1,23 +1,30 @@
 // Integration tests for the async HTTP client instrumentation, driven against
 // real loopback HTTP servers.
 
+///|
 struct RecordingExporter {
   spans : Ref[Array[@sdk.SpanData]]
 }
 
-pub impl @sdk.SpanExporter for RecordingExporter with export_spans(self, spans) {
+///|
+pub impl @sdk.SpanExporter for RecordingExporter with fn export_spans(
+  self,
+  spans,
+) {
   for data in spans {
     self.spans.val.push(data)
   }
   @sdk.ExportSuccess
 }
 
-pub impl @sdk.SpanExporter for RecordingExporter with shutdown(self) {
+///|
+pub impl @sdk.SpanExporter for RecordingExporter with fn shutdown(self) {
   let _ = self
 }
 
+///|
 fn test_tracer(scope : String) -> (@sdk.Tracer, RecordingExporter) {
-  let exporter : RecordingExporter = { spans: Ref([]) }
+  let exporter : RecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
   let provider = @sdk.TracerProviderSdk::new(
     service_name="instrumentation-test",
@@ -25,27 +32,57 @@ fn test_tracer(scope : String) -> (@sdk.Tracer, RecordingExporter) {
   (provider.get_tracer(scope), exporter)
 }
 
+///|
 test "split_url handles schemes, ports, userinfo and IPv6 hosts" {
-  assert_eq(@async_http_client.split_url("https://example.com/x"), ("example.com", 443))
-  assert_eq(@async_http_client.split_url("http://example.com:8080/x"), ("example.com", 8080))
+  assert_eq(
+    @async_http_client.split_url("https://example.com/x"),
+    ("example.com", 443),
+  )
+  assert_eq(
+    @async_http_client.split_url("http://example.com:8080/x"),
+    ("example.com", 8080),
+  )
   assert_eq(
     @async_http_client.split_url("http://user:pass@host.test:9000/"),
     ("host.test", 9000),
   )
-  assert_eq(@async_http_client.split_url("http://[::1]:4318/v1/traces"), ("[::1]", 4318))
+  assert_eq(
+    @async_http_client.split_url("http://[::1]:4318/v1/traces"),
+    ("[::1]", 4318),
+  )
   assert_eq(@async_http_client.split_url("example.com"), ("example.com", 80))
-  assert_eq(@async_http_client.split_url("HTTPS://example.com/x"), ("example.com", 443))
+  assert_eq(
+    @async_http_client.split_url("HTTPS://example.com/x"),
+    ("example.com", 443),
+  )
 }
 
+///|
 test "split_url ignores query and fragment when no path is present" {
-  assert_eq(@async_http_client.split_url("http://example.com?x=1"), ("example.com", 80))
-  assert_eq(@async_http_client.split_url("https://example.com?x=1"), ("example.com", 443))
-  assert_eq(@async_http_client.split_url("http://example.com:8080?x=1"), ("example.com", 8080))
-  assert_eq(@async_http_client.split_url("http://example.com#frag"), ("example.com", 80))
-  assert_eq(@async_http_client.split_url("http://user:pass@host.test:9000?x=1"), ("host.test", 9000))
+  assert_eq(
+    @async_http_client.split_url("http://example.com?x=1"),
+    ("example.com", 80),
+  )
+  assert_eq(
+    @async_http_client.split_url("https://example.com?x=1"),
+    ("example.com", 443),
+  )
+  assert_eq(
+    @async_http_client.split_url("http://example.com:8080?x=1"),
+    ("example.com", 8080),
+  )
+  assert_eq(
+    @async_http_client.split_url("http://example.com#frag"),
+    ("example.com", 80),
+  )
+  assert_eq(
+    @async_http_client.split_url("http://user:pass@host.test:9000?x=1"),
+    ("host.test", 9000),
+  )
   assert_eq(@async_http_client.split_url("http://[::1]?x=1"), ("[::1]", 80))
 }
 
+///|
 test "split_scheme lower-cases and validates schemes" {
   assert_eq(@async_http_client.split_scheme("https://example.com/x"), "https")
   assert_eq(@async_http_client.split_scheme("HTTP://example.com"), "http")
@@ -55,6 +92,7 @@ test "split_scheme lower-cases and validates schemes" {
   assert_eq(@async_http_client.split_scheme("http://"), "http")
 }
 
+///|
 async test "get creates a client span and injects traceparent" {
   let (tracer, exporter) = test_tracer("client-test")
   @async.with_task_group() <| group => {
@@ -72,7 +110,7 @@ async test "get creates a client span and injects traceparent" {
     let url = "http://127.0.0.1:\{port}/hello"
     let (response, _body) = @async_http_client.get(
       url,
-      tracer=tracer,
+      tracer~,
       context=@context.Context::root(),
     )
     assert_eq(response.code, 200)
@@ -112,6 +150,7 @@ async test "get creates a client span and injects traceparent" {
   }
 }
 
+///|
 async test "client span continues the current trace context" {
   let (tracer, exporter) = test_tracer("client-test-parent")
   @async.with_task_group() <| group => {
@@ -129,7 +168,10 @@ async test "client span continues the current trace context" {
     )
     let previous = @context.attach(@context.Context::root().with_span(parent))
     defer @context.detach(previous)
-    let (response, _body) = @async_http_client.get("http://127.0.0.1:\{port}/child", tracer=tracer)
+    let (response, _body) = @async_http_client.get(
+      "http://127.0.0.1:\{port}/child",
+      tracer~,
+    )
     assert_eq(response.code, 200)
     let data = exporter.spans.val[0]
     assert_eq(data.span_context.trace_id_hex(), parent.trace_id_hex())
@@ -137,6 +179,7 @@ async test "client span continues the current trace context" {
   }
 }
 
+///|
 async test "client span is marked as error for 5xx responses" {
   let (tracer, exporter) = test_tracer("client-test-error")
   @async.with_task_group() <| group => {
@@ -147,7 +190,10 @@ async test "client span is marked as error for 5xx responses" {
         conn.send_response(503, "Service Unavailable")
       })
     }
-    let (response, _body) = @async_http_client.get("http://127.0.0.1:\{port}/down", tracer=tracer)
+    let (response, _body) = @async_http_client.get(
+      "http://127.0.0.1:\{port}/down",
+      tracer~,
+    )
     assert_eq(response.code, 503)
     let data = exporter.spans.val[0]
     assert_eq(data.status, @api.StatusCode::Error)
@@ -162,6 +208,7 @@ async test "client span is marked as error for 5xx responses" {
   }
 }
 
+///|
 async test "post sends the request body" {
   let (tracer, exporter) = test_tracer("client-test-post")
   @async.with_task_group() <| group => {
@@ -177,7 +224,7 @@ async test "post sends the request body" {
     let (response, _body) = @async_http_client.post(
       "http://127.0.0.1:\{port}/items",
       "payload",
-      tracer=tracer,
+      tracer~,
     )
     assert_eq(response.code, 201)
     assert_eq(received.val, "payload")
@@ -189,6 +236,7 @@ async test "post sends the request body" {
   }
 }
 
+///|
 async test "requests are untraced when no tracer is available" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -198,11 +246,14 @@ async test "requests are untraced when no tracer is available" {
         conn.send_response(200, "OK")
       })
     }
-    let (response, _body) = @async_http_client.get("http://127.0.0.1:\{port}/plain")
+    let (response, _body) = @async_http_client.get(
+      "http://127.0.0.1:\{port}/plain",
+    )
     assert_eq(response.code, 200)
   }
 }
 
+///|
 async test "client propagates tracestate and baggage" {
   let (tracer, exporter) = test_tracer("client-test-state")
   @async.with_task_group() <| group => {
@@ -232,7 +283,7 @@ async test "client propagates tracestate and baggage" {
       .with_value("user.id", "42")
     let (response, _body) = @async_http_client.get(
       "http://127.0.0.1:\{port}/state",
-      tracer=tracer,
+      tracer~,
       context=request_context,
     )
     assert_eq(response.code, 200)
@@ -244,6 +295,7 @@ async test "client propagates tracestate and baggage" {
   }
 }
 
+///|
 async test "instrumented client and server produce a connected trace" {
   let (tracer, exporter) = test_tracer("client-test-e2e")
   @async.with_task_group() <| group => {
@@ -252,14 +304,12 @@ async test "instrumented client and server produce a connected trace" {
     group.spawn_bg(no_wait=true) <| () => {
       @server.run_server_on(
         server,
-        call => {
-          call.respond(200, body="connected")
-        },
-        tracer=tracer,
+        call => call.respond(200, body="connected"),
+        tracer~,
       )
     }
     let url = "http://127.0.0.1:\{port}/e2e"
-    let (response, body) = @async_http_client.get(url, tracer=tracer)
+    let (response, body) = @async_http_client.get(url, tracer~)
     assert_eq(response.code, 200)
     assert_eq(body.text(), "connected")
     @async.sleep(50)

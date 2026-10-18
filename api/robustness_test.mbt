@@ -1,5 +1,6 @@
 // Robustness and stress tests for SpanContext
 
+///|
 test "create_many_span_contexts" {
   let mut count = 0
   while count < 100 {
@@ -18,6 +19,7 @@ test "create_many_span_contexts" {
   }
 }
 
+///|
 test "alternating_valid_invalid_contexts" {
   let mut i = 0
   while i < 50 {
@@ -25,18 +27,19 @@ test "alternating_valid_invalid_contexts" {
     let valid_sid = Array::make(8, 1)
     let valid_sc = @api.span_context(valid_tid, valid_sid, 0)
     assert_true(valid_sc.is_valid())
-    
+
     let invalid_sc = @api.invalid_span_context()
     assert_false(invalid_sc.is_valid())
-    
+
     i = i + 1
   }
 }
 
+///|
 test "span_context_with_varying_trace_flags" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
-  
+
   let mut flags = 0
   while flags < 256 {
     let sc = @api.span_context(tid, sid, flags)
@@ -46,6 +49,7 @@ test "span_context_with_varying_trace_flags" {
   }
 }
 
+///|
 test "hex_conversion_consistency" {
   let mut byte_val = 0
   while byte_val < 256 {
@@ -55,10 +59,11 @@ test "hex_conversion_consistency" {
   }
 }
 
+///|
 test "is_zero_with_progressive_fill" {
   let arr = Array::make(16, 0)
   assert_true(@api.is_zero(arr))
-  
+
   let mut i = 0
   while i < 16 {
     arr[i] = 1
@@ -69,9 +74,10 @@ test "is_zero_with_progressive_fill" {
   }
 }
 
+///|
 test "span_context_trace_id_variations" {
   let sid = Array::make(8, 1)
-  
+
   let mut i = 0
   while i < 256 {
     let tid = Array::make(16, 0)
@@ -84,9 +90,10 @@ test "span_context_trace_id_variations" {
   }
 }
 
+///|
 test "span_context_span_id_variations" {
   let tid = Array::make(16, 1)
-  
+
   let mut i = 0
   while i < 256 {
     let sid = Array::make(8, 0)
@@ -99,6 +106,7 @@ test "span_context_span_id_variations" {
   }
 }
 
+///|
 test "mixed_zero_nonzero_patterns" {
   let patterns = [
     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -109,7 +117,7 @@ test "mixed_zero_nonzero_patterns" {
     [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   ]
-  
+
   let sid = Array::make(8, 1)
   let mut i = 0
   while i < patterns.length() {
@@ -119,32 +127,31 @@ test "mixed_zero_nonzero_patterns" {
   }
 }
 
+///|
 test "hex_encoding_all_nibbles_combined" {
-  let all_nibbles = [
-    0x01, 0x23, 0x45, 0x67,
-    0x89, 0xAB, 0xCD, 0xEF
-  ]
+  let all_nibbles = [0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF]
   let hex = bytes_to_hex(all_nibbles)
   assert_eq(hex, "0123456789abcdef")
 }
 
+///|
 test "trace_flags_bit_masking" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
-  
+
   // Test various bit patterns
   let test_flags = [
-    0b00000000,  // 0
-    0b00000001,  // 1
-    0b00000011,  // 3
-    0b00000111,  // 7
-    0b00001111,  // 15
-    0b00011111,  // 31
-    0b00111111,  // 63
-    0b01111111,  // 127
-    0b11111111,  // 255
+    0b00000000, // 0
+     0b00000001, // 1
+     0b00000011, // 3
+     0b00000111, // 7
+     0b00001111, // 15
+     0b00011111, // 31
+     0b00111111, // 63
+     0b01111111, // 127
+     0b11111111, // 255
   ]
-  
+
   let mut i = 0
   while i < test_flags.length() {
     let sc = @api.span_context(tid, sid, test_flags[i])
@@ -154,6 +161,7 @@ test "trace_flags_bit_masking" {
   }
 }
 
+///|
 test "large_scale_hex_conversion" {
   let mut size = 1
   while size <= 64 {
@@ -164,10 +172,11 @@ test "large_scale_hex_conversion" {
   }
 }
 
+///|
 test "span_context_repeated_creation" {
   let tid = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let sid = [1, 2, 3, 4, 5, 6, 7, 8]
-  
+
   let mut count = 0
   while count < 100 {
     let sc = @api.span_context(tid, sid, count % 256)
@@ -177,8 +186,3 @@ test "span_context_repeated_creation" {
     count = count + 1
   }
 }
-
-
-
-
-

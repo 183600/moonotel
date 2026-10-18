@@ -154,7 +154,9 @@ pub fn[X] Tracer::with_span(
         start_time_unix_nano?,
       )
   }
-  let previous = @context.attach(@context.current_context().with_span(span.context()))
+  let previous = @context.attach(
+    @context.current_context().with_span(span.context()),
+  )
   defer @context.detach(previous)
   defer span.end()
   f(span)
@@ -198,7 +200,9 @@ pub async fn[X] Tracer::with_span_async(
         start_time_unix_nano?,
       )
   }
-  let previous = @context.attach(@context.current_context().with_span(span.context()))
+  let previous = @context.attach(
+    @context.current_context().with_span(span.context()),
+  )
   defer @context.detach(previous)
   defer span.end()
   f(span)

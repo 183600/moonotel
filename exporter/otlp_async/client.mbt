@@ -11,7 +11,7 @@
 // The package targets native only, because the async HTTP stack does.
 
 ///|
-fn is_retryable_status(status_code : Int) -> Bool {
+fn is_retryable_status(status_code : Int32) -> Bool {
   match status_code {
     429 | 502 | 503 | 504 => true
     _ => false
@@ -23,10 +23,7 @@ fn request_headers(
   config : @otlp.OtlpHttpConfig,
   gzip : Bool,
 ) -> Map[@http.CaseInsensitiveString, String] {
-  let headers = Map(
-    [],
-    capacity=(config.headers.length() + 2) * 2,
-  )
+  let headers = Map([], capacity=(config.headers.length() + 2) * 2)
   config.headers.each(fn(key, value) {
     headers.set(@http.CaseInsensitiveString(key), value)
   })
@@ -60,16 +57,12 @@ async fn gzip_compress(data : Bytes) -> Bytes {
 // form of the header is not supported and yields `None`.
 
 ///|
-fn retry_after_millis(value : String) -> Int? {
+fn retry_after_millis(value : String) -> Int32? {
   let trimmed = value.trim()
   if trimmed == "" {
     return None
   }
-  let seconds = try {
-    @string.parse_int(trimmed)
-  } catch {
-    _ => return None
-  }
+  let seconds = @string.parse_int(trimmed) catch { _ => return None }
   if seconds < 0 {
     return None
   }
@@ -120,7 +113,7 @@ pub async fn post_trace_request(
   let headers = request_headers(config, gzip)
   let mut attempt = 0
   let mut last_failure = ""
-  let mut retry_after : Int? = None
+  let mut retry_after : Int32? = None
   while attempt <= config.max_retries {
     if attempt > 0 {
       let delay = match retry_after {
@@ -164,8 +157,7 @@ pub async fn post_trace_request(
         if !is_retryable_status(response.code) {
           return @sdk.ExportFailure(last_failure)
         }
-        match
-          response.headers.get(@http.CaseInsensitiveString("retry-after")) {
+        match response.headers.get(@http.CaseInsensitiveString("retry-after")) {
           Some(value) => retry_after = retry_after_millis(value)
           None => ()
         }

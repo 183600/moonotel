@@ -1,5 +1,5 @@
 import {
-  "yourname/otel/api" @api,
+  "yourname/otel/api",
 }
 
 pkgtype(kind: "library")

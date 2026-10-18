@@ -1,17 +1,17 @@
 import {
-  "moonbitlang/async/http" @http,
-  "moonbitlang/async/io" @io,
+  "moonbitlang/async/http",
+  "moonbitlang/async/io",
   "moonbitlang/core/string",
-  "yourname/otel/api" @api,
-  "yourname/otel/context" @context,
-  "yourname/otel/propagation" @propagation,
-  "yourname/otel/sdk" @sdk,
+  "yourname/otel/api",
+  "yourname/otel/context",
+  "yourname/otel/propagation",
+  "yourname/otel/sdk",
 }
 
 import {
-  "moonbitlang/async" @async,
-  "moonbitlang/async/socket" @socket,
-  "yourname/otel/api" @api,
+  "moonbitlang/async",
+  "moonbitlang/async/socket",
+  "yourname/otel/api",
   "yourname/otel/instrumentation/async_http_server" @server,
 } for "test"
 

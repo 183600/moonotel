@@ -55,10 +55,7 @@ test "json_export_sends_json_content_type_and_parsable_body" {
   let exporter = @otlp.OtlpHttpExporter::new(config, mock.as_transport())
   let result = exporter.export_spans([test_span()])
   assert_true(result.is_success())
-  assert_eq(
-    mock.headers[0].get("content-type"),
-    Some("application/json"),
-  )
+  assert_eq(mock.headers[0].get("content-type"), Some("application/json"))
   let text = @utf8.decode_lossy(mock.bodies[0].exact_view())
   let root = @json.parse(text) catch {
     err => abort("exporter sent invalid JSON: " + err.to_string())
@@ -69,8 +66,7 @@ test "json_export_sends_json_content_type_and_parsable_body" {
 ///|
 test "json_export_partial_success_is_reported_as_failure" {
   let mock = json_mock_transport(
-    200,
-    b"{\"partialSuccess\":{\"rejectedSpans\":\"2\",\"errorMessage\":\"bad spans\"}}",
+    200, b"{\"partialSuccess\":{\"rejectedSpans\":\"2\",\"errorMessage\":\"bad spans\"}}",
   )
   let config = @otlp.OtlpHttpConfig::new(
     endpoint="http://collector:4318",

@@ -4,6 +4,7 @@
 // Trace Context and OTLP specs. Random IDs use the platform entropy source
 // when available and fall back to a splitmix64 PRNG seeded from the clock.
 
+///|
 fn splitmix64(state : Ref[UInt64]) -> UInt64 {
   state.val = state.val + 11400714819323198485
   let mut z = state.val
@@ -13,21 +14,26 @@ fn splitmix64(state : Ref[UInt64]) -> UInt64 {
 }
 
 // A generator of trace IDs and span IDs.
+
+///|
 pub struct IdGenerator {
-  trace_id_source : () -> Array[Int]
-  span_id_source : () -> Array[Int]
+  trace_id_source : () -> Array[Int32]
+  span_id_source : () -> Array[Int32]
 }
 
 // Build a generator from two byte-array factories.
+
+///|
 pub fn IdGenerator::new(
-  trace_id_source : () -> Array[Int],
-  span_id_source : () -> Array[Int]
+  trace_id_source : () -> Array[Int32],
+  span_id_source : () -> Array[Int32],
 ) -> IdGenerator {
   { trace_id_source, span_id_source, }
 }
 
-fn pseudo_random_bytes(n : Int, state : Ref[UInt64]) -> Array[Int] {
-  let out : Array[Int] = Array::unsafe_make_uninit(n)
+///|
+fn pseudo_random_bytes(n : Int32, state : Ref[UInt64]) -> Array[Int32] {
+  let out : Array[Int32] = Array::unsafe_make_uninit(n)
   let mut filled = 0
   let mut acc = 0
   while filled < n {
@@ -49,20 +55,24 @@ fn pseudo_random_bytes(n : Int, state : Ref[UInt64]) -> Array[Int] {
 }
 
 // Bytes requested from the entropy source per draw.
-const RANDOM_DRAW_BYTES : Int = 8192
+
+///|
+const RANDOM_DRAW_BYTES : Int32 = 8192
 
 // Consume `n` bytes from the buffered draw, if enough remain.
+
+///|
 fn take_buffered(
-  n : Int,
+  n : Int32,
   pending : Ref[Bytes],
-  offset : Ref[Int]
-) -> Array[Int]? {
+  offset : Ref[Int32],
+) -> Array[Int32]? {
   let source = pending.val
   let start = offset.val
   if source.length() - start < n {
     return None
   }
-  let out : Array[Int] = Array::unsafe_make_uninit(n)
+  let out : Array[Int32] = Array::unsafe_make_uninit(n)
   let mut acc : UInt64 = 0
   let mut i = 0
   while i + 8 <= n {
@@ -96,12 +106,13 @@ fn take_buffered(
   Some(out)
 }
 
+///|
 fn random_bytes(
-  n : Int,
+  n : Int32,
   state : Ref[UInt64],
   pending : Ref[Bytes],
-  offset : Ref[Int]
-) -> Array[Int] {
+  offset : Ref[Int32],
+) -> Array[Int32] {
   match take_buffered(n, pending, offset) {
     Some(bytes) => bytes
     None => {
@@ -122,31 +133,37 @@ fn random_bytes(
 }
 
 // A generator producing random IDs.
+
+///|
 pub fn IdGenerator::random() -> IdGenerator {
   let state = Ref(@env.now() ^ 88172645463325252)
   let pending : Ref[Bytes] = Ref(b"")
-  let offset : Ref[Int] = Ref(0)
-  IdGenerator::new(
-    fn() { random_bytes(16, state, pending, offset) },
-    fn() { random_bytes(8, state, pending, offset) },
-  )
+  let offset : Ref[Int32] = Ref(0)
+  IdGenerator::new(fn() { random_bytes(16, state, pending, offset) }, fn() {
+    random_bytes(8, state, pending, offset)
+  })
 }
 
 // A deterministic generator based on splitmix64, useful for tests and demos.
+
+///|
 pub fn IdGenerator::deterministic(seed : UInt64) -> IdGenerator {
   let state = Ref(seed)
-  IdGenerator::new(
-    fn() { pseudo_random_bytes(16, state) },
-    fn() { pseudo_random_bytes(8, state) },
-  )
+  IdGenerator::new(fn() { pseudo_random_bytes(16, state) }, fn() {
+    pseudo_random_bytes(8, state)
+  })
 }
 
 // Generate a fresh 16-byte trace ID.
-pub fn IdGenerator::generate_trace_id(self : IdGenerator) -> Array[Int] {
+
+///|
+pub fn IdGenerator::generate_trace_id(self : IdGenerator) -> Array[Int32] {
   (self.trace_id_source)()
 }
 
 // Generate a fresh 8-byte span ID.
-pub fn IdGenerator::generate_span_id(self : IdGenerator) -> Array[Int] {
+
+///|
+pub fn IdGenerator::generate_span_id(self : IdGenerator) -> Array[Int32] {
   (self.span_id_source)()
 }

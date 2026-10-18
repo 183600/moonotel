@@ -1,26 +1,31 @@
 // Minimal protobuf wire-format writer used by the OTLP encoder.
 // Only the wire types needed by the OTLP trace service are implemented.
 
+///|
 priv struct ProtoWriter {
   mut buf : FixedArray[Byte]
-  mut len : Int
+  mut len : Int32
   // Scratch writers for nested message encodings, used like a call stack: a
   // nested message takes one and releases it after appending its bytes.
   scratch : Array[ProtoWriter]
 }
 
-fn ProtoWriter::with_capacity(size_hint : Int) -> ProtoWriter {
+///|
+fn ProtoWriter::with_capacity(size_hint : Int32) -> ProtoWriter {
   let capacity = if size_hint < 1 { 1 } else { size_hint }
-  { buf: FixedArray::make(capacity, b'\x00'), len: 0, scratch: [] }
+  { buf: FixedArray::make(capacity, b'\x00'), len: 0, scratch: [], }
 }
 
 // Reusable root writer for `encode_trace_request`. Its buffer and the pool of
 // nested-message scratch writers are kept between calls, so repeated encoding
 // allocates only the returned `Bytes`. Encoding never re-enters itself, so the
 // pool is safe to share process-wide.
+
+///|
 let encoder_pool : Ref[ProtoWriter?] = Ref(None)
 
-fn take_root_writer(size_hint : Int) -> ProtoWriter {
+///|
+fn take_root_writer(size_hint : Int32) -> ProtoWriter {
   match encoder_pool.val {
     Some(writer) => {
       writer.len = 0
@@ -36,7 +41,9 @@ fn take_root_writer(size_hint : Int) -> ProtoWriter {
 
 // Grow the buffer to fit `extra` more bytes, doubling the capacity as needed.
 // Call sites check `len + extra <= buf.length()` inline before calling this.
-fn ProtoWriter::reserve(self : ProtoWriter, extra : Int) -> Unit {
+
+///|
+fn ProtoWriter::reserve(self : ProtoWriter, extra : Int32) -> Unit {
   let required = self.len + extra
   let doubled = self.buf.length() * 2
   let capacity = if doubled > required { doubled } else { required }
@@ -45,8 +52,7 @@ fn ProtoWriter::reserve(self : ProtoWriter, extra : Int) -> Unit {
   self.buf = grown
 }
 
-
-
+///|
 fn ProtoWriter::take_scratch(self : ProtoWriter) -> ProtoWriter {
   match self.scratch.pop() {
     Some(buffer) => buffer
@@ -57,9 +63,11 @@ fn ProtoWriter::take_scratch(self : ProtoWriter) -> ProtoWriter {
 // Like `take_scratch`, but ensures the returned writer's buffer can hold at
 // least `hint` bytes. A recycled writer carries no data: its length is reset
 // when it is released.
+
+///|
 fn ProtoWriter::take_scratch_with_capacity(
   self : ProtoWriter,
-  hint : Int
+  hint : Int32,
 ) -> ProtoWriter {
   match self.scratch.pop() {
     Some(buffer) => {
@@ -72,15 +80,21 @@ fn ProtoWriter::take_scratch_with_capacity(
   }
 }
 
-fn ProtoWriter::release_scratch(self : ProtoWriter, buffer : ProtoWriter) -> Unit {
+///|
+fn ProtoWriter::release_scratch(
+  self : ProtoWriter,
+  buffer : ProtoWriter,
+) -> Unit {
   buffer.len = 0
   self.scratch.push(buffer)
 }
 
+///|
 fn ProtoWriter::to_bytes(self : ProtoWriter) -> Bytes {
   Bytes::from_array(self.buf[:self.len])
 }
 
+///|
 fn ProtoWriter::write_varint(self : ProtoWriter, value : UInt64) -> Unit {
   if value < 0x80 {
     if self.len + 1 > self.buf.length() {
@@ -106,7 +120,12 @@ fn ProtoWriter::write_varint(self : ProtoWriter, value : UInt64) -> Unit {
   self.len = i + 1
 }
 
-fn ProtoWriter::write_tag(self : ProtoWriter, field : Int, wire_type : Int) -> Unit {
+///|
+fn ProtoWriter::write_tag(
+  self : ProtoWriter,
+  field : Int32,
+  wire_type : Int32,
+) -> Unit {
   let tag = (field << 3) | wire_type
   if tag >= 0 && tag < 0x80 {
     if self.len + 1 > self.buf.length() {
@@ -122,7 +141,13 @@ fn ProtoWriter::write_tag(self : ProtoWriter, field : Int, wire_type : Int) -> U
 // Write the tag and length prefix of a length-delimited field. The fast path
 // covers the common case of a one-byte tag and a one-byte length, which is
 // what most OTLP fields need.
-fn ProtoWriter::write_message_header(self : ProtoWriter, field : Int, len : Int) -> Unit {
+
+///|
+fn ProtoWriter::write_message_header(
+  self : ProtoWriter,
+  field : Int32,
+  len : Int32,
+) -> Unit {
   let tag = (field << 3) | 2
   if tag >= 0 && tag < 0x80 && len < 0x80 {
     if self.len + 2 > self.buf.length() {
@@ -139,7 +164,12 @@ fn ProtoWriter::write_message_header(self : ProtoWriter, field : Int, len : Int)
   self.write_varint(len.to_uint64())
 }
 
-fn ProtoWriter::write_varint_field(self : ProtoWriter, field : Int, value : UInt64) -> Unit {
+///|
+fn ProtoWriter::write_varint_field(
+  self : ProtoWriter,
+  field : Int32,
+  value : UInt64,
+) -> Unit {
   let tag = field << 3
   if tag >= 0 && tag < 0x80 && value < 0x80 {
     if self.len + 2 > self.buf.length() {
@@ -156,11 +186,21 @@ fn ProtoWriter::write_varint_field(self : ProtoWriter, field : Int, value : UInt
   self.write_varint(value)
 }
 
-fn ProtoWriter::write_bool_field(self : ProtoWriter, field : Int, value : Bool) -> Unit {
+///|
+fn ProtoWriter::write_bool_field(
+  self : ProtoWriter,
+  field : Int32,
+  value : Bool,
+) -> Unit {
   self.write_varint_field(field, if value { 1 } else { 0 })
 }
 
-fn ProtoWriter::write_fixed64_field(self : ProtoWriter, field : Int, value : UInt64) -> Unit {
+///|
+fn ProtoWriter::write_fixed64_field(
+  self : ProtoWriter,
+  field : Int32,
+  value : UInt64,
+) -> Unit {
   let tag = (field << 3) | 1
   if tag >= 0 && tag < 0x80 {
     if self.len + 9 > self.buf.length() {
@@ -181,11 +221,21 @@ fn ProtoWriter::write_fixed64_field(self : ProtoWriter, field : Int, value : UIn
   self.len = self.len + 8
 }
 
-fn ProtoWriter::write_double_field(self : ProtoWriter, field : Int, value : Double) -> Unit {
+///|
+fn ProtoWriter::write_double_field(
+  self : ProtoWriter,
+  field : Int32,
+  value : Double,
+) -> Unit {
   self.write_fixed64_field(field, value.reinterpret_as_uint64())
 }
 
-fn ProtoWriter::write_fixed32_field(self : ProtoWriter, field : Int, value : UInt) -> Unit {
+///|
+fn ProtoWriter::write_fixed32_field(
+  self : ProtoWriter,
+  field : Int32,
+  value : UInt32,
+) -> Unit {
   let tag = (field << 3) | 5
   if tag >= 0 && tag < 0x80 {
     if self.len + 5 > self.buf.length() {
@@ -206,6 +256,7 @@ fn ProtoWriter::write_fixed32_field(self : ProtoWriter, field : Int, value : UIn
   self.len = self.len + 4
 }
 
+///|
 fn ProtoWriter::write_bytes(self : ProtoWriter, value : Bytes) -> Unit {
   let len = value.length()
   self.write_varint(len.to_uint64())
@@ -218,10 +269,12 @@ fn ProtoWriter::write_bytes(self : ProtoWriter, value : Bytes) -> Unit {
 
 // Write a length-delimited bytes field from an array of byte values, masking
 // each element to 8 bits.
+
+///|
 fn ProtoWriter::write_bytes_from_int_array(
   self : ProtoWriter,
-  field : Int,
-  values : Array[Int]
+  field : Int32,
+  values : Array[Int32],
 ) -> Unit {
   let len = values.length()
   self.write_message_header(field, len)
@@ -242,7 +295,13 @@ fn ProtoWriter::write_bytes_from_int_array(
 }
 
 // Write a length-delimited string field, encoding non-ASCII text as UTF-8.
-fn ProtoWriter::write_string_field(self : ProtoWriter, field : Int, value : String) -> Unit {
+
+///|
+fn ProtoWriter::write_string_field(
+  self : ProtoWriter,
+  field : Int32,
+  value : String,
+) -> Unit {
   let len = value.length()
   let tag = (field << 3) | 2
   let start = if tag >= 0 && tag < 0x80 && len < 0x80 {
@@ -304,6 +363,8 @@ fn ProtoWriter::write_string_field(self : ProtoWriter, field : Int, value : Stri
 // Write the bytes of an ASCII string without a tag or length prefix. On the
 // first non-ASCII code unit nothing is committed (`len` is left unchanged)
 // and `false` is returned, so the caller can fall back to UTF-8 encoding.
+
+///|
 fn ProtoWriter::try_write_ascii_raw(self : ProtoWriter, value : String) -> Bool {
   let len = value.length()
   if self.len + len > self.buf.length() {
@@ -342,7 +403,13 @@ fn ProtoWriter::try_write_ascii_raw(self : ProtoWriter, value : String) -> Bool 
 
 // Append an already encoded nested message with a length prefix, releasing
 // the writer that produced it.
-fn ProtoWriter::append_message(self : ProtoWriter, field : Int, inner : ProtoWriter) -> Unit {
+
+///|
+fn ProtoWriter::append_message(
+  self : ProtoWriter,
+  field : Int32,
+  inner : ProtoWriter,
+) -> Unit {
   let len = inner.len
   self.write_message_header(field, len)
   if self.len + len > self.buf.length() {
@@ -352,4 +419,3 @@ fn ProtoWriter::append_message(self : ProtoWriter, field : Int, inner : ProtoWri
   self.len = self.len + len
   self.release_scratch(inner)
 }
-

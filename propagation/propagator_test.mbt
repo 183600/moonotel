@@ -1,11 +1,12 @@
 // Tests for text-map propagators: the trace context and baggage propagators,
 // the composite propagator and the `OTEL_PROPAGATORS` environment handling.
 
+///|
 fn propagator_span() -> @api.SpanContext {
   @api.span_context(
     [
-      0x4b, 0xf9, 0x2f, 0x35, 0x9d, 0x1e, 0x75, 0xb7,
-      0x61, 0x8a, 0x2d, 0x1f, 0x3c, 0x4e, 0x5a, 0x6b,
+      0x4b, 0xf9, 0x2f, 0x35, 0x9d, 0x1e, 0x75, 0xb7, 0x61, 0x8a, 0x2d, 0x1f, 0x3c,
+      0x4e, 0x5a, 0x6b,
     ],
     [0x00, 0xf0, 0x67, 0xaa, 0x0b, 0xa9, 0x02, 0xb7],
     @api.TRACE_FLAGS_SAMPLED,
@@ -15,11 +16,14 @@ fn propagator_span() -> @api.SpanContext {
 
 // A propagator that writes a fixed marker header and turns it into a baggage
 // value on extraction, used to observe composite ordering.
+
+///|
 struct MarkerPropagator {
   header : String
 }
 
-pub impl @propagation.TextMapPropagator for MarkerPropagator with inject(
+///|
+pub impl @propagation.TextMapPropagator for MarkerPropagator with fn inject(
   self,
   _context,
   carrier,
@@ -27,7 +31,8 @@ pub impl @propagation.TextMapPropagator for MarkerPropagator with inject(
   carrier.set(self.header, self.header)
 }
 
-pub impl @propagation.TextMapPropagator for MarkerPropagator with extract(
+///|
+pub impl @propagation.TextMapPropagator for MarkerPropagator with fn extract(
   self,
   carrier,
 ) {
@@ -37,6 +42,7 @@ pub impl @propagation.TextMapPropagator for MarkerPropagator with extract(
   }
 }
 
+///|
 test "trace_context_propagator_round_trip" {
   let propagator = @propagation.TraceContextPropagator::new()
   let context = @context.Context::root()
@@ -60,6 +66,7 @@ test "trace_context_propagator_round_trip" {
   assert_false(extracted.has_baggage())
 }
 
+///|
 test "trace_context_propagator_extracts_invalid_traceparent_as_root" {
   let propagator = @propagation.TraceContextPropagator::new()
   let carrier = @propagation.TextMapCarrier::from_entries([
@@ -69,6 +76,7 @@ test "trace_context_propagator_extracts_invalid_traceparent_as_root" {
   assert_true(context.span_context() is None)
 }
 
+///|
 test "baggage_propagator_round_trip" {
   let propagator = @propagation.BaggagePropagator::new()
   let context = @context.Context::root().with_value("user.id", "42")
@@ -82,6 +90,7 @@ test "baggage_propagator_round_trip" {
   assert_eq(extracted.value("user.id"), Some("42"))
 }
 
+///|
 test "composite_propagator_round_trips_trace_context_and_baggage" {
   let composite = @propagation.CompositePropagator::new([
     @propagation.TraceContextPropagator::new(),
@@ -96,17 +105,15 @@ test "composite_propagator_round_trips_trace_context_and_baggage" {
   assert_true(carrier.get("traceparent") is Some(_))
   assert_eq(carrier.get("baggage"), Some("tenant=acme"))
   let extracted = composite.extract(carrier)
-  assert_eq(
-    extracted.span_context().unwrap().span_id_hex(),
-    "00f067aa0ba902b7",
-  )
+  assert_eq(extracted.span_context().unwrap().span_id_hex(), "00f067aa0ba902b7")
   assert_eq(extracted.value("tenant"), Some("acme"))
 }
 
+///|
 test "composite_propagator_runs_members_in_order" {
   let composite = @propagation.CompositePropagator::new([
-    MarkerPropagator::{ header: "first" },
-    MarkerPropagator::{ header: "second" },
+    MarkerPropagator::{ header: "first", },
+    MarkerPropagator::{ header: "second", },
   ])
   let carrier = @propagation.TextMapCarrier::new()
   composite.inject(@context.Context::root(), carrier)
@@ -117,14 +124,15 @@ test "composite_propagator_runs_members_in_order" {
   assert_eq(extracted.value("marker"), Some("second"))
 }
 
+///|
 test "empty_composite_propagator_is_a_no_op" {
   let composite = @propagation.CompositePropagator::new([])
   assert_eq(composite.length(), 0)
   let carrier = @propagation.TextMapCarrier::new()
   composite.inject(
     @context.Context::root()
-      .with_span(propagator_span())
-      .with_value("user.id", "42"),
+    .with_span(propagator_span())
+    .with_value("user.id", "42"),
     carrier,
   )
   assert_eq(carrier.length(), 0)
@@ -133,10 +141,12 @@ test "empty_composite_propagator_is_a_no_op" {
   assert_false(extracted.has_baggage())
 }
 
+///|
 fn clear_propagators_env() -> Unit {
   @env.unset_env_var("OTEL_PROPAGATORS")
 }
 
+///|
 test "propagator_from_env_defaults_to_tracecontext_and_baggage" {
   clear_propagators_env()
   let composite = @propagation.CompositePropagator::from_env()
@@ -144,8 +154,8 @@ test "propagator_from_env_defaults_to_tracecontext_and_baggage" {
   let carrier = @propagation.TextMapCarrier::new()
   composite.inject(
     @context.Context::root()
-      .with_span(propagator_span())
-      .with_value("user.id", "42"),
+    .with_span(propagator_span())
+    .with_value("user.id", "42"),
     carrier,
   )
   assert_true(carrier.get("traceparent") is Some(_))
@@ -153,6 +163,7 @@ test "propagator_from_env_defaults_to_tracecontext_and_baggage" {
   clear_propagators_env()
 }
 
+///|
 test "propagator_from_env_reads_single_propagators" {
   clear_propagators_env()
   @env.set_env_var("OTEL_PROPAGATORS", "tracecontext")
@@ -171,6 +182,7 @@ test "propagator_from_env_reads_single_propagators" {
   assert_true(carrier.get("baggage") is Some(_))
 }
 
+///|
 test "propagator_from_env_none_disables_propagation" {
   clear_propagators_env()
   @env.set_env_var("OTEL_PROPAGATORS", "none")
@@ -185,6 +197,7 @@ test "propagator_from_env_none_disables_propagation" {
   assert_eq(carrier.length(), 0)
 }
 
+///|
 test "propagator_from_env_ignores_unknown_names" {
   clear_propagators_env()
   @env.set_env_var("OTEL_PROPAGATORS", "b3, xray ,tracecontext")
@@ -194,14 +207,15 @@ test "propagator_from_env_ignores_unknown_names" {
   let carrier = @propagation.TextMapCarrier::new()
   composite.inject(
     @context.Context::root()
-      .with_span(propagator_span())
-      .with_value("user.id", "42"),
+    .with_span(propagator_span())
+    .with_value("user.id", "42"),
     carrier,
   )
   assert_true(carrier.get("traceparent") is Some(_))
   assert_true(carrier.get("baggage") is None)
 }
 
+///|
 test "propagator_from_env_is_case_insensitive_and_deduplicates" {
   clear_propagators_env()
   @env.set_env_var("OTEL_PROPAGATORS", "TraceContext, tracecontext, BAGGAGE")
@@ -210,6 +224,7 @@ test "propagator_from_env_is_case_insensitive_and_deduplicates" {
   assert_eq(composite.length(), 2)
 }
 
+///|
 test "propagator_from_env_blank_value_uses_the_default" {
   clear_propagators_env()
   @env.set_env_var("OTEL_PROPAGATORS", "  ")
@@ -218,16 +233,14 @@ test "propagator_from_env_blank_value_uses_the_default" {
   assert_eq(composite.length(), 2)
 }
 
+///|
 test "propagator_from_env_extracts_the_configured_headers" {
   clear_propagators_env()
   @env.set_env_var("OTEL_PROPAGATORS", "tracecontext,baggage")
   let composite = @propagation.CompositePropagator::from_env()
   clear_propagators_env()
   let carrier = @propagation.TextMapCarrier::from_entries([
-    (
-      "traceparent",
-      "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01",
-    ),
+    ("traceparent", "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01"),
     ("tracestate", "congo=t61rcWkgMzE"),
     ("baggage", "user.id=42"),
   ])

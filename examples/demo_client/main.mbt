@@ -9,25 +9,24 @@
 // `@sdk.ConsoleSpanExporter` with `@otlp.OtlpHttpExporter` to ship spans to a
 // collector.
 
+///|
 async fn main {
-  let provider = @sdk.TracerProviderSdk::new(service_name="demo-client")
-    .with_span_processor(
-      @sdk.SimpleSpanProcessor::new(@sdk.ConsoleSpanExporter::new()),
-    )
+  let provider = @sdk.TracerProviderSdk::new(service_name="demo-client").with_span_processor(
+    @sdk.SimpleSpanProcessor::new(@sdk.ConsoleSpanExporter::new()),
+  )
   let tracer = provider.get_tracer("demo-client")
   let previous = @context.attach(
     @context.Context::root().with_value("user.id", "demo-user"),
   )
   defer @context.detach(previous)
   let outcome = try {
-    let (response, body) = @client.get(
-      "http://127.0.0.1:8080/hello",
-      tracer=tracer,
-    )
+    let (response, body) = @client.get("http://127.0.0.1:8080/hello", tracer~)
     println("GET /hello -> \{response.code}: \{body.text()}")
   } catch {
     error =>
-      println("request failed (is the demo server running?): \{error.to_string()}")
+      println(
+        "request failed (is the demo server running?): \{error.to_string()}",
+      )
   }
   let _ = outcome
   provider.force_flush()

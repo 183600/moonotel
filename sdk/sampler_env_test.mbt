@@ -1,20 +1,23 @@
 // Tests for the standard sampler and kill-switch environment variables:
 // OTEL_TRACES_SAMPLER, OTEL_TRACES_SAMPLER_ARG and OTEL_SDK_DISABLED.
 
+///|
 fn clear_sampler_env() -> Unit {
   @env.unset_env_var("OTEL_TRACES_SAMPLER")
   @env.unset_env_var("OTEL_TRACES_SAMPLER_ARG")
   @env.unset_env_var("OTEL_SDK_DISABLED")
 }
 
-fn env_trace_id(byte : Int) -> Array[Int] {
-  let id : Array[Int] = [byte]
+///|
+fn env_trace_id(byte : Int32) -> Array[Int32] {
+  let id : Array[Int32] = [byte]
   while id.length() < 16 {
     id.push(0)
   }
   id
 }
 
+///|
 test "sampler_from_env_defaults_to_parent_based_always_on" {
   clear_sampler_env()
   let sampler = @sdk.Sampler::from_env()
@@ -24,6 +27,7 @@ test "sampler_from_env_defaults_to_parent_based_always_on" {
   clear_sampler_env()
 }
 
+///|
 test "sampler_from_env_reads_always_on_and_always_off" {
   clear_sampler_env()
   @env.set_env_var("OTEL_TRACES_SAMPLER", "always_off")
@@ -35,6 +39,7 @@ test "sampler_from_env_reads_always_on_and_always_off" {
   assert_true(on.should_sample(None, env_trace_id(1)).is_sampled)
 }
 
+///|
 test "sampler_from_env_reads_traceidratio_argument" {
   clear_sampler_env()
   @env.set_env_var("OTEL_TRACES_SAMPLER", "traceidratio")
@@ -47,6 +52,7 @@ test "sampler_from_env_reads_traceidratio_argument" {
   assert_true(always.should_sample(None, env_trace_id(255)).is_sampled)
 }
 
+///|
 test "sampler_from_env_invalid_ratio_falls_back_to_one" {
   clear_sampler_env()
   @env.set_env_var("OTEL_TRACES_SAMPLER", "traceidratio")
@@ -56,6 +62,7 @@ test "sampler_from_env_invalid_ratio_falls_back_to_one" {
   assert_true(sampler.should_sample(None, env_trace_id(255)).is_sampled)
 }
 
+///|
 test "sampler_from_env_ratio_out_of_range_falls_back_to_one" {
   clear_sampler_env()
   @env.set_env_var("OTEL_TRACES_SAMPLER", "traceidratio")
@@ -68,6 +75,7 @@ test "sampler_from_env_ratio_out_of_range_falls_back_to_one" {
   assert_true(large.should_sample(None, env_trace_id(255)).is_sampled)
 }
 
+///|
 test "sampler_from_env_argument_ignored_for_other_samplers" {
   clear_sampler_env()
   @env.set_env_var("OTEL_TRACES_SAMPLER", "always_on")
@@ -77,6 +85,7 @@ test "sampler_from_env_argument_ignored_for_other_samplers" {
   assert_true(sampler.should_sample(None, env_trace_id(255)).is_sampled)
 }
 
+///|
 test "sampler_from_env_name_is_case_insensitive" {
   clear_sampler_env()
   @env.set_env_var("OTEL_TRACES_SAMPLER", " Always_Off ")
@@ -89,6 +98,7 @@ test "sampler_from_env_name_is_case_insensitive" {
   assert_true(ratio.should_sample(None, env_trace_id(255)).is_sampled)
 }
 
+///|
 test "sampler_from_env_parentbased_traceidratio_follows_parent" {
   clear_sampler_env()
   @env.set_env_var("OTEL_TRACES_SAMPLER", "parentbased_traceidratio")
@@ -100,10 +110,13 @@ test "sampler_from_env_parentbased_traceidratio_follows_parent" {
     Array::make(8, 4),
     @api.TRACE_FLAGS_SAMPLED,
   )
-  assert_true(sampler.should_sample(Some(sampled_parent), env_trace_id(0)).is_sampled)
+  assert_true(
+    sampler.should_sample(Some(sampled_parent), env_trace_id(0)).is_sampled,
+  )
   assert_false(sampler.should_sample(None, env_trace_id(0)).is_sampled)
 }
 
+///|
 test "sampler_from_env_unknown_value_falls_back_to_default" {
   clear_sampler_env()
   @env.set_env_var("OTEL_TRACES_SAMPLER", "no_such_sampler")
@@ -112,6 +125,7 @@ test "sampler_from_env_unknown_value_falls_back_to_default" {
   assert_true(sampler.should_sample(None, env_trace_id(255)).is_sampled)
 }
 
+///|
 test "provider_uses_environment_sampler_by_default" {
   clear_sampler_env()
   @env.set_env_var("OTEL_TRACES_SAMPLER", "always_off")
@@ -122,17 +136,20 @@ test "provider_uses_environment_sampler_by_default" {
   assert_false(span.is_recording())
 }
 
+///|
 test "explicit_sampler_overrides_the_environment" {
   clear_sampler_env()
   @env.set_env_var("OTEL_TRACES_SAMPLER", "always_off")
-  let provider = @sdk.TracerProviderSdk::new(service_name="env-sampler")
-    .with_sampler(@sdk.Sampler::always_on())
+  let provider = @sdk.TracerProviderSdk::new(service_name="env-sampler").with_sampler(
+    @sdk.Sampler::always_on(),
+  )
   clear_sampler_env()
   let tracer = provider.get_tracer("env-sampler")
   let span = tracer.start_root_span("recorded")
   assert_true(span.is_recording())
 }
 
+///|
 test "otel_sdk_disabled_drops_every_span" {
   clear_sampler_env()
   @env.set_env_var("OTEL_SDK_DISABLED", "true")

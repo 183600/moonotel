@@ -1,8 +1,8 @@
 import {
   "moonbitlang/async",
-  "moonbitlang/async/socket" @socket,
+  "moonbitlang/async/socket",
   "yourname/otel/instrumentation/async_http_server" @server,
-  "yourname/otel/sdk" @sdk,
+  "yourname/otel/sdk",
 }
 
 supported_targets = "+native"

@@ -7,15 +7,18 @@
 // reports rejected spans; per the OTLP spec a partial success must not be
 // retried.
 
+///|
 fn malformed_json_response() -> @sdk.ExportResult {
   @sdk.ExportFailure("malformed OTLP response body")
 }
 
-fn json_is_ws_code(code : Int) -> Bool {
+///|
+fn json_is_ws_code(code : Int32) -> Bool {
   code == 0x20 || code == 0x09 || code == 0x0A || code == 0x0D
 }
 
-fn json_skip_ws(text : String, start : Int) -> Int {
+///|
+fn json_skip_ws(text : String, start : Int32) -> Int32 {
   let len = text.length()
   let mut pos = start
   while pos < len && json_is_ws_code(text.unsafe_get(pos).to_int()) {
@@ -24,7 +27,8 @@ fn json_skip_ws(text : String, start : Int) -> Int {
   pos
 }
 
-fn json_hex_nibble(code : Int) -> Int {
+///|
+fn json_hex_nibble(code : Int32) -> Int32 {
   if code >= 0x30 && code <= 0x39 {
     code - 0x30
   } else if code >= 0x41 && code <= 0x46 {
@@ -38,7 +42,9 @@ fn json_hex_nibble(code : Int) -> Int {
 
 // Parse the JSON string starting at the opening quote. Returns the decoded
 // text and the index just past the closing quote.
-fn json_parse_string_at(text : String, start : Int) -> (String, Int)? {
+
+///|
+fn json_parse_string_at(text : String, start : Int32) -> (String, Int32)? {
   let len = text.length()
   if start >= len || text.unsafe_get(start).to_int() != 0x22 {
     return None
@@ -78,7 +84,9 @@ fn json_parse_string_at(text : String, start : Int) -> (String, Int)? {
       }
       let unit = h0 * 4096 + h1 * 256 + h2 * 16 + h3
       pos = pos + 5
-      if unit >= 0xD800 && unit <= 0xDBFF && pos + 5 < len &&
+      if unit >= 0xD800 &&
+        unit <= 0xDBFF &&
+        pos + 5 < len &&
         text.unsafe_get(pos).to_int() == 0x5C &&
         text.unsafe_get(pos + 1).to_int() == 0x75 {
         let l0 = json_hex_nibble(text.unsafe_get(pos + 2).to_int())
@@ -122,6 +130,8 @@ fn json_parse_string_at(text : String, start : Int) -> (String, Int)? {
 
 // Parse a decimal integer, optionally signed. No whitespace or `+` sign is
 // accepted inside `value`.
+
+///|
 fn json_parse_decimal_int64(value : String) -> Int64? {
   let len = value.length()
   if len == 0 {
@@ -157,7 +167,9 @@ fn json_parse_decimal_int64(value : String) -> Int64? {
 
 // Parse a `rejectedSpans` value: either a JSON string holding a decimal
 // integer (the canonical proto3 JSON form) or a bare JSON number.
-fn json_parse_rejected_spans(text : String, start : Int) -> (Int64, Int)? {
+
+///|
+fn json_parse_rejected_spans(text : String, start : Int32) -> (Int64, Int32)? {
   let len = text.length()
   let pos = json_skip_ws(text, start)
   if pos >= len {
@@ -194,7 +206,9 @@ fn json_parse_rejected_spans(text : String, start : Int) -> (Int64, Int)? {
 
 // Skip a JSON object. `pos` points at the opening brace; returns the index
 // just past the closing brace.
-fn json_skip_object(text : String, pos : Int, depth : Int) -> Int? {
+
+///|
+fn json_skip_object(text : String, pos : Int32, depth : Int32) -> Int32? {
   let len = text.length()
   let mut cursor = json_skip_ws(text, pos + 1)
   if cursor < len && text.unsafe_get(cursor).to_int() == 0x7D {
@@ -234,7 +248,9 @@ fn json_skip_object(text : String, pos : Int, depth : Int) -> Int? {
 }
 
 // Skip a JSON array. `pos` points at the opening bracket.
-fn json_skip_array(text : String, pos : Int, depth : Int) -> Int? {
+
+///|
+fn json_skip_array(text : String, pos : Int32, depth : Int32) -> Int32? {
   let len = text.length()
   let mut cursor = json_skip_ws(text, pos + 1)
   if cursor < len && text.unsafe_get(cursor).to_int() == 0x5D {
@@ -267,7 +283,9 @@ fn json_skip_array(text : String, pos : Int, depth : Int) -> Int? {
 
 // Skip any JSON value. `start` may point at leading whitespace. The depth
 // bound keeps deeply nested input from exhausting the stack.
-fn json_skip_value(text : String, start : Int, depth : Int) -> Int? {
+
+///|
+fn json_skip_value(text : String, start : Int32, depth : Int32) -> Int32? {
   if depth > 64 {
     return None
   }
@@ -288,7 +306,8 @@ fn json_skip_value(text : String, start : Int, depth : Int) -> Int? {
     json_skip_array(text, pos, depth)
   } else if code == 0x74 {
     // true
-    if pos + 4 <= len && text.unsafe_get(pos + 1).to_int() == 0x72 &&
+    if pos + 4 <= len &&
+      text.unsafe_get(pos + 1).to_int() == 0x72 &&
       text.unsafe_get(pos + 2).to_int() == 0x75 &&
       text.unsafe_get(pos + 3).to_int() == 0x65 {
       Some(pos + 4)
@@ -297,7 +316,8 @@ fn json_skip_value(text : String, start : Int, depth : Int) -> Int? {
     }
   } else if code == 0x66 {
     // false
-    if pos + 5 <= len && text.unsafe_get(pos + 1).to_int() == 0x61 &&
+    if pos + 5 <= len &&
+      text.unsafe_get(pos + 1).to_int() == 0x61 &&
       text.unsafe_get(pos + 2).to_int() == 0x6C &&
       text.unsafe_get(pos + 3).to_int() == 0x73 &&
       text.unsafe_get(pos + 4).to_int() == 0x65 {
@@ -307,7 +327,8 @@ fn json_skip_value(text : String, start : Int, depth : Int) -> Int? {
     }
   } else if code == 0x6E {
     // null
-    if pos + 4 <= len && text.unsafe_get(pos + 1).to_int() == 0x75 &&
+    if pos + 4 <= len &&
+      text.unsafe_get(pos + 1).to_int() == 0x75 &&
       text.unsafe_get(pos + 2).to_int() == 0x6C &&
       text.unsafe_get(pos + 3).to_int() == 0x6C {
       Some(pos + 4)
@@ -339,10 +360,12 @@ fn json_skip_value(text : String, start : Int, depth : Int) -> Int? {
 
 // Parse a `partialSuccess` message. Returns the rejected span count, the
 // error message and the index just past the closing brace.
+
+///|
 fn json_parse_partial_success(
   text : String,
-  start : Int,
-) -> (Int64, String, Int)? {
+  start : Int32,
+) -> (Int64, String, Int32)? {
   let len = text.length()
   if start >= len || text.unsafe_get(start).to_int() != 0x7B {
     return None
@@ -405,6 +428,8 @@ fn json_parse_partial_success(
 
 // Interpret an OTLP/JSON `ExportTraceServiceResponse` body. Truncated or
 // otherwise malformed bodies are reported as failures.
+
+///|
 pub fn decode_export_response_json(body : Bytes) -> @sdk.ExportResult {
   let text = @utf8.decode_lossy(body.exact_view())
   let len = text.length()
@@ -436,7 +461,8 @@ pub fn decode_export_response_json(body : Bytes) -> @sdk.ExportResult {
     }
     pos = json_skip_ws(text, pos + 1)
     if key == "partialSuccess" {
-      let (count, text_message, after) = match json_parse_partial_success(text, pos) {
+      let (count, text_message, after) = match
+        json_parse_partial_success(text, pos) {
         Some(triple) => triple
         None => return malformed_json_response()
       }

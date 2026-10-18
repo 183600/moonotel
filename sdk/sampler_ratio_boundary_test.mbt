@@ -5,8 +5,9 @@
 // `ratio * 2^63`. These tests pin down the exact cut-over point so the
 // behavior stays identical to the OpenTelemetry SDKs in other languages.
 
-fn ratio_trace_id(high64 : UInt64) -> Array[Int] {
-  let id : Array[Int] = []
+///|
+fn ratio_trace_id(high64 : UInt64) -> Array[Int32] {
+  let id : Array[Int32] = []
   let mut i = 0
   while i < 8 {
     id.push(((high64 >> (56 - i * 8)) & 0xFF).to_int())
@@ -18,6 +19,7 @@ fn ratio_trace_id(high64 : UInt64) -> Array[Int] {
   id
 }
 
+///|
 test "ratio_half_boundary_uses_top_bit" {
   let sampler = @sdk.Sampler::trace_id_ratio_based(0.5)
   assert_true(
@@ -28,6 +30,7 @@ test "ratio_half_boundary_uses_top_bit" {
   )
 }
 
+///|
 test "ratio_quarter_boundary" {
   let sampler = @sdk.Sampler::trace_id_ratio_based(0.25)
   assert_true(
@@ -38,6 +41,7 @@ test "ratio_quarter_boundary" {
   )
 }
 
+///|
 test "ratio_three_quarters_boundary" {
   let sampler = @sdk.Sampler::trace_id_ratio_based(0.75)
   assert_true(
@@ -48,6 +52,7 @@ test "ratio_three_quarters_boundary" {
   )
 }
 
+///|
 test "ratio_boundary_ignores_low_bits" {
   let sampler = @sdk.Sampler::trace_id_ratio_based(0.5)
   assert_true(
@@ -58,6 +63,7 @@ test "ratio_boundary_ignores_low_bits" {
   )
 }
 
+///|
 test "ratio_small_is_deterministic" {
   let sampler = @sdk.Sampler::trace_id_ratio_based(0.001)
   let id = ratio_trace_id(0x0000000000000001)

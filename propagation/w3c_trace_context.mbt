@@ -11,20 +11,27 @@
 // greater than `00`, as recommended by the specification.
 
 // Name of the `traceparent` header
+
+///|
 pub fn traceparent_header_name() -> String {
   "traceparent"
 }
 
 // Name of the `tracestate` header
+
+///|
 pub fn tracestate_header_name() -> String {
   "tracestate"
 }
 
+///|
 fn is_trim_char(c : Char) -> Bool {
   c == ' ' || c == '\t' || c == '\n' || c == '\r'
 }
 
 // Equivalent to `value.trim()` (the default whitespace set).
+
+///|
 fn trim_ows(value : StringView) -> StringView {
   let len = value.length()
   if len == 0 {
@@ -47,7 +54,9 @@ fn trim_ows(value : StringView) -> StringView {
 
 // Index of the first occurrence of `needle` at or after `start`, or the view
 // length when absent.
-fn find_code_unit(view : StringView, needle : UInt16, start : Int) -> Int {
+
+///|
+fn find_code_unit(view : StringView, needle : UInt16, start : Int32) -> Int32 {
   let len = view.length()
   let mut i = start
   while i < len {
@@ -60,15 +69,22 @@ fn find_code_unit(view : StringView, needle : UInt16, start : Int) -> Int {
 }
 
 // ASCII code unit of every hex digit 0-9a-f, indexed by the digit value.
+
+///|
 let hex_ascii : FixedArray[Byte] = build_hex_ascii()
 
+///|
 fn build_hex_ascii() -> FixedArray[Byte] {
   let table : FixedArray[Byte] = FixedArray::make(16, b'0')
   let mut i = 0
   while i < 16 {
     table.unsafe_set(
       i,
-      if i < 10 { (i + 48).to_byte() } else { (i + 87).to_byte() },
+      if i < 10 {
+        (i + 48).to_byte()
+      } else {
+        (i + 87).to_byte()
+      },
     )
     i = i + 1
   }
@@ -77,10 +93,13 @@ fn build_hex_ascii() -> FixedArray[Byte] {
 
 // UTF-16LE code unit pairs for every byte value: entry `b` holds the two hex
 // characters of `b` packed into one 32-bit word (low byte first).
-let hex_pairs : FixedArray[UInt] = build_hex_pairs()
 
-fn build_hex_pairs() -> FixedArray[UInt] {
-  let table : FixedArray[UInt] = FixedArray::make(256, 0U)
+///|
+let hex_pairs : FixedArray[UInt32] = build_hex_pairs()
+
+///|
+fn build_hex_pairs() -> FixedArray[UInt32] {
+  let table : FixedArray[UInt32] = FixedArray::make(256, 0U)
   let mut b = 0
   while b < 256 {
     let hi = b >> 4
@@ -95,10 +114,13 @@ fn build_hex_pairs() -> FixedArray[UInt] {
 
 // Reverse table: the 0-15 value of each ASCII hex digit, -1 for every other
 // code unit below 128.
-let hex_value : FixedArray[Int] = build_hex_value()
 
-fn build_hex_value() -> FixedArray[Int] {
-  let table : FixedArray[Int] = FixedArray::make(128, -1)
+///|
+let hex_value : FixedArray[Int32] = build_hex_value()
+
+///|
+fn build_hex_value() -> FixedArray[Int32] {
+  let table : FixedArray[Int32] = FixedArray::make(128, -1)
   let mut i = 0
   while i < 10 {
     table.unsafe_set(48 + i, i)
@@ -114,7 +136,9 @@ fn build_hex_value() -> FixedArray[Int] {
 }
 
 // Value of a hex digit, or -1 when the character is not a hex digit.
-fn hex_digit_value(c : Char) -> Int {
+
+///|
+fn hex_digit_value(c : Char) -> Int32 {
   let code = c.to_int()
   if code >= 0 && code < 128 {
     hex_value.unsafe_get(code)
@@ -127,18 +151,22 @@ fn hex_digit_value(c : Char) -> Int {
 // goes and tracking whether any byte is non-zero. Returns None when any
 // character is not a hex digit or when every decoded byte is zero, so the
 // caller never needs a second pass over the decoded ID.
+
+///|
 fn decode_hex_nonzero(
   value : String,
-  start : Int,
-  byte_count : Int
-) -> Array[Int]? {
+  start : Int32,
+  byte_count : Int32,
+) -> Array[Int32]? {
   // Every element is written before `Some` is returned.
-  let out : Array[Int] = Array::unsafe_make_uninit(byte_count)
+  let out : Array[Int32] = Array::unsafe_make_uninit(byte_count)
   let mut acc = 0
   let mut i = 0
   while i < byte_count {
     let hi = hex_digit_value(value.unsafe_get(start + i * 2).unsafe_to_char())
-    let lo = hex_digit_value(value.unsafe_get(start + i * 2 + 1).unsafe_to_char())
+    let lo = hex_digit_value(
+      value.unsafe_get(start + i * 2 + 1).unsafe_to_char(),
+    )
     if hi < 0 || lo < 0 {
       return None
     }
@@ -153,7 +181,8 @@ fn decode_hex_nonzero(
   Some(out)
 }
 
-fn nibble_to_hex_byte(value : Int) -> Byte {
+///|
+fn nibble_to_hex_byte(value : Int32) -> Byte {
   if value >= 0 && value < 16 {
     hex_ascii.unsafe_get(value)
   } else {
@@ -164,11 +193,13 @@ fn nibble_to_hex_byte(value : Int) -> Byte {
 // Write `byte_count` bytes as hex characters into `out` starting at character
 // index `start`. Each character occupies a UTF-16LE code unit (two bytes, low
 // byte first); the high bytes are left zero by the caller's buffer.
+
+///|
 fn write_hex(
   out : FixedArray[Byte],
-  start : Int,
-  bytes : Array[Int],
-  byte_count : Int
+  start : Int32,
+  bytes : Array[Int32],
+  byte_count : Int32,
 ) -> Unit {
   let mut i = 0
   while i + 2 <= byte_count {
@@ -183,13 +214,21 @@ fn write_hex(
       let hi0 = b0 >> 4
       out.unsafe_set(
         pos,
-        if hi0 >= 0 && hi0 < 16 { hex_ascii.unsafe_get(hi0) } else { b'0' },
+        if hi0 >= 0 && hi0 < 16 {
+          hex_ascii.unsafe_get(hi0)
+        } else {
+          b'0'
+        },
       )
       out.unsafe_set(pos + 2, hex_ascii.unsafe_get(b0 & 0x0F))
       let hi1 = b1 >> 4
       out.unsafe_set(
         pos + 4,
-        if hi1 >= 0 && hi1 < 16 { hex_ascii.unsafe_get(hi1) } else { b'0' },
+        if hi1 >= 0 && hi1 < 16 {
+          hex_ascii.unsafe_get(hi1)
+        } else {
+          b'0'
+        },
       )
       out.unsafe_set(pos + 6, hex_ascii.unsafe_get(b1 & 0x0F))
     }
@@ -204,7 +243,11 @@ fn write_hex(
       let hi = b >> 4
       out.unsafe_set(
         pos,
-        if hi >= 0 && hi < 16 { hex_ascii.unsafe_get(hi) } else { b'0' },
+        if hi >= 0 && hi < 16 {
+          hex_ascii.unsafe_get(hi)
+        } else {
+          b'0'
+        },
       )
       out.unsafe_set(pos + 2, hex_ascii.unsafe_get(b & 0x0F))
     }
@@ -214,6 +257,8 @@ fn write_hex(
 
 // Format a valid SpanContext as a `traceparent` header value (version 00).
 // An invalid SpanContext yields an empty string.
+
+///|
 pub fn format_traceparent(sc : @api.SpanContext) -> String {
   if !sc.is_valid() {
     return ""
@@ -237,6 +282,8 @@ pub fn format_traceparent(sc : @api.SpanContext) -> String {
 // Parse a `traceparent` header value into a SpanContext.
 // Returns None when the value is malformed, uses `ff` as version, contains
 // all-zero IDs, or otherwise violates the specification.
+
+///|
 pub fn parse_traceparent(value : String) -> @api.SpanContext? {
   let len = value.length()
   // The shortest well-formed value is `00-` + 32 + `-` + 16 + `-` + 2 = 55
@@ -301,6 +348,8 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
 // Inject a SpanContext into the carrier as a `traceparent` header, plus a
 // `tracestate` header when the SpanContext carries a valid one.
 // Does nothing when the SpanContext is invalid.
+
+///|
 pub fn inject(sc : @api.SpanContext, carrier : TextMapCarrier) -> Unit {
   if sc.is_valid() {
     carrier.set(traceparent_header_name(), format_traceparent(sc))
@@ -317,6 +366,8 @@ pub fn inject(sc : @api.SpanContext, carrier : TextMapCarrier) -> Unit {
 // Extract a SpanContext from the carrier's `traceparent` header, attaching the
 // `tracestate` header when it is present and valid. An invalid `tracestate`
 // is ignored, as required by the specification.
+
+///|
 pub fn extract(carrier : TextMapCarrier) -> @api.SpanContext? {
   match carrier.get(traceparent_header_name()) {
     Some(value) =>
@@ -337,10 +388,12 @@ pub fn extract(carrier : TextMapCarrier) -> @api.SpanContext? {
 }
 
 // Inject both `traceparent` and (when non-empty) `tracestate`.
+
+///|
 pub fn inject_with_tracestate(
   sc : @api.SpanContext,
   tracestate : String?,
-  carrier : TextMapCarrier
+  carrier : TextMapCarrier,
 ) -> Unit {
   inject(sc, carrier)
   match tracestate {
@@ -354,24 +407,36 @@ pub fn inject_with_tracestate(
 
 // Extract the raw `tracestate` header value, if present.
 // The value is passed through unchanged.
+
+///|
 pub fn extract_tracestate(carrier : TextMapCarrier) -> String? {
   carrier.get(tracestate_header_name())
 }
 
+///|
 fn is_lcalpha(c : Char) -> Bool {
   c >= 'a' && c <= 'z'
 }
 
+///|
 fn is_digit_char(c : Char) -> Bool {
   c >= '0' && c <= '9'
 }
 
+///|
 fn is_tracestate_key_tail(c : Char) -> Bool {
-  is_lcalpha(c) || is_digit_char(c) || c == '_' || c == '-' || c == '*' || c == '/'
+  is_lcalpha(c) ||
+  is_digit_char(c) ||
+  c == '_' ||
+  c == '-' ||
+  c == '*' ||
+  c == '/'
 }
 
 // Validate a `tracestate` key: either a simple key (`lcalpha` followed by up to
 // 255 key characters) or a multi-tenant key (`tenant-id@system-id`).
+
+///|
 fn is_valid_tracestate_key(key : StringView) -> Bool {
   let len = key.length()
   if len == 0 || len > 256 {
@@ -412,6 +477,8 @@ fn is_valid_tracestate_key(key : StringView) -> Bool {
 // Validate a `tracestate` value: printable ASCII without `,` or `=`, holding
 // 1 to 256 characters and ending with a non-blank character, matching the
 // grammar `value = 0*255(chr) nblk-chr`.
+
+///|
 fn is_valid_tracestate_value(value : StringView) -> Bool {
   let len = value.length()
   if len == 0 || len > 256 {
@@ -430,7 +497,9 @@ fn is_valid_tracestate_value(value : StringView) -> Bool {
 
 // Write the normalized form of an already validated `tracestate` value: the
 // members joined by `,` with optional whitespace trimmed.
-fn write_normalized_tracestate(view : StringView, len : Int) -> String {
+
+///|
+fn write_normalized_tracestate(view : StringView, len : Int32) -> String {
   let sb = StringBuilder(size_hint=len * 2)
   let mut count = 0
   let mut start = 0
@@ -460,6 +529,8 @@ fn write_normalized_tracestate(view : StringView, len : Int) -> String {
 // The result is the list of members joined by `,` with optional whitespace
 // trimmed. Returns None when the value is empty, has more than 32 members,
 // contains a malformed or duplicate key, or has an invalid value.
+
+///|
 pub fn parse_tracestate(value : String) -> String? {
   if value == "" {
     return None

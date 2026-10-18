@@ -58,6 +58,7 @@ fn probe_names_equal(a : Array[String], b : Array[String]) -> Bool {
   true
 }
 
+///|
 test "batch_config_defaults" {
   let config = @sdk.BatchConfig::default()
   assert_eq(config.max_queue_size, 2048)
@@ -65,6 +66,7 @@ test "batch_config_defaults" {
   assert_eq(config.flush_interval_millis, 5000)
 }
 
+///|
 test "batch_config_new_clamps_out_of_range_values" {
   let config = @sdk.BatchConfig::new(
     max_queue_size=0,
@@ -76,6 +78,7 @@ test "batch_config_new_clamps_out_of_range_values" {
   assert_eq(config.flush_interval_millis, 0)
 }
 
+///|
 test "batch_config_new_honors_explicit_values" {
   let config = @sdk.BatchConfig::new(
     max_queue_size=16,
@@ -87,6 +90,7 @@ test "batch_config_new_honors_explicit_values" {
   assert_eq(config.flush_interval_millis, 250)
 }
 
+///|
 test "batch_config_from_env_reads_configuration" {
   clear_bsp_env()
   @env.set_env_var("OTEL_BSP_MAX_QUEUE_SIZE", "3")
@@ -100,6 +104,7 @@ test "batch_config_from_env_reads_configuration" {
   assert_eq(config.flush_interval_millis, 250)
 }
 
+///|
 test "batch_config_from_env_falls_back_on_malformed_values" {
   clear_bsp_env()
   @env.set_env_var("OTEL_BSP_MAX_QUEUE_SIZE", "not-a-number")
@@ -112,8 +117,9 @@ test "batch_config_from_env_falls_back_on_malformed_values" {
   assert_eq(config.flush_interval_millis, 5000)
 }
 
+///|
 test "batch_processor_with_config_uses_every_field" {
-  let exporter : ProbeExporter = { names: [] }
+  let exporter : ProbeExporter = { names: [], }
   let config = @sdk.BatchConfig::new(
     max_queue_size=1,
     max_export_batch_size=2,

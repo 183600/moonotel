@@ -7,9 +7,11 @@
 
 // Inject the trace context and the baggage carried by `context` into
 // `carrier`. A context without a valid span propagates only its baggage.
+
+///|
 pub fn inject_context(
   context : @context.Context,
-  carrier : TextMapCarrier
+  carrier : TextMapCarrier,
 ) -> Unit {
   match context.span_context() {
     Some(sc) => inject(sc, carrier)
@@ -21,6 +23,8 @@ pub fn inject_context(
 // Extract a context from `carrier`: the W3C trace context when present and
 // valid, plus every valid baggage member. Returns the root context when the
 // carrier carries neither.
+
+///|
 pub fn extract_context(carrier : TextMapCarrier) -> @context.Context {
   let mut context = extract_baggage_context(carrier)
   match extract(carrier) {

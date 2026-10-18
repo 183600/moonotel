@@ -10,16 +10,20 @@
 // and the `service.name` attribute (blank values are skipped, in that order),
 // and the `telemetry.sdk.*` attributes are added.
 
+///|
 pub struct Resource {
   attributes : Map[String, AttributeValue]
 }
 
 // Reverse table: the 0-15 value of each ASCII hex digit, -1 for every other
 // code unit below 128.
-let hex_value : FixedArray[Int] = build_hex_value()
 
-fn build_hex_value() -> FixedArray[Int] {
-  let table : FixedArray[Int] = FixedArray::make(128, -1)
+///|
+let hex_value : FixedArray[Int32] = build_hex_value()
+
+///|
+fn build_hex_value() -> FixedArray[Int32] {
+  let table : FixedArray[Int32] = FixedArray::make(128, -1)
   let mut i = 0
   while i < 10 {
     table.unsafe_set(48 + i, i)
@@ -34,7 +38,8 @@ fn build_hex_value() -> FixedArray[Int] {
   table
 }
 
-fn hex_digit_value(c : Char) -> Int {
+///|
+fn hex_digit_value(c : Char) -> Int32 {
   let code = c.to_int()
   if code >= 0 && code < 128 {
     hex_value.unsafe_get(code)
@@ -45,6 +50,8 @@ fn hex_digit_value(c : Char) -> Int {
 
 // Decode the `%XX` sequences used by `OTEL_RESOURCE_ATTRIBUTES` values.
 // Invalid sequences are kept verbatim.
+
+///|
 fn decode_percent(value : StringView) -> String {
   if value.find("%") is None {
     return value.to_owned()
@@ -90,9 +97,11 @@ fn decode_percent(value : StringView) -> String {
 
 // Parse the `key=value,key2=value2` format of `OTEL_RESOURCE_ATTRIBUTES`.
 // Both keys and values are percent-decoded, as required by the specification.
+
+///|
 fn parse_resource_attributes(
   value : String,
-  resource : Map[String, AttributeValue]
+  resource : Map[String, AttributeValue],
 ) -> Unit {
   for pair in value.split(",") {
     match pair.trim().split_once("=") {
@@ -110,29 +119,22 @@ fn parse_resource_attributes(
 // Resolve the service name from the explicit argument, `OTEL_SERVICE_NAME`
 // and the `service.name` resource attribute, in that order. Blank values are
 // treated as unset, as required by the OpenTelemetry specification.
+
+///|
 fn resolve_service_name(
   service_name : String?,
-  resource : Map[String, AttributeValue]
+  resource : Map[String, AttributeValue],
 ) -> String {
   match service_name {
-    Some(value) =>
-      if value.trim() != "" {
-        return value
-      }
+    Some(value) => if value.trim() != "" { return value }
     None => ()
   }
   match @env.get_env_var("OTEL_SERVICE_NAME") {
-    Some(value) =>
-      if value.trim() != "" {
-        return value
-      }
+    Some(value) => if value.trim() != "" { return value }
     None => ()
   }
   match resource.get(SERVICE_NAME) {
-    Some(StringValue(existing)) =>
-      if existing.trim() != "" {
-        return existing
-      }
+    Some(StringValue(existing)) => if existing.trim() != "" { return existing }
     _ => ()
   }
   "unknown_service"
@@ -140,74 +142,87 @@ fn resolve_service_name(
 
 // Copy an attribute map so that a `Resource` owns its attributes and callers
 // cannot mutate provider state through a shared map.
+
+///|
 fn copy_attributes_with_capacity(
   values : Map[String, AttributeValue],
-  capacity : Int
+  capacity : Int32,
 ) -> Map[String, AttributeValue] {
-  let out : Map[String, AttributeValue] = Map([], capacity=capacity)
+  let out : Map[String, AttributeValue] = Map([], capacity~)
   for key, value in values.iter2() {
     out.set(key, value)
   }
   out
 }
 
+///|
 fn copy_attributes(
-  values : Map[String, AttributeValue]
+  values : Map[String, AttributeValue],
 ) -> Map[String, AttributeValue] {
   copy_attributes_with_capacity(values, values.length() * 2)
 }
 
 // An empty resource, carrying no attributes.
+
+///|
 pub fn Resource::empty() -> Resource {
-  { attributes: Map([], capacity=1) }
+  { attributes: Map([], capacity=1), }
 }
 
 // Create a resource from an attribute map. The map is copied.
-pub fn Resource::new(
-  attributes? : Map[String, AttributeValue]
-) -> Resource {
+
+///|
+pub fn Resource::new(attributes? : Map[String, AttributeValue]) -> Resource {
   match attributes {
-    Some(values) => { attributes: copy_attributes(values) }
+    Some(values) => { attributes: copy_attributes(values), }
     None => Resource::empty()
   }
 }
 
 // The attribute map of this resource, as a fresh copy.
-pub fn Resource::attributes(
-  self : Resource
-) -> Map[String, AttributeValue] {
+
+///|
+pub fn Resource::attributes(self : Resource) -> Map[String, AttributeValue] {
   copy_attributes(self.attributes)
 }
 
 // The attribute map backing this resource, shared with the caller. Callers
 // must not mutate it.
-fn Resource::attributes_shared(
-  self : Resource
-) -> Map[String, AttributeValue] {
+
+///|
+fn Resource::attributes_shared(self : Resource) -> Map[String, AttributeValue] {
   self.attributes
 }
 
 // The value of `key`, or None when the resource does not carry it.
+
+///|
 pub fn Resource::get(self : Resource, key : String) -> AttributeValue? {
   self.attributes.get(key)
 }
 
 // Number of attributes in this resource.
-pub fn Resource::length(self : Resource) -> Int {
+
+///|
+pub fn Resource::length(self : Resource) -> Int32 {
   self.attributes.length()
 }
 
 // Whether the resource carries no attributes.
+
+///|
 pub fn Resource::is_empty(self : Resource) -> Bool {
   self.attributes.length() == 0
 }
 
 // Derive a resource with `key` set to `value`. The original is unchanged;
 // an existing value of `key` is replaced.
+
+///|
 pub fn Resource::with_attribute(
   self : Resource,
   key : String,
-  value : AttributeValue
+  value : AttributeValue,
 ) -> Resource {
   let attributes = copy_attributes_with_capacity(
     self.attributes,
@@ -219,6 +234,8 @@ pub fn Resource::with_attribute(
 
 // Merge `other` into this resource. Values from `other` win over values of
 // this resource; neither input is modified.
+
+///|
 pub fn Resource::merge(self : Resource, other : Resource) -> Resource {
   let attributes = copy_attributes_with_capacity(
     self.attributes,
@@ -230,6 +247,8 @@ pub fn Resource::merge(self : Resource, other : Resource) -> Resource {
 
 // The `service.name` of this resource, or `unknown_service` when it is
 // missing or blank.
+
+///|
 pub fn Resource::service_name(self : Resource) -> String {
   match self.attributes.get(SERVICE_NAME) {
     Some(StringValue(name)) =>
@@ -252,6 +271,8 @@ pub fn Resource::service_name(self : Resource) -> String {
 // The `telemetry.sdk.name`, `telemetry.sdk.language` and
 // `telemetry.sdk.version` attributes are always added and take precedence
 // over same-named values from the environment.
+
+///|
 pub fn Resource::from_env(service_name? : String) -> Resource {
   let attributes : Map[String, AttributeValue] = Map([])
   match @env.get_env_var("OTEL_RESOURCE_ATTRIBUTES") {

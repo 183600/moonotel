@@ -8,18 +8,24 @@ pub struct ConsoleSpanExporter {
 }
 
 // Create a console exporter.
+
+///|
 pub fn ConsoleSpanExporter::new() -> ConsoleSpanExporter {
-  { shutdown_called: false }
+  { shutdown_called: false, }
 }
 
 // Whether `shutdown` has been called. A shut-down exporter rejects further
 // exports.
+
+///|
 pub fn ConsoleSpanExporter::is_shutdown(self : ConsoleSpanExporter) -> Bool {
   self.shutdown_called
 }
 
 // Lower-case hex character of a nibble value.
-fn hex_nibble_char(value : Int) -> Char {
+
+///|
+fn hex_nibble_char(value : Int32) -> Char {
   if value < 10 {
     (value + 48).unsafe_to_char()
   } else {
@@ -29,6 +35,8 @@ fn hex_nibble_char(value : Int) -> Char {
 
 // Append the hex form of an `Int32` byte array, matching `@api.bytes_to_hex`
 // (which takes `Array[Int]`).
+
+///|
 fn write_int32_hex(out : StringBuilder, bytes : Array[Int32]) -> Unit {
   for byte in bytes {
     let value = byte & 0xFF
@@ -40,6 +48,8 @@ fn write_int32_hex(out : StringBuilder, bytes : Array[Int32]) -> Unit {
 // Render one span as a single summary line:
 // `name=<name> trace_id=<hex> span_id=<hex> parent_span_id=<hex> kind=<kind>
 //  status=<status> duration_ms=<n> attributes=<n> events=<n> links=<n>`
+
+///|
 fn format_span(data : SpanData) -> String {
   let out = StringBuilder()
   out.write_string("span name=")
@@ -69,7 +79,8 @@ fn format_span(data : SpanData) -> String {
   out.to_string()
 }
 
-pub impl SpanExporter for ConsoleSpanExporter with export_spans(self, spans) {
+///|
+pub impl SpanExporter for ConsoleSpanExporter with fn export_spans(self, spans) {
   if self.shutdown_called {
     ExportFailure("console exporter is shut down")
   } else {
@@ -80,8 +91,10 @@ pub impl SpanExporter for ConsoleSpanExporter with export_spans(self, spans) {
   }
 }
 
-pub impl SpanExporter for ConsoleSpanExporter with shutdown(self) {
+///|
+pub impl SpanExporter for ConsoleSpanExporter with fn shutdown(self) {
   self.shutdown_called = true
 }
 
+///|
 pub extend ConsoleSpanExporter with SpanExporter::{export_spans, shutdown}

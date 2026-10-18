@@ -16,7 +16,9 @@
 // All operations return new values; a `Tracestate` is never mutated in place.
 
 // Maximum number of members in a `tracestate` list, as defined by W3C.
-pub const TRACESTATE_MAX_MEMBERS : Int = 32
+
+///|
+pub const TRACESTATE_MAX_MEMBERS : Int32 = 32
 
 ///|
 pub struct Tracestate {
@@ -25,12 +27,16 @@ pub struct Tracestate {
 }
 
 // The empty `tracestate`.
+
+///|
 pub fn Tracestate::empty() -> Tracestate {
-  { members: [] }
+  { members: [], }
 }
 
 // Validate one member with the shared key/value rules; values must not be
 // empty because W3C requires a value to end with a non-blank character.
+
+///|
 fn is_valid_tracestate_member(key : StringView, value : StringView) -> Bool {
   is_valid_tracestate_key(key) &&
   is_valid_tracestate_value(value) &&
@@ -41,6 +47,8 @@ fn is_valid_tracestate_member(key : StringView, value : StringView) -> Bool {
 // has more than 32 members, contains a malformed or duplicate member, or has
 // an empty value. Optional whitespace around members, keys and values is
 // ignored.
+
+///|
 pub fn Tracestate::parse(value : String) -> Tracestate? {
   if value == "" {
     return None
@@ -83,6 +91,8 @@ pub fn Tracestate::parse(value : String) -> Tracestate? {
 
 // Parse a `tracestate` header value, yielding the empty list when it is
 // absent or invalid. Useful when a best-effort `tracestate` is wanted.
+
+///|
 pub fn Tracestate::parse_or_empty(value : String) -> Tracestate {
   match Tracestate::parse(value) {
     Some(parsed) => parsed
@@ -91,16 +101,22 @@ pub fn Tracestate::parse_or_empty(value : String) -> Tracestate {
 }
 
 // Number of members.
-pub fn Tracestate::length(self : Tracestate) -> Int {
+
+///|
+pub fn Tracestate::length(self : Tracestate) -> Int32 {
   self.members.length()
 }
 
 // Whether the list has no members.
+
+///|
 pub fn Tracestate::is_empty(self : Tracestate) -> Bool {
   self.members.length() == 0
 }
 
 // The value of `key`, or None when the key is absent.
+
+///|
 pub fn Tracestate::get(self : Tracestate, key : String) -> String? {
   for entry in self.members {
     if entry.0 == key {
@@ -111,6 +127,8 @@ pub fn Tracestate::get(self : Tracestate, key : String) -> String? {
 }
 
 // The members in order, as fresh `(key, value)` pairs.
+
+///|
 pub fn Tracestate::entries(self : Tracestate) -> Array[(String, String)] {
   let out : Array[(String, String)] = Array(capacity=self.members.length())
   for entry in self.members {
@@ -120,6 +138,8 @@ pub fn Tracestate::entries(self : Tracestate) -> Array[(String, String)] {
 }
 
 // Render the list as a `tracestate` header value. The empty list yields "".
+
+///|
 pub fn Tracestate::to_header(self : Tracestate) -> String {
   if self.members.length() == 0 {
     return ""
@@ -144,10 +164,12 @@ pub fn Tracestate::to_header(self : Tracestate) -> String {
 
 // Append `members` to `out` while there is room, keeping their order and
 // skipping the member whose key is `skip`.
+
+///|
 fn take_members(
   out : Array[(String, String)],
   members : Array[(String, String)],
-  skip : String
+  skip : String,
 ) -> Unit {
   for entry in members {
     if out.length() >= TRACESTATE_MAX_MEMBERS {
@@ -162,10 +184,12 @@ fn take_members(
 // Add `key=value` at the beginning of the list. When the key is already
 // present its old member is replaced. Adding to a full list drops the
 // right-most member. Invalid keys or values leave the list unchanged.
+
+///|
 pub fn Tracestate::add(
   self : Tracestate,
   key : String,
-  value : String
+  value : String,
 ) -> Tracestate {
   if !is_valid_tracestate_member(key[:], value[:]) {
     return self
@@ -176,7 +200,7 @@ pub fn Tracestate::add(
   } else {
     TRACESTATE_MAX_MEMBERS
   }
-  let members : Array[(String, String)] = Array(capacity=capacity)
+  let members : Array[(String, String)] = Array(capacity~)
   members.push((key, value))
   take_members(members, self.members, key)
   { members, }
@@ -185,10 +209,12 @@ pub fn Tracestate::add(
 // Update the value of `key`, moving the member to the beginning of the list.
 // When the key is absent the list is unchanged. Invalid keys or values leave
 // the list unchanged.
+
+///|
 pub fn Tracestate::update(
   self : Tracestate,
   key : String,
-  value : String
+  value : String,
 ) -> Tracestate {
   if !is_valid_tracestate_member(key[:], value[:]) {
     return self
@@ -202,7 +228,7 @@ pub fn Tracestate::update(
       } else {
         TRACESTATE_MAX_MEMBERS
       }
-      let members : Array[(String, String)] = Array(capacity=capacity)
+      let members : Array[(String, String)] = Array(capacity~)
       members.push((key, value))
       take_members(members, self.members, key)
       { members, }
@@ -212,10 +238,10 @@ pub fn Tracestate::update(
 
 // Remove the member with `key`. Removing an absent key leaves the list
 // unchanged.
+
+///|
 pub fn Tracestate::remove(self : Tracestate, key : String) -> Tracestate {
-  let members : Array[(String, String)] = Array(
-    capacity=self.members.length(),
-  )
+  let members : Array[(String, String)] = Array(capacity=self.members.length())
   for entry in self.members {
     if entry.0 != key {
       members.push(entry)

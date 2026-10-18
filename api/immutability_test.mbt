@@ -1,3 +1,4 @@
+///|
 test "span_context_aliases_input_arrays" {
   let trace_id = Array::make(16, 0)
   trace_id[0] = 1
@@ -14,6 +15,7 @@ test "span_context_aliases_input_arrays" {
   assert_eq(sc.span_id[0], 9)
 }
 
+///|
 test "span_context_validity_does_not_recompute_after_id_mutation" {
   let trace_id = Array::make(16, 0)
   trace_id[15] = 1

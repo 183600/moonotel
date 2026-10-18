@@ -7,6 +7,7 @@
 // a test double, or any other client.
 
 // Response returned by an injected transport.
+
 ///|
 pub(all) struct TransportResponse {
   status_code : Int32
@@ -93,10 +94,11 @@ pub fn OtlpHttpConfig::new(
 ///|
 // Reverse table: the 0-15 value of each ASCII hex digit, -1 for every other
 // code unit below 128.
-let hex_value : FixedArray[Int] = build_hex_value()
+let hex_value : FixedArray[Int32] = build_hex_value()
 
-fn build_hex_value() -> FixedArray[Int] {
-  let table : FixedArray[Int] = FixedArray::make(128, -1)
+///|
+fn build_hex_value() -> FixedArray[Int32] {
+  let table : FixedArray[Int32] = FixedArray::make(128, -1)
   let mut i = 0
   while i < 10 {
     table.unsafe_set(48 + i, i)
@@ -111,7 +113,8 @@ fn build_hex_value() -> FixedArray[Int] {
   table
 }
 
-fn hex_digit_value(c : Char) -> Int {
+///|
+fn hex_digit_value(c : Char) -> Int32 {
   let code = c.to_int()
   if code >= 0 && code < 128 {
     hex_value.unsafe_get(code)
@@ -123,6 +126,8 @@ fn hex_digit_value(c : Char) -> Int {
 // Decode the `%XX` sequences used by `OTEL_EXPORTER_OTLP_HEADERS` values.
 // The header format follows W3C Baggage, where values are percent-encoded.
 // Invalid sequences are kept verbatim; keys are not decoded.
+
+///|
 fn decode_header_value(value : StringView) -> String {
   if value.find("%") is None {
     return value.to_owned()
@@ -342,10 +347,7 @@ pub fn OtlpHttpExporter::config(self : OtlpHttpExporter) -> OtlpHttpConfig {
 
 ///|
 fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
-  let headers = Map(
-    [],
-    capacity=(config.headers.length() + 1) * 2,
-  )
+  let headers = Map([], capacity=(config.headers.length() + 1) * 2)
   config.headers.each(fn(key, value) { headers.set(key, value) })
   headers.set("content-type", content_type_for_protocol(config.protocol))
   headers

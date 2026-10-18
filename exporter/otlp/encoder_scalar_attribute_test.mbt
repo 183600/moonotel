@@ -36,17 +36,12 @@ test "encode_scalar_attribute_values" {
     1,
   )
   assert_eq(
-    first_of(scalar_attribute_fields(span_fields, "count"), 3)
-    .unwrap()
-    .varint
-    .reinterpret_as_int64(),
+    first_of(scalar_attribute_fields(span_fields, "count"), 3).unwrap().varint.reinterpret_as_int64(),
     -2L,
   )
   assert_eq(
     fixed64_value(
-      first_of(scalar_attribute_fields(span_fields, "ratio"), 4)
-      .unwrap()
-      .payload,
+      first_of(scalar_attribute_fields(span_fields, "ratio"), 4).unwrap().payload,
     ),
     0x3FF8000000000000UL,
   )

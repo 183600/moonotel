@@ -1,5 +1,6 @@
 // `setup` applies an explicit `BatchConfig` and prefers it over `use_batch`.
 
+///|
 test "setup_with_batch_config_exports_on_flush" {
   @otel.shutdown_global_tracer_provider()
   let capture = capturing_transport()
@@ -24,6 +25,7 @@ test "setup_with_batch_config_exports_on_flush" {
   @otel.shutdown_global_tracer_provider()
 }
 
+///|
 test "explicit_batch_config_overrides_use_batch_false" {
   @otel.shutdown_global_tracer_provider()
   let capture = capturing_transport()

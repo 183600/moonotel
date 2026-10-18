@@ -1,6 +1,7 @@
 // The facade re-exports the built-in test/debug exporters together with their
 // constructors.
 
+///|
 test "facade_reexports_in_memory_exporter" {
   let exporter = @otel.InMemorySpanExporter::new()
   let provider = @otel.TracerProviderSdk::new(service_name="facade-mem")
@@ -12,6 +13,7 @@ test "facade_reexports_in_memory_exporter" {
   assert_eq(exporter.exported_spans()[0].name, "op")
 }
 
+///|
 test "facade_reexports_console_exporter" {
   let exporter = @otel.ConsoleSpanExporter::new()
   assert_false(exporter.is_shutdown())

@@ -10,6 +10,7 @@
 // scheduler hooks) can swap in their own backend via `set_context_storage`.
 
 // Pluggable storage backend for the current context.
+
 ///|
 pub(all) struct ContextStorage {
   current : () -> Context

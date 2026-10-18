@@ -1,5 +1,6 @@
 // Blank environment values fall back to the generic variable or the default.
 
+///|
 test "blank_generic_compression_falls_back_to_none" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_COMPRESSION", "   ")
@@ -8,6 +9,7 @@ test "blank_generic_compression_falls_back_to_none" {
   assert_eq(config.compression, "none")
 }
 
+///|
 test "blank_traces_compression_falls_back_to_generic" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_COMPRESSION", "gzip")
@@ -17,6 +19,7 @@ test "blank_traces_compression_falls_back_to_generic" {
   assert_eq(config.compression, "gzip")
 }
 
+///|
 test "blank_traces_protocol_falls_back_to_default" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "  ")
@@ -25,6 +28,7 @@ test "blank_traces_protocol_falls_back_to_default" {
   assert_eq(config.protocol, "http/protobuf")
 }
 
+///|
 test "blank_generic_protocol_falls_back_to_default" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_PROTOCOL", "\t")
@@ -33,6 +37,7 @@ test "blank_generic_protocol_falls_back_to_default" {
   assert_eq(config.protocol, "http/protobuf")
 }
 
+///|
 test "blank_endpoints_fall_back_to_default" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_ENDPOINT", "   ")
@@ -44,12 +49,12 @@ test "blank_endpoints_fall_back_to_default" {
   assert_eq(config.traces_url(), "http://localhost:4318/v1/traces")
 }
 
+///|
 test "blank_generic_endpoint_keeps_traces_endpoint" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_ENDPOINT", " ")
   @env.set_env_var(
-    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
-    "http://specific:4318/custom/traces",
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://specific:4318/custom/traces",
   )
   let config = @otlp.OtlpHttpConfig::from_env()
   unset_otlp_env()
@@ -57,6 +62,7 @@ test "blank_generic_endpoint_keeps_traces_endpoint" {
   assert_eq(config.traces_url(), "http://specific:4318/custom/traces")
 }
 
+///|
 test "timeout_is_trimmed_before_parsing" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", " 2500 ")
@@ -65,6 +71,7 @@ test "timeout_is_trimmed_before_parsing" {
   assert_eq(config.timeout_millis, 2500)
 }
 
+///|
 test "blank_timeout_falls_back_to_default" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_TIMEOUT", "  ")
@@ -73,6 +80,7 @@ test "blank_timeout_falls_back_to_default" {
   assert_eq(config.timeout_millis, 10000)
 }
 
+///|
 test "header_without_equals_is_skipped" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_HEADERS", "novalue,x=1")
@@ -82,6 +90,7 @@ test "header_without_equals_is_skipped" {
   assert_eq(config.headers.get("x"), Some("1"))
 }
 
+///|
 test "non_ascii_percent_escape_is_kept_verbatim" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_HEADERS", "x=%éA")

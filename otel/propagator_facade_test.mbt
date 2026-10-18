@@ -1,6 +1,7 @@
 // Facade tests for the re-exported text-map propagators and the global
 // force-flush helper.
 
+///|
 fn facade_propagator_span() -> @otel.SpanContext {
   @otel.span_context(
     @otel.bytes_from_hex("4bf92f359d1e75b7618a2d1f3c4e5a6b").unwrap(),
@@ -10,6 +11,7 @@ fn facade_propagator_span() -> @otel.SpanContext {
   )
 }
 
+///|
 test "facade_composite_propagator_from_env_round_trip" {
   @env.unset_env_var("OTEL_PROPAGATORS")
   let composite = @otel.CompositePropagator::from_env()
@@ -33,6 +35,7 @@ test "facade_composite_propagator_from_env_round_trip" {
   assert_eq(extracted.value("user.id"), Some("42"))
 }
 
+///|
 test "facade_propagator_types_are_constructible" {
   let trace : &@otel.TextMapPropagator = @otel.TraceContextPropagator::new()
   let baggage : &@otel.TextMapPropagator = @otel.BaggagePropagator::new()
@@ -40,6 +43,7 @@ test "facade_propagator_types_are_constructible" {
   assert_eq(composite.length(), 2)
 }
 
+///|
 test "force_flush_global_tracer_provider_drains_batch_processor" {
   @otel.shutdown_global_tracer_provider()
   let capture = capturing_transport()
@@ -65,6 +69,7 @@ test "force_flush_global_tracer_provider_drains_batch_processor" {
   @otel.shutdown_global_tracer_provider()
 }
 
+///|
 test "force_flush_global_tracer_provider_without_a_provider_is_a_no_op" {
   @otel.shutdown_global_tracer_provider()
   @otel.force_flush_global_tracer_provider()

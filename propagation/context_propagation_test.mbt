@@ -1,10 +1,11 @@
 // Blackbox tests for context-level propagation helpers.
 
+///|
 fn context_propagation_span() -> @api.SpanContext {
   @api.span_context(
     [
-      0x4b, 0xf9, 0x2f, 0x35, 0x9d, 0x1e, 0x75, 0xb7,
-      0x61, 0x8a, 0x2d, 0x1f, 0x3c, 0x4e, 0x5a, 0x6b,
+      0x4b, 0xf9, 0x2f, 0x35, 0x9d, 0x1e, 0x75, 0xb7, 0x61, 0x8a, 0x2d, 0x1f, 0x3c,
+      0x4e, 0x5a, 0x6b,
     ],
     [0x00, 0xf0, 0x67, 0xaa, 0x0b, 0xa9, 0x02, 0xb7],
     @api.TRACE_FLAGS_SAMPLED,
@@ -12,6 +13,7 @@ fn context_propagation_span() -> @api.SpanContext {
   )
 }
 
+///|
 test "inject_context writes trace context and baggage" {
   let context = @context.Context::root()
     .with_span(context_propagation_span())
@@ -26,6 +28,7 @@ test "inject_context writes trace context and baggage" {
   assert_eq(carrier.get("baggage"), Some("user.id=42"))
 }
 
+///|
 test "extract_context round_trips span and baggage" {
   let context = @context.Context::root()
     .with_span(context_propagation_span())
@@ -41,6 +44,7 @@ test "extract_context round_trips span and baggage" {
   assert_true(extracted.has_baggage())
 }
 
+///|
 test "extract_context without traceparent keeps baggage" {
   let carrier = @propagation.TextMapCarrier::from_entries([
     ("baggage", "user.id=42,tenant=acme"),
@@ -51,6 +55,7 @@ test "extract_context without traceparent keeps baggage" {
   assert_eq(context.value("tenant"), Some("acme"))
 }
 
+///|
 test "extract_context without baggage keeps the trace context" {
   let carrier = @propagation.TextMapCarrier::new()
   @propagation.inject(context_propagation_span(), carrier)
@@ -59,14 +64,14 @@ test "extract_context without baggage keeps the trace context" {
   assert_false(context.has_baggage())
 }
 
+///|
 test "extract_context returns the root context for an empty carrier" {
-  let context = @propagation.extract_context(
-    @propagation.TextMapCarrier::new(),
-  )
+  let context = @propagation.extract_context(@propagation.TextMapCarrier::new())
   assert_true(context.span_context() is None)
   assert_false(context.has_baggage())
 }
 
+///|
 test "extract_context ignores an invalid traceparent but keeps baggage" {
   let carrier = @propagation.TextMapCarrier::from_entries([
     ("traceparent", "00-00000000000000000000000000000000-0000000000000000-01"),
@@ -77,6 +82,7 @@ test "extract_context ignores an invalid traceparent but keeps baggage" {
   assert_eq(context.value("user.id"), Some("42"))
 }
 
+///|
 test "inject_context without a span writes only baggage" {
   let context = @context.Context::root().with_value("user.id", "42")
   let carrier = @propagation.TextMapCarrier::new()
@@ -85,6 +91,7 @@ test "inject_context without a span writes only baggage" {
   assert_eq(carrier.get("baggage"), Some("user.id=42"))
 }
 
+///|
 test "inject_context with an invalid span writes only baggage" {
   let context = @context.Context::root()
     .with_span(@api.invalid_span_context())

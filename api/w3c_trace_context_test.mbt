@@ -1,13 +1,16 @@
 // W3C Trace Context propagation tests - simplified basic version
 
 // Test hex conversion functions
+
+///|
 test "hex_to_bytes_simple" {
-  let hex = "4b"  // single byte
+  let hex = "4b" // single byte
   let bytes = hex_to_bytes(hex)
   assert_eq(bytes.length(), 1)
   assert_eq(bytes[0], 0x4b)
 }
 
+///|
 test "hex_to_bytes_multiple" {
   let bytes = hex_to_bytes("4bf9")
   assert_eq(bytes.length(), 2)
@@ -15,12 +18,14 @@ test "hex_to_bytes_multiple" {
   assert_eq(bytes[1], 0xf9)
 }
 
+///|
 test "hex_to_bytes_empty" {
   let hex = ""
   let bytes = hex_to_bytes(hex)
   assert_eq(bytes.length(), 0)
 }
 
+///|
 test "hex_to_int_simple" {
   assert_eq(hex_to_int("0"), 0)
   assert_eq(hex_to_int("1"), 1)
@@ -29,17 +34,21 @@ test "hex_to_int_simple" {
   assert_eq(hex_to_int("ff"), 255)
 }
 
+///|
 test "hex_to_int_case_insensitive" {
   assert_eq(hex_to_int("FF"), 255)
   assert_eq(hex_to_int("ff"), 255)
   assert_eq(hex_to_int("aB"), 171)
 }
 
+///|
 test "hex_to_int_empty" {
   assert_eq(hex_to_int(""), 0)
 }
 
 // Test basic string operations
+
+///|
 test "string_split_basic" {
   let text = "a-b-c"
   let parts = text.split("-").collect()
@@ -49,6 +58,7 @@ test "string_split_basic" {
   assert_eq(parts[2].to_owned(), "c")
 }
 
+///|
 test "string_find_basic" {
   let text = "hello world"
   let pos = text.find("world")
@@ -56,12 +66,14 @@ test "string_find_basic" {
   assert_eq(pos.unwrap(), 6)
 }
 
+///|
 test "string_find_not_found" {
   let text = "hello world"
   let pos = text.find("xyz")
   assert_true(pos is None)
 }
 
+///|
 test "string_find_empty" {
   let text = "hello world"
   let pos = text.find("")
@@ -69,12 +81,14 @@ test "string_find_empty" {
   assert_eq(pos.unwrap(), 0)
 }
 
+///|
 test "string_trim_basic" {
   assert_eq("  hello  ".trim(), "hello")
   assert_eq("hello".trim(), "hello")
   assert_eq("".trim(), "")
 }
 
+///|
 test "string_to_lower_basic" {
   assert_eq("HELLO".to_lower(), "hello")
   assert_eq("HeLLo".to_lower(), "hello")
@@ -82,20 +96,23 @@ test "string_to_lower_basic" {
 }
 
 // Test map operations
+
+///|
 test "map_basic_operations" {
   let map = Map([], capacity=1)
   map.set("key1", "value1")
   map.set("key2", "value2")
-  
+
   assert_eq(map.get("key1"), Some("value1"))
   assert_eq(map.get("key2"), Some("value2"))
   assert_eq(map.get("key3"), None)
 }
 
+///|
 test "map_case_sensitivity" {
   let map = Map([], capacity=1)
   map.set("Key", "value")
-  
+
   // Note: Map keys may be case-sensitive in this implementation
   assert_eq(map.get("Key"), Some("value"))
   // The following might fail if Map is case-sensitive
@@ -104,6 +121,8 @@ test "map_case_sensitivity" {
 }
 
 // Test basic SpanContext operations
+
+///|
 test "span_context_invalid_with_zeros" {
   let sc = @api.invalid_span_context()
   assert_false(sc.is_valid())
@@ -111,6 +130,7 @@ test "span_context_invalid_with_zeros" {
   assert_eq(sc.span_id_hex(), "0000000000000000")
 }
 
+///|
 test "span_context_valid_with_nonzero" {
   let trace_id = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
@@ -119,6 +139,7 @@ test "span_context_valid_with_nonzero" {
   assert_true(sc.is_sampled())
 }
 
+///|
 test "span_context_unsampled" {
   let trace_id = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
@@ -127,53 +148,83 @@ test "span_context_unsampled" {
   assert_false(sc.is_sampled())
 }
 
+///|
 test "span_context_hex_conversion" {
-  let trace_id = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]
+  let trace_id = [
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c,
+    0x0d, 0x0e, 0x0f,
+  ]
   let span_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
   let sc = @api.span_context(trace_id, span_id, 1)
-  
+
   assert_eq(sc.trace_id_hex(), "000102030405060708090a0b0c0d0e0f")
   assert_eq(sc.span_id_hex(), "0102030405060708")
 }
 
 // Test helper functions implementation
-fn hex_to_int(hex : String) -> Int {
+
+///|
+fn hex_to_int(hex : String) -> Int32 {
   let mut result = 0
   let chars = hex.to_array()
   let mut i = 0
   while i < chars.length() {
     let c = chars[i]
-    let digit = 
-      if c == '0' { 0 }
-      else if c == '1' { 1 }
-      else if c == '2' { 2 }
-      else if c == '3' { 3 }
-      else if c == '4' { 4 }
-      else if c == '5' { 5 }
-      else if c == '6' { 6 }
-      else if c == '7' { 7 }
-      else if c == '8' { 8 }
-      else if c == '9' { 9 }
-      else if c == 'a' { 10 }
-      else if c == 'b' { 11 }
-      else if c == 'c' { 12 }
-      else if c == 'd' { 13 }
-      else if c == 'e' { 14 }
-      else if c == 'f' { 15 }
-      else if c == 'A' { 10 }
-      else if c == 'B' { 11 }
-      else if c == 'C' { 12 }
-      else if c == 'D' { 13 }
-      else if c == 'E' { 14 }
-      else if c == 'F' { 15 }
-      else { 0 }
+    let digit = if c == '0' {
+      0
+    } else if c == '1' {
+      1
+    } else if c == '2' {
+      2
+    } else if c == '3' {
+      3
+    } else if c == '4' {
+      4
+    } else if c == '5' {
+      5
+    } else if c == '6' {
+      6
+    } else if c == '7' {
+      7
+    } else if c == '8' {
+      8
+    } else if c == '9' {
+      9
+    } else if c == 'a' {
+      10
+    } else if c == 'b' {
+      11
+    } else if c == 'c' {
+      12
+    } else if c == 'd' {
+      13
+    } else if c == 'e' {
+      14
+    } else if c == 'f' {
+      15
+    } else if c == 'A' {
+      10
+    } else if c == 'B' {
+      11
+    } else if c == 'C' {
+      12
+    } else if c == 'D' {
+      13
+    } else if c == 'E' {
+      14
+    } else if c == 'F' {
+      15
+    } else {
+      0
+    }
     result = result * 16 + digit
     i = i + 1
   }
   result
 }
 
-fn hex_to_bytes(hex : String) -> Array[Int] {
+///|
+fn hex_to_bytes(hex : String) -> Array[Int32] {
   let mut bytes = []
   let chars = hex.to_array()
   let mut i = 0
@@ -189,28 +240,53 @@ fn hex_to_bytes(hex : String) -> Array[Int] {
   bytes
 }
 
-fn hex_char_to_int(c : Char) -> Int {
-  if c == '0' { 0 }
-  else if c == '1' { 1 }
-  else if c == '2' { 2 }
-  else if c == '3' { 3 }
-  else if c == '4' { 4 }
-  else if c == '5' { 5 }
-  else if c == '6' { 6 }
-  else if c == '7' { 7 }
-  else if c == '8' { 8 }
-  else if c == '9' { 9 }
-  else if c == 'a' { 10 }
-  else if c == 'b' { 11 }
-  else if c == 'c' { 12 }
-  else if c == 'd' { 13 }
-  else if c == 'e' { 14 }
-  else if c == 'f' { 15 }
-  else if c == 'A' { 10 }
-  else if c == 'B' { 11 }
-  else if c == 'C' { 12 }
-  else if c == 'D' { 13 }
-  else if c == 'E' { 14 }
-  else if c == 'F' { 15 }
-  else { 0 }
+///|
+fn hex_char_to_int(c : Char) -> Int32 {
+  if c == '0' {
+    0
+  } else if c == '1' {
+    1
+  } else if c == '2' {
+    2
+  } else if c == '3' {
+    3
+  } else if c == '4' {
+    4
+  } else if c == '5' {
+    5
+  } else if c == '6' {
+    6
+  } else if c == '7' {
+    7
+  } else if c == '8' {
+    8
+  } else if c == '9' {
+    9
+  } else if c == 'a' {
+    10
+  } else if c == 'b' {
+    11
+  } else if c == 'c' {
+    12
+  } else if c == 'd' {
+    13
+  } else if c == 'e' {
+    14
+  } else if c == 'f' {
+    15
+  } else if c == 'A' {
+    10
+  } else if c == 'B' {
+    11
+  } else if c == 'C' {
+    12
+  } else if c == 'D' {
+    13
+  } else if c == 'E' {
+    14
+  } else if c == 'F' {
+    15
+  } else {
+    0
+  }
 }

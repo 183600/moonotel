@@ -1,13 +1,16 @@
 // Tests for the `tracestate` carried by a SpanContext.
 
-fn tracestate_trace_id() -> Array[Int] {
+///|
+fn tracestate_trace_id() -> Array[Int32] {
   [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 }
 
-fn tracestate_span_id() -> Array[Int] {
+///|
+fn tracestate_span_id() -> Array[Int32] {
   [1, 2, 3, 4, 5, 6, 7, 8]
 }
 
+///|
 test "span_context_carries_tracestate" {
   let sc = @api.span_context(
     tracestate_trace_id(),
@@ -19,12 +22,14 @@ test "span_context_carries_tracestate" {
   assert_eq(sc.tracestate(), "vendor=value")
 }
 
+///|
 test "span_context_default_tracestate_is_empty" {
   let sc = @api.span_context(tracestate_trace_id(), tracestate_span_id(), 1)
   assert_eq(sc.tracestate(), "")
   assert_eq(@api.invalid_span_context().tracestate(), "")
 }
 
+///|
 test "with_tracestate_returns_a_copy" {
   let sc = @api.span_context(tracestate_trace_id(), tracestate_span_id(), 1)
   let updated = sc.with_tracestate("other=state")

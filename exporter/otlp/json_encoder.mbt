@@ -13,7 +13,9 @@
 // encoder so that both encodings carry identical data.
 
 // Hex character of a 4-bit value, lower case.
-fn json_hex_digit(nibble : Int) -> Char {
+
+///|
+fn json_hex_digit(nibble : Int32) -> Char {
   if nibble < 10 {
     (0x30 + nibble).unsafe_to_char()
   } else {
@@ -22,8 +24,11 @@ fn json_hex_digit(nibble : Int) -> Char {
 }
 
 // Lower-case hex digit of every nibble value 0-15.
+
+///|
 let json_hex_digits : FixedArray[Char] = build_json_hex_digits()
 
+///|
 fn build_json_hex_digits() -> FixedArray[Char] {
   let table : FixedArray[Char] = FixedArray::make(16, '0')
   let mut i = 0
@@ -37,12 +42,18 @@ fn build_json_hex_digits() -> FixedArray[Char] {
 // Append `"<hex>"` for a byte array without materializing an intermediate hex
 // string: hex digits need no JSON escaping. Out-of-range values are rendered
 // exactly like `@api.bytes_to_hex` does.
-fn json_write_hex_quoted(sb : StringBuilder, bytes : Array[Int]) -> Unit {
+
+///|
+fn json_write_hex_quoted(sb : StringBuilder, bytes : Array[Int32]) -> Unit {
   sb.write_char('"')
   for byte in bytes {
     let hi = byte >> 4
     sb.write_char(
-      if hi >= 0 && hi < 16 { json_hex_digits.unsafe_get(hi) } else { '0' },
+      if hi >= 0 && hi < 16 {
+        json_hex_digits.unsafe_get(hi)
+      } else {
+        '0'
+      },
     )
     sb.write_char(json_hex_digits.unsafe_get(byte & 0x0F))
   }
@@ -52,6 +63,8 @@ fn json_write_hex_quoted(sb : StringBuilder, bytes : Array[Int]) -> Unit {
 // Append `value` as a JSON string literal, escaping the characters required by
 // RFC 8259. Non-ASCII text is emitted verbatim (JSON documents are UTF-8).
 // Runs of characters that need no escaping are appended in one slice.
+
+///|
 fn json_write_escaped(sb : StringBuilder, value : String) -> Unit {
   sb.write_char('"')
   let len = value.length()
@@ -95,6 +108,8 @@ fn json_write_escaped(sb : StringBuilder, value : String) -> Unit {
 }
 
 // Append the decimal digits of an unsigned magnitude.
+
+///|
 fn json_write_decimal_digits(sb : StringBuilder, value : UInt64) -> Unit {
   if value >= 10 {
     json_write_decimal_digits(sb, value / 10)
@@ -104,6 +119,8 @@ fn json_write_decimal_digits(sb : StringBuilder, value : UInt64) -> Unit {
 
 // Append a 64-bit integer as a JSON string, the protobuf JSON representation
 // of `int64`/`uint64` values.
+
+///|
 fn json_write_int64_string(sb : StringBuilder, value : Int64) -> Unit {
   sb.write_char('"')
   if value < 0L {
@@ -119,6 +136,8 @@ fn json_write_int64_string(sb : StringBuilder, value : Int64) -> Unit {
 // Append a double as a JSON number. Non-finite values are encoded as the
 // strings "NaN", "Infinity" and "-Infinity", as required by the protobuf JSON
 // mapping.
+
+///|
 fn json_write_double(sb : StringBuilder, value : Double) -> Unit {
   if value.is_nan() {
     sb.write_string("\"NaN\"")
@@ -132,6 +151,8 @@ fn json_write_double(sb : StringBuilder, value : Double) -> Unit {
 }
 
 // Append one `AnyValue` message.
+
+///|
 fn json_write_any_value(
   sb : StringBuilder,
   value : @sdk.AttributeValue,
@@ -143,7 +164,13 @@ fn json_write_any_value(
       json_write_escaped(sb, text)
     }
     @sdk.BoolValue(flag) =>
-      sb.write_string(if flag { "\"boolValue\":true" } else { "\"boolValue\":false" })
+      sb.write_string(
+        if flag {
+          "\"boolValue\":true"
+        } else {
+          "\"boolValue\":false"
+        },
+      )
     @sdk.IntValue(number) => {
       sb.write_string("\"intValue\":")
       json_write_int64_string(sb, number)
@@ -175,7 +202,11 @@ fn json_write_any_value(
         }
         first = false
         sb.write_string(
-          if item { "{\"boolValue\":true}" } else { "{\"boolValue\":false}" },
+          if item {
+            "{\"boolValue\":true}"
+          } else {
+            "{\"boolValue\":false}"
+          },
         )
       }
       sb.write_string("]}")
@@ -213,6 +244,8 @@ fn json_write_any_value(
 }
 
 // Append a `repeated KeyValue` array.
+
+///|
 fn json_write_attributes(
   sb : StringBuilder,
   attributes : Map[String, @sdk.AttributeValue],
@@ -234,6 +267,8 @@ fn json_write_attributes(
 }
 
 // Append the `resource` message.
+
+///|
 fn json_write_resource(
   sb : StringBuilder,
   resource : Map[String, @sdk.AttributeValue],
@@ -244,7 +279,13 @@ fn json_write_resource(
 }
 
 // Append the `instrumentation_scope` message.
-fn json_write_scope(sb : StringBuilder, name : String, version : String) -> Unit {
+
+///|
+fn json_write_scope(
+  sb : StringBuilder,
+  name : String,
+  version : String,
+) -> Unit {
   sb.write_string("{\"name\":")
   json_write_escaped(sb, name)
   if version != "" {
@@ -255,6 +296,8 @@ fn json_write_scope(sb : StringBuilder, name : String, version : String) -> Unit
 }
 
 // Append one `Event` message.
+
+///|
 fn json_write_event(sb : StringBuilder, event : @sdk.SpanEvent) -> Unit {
   sb.write_string("{\"timeUnixNano\":")
   json_write_int64_string(sb, event.time_unix_nano)
@@ -272,6 +315,8 @@ fn json_write_event(sb : StringBuilder, event : @sdk.SpanEvent) -> Unit {
 }
 
 // Append one `Link` message.
+
+///|
 fn json_write_link(sb : StringBuilder, link : @sdk.SpanLink) -> Unit {
   sb.write_string("{\"traceId\":")
   json_write_hex_quoted(sb, link.span_context.trace_id_view())
@@ -297,6 +342,8 @@ fn json_write_link(sb : StringBuilder, link : @sdk.SpanLink) -> Unit {
 
 // Append the `status` message, omitted for an unset status without a
 // description.
+
+///|
 fn json_write_status(sb : StringBuilder, data : @sdk.SpanData) -> Unit {
   if data.status != @api.StatusCode::Unset || data.status_description != "" {
     sb.write_string(",\"status\":{")
@@ -319,6 +366,8 @@ fn json_write_status(sb : StringBuilder, data : @sdk.SpanData) -> Unit {
 }
 
 // Append one `Span` message.
+
+///|
 fn json_write_span(sb : StringBuilder, data : @sdk.SpanData) -> Unit {
   sb.write_string("{\"traceId\":")
   json_write_hex_quoted(sb, data.span_context.trace_id_view())
@@ -389,6 +438,8 @@ fn json_write_span(sb : StringBuilder, data : @sdk.SpanData) -> Unit {
 
 // Encode spans as an OTLP/JSON `ExportTraceServiceRequest`. An empty batch
 // yields empty bytes, mirroring the protobuf encoder.
+
+///|
 pub fn encode_trace_request_json(spans : Array[@sdk.SpanData]) -> Bytes {
   if spans.length() == 0 {
     return b""
@@ -397,7 +448,7 @@ pub fn encode_trace_request_json(spans : Array[@sdk.SpanData]) -> Bytes {
   for data in spans {
     size_hint = size_hint + estimate_span_size(data) * 2
   }
-  let sb = StringBuilder(size_hint=size_hint)
+  let sb = StringBuilder(size_hint~)
   sb.write_string("{\"resourceSpans\":[")
   let groups = group_spans(spans)
   let mut first_group = true

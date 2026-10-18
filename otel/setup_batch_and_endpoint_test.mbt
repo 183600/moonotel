@@ -1,12 +1,12 @@
 // `setup` defaults to the batch processor and honors the environment trace
 // endpoint when no explicit endpoint argument is given.
 
+///|
 test "setup_defaults_to_batch_and_env_traces_endpoint" {
   @otel.shutdown_global_tracer_provider()
   @env.set_env_var("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4318")
   @env.set_env_var(
-    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
-    "http://collector:4318/env/traces",
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://collector:4318/env/traces",
   )
   let capture = capturing_transport()
   let provider = @otel.setup(

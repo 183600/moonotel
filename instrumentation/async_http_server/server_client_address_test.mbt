@@ -1,26 +1,36 @@
 // Blackbox tests for the client address semantic-convention attribute of the
 // server instrumentation.
 
+///|
 struct ClientAddressRecordingExporter {
   spans : Ref[Array[@sdk.SpanData]]
 }
 
-pub impl @sdk.SpanExporter for ClientAddressRecordingExporter with export_spans(self, spans) {
+///|
+pub impl @sdk.SpanExporter for ClientAddressRecordingExporter with fn export_spans(
+  self,
+  spans,
+) {
   for data in spans {
     self.spans.val.push(data)
   }
   @sdk.ExportSuccess
 }
 
-pub impl @sdk.SpanExporter for ClientAddressRecordingExporter with shutdown(self) {
+///|
+pub impl @sdk.SpanExporter for ClientAddressRecordingExporter with fn shutdown(
+  self,
+) {
   let _ = self
 }
 
+///|
 async test "server span does not record the listen address as client.address" {
-  let exporter : ClientAddressRecordingExporter = { spans: Ref([]) }
+  let exporter : ClientAddressRecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
-  let provider = @sdk.TracerProviderSdk::new(service_name="client-addr-test")
-    .with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="client-addr-test").with_span_processor(
+    processor,
+  )
   let tracer = provider.get_tracer("client-addr-test")
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -33,7 +43,7 @@ async test "server span does not record the listen address as client.address" {
           seen_client_addr.val = Some(call.connection.client_addr().to_string())
           call.respond(200, body="ok")
         },
-        tracer=tracer,
+        tracer~,
       )
     }
     let connection = @socket.Tcp::connect(

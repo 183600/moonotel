@@ -2,6 +2,7 @@
 // 
 // While MoonBit doesn't ship QuickCheck, we manually test representative sets
 
+///|
 test "property_trace_id_hex_length_always_32_for_valid_length" {
   // For any 16-byte array, hex is 32 characters
   let pattern = Array::make(16, 0)
@@ -14,6 +15,7 @@ test "property_trace_id_hex_length_always_32_for_valid_length" {
   }
 }
 
+///|
 test "property_span_id_hex_length_always_16_for_valid_length" {
   // For any 8-byte array, hex is 16 characters
   let pattern = Array::make(8, 0)
@@ -26,6 +28,7 @@ test "property_span_id_hex_length_always_16_for_valid_length" {
   }
 }
 
+///|
 test "property_valid_span_context_requires_nonzero_ids" {
   let valid_tid = Array::make(16, 1)
   let valid_sid = Array::make(8, 1)
@@ -45,6 +48,7 @@ test "property_valid_span_context_requires_nonzero_ids" {
   assert_false(sc_both_zero.is_valid())
 }
 
+///|
 test "property_sampled_flag_only_depends_on_bit_0" {
   let trace_id = Array::make(16, 1)
   let span_id = Array::make(8, 1)
@@ -58,6 +62,7 @@ test "property_sampled_flag_only_depends_on_bit_0" {
   }
 }
 
+///|
 test "property_is_zero_iff_all_elements_zero" {
   // all zeros => is_zero
   assert_true(@api.is_zero(Array::make(0, 0)))
@@ -76,11 +81,27 @@ test "property_is_zero_iff_all_elements_zero" {
   assert_false(@api.is_zero(arr2))
 }
 
+///|
 fn is_lower_hex_char(c : Char) -> Bool {
-  c == '0' || c == '1' || c == '2' || c == '3' || c == '4' || c == '5' || c == '6' || c == '7' || c == '8' || c == '9' ||
-  c == 'a' || c == 'b' || c == 'c' || c == 'd' || c == 'e' || c == 'f'
+  c == '0' ||
+  c == '1' ||
+  c == '2' ||
+  c == '3' ||
+  c == '4' ||
+  c == '5' ||
+  c == '6' ||
+  c == '7' ||
+  c == '8' ||
+  c == '9' ||
+  c == 'a' ||
+  c == 'b' ||
+  c == 'c' ||
+  c == 'd' ||
+  c == 'e' ||
+  c == 'f'
 }
 
+///|
 test "property_bytes_to_hex_only_uses_lower_hex_chars" {
   let mut b = 0
   while b < 256 {
@@ -93,6 +114,7 @@ test "property_bytes_to_hex_only_uses_lower_hex_chars" {
   }
 }
 
+///|
 test "property_bytes_to_hex_length_twice_input" {
   let mut len = 0
   while len <= 20 {
@@ -102,6 +124,3 @@ test "property_bytes_to_hex_length_twice_input" {
     len = len + 1
   }
 }
-
-
-

@@ -1,6 +1,7 @@
 // Tests for resource construction: defaults, environment parsing and
 // copy-on-write updates.
 
+///|
 test "resource_includes_telemetry_sdk_attributes" {
   let provider = @sdk.TracerProviderSdk::new(service_name="svc")
   let resource = provider.resource()
@@ -18,10 +19,10 @@ test "resource_includes_telemetry_sdk_attributes" {
   )
 }
 
+///|
 test "resource_attributes_from_env" {
   @env.set_env_var(
-    "OTEL_RESOURCE_ATTRIBUTES",
-    "deployment.environment=prod,service.version=1.2%2E3",
+    "OTEL_RESOURCE_ATTRIBUTES", "deployment.environment=prod,service.version=1.2%2E3",
   )
   let provider = @sdk.TracerProviderSdk::new(service_name="svc")
   @env.unset_env_var("OTEL_RESOURCE_ATTRIBUTES")
@@ -33,6 +34,7 @@ test "resource_attributes_from_env" {
   assert_eq(resource.get("service.version"), Some(@sdk.StringValue("1.2.3")))
 }
 
+///|
 test "resource_attributes_decode_percent_with_surrogate_pair" {
   @env.set_env_var("OTEL_RESOURCE_ATTRIBUTES", "note=smile😀%41")
   let provider = @sdk.TracerProviderSdk::new(service_name="svc")
@@ -43,6 +45,7 @@ test "resource_attributes_decode_percent_with_surrogate_pair" {
   )
 }
 
+///|
 test "resource_attributes_decode_percent_in_keys" {
   @env.set_env_var("OTEL_RESOURCE_ATTRIBUTES", "a%2Cb=1,k%3Dv=2")
   let provider = @sdk.TracerProviderSdk::new(service_name="svc")
@@ -52,6 +55,7 @@ test "resource_attributes_decode_percent_in_keys" {
   assert_eq(resource.get("k=v"), Some(@sdk.StringValue("2")))
 }
 
+///|
 test "service_name_falls_back_to_resource_attributes" {
   @env.set_env_var("OTEL_RESOURCE_ATTRIBUTES", "service.name=from-resource")
   let provider = @sdk.TracerProviderSdk::new()
@@ -62,6 +66,7 @@ test "service_name_falls_back_to_resource_attributes" {
   )
 }
 
+///|
 test "explicit_service_name_wins_over_resource_attributes" {
   @env.set_env_var("OTEL_RESOURCE_ATTRIBUTES", "service.name=from-resource")
   let provider = @sdk.TracerProviderSdk::new(service_name="explicit")
@@ -72,6 +77,7 @@ test "explicit_service_name_wins_over_resource_attributes" {
   )
 }
 
+///|
 test "with_resource_attributes_returns_a_copy" {
   let base = @sdk.TracerProviderSdk::new(service_name="svc")
   let extra : Map[String, @sdk.AttributeValue] = Map([])
@@ -85,19 +91,20 @@ test "with_resource_attributes_returns_a_copy" {
   )
 }
 
+///|
 test "child_span_inherits_parent_tracestate" {
   let provider = @sdk.TracerProviderSdk::new(service_name="svc")
   let tracer = provider.get_tracer("t")
   let parent = @api.span_context(
     [
-      0x4b, 0xf9, 0x2f, 0x35, 0x9d, 0x1e, 0x75, 0xb7,
-      0x61, 0x8a, 0x2d, 0x1f, 0x3c, 0x4e, 0x5a, 0x6b,
+      0x4b, 0xf9, 0x2f, 0x35, 0x9d, 0x1e, 0x75, 0xb7, 0x61, 0x8a, 0x2d, 0x1f, 0x3c,
+      0x4e, 0x5a, 0x6b,
     ],
     [0x00, 0xf0, 0x67, 0xaa, 0x0b, 0xa9, 0x02, 0xb7],
     1,
     tracestate="vendor=value",
   )
-  let child = tracer.start_span("child", parent=parent)
+  let child = tracer.start_span("child", parent~)
   assert_eq(child.context().tracestate(), "vendor=value")
   assert_eq(child.context().trace_id_hex(), parent.trace_id_hex())
 }

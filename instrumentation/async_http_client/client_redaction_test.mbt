@@ -1,12 +1,16 @@
 // Tests for `redact_url`, which keeps credentials out of the `url.full`
 // span attribute as required by the HTTP semantic conventions.
 
+///|
 test "redact_url_removes_user_and_password" {
   assert_eq(
     @async_http_client.redact_url("http://user:pass@example.com/path"),
     "http://example.com/path",
   )
-  assert_eq(@async_http_client.redact_url("https://user@example.com"), "https://example.com")
+  assert_eq(
+    @async_http_client.redact_url("https://user@example.com"),
+    "https://example.com",
+  )
   assert_eq(
     @async_http_client.redact_url("http://user:pass@example.com?q=1#f"),
     "http://example.com?q=1#f",
@@ -21,6 +25,7 @@ test "redact_url_removes_user_and_password" {
   )
 }
 
+///|
 test "redact_url_leaves_urls_without_userinfo_unchanged" {
   assert_eq(
     @async_http_client.redact_url("http://example.com/path"),
@@ -30,10 +35,14 @@ test "redact_url_leaves_urls_without_userinfo_unchanged" {
     @async_http_client.redact_url("http://example.com:8080/path?x=1"),
     "http://example.com:8080/path?x=1",
   )
-  assert_eq(@async_http_client.redact_url("example.com/path"), "example.com/path")
+  assert_eq(
+    @async_http_client.redact_url("example.com/path"),
+    "example.com/path",
+  )
   assert_eq(@async_http_client.redact_url(""), "")
 }
 
+///|
 test "redact_url_preserves_at_signs_outside_the_authority" {
   assert_eq(
     @async_http_client.redact_url("http://example.com/a@b"),
@@ -48,4 +57,3 @@ test "redact_url_preserves_at_signs_outside_the_authority" {
     "http://example.com#a@b",
   )
 }
-

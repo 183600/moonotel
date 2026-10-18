@@ -13,10 +13,12 @@
 // The loop is cancelled together with `group`, so no explicit shutdown is
 // needed; spans still queued in the processor are flushed by the group defer
 // as long as the exporter itself is synchronous.
+
+///|
 pub fn[G] spawn_flush_loop(
   group : @async.TaskGroup[G],
   processor : @sdk.BatchSpanProcessor,
-  interval_millis? : Int
+  interval_millis? : Int32,
 ) -> Unit {
   let interval = match interval_millis {
     Some(value) => value
@@ -40,12 +42,14 @@ pub fn[G] spawn_flush_loop(
 // when omitted) installed as the ambient context, and restores the previous
 // context when it finishes. Use this instead of `TaskGroup::spawn_bg` to
 // carry the current span and baggage into tasks that outlive the caller.
+
+///|
 pub fn[G] spawn_bg(
   group : @async.TaskGroup[G],
   f : async () -> Unit,
   context? : @context.Context,
   no_wait? : Bool,
-  allow_failure? : Bool
+  allow_failure? : Bool,
 ) -> Unit {
   let carried = match context {
     Some(value) => value
@@ -57,8 +61,8 @@ pub fn[G] spawn_bg(
       defer @context.detach(previous)
       f()
     },
-    no_wait?=no_wait,
-    allow_failure?=allow_failure,
+    no_wait?,
+    allow_failure?,
   )
 }
 
@@ -66,12 +70,14 @@ pub fn[G] spawn_bg(
 // installed as the ambient context, and restores the previous context when it
 // finishes. Unlike `spawn_bg`, the returned task is joined through `group`
 // and its result can be collected with `Task::wait`.
+
+///|
 pub fn[G, X] spawn(
   group : @async.TaskGroup[G],
   f : async () -> X,
   context? : @context.Context,
   no_wait? : Bool,
-  allow_failure? : Bool
+  allow_failure? : Bool,
 ) -> @async.Task[X] {
   let carried = match context {
     Some(value) => value
@@ -83,8 +89,8 @@ pub fn[G, X] spawn(
       defer @context.detach(previous)
       f()
     },
-    no_wait?=no_wait,
-    allow_failure?=allow_failure,
+    no_wait?,
+    allow_failure?,
   )
 }
 
@@ -100,6 +106,8 @@ pub fn[G, X] spawn(
 // environment variables. Spans are handed to the background task when they
 // end and sent in coalesced batches; pending spans are drained when the task
 // group exits.
+
+///|
 pub fn[G] setup(
   group : @async.TaskGroup[G],
   service_name? : String,
@@ -109,7 +117,7 @@ pub fn[G] setup(
   headers? : Map[String, String],
   sampler? : @sdk.Sampler,
   span_limits? : @sdk.SpanLimits,
-  max_queue_size? : Int
+  max_queue_size? : Int32,
 ) -> @sdk.TracerProviderSdk {
   let base = @otlp.OtlpHttpConfig::from_env()
   let config : @otlp.OtlpHttpConfig = {
@@ -121,7 +129,7 @@ pub fn[G] setup(
     },
     headers: headers.unwrap_or(base.headers),
   }
-  let mut provider = @sdk.TracerProviderSdk::new(service_name?=service_name)
+  let mut provider = @sdk.TracerProviderSdk::new(service_name?)
   match resource {
     Some(value) => provider = provider.with_resource(value)
     None => ()
@@ -138,11 +146,11 @@ pub fn[G] setup(
     Some(value) => provider = provider.with_span_limits(value)
     None => ()
   }
-  if !(@sdk.traces_exporter_disabled()) {
+  if !@sdk.traces_exporter_disabled() {
     let exporter = OtlpHttpAsyncSpanExporter::new(
       config,
       group,
-      max_queue_size?=max_queue_size,
+      max_queue_size?,
     )
     provider = provider.with_span_processor(
       @sdk.SimpleSpanProcessor::new(exporter),

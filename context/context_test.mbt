@@ -1,5 +1,6 @@
 // Blackbox tests for immutable Context and the context storage.
 
+///|
 fn span_context_a() -> @api.SpanContext {
   @api.span_context(
     @api.bytes_from_hex("4bf92f359d1e75b7618a2d1f3c4e5a6b").unwrap(),
@@ -8,6 +9,7 @@ fn span_context_a() -> @api.SpanContext {
   )
 }
 
+///|
 fn span_context_b() -> @api.SpanContext {
   @api.span_context(
     @api.bytes_from_hex("4bf92f359d1e75b7618a2d1f3c4e5a6b").unwrap(),
@@ -16,6 +18,7 @@ fn span_context_b() -> @api.SpanContext {
   )
 }
 
+///|
 test "root_context_is_empty" {
   let root = @context.Context::root()
   assert_true(root.span_context() is None)
@@ -24,6 +27,7 @@ test "root_context_is_empty" {
   assert_true(root.parent() is None)
 }
 
+///|
 test "with_span_is_immutable" {
   let root = @context.Context::root()
   let derived = root.with_span(span_context_a())
@@ -32,6 +36,7 @@ test "with_span_is_immutable" {
   assert_eq(derived.span_context().unwrap().span_id_hex(), "00f067aa0ba902b7")
 }
 
+///|
 test "inner_span_shadows_outer" {
   let root = @context.Context::root()
   let outer = root.with_span(span_context_a())
@@ -40,6 +45,7 @@ test "inner_span_shadows_outer" {
   assert_eq(outer.span_context().unwrap().span_id_hex(), "00f067aa0ba902b7")
 }
 
+///|
 test "baggage_inheritance_and_override" {
   let root = @context.Context::root()
   let with_user = root.with_value("user.id", "42").with_value("tenant", "acme")
@@ -53,6 +59,7 @@ test "baggage_inheritance_and_override" {
   assert_eq(baggage.get("user.id"), Some("42"))
 }
 
+///|
 test "baggage_and_span_coexist" {
   let ctx = @context.Context::root()
     .with_value("k", "v")
@@ -61,18 +68,23 @@ test "baggage_and_span_coexist" {
   assert_true(ctx.span_context() is Some(_))
 }
 
+///|
 test "storage_defaults_to_root" {
   assert_true(@context.current_context().span_context() is None)
   assert_true(@context.current_span_context() is None)
 }
 
+///|
 test "attach_and_detach" {
-  let previous = @context.attach(@context.Context::root().with_span(span_context_a()))
+  let previous = @context.attach(
+    @context.Context::root().with_span(span_context_a()),
+  )
   assert_true(@context.current_span_context() is Some(_))
   @context.detach(previous)
   assert_true(@context.current_span_context() is None)
 }
 
+///|
 test "with_context_scopes_nested_blocks" {
   let outer = @context.Context::root().with_span(span_context_a())
   let inner = @context.Context::root().with_span(span_context_b())
@@ -95,6 +107,7 @@ test "with_context_scopes_nested_blocks" {
   assert_true(@context.current_span_context() is None)
 }
 
+///|
 test "with_span_context_helper" {
   @context.with_span_context(span_context_a(), () => {
     assert_eq(
@@ -105,6 +118,7 @@ test "with_span_context_helper" {
   assert_true(@context.current_span_context() is None)
 }
 
+///|
 test "with_span_context_keeps_the_current_baggage" {
   let current = @context.Context::root().with_value("user.id", "42")
   @context.with_context(current, () => {

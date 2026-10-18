@@ -1,10 +1,12 @@
 // Integration tests for the HEAD / PATCH / OPTIONS client helpers.
 
+///|
 struct MethodsRecordingExporter {
   spans : Ref[Array[@sdk.SpanData]]
 }
 
-pub impl @sdk.SpanExporter for MethodsRecordingExporter with export_spans(
+///|
+pub impl @sdk.SpanExporter for MethodsRecordingExporter with fn export_spans(
   self,
   spans,
 ) {
@@ -14,21 +16,24 @@ pub impl @sdk.SpanExporter for MethodsRecordingExporter with export_spans(
   @sdk.ExportSuccess
 }
 
-pub impl @sdk.SpanExporter for MethodsRecordingExporter with shutdown(self) {
+///|
+pub impl @sdk.SpanExporter for MethodsRecordingExporter with fn shutdown(self) {
   let _ = self
 }
 
+///|
 fn methods_test_tracer(
-  scope : String
+  scope : String,
 ) -> (@sdk.Tracer, MethodsRecordingExporter) {
-  let exporter : MethodsRecordingExporter = { spans: Ref([]) }
+  let exporter : MethodsRecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
-  let provider = @sdk.TracerProviderSdk::new(
-    service_name="client-methods",
-  ).with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="client-methods").with_span_processor(
+    processor,
+  )
   (provider.get_tracer(scope), exporter)
 }
 
+///|
 async test "head patch and options use the right methods" {
   let (tracer, exporter) = methods_test_tracer("client-methods")
   @async.with_task_group() <| group => {
@@ -45,9 +50,9 @@ async test "head patch and options use the right methods" {
       })
     }
     let url = "http://127.0.0.1:\{port}/methods"
-    let (head_response, _) = @async_http_client.head(url, tracer=tracer)
-    let (patch_response, _) = @async_http_client.patch(url, "payload", tracer=tracer)
-    let (options_response, _) = @async_http_client.options(url, tracer=tracer)
+    let (head_response, _) = @async_http_client.head(url, tracer~)
+    let (patch_response, _) = @async_http_client.patch(url, "payload", tracer~)
+    let (options_response, _) = @async_http_client.options(url, tracer~)
     assert_eq(head_response.code, 200)
     assert_eq(patch_response.code, 200)
     assert_eq(options_response.code, 200)

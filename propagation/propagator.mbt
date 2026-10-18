@@ -11,26 +11,27 @@
 // configuration points of the SDK.
 
 // A propagator that injects and extracts a `Context` through a text carrier.
+
 ///|
 pub(open) trait TextMapPropagator {
-  inject(Self, @context.Context, TextMapCarrier) -> Unit
-  extract(Self, TextMapCarrier) -> @context.Context
+  fn inject(Self, @context.Context, TextMapCarrier) -> Unit
+  fn extract(Self, TextMapCarrier) -> @context.Context
 }
 
 // The W3C Trace Context propagator, handling `traceparent` and `tracestate`.
 
 ///|
-pub struct TraceContextPropagator {
-}
+pub struct TraceContextPropagator {}
 
 // Create a W3C Trace Context propagator.
 
 ///|
 pub fn TraceContextPropagator::new() -> TraceContextPropagator {
-  TraceContextPropagator::{  }
+  TraceContextPropagator::{ }
 }
 
-pub impl TextMapPropagator for TraceContextPropagator with inject(
+///|
+pub impl TextMapPropagator for TraceContextPropagator with fn inject(
   self,
   context,
   carrier,
@@ -42,7 +43,8 @@ pub impl TextMapPropagator for TraceContextPropagator with inject(
   }
 }
 
-pub impl TextMapPropagator for TraceContextPropagator with extract(
+///|
+pub impl TextMapPropagator for TraceContextPropagator with fn extract(
   self,
   carrier,
 ) {
@@ -53,22 +55,23 @@ pub impl TextMapPropagator for TraceContextPropagator with extract(
   }
 }
 
+///|
 pub extend TraceContextPropagator with TextMapPropagator::{inject, extract}
 
 // The W3C Baggage propagator, handling the `baggage` header.
 
 ///|
-pub struct BaggagePropagator {
-}
+pub struct BaggagePropagator {}
 
 // Create a W3C Baggage propagator.
 
 ///|
 pub fn BaggagePropagator::new() -> BaggagePropagator {
-  BaggagePropagator::{  }
+  BaggagePropagator::{ }
 }
 
-pub impl TextMapPropagator for BaggagePropagator with inject(
+///|
+pub impl TextMapPropagator for BaggagePropagator with fn inject(
   self,
   context,
   carrier,
@@ -77,11 +80,13 @@ pub impl TextMapPropagator for BaggagePropagator with inject(
   inject_baggage(context, carrier)
 }
 
-pub impl TextMapPropagator for BaggagePropagator with extract(self, carrier) {
+///|
+pub impl TextMapPropagator for BaggagePropagator with fn extract(self, carrier) {
   let _ = self
   extract_baggage_context(carrier)
 }
 
+///|
 pub extend BaggagePropagator with TextMapPropagator::{inject, extract}
 
 // A propagator that runs a list of propagators in order. Injection writes
@@ -98,7 +103,7 @@ pub struct CompositePropagator {
 
 ///|
 pub fn CompositePropagator::new(
-  propagators : Array[&TextMapPropagator]
+  propagators : Array[&TextMapPropagator],
 ) -> CompositePropagator {
   { propagators, }
 }
@@ -106,11 +111,12 @@ pub fn CompositePropagator::new(
 // Number of member propagators.
 
 ///|
-pub fn CompositePropagator::length(self : CompositePropagator) -> Int {
+pub fn CompositePropagator::length(self : CompositePropagator) -> Int32 {
   self.propagators.length()
 }
 
-pub impl TextMapPropagator for CompositePropagator with inject(
+///|
+pub impl TextMapPropagator for CompositePropagator with fn inject(
   self,
   context,
   carrier,
@@ -120,16 +126,17 @@ pub impl TextMapPropagator for CompositePropagator with inject(
   }
 }
 
-pub impl TextMapPropagator for CompositePropagator with extract(
+///|
+pub impl TextMapPropagator for CompositePropagator with fn extract(
   self,
   carrier,
 ) {
   let mut context = @context.Context::root()
   for propagator in self.propagators {
     let extracted = propagator.extract(carrier)
-    extracted.baggage().each(fn(key, value) {
-      context = context.with_value(key, value)
-    })
+    extracted
+    .baggage()
+    .each(fn(key, value) { context = context.with_value(key, value) })
     match extracted.span_context() {
       Some(sc) => context = context.with_span(sc)
       None => ()
@@ -138,6 +145,7 @@ pub impl TextMapPropagator for CompositePropagator with extract(
   context
 }
 
+///|
 pub extend CompositePropagator with TextMapPropagator::{inject, extract}
 
 // Build a composite propagator from `OTEL_PROPAGATORS`, a comma-separated

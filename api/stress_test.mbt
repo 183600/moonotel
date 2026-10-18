@@ -1,4 +1,6 @@
 // Additional stress and boundary tests for SpanContext
+
+///|
 test "span_context_stress_test" {
   // Test with maximum valid values
   let mut max_trace = []
@@ -20,6 +22,7 @@ test "span_context_stress_test" {
   assert_true(sc_max.is_sampled())
 }
 
+///|
 test "span_context_stress_unsampled" {
   // Test with sampled flag off
   let mut trace_id = []
@@ -42,6 +45,8 @@ test "span_context_stress_unsampled" {
 }
 
 // Hex conversion stress tests
+
+///|
 test "hex_conversion_stress_test" {
   // Test large hex numbers (use smaller values that fit in Int)
   assert_eq(hex_to_int("ff"), 255)
@@ -49,9 +54,10 @@ test "hex_conversion_stress_test" {
   assert_eq(hex_to_int("1234"), 4660)
 }
 
+///|
 test "hex_to_bytes_stress_test" {
   // Test large byte sequences
-  let large_hex = "ff".repeat(32)  // 32 bytes of 0xFF
+  let large_hex = "ff".repeat(32) // 32 bytes of 0xFF
   let bytes = hex_to_bytes(large_hex)
   assert_eq(bytes.length(), 32)
 
@@ -62,6 +68,7 @@ test "hex_to_bytes_stress_test" {
   }
 }
 
+///|
 test "edge_case_hex_combinations" {
   // Test various hex combinations
   assert_eq(hex_to_int("a"), 10)
@@ -71,17 +78,19 @@ test "edge_case_hex_combinations" {
 }
 
 // Boundary string tests
+
+///|
 test "boundary_string_tests" {
   // Test empty string operations
   let empty = ""
   let empty_bytes = hex_to_bytes(empty)
   assert_eq(empty_bytes.length(), 0)
-  
+
   // Test single character
   let single = "f"
   let single_bytes = hex_to_bytes(single)
-  assert_eq(single_bytes.length(), 0)  // Should be ignored as odd length
-  
+  assert_eq(single_bytes.length(), 0) // Should be ignored as odd length
+
   // Test two characters
   let pair = "ff"
   let pair_bytes = hex_to_bytes(pair)
@@ -89,6 +98,7 @@ test "boundary_string_tests" {
   assert_eq(pair_bytes[0], 255)
 }
 
+///|
 test "performance_regression_test" {
   // Test many hex operations
   let mut count = 0

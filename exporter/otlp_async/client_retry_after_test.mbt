@@ -1,5 +1,6 @@
 // Tests for `Retry-After` handling in the async OTLP/HTTP exporter.
 
+///|
 async test "post_trace_request honors the Retry-After header" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -28,6 +29,7 @@ async test "post_trace_request honors the Retry-After header" {
   }
 }
 
+///|
 async test "post_trace_request ignores a malformed Retry-After header" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))

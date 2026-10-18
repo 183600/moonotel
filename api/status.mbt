@@ -1,4 +1,6 @@
 // StatusCode represents the canonical status of a Span operation.
+
+///|
 pub(all) enum StatusCode {
   Unset
   Ok
@@ -6,6 +8,8 @@ pub(all) enum StatusCode {
 } derive(Eq, @debug.Debug)
 
 // Lower-case name of the status code
+
+///|
 pub fn StatusCode::to_string(self : StatusCode) -> String {
   match self {
     Unset => "unset"
@@ -15,7 +19,9 @@ pub fn StatusCode::to_string(self : StatusCode) -> String {
 }
 
 // Numeric value used by the OTLP protobuf encoding
-pub fn StatusCode::otlp_value(self : StatusCode) -> Int {
+
+///|
+pub fn StatusCode::otlp_value(self : StatusCode) -> Int32 {
   match self {
     Unset => 0
     Ok => 1
@@ -23,5 +29,8 @@ pub fn StatusCode::otlp_value(self : StatusCode) -> Int {
   }
 }
 
+///|
 pub extend StatusCode with Eq::{not_equal, equal}
+
+///|
 pub extend StatusCode with @debug.Debug::{to_repr}
