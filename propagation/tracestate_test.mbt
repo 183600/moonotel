@@ -60,6 +60,13 @@ test "parse_tracestate_rejects_too_many_members" {
   assert_eq(@propagation.parse_tracestate(state), None)
 }
 
+test "tracestate_mutations_reject_trailing_blank_values" {
+  let ts = @propagation.Tracestate::parse("a=1").unwrap()
+  assert_eq(ts.add("b", "v ").to_header(), "a=1")
+  assert_eq(ts.update("a", "x ").to_header(), "a=1")
+  assert_eq(ts.add("b", " v").to_header(), "b= v,a=1")
+}
+
 test "inject_writes_tracestate_from_span_context" {
   let sc = tracestate_test_context().with_tracestate("congo=t61rcWkgMzE")
   let carrier = @propagation.TextMapCarrier::new()
