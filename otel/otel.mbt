@@ -68,6 +68,7 @@ pub using @propagation {
   type TraceContextPropagator,
   type BaggagePropagator,
   type CompositePropagator,
+  type BaggageEntry,
   TRACESTATE_MAX_MEMBERS,
   BAGGAGE_MAX_MEMBERS,
   BAGGAGE_MAX_BYTES,
@@ -89,6 +90,10 @@ pub using @propagation {
   extract_baggage_context,
   parse_baggage,
   format_baggage,
+  parse_baggage_entries,
+  format_baggage_entries,
+  extract_baggage_entries,
+  inject_baggage_entries,
 }
 
 ///|

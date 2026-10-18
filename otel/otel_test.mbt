@@ -171,3 +171,27 @@ test "facade_baggage_round_trip" {
   let restored = @otel.extract_baggage_context(carrier)
   assert_eq(restored.value("user.id"), Some("42"))
 }
+
+///|
+test "facade_baggage_entries_round_trip" {
+  let entries : Array[@otel.BaggageEntry] = [
+    @otel.BaggageEntry::new("user.id", "42", properties=[("ttl", "1")]),
+  ]
+  let carrier = @otel.TextMapCarrier::new()
+  @otel.inject_baggage_entries(entries, carrier)
+  assert_eq(
+    carrier.get(@otel.baggage_header_name()),
+    Some("user.id=42;ttl=1"),
+  )
+  let restored = @otel.extract_baggage_entries(carrier)
+  assert_eq(restored.length(), 1)
+  assert_eq(restored[0].key, "user.id")
+  assert_eq(restored[0].properties, [("ttl", "1")])
+  assert_eq(
+    @otel.format_baggage_entries(restored),
+    "user.id=42;ttl=1",
+  )
+  assert_eq(@otel.parse_baggage_entries("a=1;p=2")[0].properties, [
+    ("p", "2"),
+  ])
+}

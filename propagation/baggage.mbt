@@ -3,11 +3,13 @@
 // `baggage` layout: a comma-separated list of `key=value` members, where each
 // member may carry `;`-separated properties. Keys are HTTP tokens; values are
 // percent-encoded so that any octet can be represented. Parsing is lenient:
-// members with a malformed key, value or encoding are dropped, while the
-// remaining members are kept.
+// members with a malformed key, value or encoding are dropped, malformed
+// properties are skipped, while the remaining members are kept.
 //
-// Properties (`key=value;prop=1`) are accepted but not surfaced; the MVP only
-// propagates the key/value pairs.
+// `parse_baggage` / `format_baggage` work with plain key/value pairs and drop
+// properties. `parse_baggage_entries` / `format_baggage_entries` surface the
+// properties as `BaggageEntry` values, so a full member
+// (`key=value;prop=1`) round-trips.
 
 // Name of the `baggage` header
 
@@ -29,6 +31,37 @@ pub const BAGGAGE_MAX_MEMBERS : Int32 = 64
 
 ///|
 pub const BAGGAGE_MAX_BYTES : Int32 = 8192
+
+// One member of a `baggage` header: a key, a percent-decoded value and the
+// (percent-decoded) properties attached to the member. Constructed by
+// `parse_baggage_entries` / `BaggageEntry::new` and accepted by
+// `format_baggage_entries`.
+
+///|
+pub(all) struct BaggageEntry {
+  key : String
+  value : String
+  properties : Array[(String, String)]
+} derive(Eq, @debug.Debug)
+
+// Create a baggage member with optional `key=value` properties. The
+// properties array is stored as given; callers must not mutate it afterwards.
+
+///|
+pub fn BaggageEntry::new(
+  key : String,
+  value : String,
+  properties? : Array[(String, String)],
+) -> BaggageEntry {
+  {
+    key,
+    value,
+    properties: match properties {
+      Some(values) => values
+      None => []
+    },
+  }
+}
 
 // Whether each ASCII code unit (0-127) is an HTTP token character.
 
@@ -422,16 +455,100 @@ pub fn percent_encoded_length(value : String) -> Int32 {
   total
 }
 
-// Parse a `baggage` header value into an ordered list of key/value pairs.
-// Members that are malformed are skipped; properties are ignored.
-//
-// Following the W3C Baggage specification, at most `BAGGAGE_MAX_MEMBERS`
-// members and `BAGGAGE_MAX_BYTES` bytes are kept; once a member would exceed
-// either limit it and every following member are dropped.
+// Parse the `;`-separated properties of a member spanning `[semi, item_end)`
+// (`semi` points at the first `;`, or is -1 when the member has none).
+// Malformed properties and duplicates of an already accepted property key are
+// skipped; the property values are percent-decoded like member values.
 
 ///|
-pub fn parse_baggage(value : String) -> Array[(String, String)] {
-  let entries : Array[(String, String)] = []
+fn parse_baggage_properties(
+  view : StringView,
+  semi : Int32,
+  item_end : Int32,
+) -> Array[(String, String)] {
+  let properties : Array[(String, String)] = []
+  if semi < 0 {
+    return properties
+  }
+  let mut start = semi
+  while start < item_end {
+    let mut end = start + 1
+    while end < item_end && view.unsafe_get(end) != 0x3B {
+      end = end + 1
+    }
+    let mut item_start = start + 1
+    while item_start < end && is_ows_code(view.unsafe_get(item_start)) {
+      item_start = item_start + 1
+    }
+    let mut property_end = end
+    while property_end > item_start &&
+          is_ows_code(view.unsafe_get(property_end - 1)) {
+      property_end = property_end - 1
+    }
+    let mut eq = -1
+    let mut i = item_start
+    while i < property_end {
+      if view.unsafe_get(i) == 0x3D {
+        eq = i
+        break
+      }
+      i = i + 1
+    }
+    if eq >= 0 {
+      let mut key_end = eq
+      while key_end > item_start && is_ows_code(view.unsafe_get(key_end - 1)) {
+        key_end = key_end - 1
+      }
+      let key_view = view.view(start_offset=item_start, end_offset=key_end)
+      let mut value_start = eq + 1
+      while value_start < property_end &&
+            is_ows_code(view.unsafe_get(value_start)) {
+        value_start = value_start + 1
+      }
+      let mut value_end = property_end
+      while value_end > value_start &&
+            is_ows_code(view.unsafe_get(value_end - 1)) {
+        value_end = value_end - 1
+      }
+      if is_valid_baggage_key(key_view) {
+        match
+          percent_decode_view_with_length(
+            view.view(start_offset=value_start, end_offset=value_end),
+          ) {
+          Some((decoded, _)) => {
+            let key = key_view.to_owned()
+            let mut duplicate = false
+            for existing in properties {
+              if existing.0 == key {
+                duplicate = true
+                break
+              }
+            }
+            if !duplicate {
+              properties.push((key, decoded))
+            }
+          }
+          None => ()
+        }
+      }
+    }
+    start = end
+  }
+  properties
+}
+
+// Parse a `baggage` header value into an ordered list of members, keeping the
+// properties of each member.
+//
+// Members that are malformed are skipped; malformed properties are skipped
+// while the member itself is kept. Following the W3C Baggage specification, at
+// most `BAGGAGE_MAX_MEMBERS` members and `BAGGAGE_MAX_BYTES` bytes (properties
+// included) are kept; once a member would exceed either limit it and every
+// following member are dropped.
+
+///|
+pub fn parse_baggage_entries(value : String) -> Array[BaggageEntry] {
+  let entries : Array[BaggageEntry] = []
   // Size of the normalized header built from `entries` so far.
   let mut bytes = 0
   let view = value[:]
@@ -501,13 +618,18 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
             view.view(start_offset=value_start, end_offset=value_end),
           ) {
           Some((decoded, encoded_len)) => {
+            let properties = parse_baggage_properties(view, semi, item_end)
             let key = key_view.to_owned()
             let separator = if entries.length() > 0 { 1 } else { 0 }
-            let size = key.length() + 1 + encoded_len + separator
+            let mut size = key.length() + 1 + encoded_len + separator
+            for property in properties {
+              size = size +
+                baggage_property_size(property.0, property.1)
+            }
             if bytes + size > BAGGAGE_MAX_BYTES {
               break
             }
-            entries.push((key, decoded))
+            entries.push({ key, value: decoded, properties, })
             bytes = bytes + size
           }
           None => ()
@@ -522,8 +644,147 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
   entries
 }
 
+// Parse a `baggage` header value into an ordered list of key/value pairs.
+// Members that are malformed are skipped; properties are dropped (use
+// `parse_baggage_entries` to keep them).
+//
+// Following the W3C Baggage specification, at most `BAGGAGE_MAX_MEMBERS`
+// members and `BAGGAGE_MAX_BYTES` bytes are kept; once a member would exceed
+// either limit it and every following member are dropped.
+
+///|
+pub fn parse_baggage(value : String) -> Array[(String, String)] {
+  let pairs : Array[(String, String)] = []
+  for entry in parse_baggage_entries(value) {
+    pairs.push((entry.key, entry.value))
+  }
+  pairs
+}
+
+// Number of bytes the `;key=value` form of one property occupies in a
+// normalized `baggage` header.
+
+///|
+fn baggage_property_size(key : String, value : String) -> Int32 {
+  1 + key.length() + 1 + percent_encoded_length(value)
+}
+
+// Write a validated baggage key (ASCII token characters, one byte per code
+// unit; two of them are written per 32-bit store) into the UTF-16LE buffer and
+// return the position after the key.
+
+///|
+fn write_baggage_key_to(
+  out : FixedArray[Byte],
+  pos : Int32,
+  key : String,
+) -> Int32 {
+  let key_len = key.length()
+  let mut pos = pos
+  let mut i = 0
+  while i + 1 < key_len {
+    let c0 = key.unsafe_get(i).to_int()
+    let c1 = key.unsafe_get(i + 1).to_int()
+    out.unsafe_write_uint32_le(pos * 2, (c0 | (c1 << 16)).reinterpret_as_uint())
+    pos = pos + 2
+    i = i + 2
+  }
+  if i < key_len {
+    out.unsafe_set(pos * 2, key.unsafe_get(i).to_int().to_byte())
+    pos = pos + 1
+  }
+  pos
+}
+
+// Format an ordered list of baggage members as a `baggage` header value.
+// Members with an invalid key are skipped; properties with an invalid or
+// duplicate key are skipped while their member is kept.
+//
+// Following the W3C Baggage specification, at most `BAGGAGE_MAX_MEMBERS`
+// members and `BAGGAGE_MAX_BYTES` bytes (properties included) are emitted;
+// once a member would exceed either limit it and every following member are
+// dropped.
+
+///|
+pub fn format_baggage_entries(entries : Array[BaggageEntry]) -> String {
+  if entries.length() == 0 {
+    return ""
+  }
+  // First pass: normalize the members that fit within the limits (at most
+  // `BAGGAGE_MAX_MEMBERS` members and `BAGGAGE_MAX_BYTES` bytes). Invalid keys
+  // are skipped, invalid or duplicated properties are dropped; once a member
+  // would exceed the byte budget it and every following member are dropped.
+  let members : Array[BaggageEntry] = []
+  let mut bytes = 0
+  let mut size = 0
+  for entry in entries {
+    if members.length() >= BAGGAGE_MAX_MEMBERS {
+      break
+    }
+    if !is_valid_baggage_key(entry.key) {
+      continue
+    }
+    let properties : Array[(String, String)] = []
+    for property in entry.properties {
+      if is_valid_baggage_key(property.0) {
+        let mut duplicate = false
+        for existing in properties {
+          if existing.0 == property.0 {
+            duplicate = true
+            break
+          }
+        }
+        if !duplicate {
+          properties.push(property)
+        }
+      }
+    }
+    let separator = if members.length() > 0 { 1 } else { 0 }
+    let mut member_size = entry.key.length() +
+      1 +
+      separator +
+      percent_encoded_length(entry.value)
+    for property in properties {
+      member_size = member_size + baggage_property_size(property.0, property.1)
+    }
+    if bytes + member_size > BAGGAGE_MAX_BYTES {
+      break
+    }
+    members.push({ key: entry.key, value: entry.value, properties, })
+    bytes = bytes + member_size
+    size = size + member_size
+  }
+  if members.length() == 0 {
+    return ""
+  }
+  // Second pass: render the selected members into a UTF-16LE buffer.
+  let out : FixedArray[Byte] = FixedArray::make(size * 2, b'\x00')
+  let mut pos = 0
+  let mut written = 0
+  for entry in members {
+    if written > 0 {
+      out.unsafe_set(pos * 2, b',')
+      pos = pos + 1
+    }
+    pos = write_baggage_key_to(out, pos, entry.key)
+    out.unsafe_set(pos * 2, b'=')
+    pos = pos + 1
+    pos = write_percent_encode_to(out, pos, entry.value)
+    for property in entry.properties {
+      out.unsafe_set(pos * 2, b';')
+      pos = pos + 1
+      pos = write_baggage_key_to(out, pos, property.0)
+      out.unsafe_set(pos * 2, b'=')
+      pos = pos + 1
+      pos = write_percent_encode_to(out, pos, property.1)
+    }
+    written = written + 1
+  }
+  out.unsafe_reinterpret_as_bytes().to_unchecked_string()
+}
+
 // Format an ordered list of key/value pairs as a `baggage` header value.
-// Pairs with an invalid key are skipped.
+// Pairs with an invalid key are skipped; no properties are emitted.
 //
 // Following the W3C Baggage specification, at most `BAGGAGE_MAX_MEMBERS`
 // members and `BAGGAGE_MAX_BYTES` bytes are emitted; once a member would
@@ -534,74 +795,11 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
   if entries.length() == 0 {
     return ""
   }
-  // First pass: size of the members that fit within the limits (at most
-  // `BAGGAGE_MAX_MEMBERS` members and `BAGGAGE_MAX_BYTES` bytes). Invalid keys
-  // are skipped; once a member would exceed the byte budget it and every
-  // following member are dropped.
-  let mut count = 0
-  let mut bytes = 0
-  let mut size = 0
+  let expanded : Array[BaggageEntry] = []
   for entry in entries {
-    if count >= BAGGAGE_MAX_MEMBERS {
-      break
-    }
-    let (key, value) = entry
-    if is_valid_baggage_key(key) {
-      let separator = if count > 0 { 1 } else { 0 }
-      let member_size = key.length() +
-        1 +
-        separator +
-        percent_encoded_length(value)
-      if bytes + member_size > BAGGAGE_MAX_BYTES {
-        break
-      }
-      bytes = bytes + member_size
-      size = size + member_size
-      count = count + 1
-    }
+    expanded.push({ key: entry.0, value: entry.1, properties: [], })
   }
-  if count == 0 {
-    return ""
-  }
-  // Second pass: render the selected members into a UTF-16LE buffer.
-  let out : FixedArray[Byte] = FixedArray::make(size * 2, b'\x00')
-  let mut pos = 0
-  let mut written = 0
-  for entry in entries {
-    if written >= count {
-      break
-    }
-    let (key, value) = entry
-    if is_valid_baggage_key(key) {
-      if written > 0 {
-        out.unsafe_set(pos * 2, b',')
-        pos = pos + 1
-      }
-      // Keys are ASCII token characters, one byte per code unit; two of them
-      // are written per 32-bit store.
-      let key_len = key.length()
-      let mut i = 0
-      while i + 1 < key_len {
-        let c0 = key.unsafe_get(i).to_int()
-        let c1 = key.unsafe_get(i + 1).to_int()
-        out.unsafe_write_uint32_le(
-          pos * 2,
-          (c0 | (c1 << 16)).reinterpret_as_uint(),
-        )
-        pos = pos + 2
-        i = i + 2
-      }
-      if i < key_len {
-        out.unsafe_set(pos * 2, key.unsafe_get(i).to_int().to_byte())
-        pos = pos + 1
-      }
-      out.unsafe_set(pos * 2, b'=')
-      pos = pos + 1
-      pos = write_percent_encode_to(out, pos, value)
-      written = written + 1
-    }
-  }
-  out.unsafe_reinterpret_as_bytes().to_unchecked_string()
+  format_baggage_entries(expanded)
 }
 
 // Format the baggage of `context` as a `baggage` header value, or `None` when
@@ -754,12 +952,40 @@ pub fn inject_baggage(
 }
 
 // Extract the baggage of a carrier as an ordered list of key/value pairs.
+// Properties are dropped; use `extract_baggage_entries` to keep them.
 
 ///|
 pub fn extract_baggage(carrier : TextMapCarrier) -> Array[(String, String)] {
   match carrier.get(baggage_header_name()) {
     Some(value) => parse_baggage(value)
     None => []
+  }
+}
+
+// Extract the baggage of a carrier as an ordered list of members, keeping the
+// properties of each member.
+
+///|
+pub fn extract_baggage_entries(
+  carrier : TextMapCarrier,
+) -> Array[BaggageEntry] {
+  match carrier.get(baggage_header_name()) {
+    Some(value) => parse_baggage_entries(value)
+    None => []
+  }
+}
+
+// Inject an ordered list of baggage members into the carrier as a `baggage`
+// header. Does nothing when no member survives formatting.
+
+///|
+pub fn inject_baggage_entries(
+  entries : Array[BaggageEntry],
+  carrier : TextMapCarrier,
+) -> Unit {
+  let formatted = format_baggage_entries(entries)
+  if formatted != "" {
+    carrier.set(baggage_header_name(), formatted)
   }
 }
 
@@ -793,3 +1019,9 @@ pub fn extract_baggage_context(carrier : TextMapCarrier) -> @context.Context {
   }
   @context.Context::root().with_baggage(values)
 }
+
+///|
+pub extend BaggageEntry with Eq::{not_equal, equal}
+
+///|
+pub extend BaggageEntry with @debug.Debug::{to_repr}
