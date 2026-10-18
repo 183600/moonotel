@@ -13,6 +13,14 @@ fn malformed_response() -> @sdk.ExportResult {
 ///|
 fn read_response_varint(data : BytesView, offset : Int32) -> (UInt64, Int32)? {
   let length = data.length()
+  // Most fields in an OTLP response start with a single-byte varint; that
+  // case is resolved without entering the loop.
+  if offset < length {
+    let first = data.unsafe_get(offset).to_int() & 0xFF
+    if first < 0x80 {
+      return Some((first.to_uint64(), offset + 1))
+    }
+  }
   let mut result : UInt64 = 0
   let mut shift = 0
   let mut pos = offset

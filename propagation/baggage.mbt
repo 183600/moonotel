@@ -335,15 +335,35 @@ fn write_percent_encode_to(
       return pos
     }
     if is_baggage_value_char(code) {
-      out.unsafe_set(pos * 2, code.to_byte())
-      pos = pos + 1
+      // Allowed characters come in runs; two of them are written per 32-bit
+      // store. The high byte of every code unit stays zero because the buffer
+      // is zero-initialized.
+      let mut end = i + 1
+      while end < len && is_baggage_value_char(value.unsafe_get(end).to_int()) {
+        end = end + 1
+      }
+      while i + 1 < end {
+        let c0 = value.unsafe_get(i).to_int()
+        let c1 = value.unsafe_get(i + 1).to_int()
+        out.unsafe_write_uint32_le(
+          pos * 2,
+          (c0 | (c1 << 16)).reinterpret_as_uint(),
+        )
+        pos = pos + 2
+        i = i + 2
+      }
+      if i < end {
+        out.unsafe_set(pos * 2, value.unsafe_get(i).to_int().to_byte())
+        pos = pos + 1
+        i = i + 1
+      }
     } else {
       out.unsafe_set(pos * 2, b'%')
       out.unsafe_set(pos * 2 + 2, upper_hex_byte(code >> 4))
       out.unsafe_set(pos * 2 + 4, upper_hex_byte(code & 0x0F))
       pos = pos + 3
+      i = i + 1
     }
-    i = i + 1
   }
   pos
 }
@@ -557,13 +577,23 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
         out.unsafe_set(pos * 2, b',')
         pos = pos + 1
       }
-      // Keys are ASCII token characters, one byte per code unit.
+      // Keys are ASCII token characters, one byte per code unit; two of them
+      // are written per 32-bit store.
       let key_len = key.length()
       let mut i = 0
-      while i < key_len {
+      while i + 1 < key_len {
+        let c0 = key.unsafe_get(i).to_int()
+        let c1 = key.unsafe_get(i + 1).to_int()
+        out.unsafe_write_uint32_le(
+          pos * 2,
+          (c0 | (c1 << 16)).reinterpret_as_uint(),
+        )
+        pos = pos + 2
+        i = i + 2
+      }
+      if i < key_len {
         out.unsafe_set(pos * 2, key.unsafe_get(i).to_int().to_byte())
         pos = pos + 1
-        i = i + 1
       }
       out.unsafe_set(pos * 2, b'=')
       pos = pos + 1
@@ -643,10 +673,14 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
     Some(list) => list
     None => return None
   }
-  if entries.length() > 1 {
-    let n = entries.length()
+  // Small lists (the common case) are sorted with an allocation-free
+  // insertion sort; larger lists use the O(n log n) generic sort.
+  let entry_count = entries.length()
+  if entry_count > 16 {
+    entries.sort_by(fn(a, b) { a.0.compare(b.0) })
+  } else if entry_count > 1 {
     let mut i = 1
-    while i < n {
+    while i < entry_count {
       let current = entries.unsafe_get(i)
       let mut j = i
       while j > 0 && current.0.compare(entries.unsafe_get(j - 1).0) < 0 {

@@ -49,8 +49,25 @@ fn json_parse_string_at(text : String, start : Int32) -> (String, Int32)? {
   if start >= len || text.unsafe_get(start).to_int() != 0x22 {
     return None
   }
-  let sb = StringBuilder()
+  // Fast path: strings without escapes or control characters make up the
+  // bulk of response field names and messages; they are copied in a single
+  // slice instead of being appended character by character.
   let mut pos = start + 1
+  while pos < len {
+    let code = text.unsafe_get(pos).to_int()
+    if code == 0x22 {
+      return Some((text[start + 1:pos].to_owned(), pos + 1))
+    }
+    if code == 0x5C || code < 0x20 {
+      break
+    }
+    pos = pos + 1
+  }
+  if pos >= len {
+    return None
+  }
+  let sb = StringBuilder()
+  sb.write_stringview(text.view(start_offset=start + 1, end_offset=pos))
   while pos < len {
     let code = text.unsafe_get(pos).to_int()
     if code == 0x22 {

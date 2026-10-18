@@ -285,3 +285,15 @@ test "bench context baggage header" (b : @bench.T) {
   }
   b.bench(fn() { let _ = @propagation.context_baggage_header(ctx) })
 }
+
+///|
+test "bench decode export response" (b : @bench.T) {
+  let body : Bytes = b"\x0A\x08\x08\x01\x12\x04oops"
+  b.bench(fn() { let _ = @otlp.decode_export_response(body) })
+}
+
+///|
+test "bench decode export response json" (b : @bench.T) {
+  let body : Bytes = b"{\"partialSuccess\":{\"rejectedSpans\":\"1\",\"errorMessage\":\"oops\"}}"
+  b.bench(fn() { let _ = @otlp.decode_export_response_json(body) })
+}
