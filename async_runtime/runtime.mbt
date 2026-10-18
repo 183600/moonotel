@@ -96,8 +96,11 @@ pub fn[G, X] spawn(
 
 // One-call native setup: build a TracerProvider that exports over OTLP/HTTP
 // through a background task in `group`, and install it as the process-wide
-// provider. When `OTEL_TRACES_EXPORTER=none`, no exporter is installed and
-// spans are recorded but not exported.
+// provider. The exporters are selected by the `exporters` list when it is
+// supplied and by the comma-separated `OTEL_TRACES_EXPORTER` environment
+// variable otherwise: `otlp` (the default) installs the async OTLP exporter,
+// `console` prints every finished span, and `none` disables export entirely
+// (spans are recorded but not exported).
 //
 // `endpoint` and `headers` override the values read from the
 // OTEL_EXPORTER_OTLP_* environment variables, `resource` replaces the
@@ -117,6 +120,7 @@ pub fn[G] setup(
   headers? : Map[String, String],
   sampler? : @sdk.Sampler,
   span_limits? : @sdk.SpanLimits,
+  exporters? : Array[String],
   max_queue_size? : Int32,
 ) -> @sdk.TracerProviderSdk {
   let base = @otlp.OtlpHttpConfig::from_env()
@@ -146,7 +150,13 @@ pub fn[G] setup(
     Some(value) => provider = provider.with_span_limits(value)
     None => ()
   }
-  if !@sdk.traces_exporter_disabled() {
+  if @sdk.exporter_selected(exporters, "console") {
+    let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
+      @sdk.ConsoleSpanExporter::new(),
+    )
+    provider = provider.with_span_processor(processor)
+  }
+  if @sdk.exporter_selected(exporters, "otlp") {
     let exporter = OtlpHttpAsyncSpanExporter::new(
       config,
       group,

@@ -41,6 +41,8 @@ pub using @sdk {
   set_global_tracer_provider,
   shutdown_global_tracer_provider,
   force_flush_global_tracer_provider,
+  traces_exporter_enabled,
+  exporter_selected,
   SDK_VERSION,
   TELEMETRY_SDK_NAME,
   TELEMETRY_SDK_LANGUAGE,
@@ -102,9 +104,9 @@ pub using @otlp {
   encode_trace_request_json,
 }
 
-// One-call setup: build a TracerProvider, optionally wire an OTLP/HTTP
-// batch exporter with the supplied transport function, and install it as the
-// process-wide provider.
+// One-call setup: build a TracerProvider, optionally wire the exporters
+// selected by `OTEL_TRACES_EXPORTER`, and install it as the process-wide
+// provider.
 //
 // `endpoint` and `headers` override the values read from the
 // OTEL_EXPORTER_OTLP_* environment variables. `resource` replaces the
@@ -112,9 +114,15 @@ pub using @otlp {
 // it, and `span_limits` replaces the limits read from the OTEL_SPAN_*
 // environment variables.
 //
-// Spans are exported through a batch processor unless `use_batch` is false.
-// `batch` overrides the queue size, export batch size and flush interval read
-// from the OTEL_BSP_* environment variables.
+// The exporters are selected by the `exporters` list when it is supplied and
+// by the comma-separated `OTEL_TRACES_EXPORTER` environment variable
+// otherwise: `otlp` (the default) installs the OTLP/HTTP exporter when a
+// `transport` is supplied, `console` installs a `ConsoleSpanExporter` that
+// prints every finished span, and `none` disables export. Spans are exported
+// through a batch processor unless `use_batch` is false; `batch` overrides
+// the queue size, export batch size and flush interval read from the
+// OTEL_BSP_* environment variables. The console exporter always uses a simple
+// processor.
 
 ///|
 pub fn setup(
@@ -126,6 +134,7 @@ pub fn setup(
   sampler? : @sdk.Sampler,
   span_limits? : @sdk.SpanLimits,
   transport? : @otlp.Transport,
+  exporters? : Array[String],
   use_batch? : Bool,
   batch? : @sdk.BatchConfig,
 ) -> @sdk.TracerProviderSdk {
@@ -146,11 +155,17 @@ pub fn setup(
     Some(value) => provider = provider.with_span_limits(value)
     None => ()
   }
+  if @sdk.exporter_selected(exporters, "console") {
+    let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
+      @sdk.ConsoleSpanExporter::new(),
+    )
+    provider = provider.with_span_processor(processor)
+  }
   match transport {
     Some(send) =>
-      if @sdk.traces_exporter_disabled() {
-        // `OTEL_TRACES_EXPORTER=none` disables the automatically configured
-        // exporter, matching the native async `setup`.
+      if !@sdk.exporter_selected(exporters, "otlp") {
+        // The OTLP exporter is not selected (for example `none` or
+        // `console`), matching the native async `setup`.
         ()
       } else {
         let base = @otlp.OtlpHttpConfig::from_env()

@@ -28,14 +28,79 @@ fn sdk_disabled() -> Bool {
 }
 
 // Whether `OTEL_TRACES_EXPORTER` requests that no trace exporter be
-// installed (the value `none`). Every other value, including an unset
-// variable, selects the default OTLP exporter.
+// installed. `none` disables export wherever it appears in the
+// comma-separated list; an unset or blank variable selects the default OTLP
+// exporter.
 
 ///|
 pub fn traces_exporter_disabled() -> Bool {
   match @env.get_env_var("OTEL_TRACES_EXPORTER") {
-    Some(value) => value.trim().to_lower() == "none"
+    Some(value) => {
+      for item in value.split(",") {
+        if item.trim().to_lower() == "none" {
+          return true
+        }
+      }
+      false
+    }
     None => false
+  }
+}
+
+// Whether `OTEL_TRACES_EXPORTER` requests the exporter named `name`
+// (`otlp`, `console`, ...). The variable holds a comma-separated list that is
+// matched case-insensitively; an unset or blank variable selects the default
+// `otlp` exporter, and `none` anywhere in the list disables every exporter.
+
+///|
+pub fn traces_exporter_enabled(name : String) -> Bool {
+  let wanted = name.trim().to_lower()
+  match @env.get_env_var("OTEL_TRACES_EXPORTER") {
+    None => wanted == "otlp"
+    Some(value) => {
+      let trimmed = value.trim()
+      if trimmed == "" {
+        wanted == "otlp"
+      } else {
+        let mut found = false
+        let mut disabled = false
+        for item in trimmed.split(",") {
+          let item = item.trim().to_lower()
+          if item == "none" {
+            disabled = true
+          } else if item == wanted {
+            found = true
+          }
+        }
+        found && !disabled
+      }
+    }
+  }
+}
+
+// Whether the exporter named `name` is selected. An explicit `exporters` list
+// is matched case-insensitively (an empty list selects nothing; `none`
+// anywhere disables every exporter); when `exporters` is `None` the selection
+// comes from `OTEL_TRACES_EXPORTER` via `traces_exporter_enabled`.
+
+///|
+pub fn exporter_selected(exporters : Array[String]?, name : String) -> Bool {
+  match exporters {
+    None => traces_exporter_enabled(name)
+    Some(names) => {
+      let wanted = name.trim().to_lower()
+      let mut found = false
+      let mut disabled = false
+      for item in names {
+        let item = item.trim().to_lower()
+        if item == "none" {
+          disabled = true
+        } else if item == wanted {
+          found = true
+        }
+      }
+      found && !disabled
+    }
   }
 }
 
@@ -168,6 +233,13 @@ pub fn TracerProviderSdk::sampler(self : TracerProviderSdk) -> Sampler {
 ///|
 pub fn TracerProviderSdk::span_limits(self : TracerProviderSdk) -> SpanLimits {
   self.span_limits
+}
+
+// Number of span processors registered with this provider.
+
+///|
+pub fn TracerProviderSdk::processor_count(self : TracerProviderSdk) -> Int32 {
+  self.processors.length()
 }
 
 // Whether `shutdown` has been called.
