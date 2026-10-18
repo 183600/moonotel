@@ -39,6 +39,28 @@ fn build_json_hex_digits() -> FixedArray[Char] {
   table
 }
 
+// Lower-case hex pair "00".."ff" of every byte value.
+
+///|
+let json_hex_bytes : FixedArray[String] = build_json_hex_bytes()
+
+///|
+fn build_json_hex_bytes() -> FixedArray[String] {
+  let table : FixedArray[String] = FixedArray::make(256, "00")
+  let mut i = 0
+  while i < 256 {
+    table.unsafe_set(
+      i,
+      String::from_array([
+        json_hex_digits.unsafe_get(i >> 4),
+        json_hex_digits.unsafe_get(i & 0x0F),
+      ]),
+    )
+    i = i + 1
+  }
+  table
+}
+
 // Append `"<hex>"` for a byte array. Out-of-range values are rendered exactly
 // like `@api.bytes_to_hex` does.
 
@@ -46,15 +68,19 @@ fn build_json_hex_digits() -> FixedArray[Char] {
 fn json_write_hex_quoted(sb : StringBuilder, bytes : Array[Int32]) -> Unit {
   sb.write_char('"')
   for byte in bytes {
-    let hi = byte >> 4
-    sb.write_char(
-      if hi >= 0 && hi < 16 {
-        json_hex_digits.unsafe_get(hi)
-      } else {
-        '0'
-      },
-    )
-    sb.write_char(json_hex_digits.unsafe_get(byte & 0x0F))
+    if byte >= 0 && byte < 256 {
+      sb.write_string(json_hex_bytes.unsafe_get(byte))
+    } else {
+      let hi = byte >> 4
+      sb.write_char(
+        if hi >= 0 && hi < 16 {
+          json_hex_digits.unsafe_get(hi)
+        } else {
+          '0'
+        },
+      )
+      sb.write_char(json_hex_digits.unsafe_get(byte & 0x0F))
+    }
   }
   sb.write_char('"')
 }
@@ -105,14 +131,57 @@ fn json_write_escaped(sb : StringBuilder, value : String) -> Unit {
   sb.write_char('"')
 }
 
-// Append the decimal digits of an unsigned magnitude.
+// Append the decimal digits of an unsigned magnitude, two digits at a time.
+
+///|
+let json_two_digits : FixedArray[String] = build_json_two_digits()
+
+///|
+fn build_json_two_digits() -> FixedArray[String] {
+  let table : FixedArray[String] = FixedArray::make(100, "00")
+  let mut i = 0
+  while i < 100 {
+    table.unsafe_set(
+      i,
+      String::from_array([
+        (0x30 + i / 10).unsafe_to_char(),
+        (0x30 + i % 10).unsafe_to_char(),
+      ]),
+    )
+    i = i + 1
+  }
+  table
+}
 
 ///|
 fn json_write_decimal_digits(sb : StringBuilder, value : UInt64) -> Unit {
-  if value >= 10 {
-    json_write_decimal_digits(sb, value / 10)
+  if value < 10 {
+    sb.write_char((0x30 + value.to_int()).unsafe_to_char())
+    return
   }
-  sb.write_char((0x30 + (value % 10).to_int()).unsafe_to_char())
+  if value < 100 {
+    sb.write_string(json_two_digits.unsafe_get(value.to_int()))
+    return
+  }
+  let high = value / 100
+  json_write_decimal_digits(sb, high)
+  sb.write_string(json_two_digits.unsafe_get((value - high * 100).to_int()))
+}
+
+// Append a 32-bit integer as a JSON number, spelled exactly like
+// `Int32::to_string`.
+
+///|
+fn json_write_int32(sb : StringBuilder, value : Int32) -> Unit {
+  if value < 0 {
+    sb.write_char('-')
+    json_write_decimal_digits(
+      sb,
+      (0L - value.to_int64()).reinterpret_as_uint64(),
+    )
+  } else {
+    json_write_decimal_digits(sb, value.to_uint64())
+  }
 }
 
 // Append a 64-bit integer as a JSON string, the protobuf JSON representation
@@ -250,7 +319,7 @@ fn json_write_attributes(
 ) -> Unit {
   sb.write_char('[')
   let mut first = true
-  for key, value in attributes.iter2() {
+  attributes.each(fn(key, value) {
     if !first {
       sb.write_char(',')
     }
@@ -260,7 +329,7 @@ fn json_write_attributes(
     sb.write_string(",\"value\":")
     json_write_any_value(sb, value)
     sb.write_char('}')
-  }
+  })
   sb.write_char(']')
 }
 
@@ -307,7 +376,7 @@ fn json_write_event(sb : StringBuilder, event : @sdk.SpanEvent) -> Unit {
   }
   if event.dropped_attributes_count > 0 {
     sb.write_string(",\"droppedAttributesCount\":")
-    sb.write_string(event.dropped_attributes_count.to_string())
+    json_write_int32(sb, event.dropped_attributes_count)
   }
   sb.write_char('}')
 }
@@ -331,10 +400,10 @@ fn json_write_link(sb : StringBuilder, link : @sdk.SpanLink) -> Unit {
   }
   if link.dropped_attributes_count > 0 {
     sb.write_string(",\"droppedAttributesCount\":")
-    sb.write_string(link.dropped_attributes_count.to_string())
+    json_write_int32(sb, link.dropped_attributes_count)
   }
   sb.write_string(",\"flags\":")
-  sb.write_string(link.span_context.trace_flags().to_string())
+  json_write_int32(sb, link.span_context.trace_flags())
   sb.write_char('}')
 }
 
@@ -357,7 +426,7 @@ fn json_write_status(sb : StringBuilder, data : @sdk.SpanData) -> Unit {
         sb.write_char(',')
       }
       sb.write_string("\"code\":")
-      sb.write_string(code.to_string())
+      json_write_int32(sb, code)
     }
     sb.write_char('}')
   }
@@ -383,7 +452,7 @@ fn json_write_span(sb : StringBuilder, data : @sdk.SpanData) -> Unit {
   sb.write_string(",\"name\":")
   json_write_escaped(sb, data.name)
   sb.write_string(",\"kind\":")
-  sb.write_string(data.kind.otlp_value().to_string())
+  json_write_int32(sb, data.kind.otlp_value())
   sb.write_string(",\"startTimeUnixNano\":")
   json_write_int64_string(sb, data.start_time_unix_nano)
   sb.write_string(",\"endTimeUnixNano\":")
@@ -394,7 +463,7 @@ fn json_write_span(sb : StringBuilder, data : @sdk.SpanData) -> Unit {
   }
   if data.dropped_attributes_count > 0 {
     sb.write_string(",\"droppedAttributesCount\":")
-    sb.write_string(data.dropped_attributes_count.to_string())
+    json_write_int32(sb, data.dropped_attributes_count)
   }
   if data.events.length() > 0 {
     sb.write_string(",\"events\":[")
@@ -410,7 +479,7 @@ fn json_write_span(sb : StringBuilder, data : @sdk.SpanData) -> Unit {
   }
   if data.dropped_events_count > 0 {
     sb.write_string(",\"droppedEventsCount\":")
-    sb.write_string(data.dropped_events_count.to_string())
+    json_write_int32(sb, data.dropped_events_count)
   }
   if data.links.length() > 0 {
     sb.write_string(",\"links\":[")
@@ -426,11 +495,11 @@ fn json_write_span(sb : StringBuilder, data : @sdk.SpanData) -> Unit {
   }
   if data.dropped_links_count > 0 {
     sb.write_string(",\"droppedLinksCount\":")
-    sb.write_string(data.dropped_links_count.to_string())
+    json_write_int32(sb, data.dropped_links_count)
   }
   json_write_status(sb, data)
   sb.write_string(",\"flags\":")
-  sb.write_string(data.span_context.trace_flags().to_string())
+  json_write_int32(sb, data.span_context.trace_flags())
   sb.write_char('}')
 }
 

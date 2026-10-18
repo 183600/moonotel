@@ -453,9 +453,9 @@ pub async fn ServerCall::respond(
   }
   match headers {
     Some(values) =>
-      for key, value in values {
+      values.each(fn(key, value) {
         extra_headers.set(@http.CaseInsensitiveString(key), value)
-      }
+      })
     None => ()
   }
   let close_requested = self.connection_close_requested()

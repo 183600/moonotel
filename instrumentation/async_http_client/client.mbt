@@ -270,9 +270,9 @@ fn plain_headers(
     Some(values) => {
       let total = values.length() + extra
       let out = Map([], capacity=if total == 0 { 1 } else { total * 2 })
-      for key, value in values {
+      values.each(fn(key, value) {
         out.set(@http.CaseInsensitiveString(key), value)
-      }
+      })
       out
     }
     None => Map([], capacity=if extra == 0 { 1 } else { (extra + 1) * 2 })

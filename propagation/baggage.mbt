@@ -122,38 +122,6 @@ fn is_baggage_value_char(code : Int32) -> Bool {
   code >= 0 && code < 128 && baggage_value_char_table.unsafe_get(code)
 }
 
-// Upper-case ASCII code unit of every hex digit 0-9A-F.
-
-///|
-let hex_ascii_upper : FixedArray[Char] = build_hex_ascii_upper()
-
-///|
-fn build_hex_ascii_upper() -> FixedArray[Char] {
-  let table : FixedArray[Char] = FixedArray::make(16, '0')
-  let mut i = 0
-  while i < 16 {
-    table.unsafe_set(
-      i,
-      if i < 10 {
-        (i + 48).unsafe_to_char()
-      } else {
-        (i + 55).unsafe_to_char()
-      },
-    )
-    i = i + 1
-  }
-  table
-}
-
-///|
-fn upper_hex_digit(value : Int32) -> Char {
-  if value >= 0 && value < 16 {
-    hex_ascii_upper.unsafe_get(value)
-  } else {
-    '0'
-  }
-}
-
 // Decode the body of a baggage value that contains at least one `%`.
 
 ///|
@@ -229,12 +197,10 @@ fn percent_decode_escaped(value : StringView) -> String? {
 }
 
 // Percent-decode a baggage value held as a view. Returns None when a `%`
-// sequence is truncated or not followed by two hex digits. The second element
-// of the pair is `false` when the input had no `%`, in which case the decoded
-// value is a plain copy whose characters all percent-encode to themselves.
+// sequence is truncated or not followed by two hex digits.
 
 ///|
-fn percent_decode_view(value : StringView) -> (String, Bool)? {
+fn percent_decode_view(value : StringView) -> String? {
   let len = value.length()
   // A value without `%` decodes to itself; its characters still need
   // validating.
@@ -250,12 +216,9 @@ fn percent_decode_view(value : StringView) -> (String, Bool)? {
     i = i + 1
   }
   if i == len {
-    return Some((value.to_owned(), false))
+    return Some(value.to_owned())
   }
-  match percent_decode_escaped(value) {
-    Some(decoded) => Some((decoded, true))
-    None => None
-  }
+  percent_decode_escaped(value)
 }
 
 // Percent-decode a baggage value. Returns None when a `%` sequence is
@@ -283,63 +246,77 @@ pub fn percent_decode(value : String) -> String? {
   percent_decode_escaped(value[:])
 }
 
-// Append the percent-encoded form of one byte value and return the number of
-// characters written (1 for a literal character, 3 for `%XX`).
+// Upper-case hex ASCII byte of every nibble value 0-15.
 
 ///|
-fn write_percent_encoded(sb : StringBuilder, code : Int32) -> Int32 {
-  if is_baggage_value_char(code) {
-    sb.write_char(code.unsafe_to_char())
-    1
+let hex_ascii_upper_bytes : FixedArray[Byte] = build_hex_ascii_upper_bytes()
+
+///|
+fn build_hex_ascii_upper_bytes() -> FixedArray[Byte] {
+  let table : FixedArray[Byte] = FixedArray::make(16, b'0')
+  let mut i = 0
+  while i < 16 {
+    table.unsafe_set(
+      i,
+      (if i < 10 { i + 48 } else { i + 55 }).to_byte(),
+    )
+    i = i + 1
+  }
+  table
+}
+
+///|
+fn upper_hex_byte(value : Int32) -> Byte {
+  if value >= 0 && value < 16 {
+    hex_ascii_upper_bytes.unsafe_get(value)
   } else {
-    sb.write_char('%')
-    sb.write_char(upper_hex_digit(code >> 4))
-    sb.write_char(upper_hex_digit(code & 0x0F))
-    3
+    b'0'
   }
 }
 
-// Append the percent-encoded form of `value` to `sb`.
+// Write the percent-encoded form of `value` into the UTF-16LE byte buffer
+// `out` starting at character position `start`; each written character occupies
+// one code unit with a zero high byte. Returns the position after the last
+// written character.
 
 ///|
-fn write_percent_encode(sb : StringBuilder, value : String) -> Unit {
+fn write_percent_encode_to(
+  out : FixedArray[Byte],
+  start : Int32,
+  value : String,
+) -> Int32 {
   let len = value.length()
-  // ASCII text is encoded from its code units; once a non-ASCII code unit is
-  // found the remainder is encoded as UTF-8.
+  let mut pos = start
   let mut i = 0
   while i < len {
     let code = value.unsafe_get(i).to_int()
     if code >= 0x80 {
       for byte in @utf8.encode(value[i:]) {
-        let _ = write_percent_encoded(sb, byte.to_int() & 0xFF)
+        let b = byte.to_int() & 0xFF
+        if is_baggage_value_char(b) {
+          out.unsafe_set(pos * 2, b.to_byte())
+          pos = pos + 1
+        } else {
+          out.unsafe_set(pos * 2, b'%')
+          out.unsafe_set(pos * 2 + 2, upper_hex_byte(b >> 4))
+          out.unsafe_set(pos * 2 + 4, upper_hex_byte(b & 0x0F))
+          pos = pos + 3
+        }
       }
-      return
+      return pos
     }
-    let _ = write_percent_encoded(sb, code)
+    if is_baggage_value_char(code) {
+      out.unsafe_set(pos * 2, code.to_byte())
+      pos = pos + 1
+    } else {
+      out.unsafe_set(pos * 2, b'%')
+      out.unsafe_set(pos * 2 + 2, upper_hex_byte(code >> 4))
+      out.unsafe_set(pos * 2 + 4, upper_hex_byte(code & 0x0F))
+      pos = pos + 3
+    }
     i = i + 1
   }
-}
-
-// Like `write_percent_encode`, but also returns the number of encoded bytes
-// (characters) written.
-
-///|
-fn write_percent_encode_counted(sb : StringBuilder, value : String) -> Int32 {
-  let len = value.length()
-  let mut total = 0
-  let mut i = 0
-  while i < len {
-    let code = value.unsafe_get(i).to_int()
-    if code >= 0x80 {
-      for byte in @utf8.encode(value[i:]) {
-        total = total + write_percent_encoded(sb, byte.to_int() & 0xFF)
-      }
-      return total
-    }
-    total = total + write_percent_encoded(sb, code)
-    i = i + 1
-  }
-  total
+  pos
 }
 
 // Percent-encode a baggage value, leaving the characters allowed by the
@@ -350,9 +327,10 @@ pub fn percent_encode(value : String) -> String {
   if value == "" {
     return ""
   }
-  let sb = StringBuilder(size_hint=value.length() * 2)
-  write_percent_encode(sb, value)
-  sb.to_string()
+  let size = percent_encoded_length(value)
+  let out : FixedArray[Byte] = FixedArray::make(size * 2, b'\x00')
+  let _ = write_percent_encode_to(out, 0, value)
+  out.unsafe_reinterpret_as_bytes().to_unchecked_string()
 }
 
 // Whether a code unit is HTTP optional whitespace (space, tab, CR, LF).
@@ -473,16 +451,12 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
           percent_decode_view(
             view.view(start_offset=value_start, end_offset=value_end),
           ) {
-          Some((decoded, escaped)) => {
+          Some(decoded) => {
             let key = key_view.to_owned()
             let separator = if entries.length() > 0 { 1 } else { 0 }
-            // Without escapes the decoded value consists of literal baggage
-            // value characters, each of which encodes to a single byte.
-            let encoded_len = if escaped {
-              percent_encoded_length(decoded)
-            } else {
-              decoded.length()
-            }
+            // The encoded form is ASCII, so its byte count equals the number
+            // of characters written.
+            let encoded_len = percent_encoded_length(decoded)
             let size = key.length() + 1 + encoded_len + separator
             if bytes + size > BAGGAGE_MAX_BYTES {
               break
@@ -514,19 +488,13 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
   if entries.length() == 0 {
     return ""
   }
-  // Approximate output size: key, value and the `key=` separator per member.
-  let mut size_hint = 0
-  for entry in entries {
-    let (key, value) = entry
-    size_hint = size_hint + key.length() + value.length() + 2
-    if size_hint >= BAGGAGE_MAX_BYTES {
-      size_hint = BAGGAGE_MAX_BYTES
-      break
-    }
-  }
-  let sb = StringBuilder(size_hint=size_hint * 2)
+  // First pass: exact size of the members that fit within the limits (at most
+  // `BAGGAGE_MAX_MEMBERS` members and `BAGGAGE_MAX_BYTES` bytes). Invalid keys
+  // are skipped; once a member would exceed the byte budget it and every
+  // following member are dropped.
   let mut count = 0
   let mut bytes = 0
+  let mut size = 0
   for entry in entries {
     if count >= BAGGAGE_MAX_MEMBERS {
       break
@@ -534,34 +502,47 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
     let (key, value) = entry
     if is_valid_baggage_key(key) {
       let separator = if count > 0 { 1 } else { 0 }
-      let fixed = key.length() + 1 + separator
-      // A code unit expands to at most 9 encoded bytes (3 UTF-8 bytes, each
-      // `%XX`).
-      let budget_left = BAGGAGE_MAX_BYTES - bytes
-      if fixed <= budget_left && value.length() <= (budget_left - fixed) / 9 {
-        if count > 0 {
-          sb.write_char(',')
-        }
-        sb.write_string(key)
-        sb.write_char('=')
-        bytes = bytes + fixed + write_percent_encode_counted(sb, value)
-      } else {
-        let size = fixed + percent_encoded_length(value)
-        if bytes + size > BAGGAGE_MAX_BYTES {
-          break
-        }
-        if count > 0 {
-          sb.write_char(',')
-        }
-        sb.write_string(key)
-        sb.write_char('=')
-        write_percent_encode(sb, value)
-        bytes = bytes + size
+      let member_size = key.length() + 1 + separator + percent_encoded_length(value)
+      if bytes + member_size > BAGGAGE_MAX_BYTES {
+        break
       }
+      bytes = bytes + member_size
+      size = size + member_size
       count = count + 1
     }
   }
-  sb.to_string()
+  if count == 0 {
+    return ""
+  }
+  // Second pass: render exactly the selected members into a UTF-16LE buffer.
+  let out : FixedArray[Byte] = FixedArray::make(size * 2, b'\x00')
+  let mut pos = 0
+  let mut written = 0
+  for entry in entries {
+    if written >= count {
+      break
+    }
+    let (key, value) = entry
+    if is_valid_baggage_key(key) {
+      if written > 0 {
+        out.unsafe_set(pos * 2, b',')
+        pos = pos + 1
+      }
+      // Keys are ASCII token characters, one byte per code unit.
+      let key_len = key.length()
+      let mut i = 0
+      while i < key_len {
+        out.unsafe_set(pos * 2, key.unsafe_get(i).to_int().to_byte())
+        pos = pos + 1
+        i = i + 1
+      }
+      out.unsafe_set(pos * 2, b'=')
+      pos = pos + 1
+      pos = write_percent_encode_to(out, pos, value)
+      written = written + 1
+    }
+  }
+  out.unsafe_reinterpret_as_bytes().to_unchecked_string()
 }
 
 // Format the baggage of `context` as a `baggage` header value, or `None` when
@@ -634,7 +615,18 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
     None => return None
   }
   if entries.length() > 1 {
-    entries.sort_by(fn(a, b) { a.0.compare(b.0) })
+    let n = entries.length()
+    let mut i = 1
+    while i < n {
+      let current = entries.unsafe_get(i)
+      let mut j = i
+      while j > 0 && current.0.compare(entries.unsafe_get(j - 1).0) < 0 {
+        entries.unsafe_set(j, entries.unsafe_get(j - 1))
+        j = j - 1
+      }
+      entries.unsafe_set(j, current)
+      i = i + 1
+    }
   }
   let formatted = format_baggage(entries)
   if formatted == "" {

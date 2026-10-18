@@ -639,10 +639,13 @@ pub fn parse_tracestate(value : String) -> String? {
     }
     match seen {
       Some(keys) => {
-        for existing in keys {
-          if existing == key {
+        let mut i = 0
+        let n = keys.length()
+        while i < n {
+          if keys.unsafe_get(i) == key {
             return None
           }
+          i = i + 1
         }
         keys.push(key)
       }
