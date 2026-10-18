@@ -36,7 +36,7 @@ fn empty_span_data() -> SpanData {
     kind: @api.SpanKind::Internal,
     start_time_unix_nano: 0L,
     end_time_unix_nano: 0L,
-    attributes: Map([]),
+    attributes: Map([], capacity=1),
     events: [],
     links: [],
     dropped_attributes_count: 0,
@@ -44,7 +44,7 @@ fn empty_span_data() -> SpanData {
     dropped_links_count: 0,
     status: @api.StatusCode::Unset,
     status_description: "",
-    resource: Map([]),
+    resource: Map([], capacity=1),
     scope_name: "",
     scope_version: "",
   }

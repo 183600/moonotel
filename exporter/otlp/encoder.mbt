@@ -187,7 +187,7 @@ fn encode_attributes(
   field : Int32,
   attributes : Map[String, @sdk.AttributeValue],
 ) -> Unit {
-  attributes.each(fn(key, value) {
+  for key, value in attributes {
     if !try_encode_scalar_attribute(writer, field, key, value) {
       let kv = writer.take_scratch()
       kv.write_string_field(1, key)
@@ -196,7 +196,7 @@ fn encode_attributes(
       kv.append_message(2, any_value)
       writer.append_message(field, kv)
     }
-  })
+  }
 }
 
 ///|
@@ -379,21 +379,21 @@ fn resource_key_value(sb : StringBuilder, value : @sdk.AttributeValue) -> Unit {
 // Canonical key for grouping spans that share a resource.
 ///|
 fn resource_key(resource : Map[String, @sdk.AttributeValue]) -> String {
-  let keys : Array[String] = []
-  resource.each(fn(key, _value) { keys.push(key) })
-  keys.sort()
+  let entries : Array[(String, @sdk.AttributeValue)] = Array(
+    capacity=resource.length(),
+  )
+  for key, value in resource {
+    entries.push((key, value))
+  }
+  entries.sort_by(fn(a, b) { a.0.compare(b.0) })
   let sb = StringBuilder()
-  for key in keys {
-    match resource.get(key) {
-      Some(value) => {
-        write_decimal(sb, key.length())
-        sb.write_char(':')
-        sb.write_string(key)
-        sb.write_char('=')
-        resource_key_value(sb, value)
-      }
-      None => ()
-    }
+  for entry in entries {
+    let (key, value) = entry
+    write_decimal(sb, key.length())
+    sb.write_char(':')
+    sb.write_string(key)
+    sb.write_char('=')
+    resource_key_value(sb, value)
   }
   sb.to_string()
 }
@@ -403,12 +403,14 @@ priv struct ScopeGroup {
   scope_name : String
   scope_version : String
   spans : Array[@sdk.SpanData]
+  mut size_hint : Int
 }
 
 ///|
 priv struct ResourceGroup {
   resource : Map[String, @sdk.AttributeValue]
   scopes : Array[ScopeGroup]
+  mut size_hint : Int
 }
 
 // Find the scope group with the given name and version inside a resource
@@ -426,6 +428,21 @@ fn find_scope_group(
     }
   }
   None
+}
+
+// Rough encoded size of one span, used to size scratch buffers without
+// reallocating. Attribute values are approximated by their count; unusually
+// long values simply let the buffer grow as before.
+///|
+fn estimate_span_size(data : @sdk.SpanData) -> Int {
+  let mut size = 96 + data.name.length() + data.attributes.length() * 40
+  for event in data.events {
+    size = size + 64 + event.name.length() + event.attributes.length() * 40
+  }
+  for link in data.links {
+    size = size + 64 + link.attributes.length() * 40
+  }
+  size
 }
 
 ///|
@@ -468,6 +485,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
             let created : ResourceGroup = {
               resource: data.resource,
               scopes: [],
+              size_hint: 0,
             }
             groups.push(created)
             unindexed = true
@@ -486,6 +504,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
                 let created : ResourceGroup = {
                   resource: data.resource,
                   scopes: [],
+                  size_hint: 0,
                 }
                 groups.push(created)
                 unindexed = true
@@ -501,6 +520,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
       }
     }
     let target = groups[index]
+    let span_hint = estimate_span_size(data)
     let cached_hit = match cached_scope {
       Some(scope) =>
         cached_group_index == index &&
@@ -516,6 +536,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
     match scope_group {
       Some(scope) => {
         scope.spans.push(data)
+        scope.size_hint = scope.size_hint + span_hint
         cached_scope = Some(scope)
         cached_group_index = index
       }
@@ -525,82 +546,119 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
           scope_name: data.scope_name,
           scope_version: data.scope_version,
           spans: spans_for_scope,
+          size_hint: span_hint,
         }
         target.scopes.push(created)
         cached_scope = Some(created)
         cached_group_index = index
       }
     }
+    target.size_hint = target.size_hint + span_hint
   }
   groups
 }
 
-// Whether every span shares the same resource (by reference) and the same
-// scope name and version, so the whole batch forms one ResourceSpans with one
-// ScopeSpans.
+// If every span shares the same resource (by reference) and the same scope
+// name and version, returning the total estimated encoded span size. The batch
+// can then be encoded as one ResourceSpans with one ScopeSpans.
 ///|
-fn is_uniform_batch(spans : Array[@sdk.SpanData]) -> Bool {
+fn uniform_batch_size_hint(spans : Array[@sdk.SpanData]) -> Int? {
   let len = spans.length()
   if len == 0 {
-    return false
+    return None
   }
   let first = spans.unsafe_get(0)
+  let mut hint = estimate_span_size(first)
   let mut i = 1
   while i < len {
     let data = spans.unsafe_get(i)
     if !physical_equal(data.resource, first.resource) ||
       data.scope_name != first.scope_name ||
       data.scope_version != first.scope_version {
-      return false
+      return None
     }
+    hint = hint + estimate_span_size(data)
     i = i + 1
   }
-  true
+  Some(hint)
+}
+
+// Estimate encoded size of resource attributes and of a scope group's
+// name/version plus span payloads.
+///|
+fn resource_size_hint(resource : Map[String, @sdk.AttributeValue]) -> Int {
+  16 + resource.length() * 48
+}
+
+///|
+fn scope_size_hint(scope : ScopeGroup) -> Int {
+  32 + scope.scope_name.length() + scope.scope_version.length() + scope.size_hint
 }
 
 // Encode spans as an `ExportTraceServiceRequest` protobuf message.
 
 ///|
 pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
-  // Initial capacity estimate: 160 bytes per span plus the message header.
-  let writer = ProtoWriter::with_capacity(288 + spans.length() * 160)
-  if is_uniform_batch(spans) {
-    let first = spans.unsafe_get(0)
-    let resource_spans = writer.take_scratch_with_capacity(
-      288 + spans.length() * 320,
-    )
-    encode_resource(resource_spans, first.resource)
-    let scope_spans = resource_spans.take_scratch_with_capacity(
-      288 + spans.length() * 320,
-    )
-    encode_scope(scope_spans, first.scope_name, first.scope_version)
-    for span in spans {
-      encode_span(scope_spans, span)
-    }
-    resource_spans.append_message(2, scope_spans)
-    writer.append_message(1, resource_spans)
-  } else {
-    for group in group_spans(spans) {
-      let mut group_span_count = 0
-      for scope in group.scopes {
-        group_span_count = group_span_count + scope.spans.length()
-      }
+  if spans.length() == 0 {
+    return b""
+  }
+  match uniform_batch_size_hint(spans) {
+    Some(span_hint) => {
+      let first = spans.unsafe_get(0)
+      let scope_hint = 32 +
+        first.scope_name.length() +
+        first.scope_version.length()
+      let scope_spans_hint = scope_hint + span_hint
+      let resource_spans_hint = resource_size_hint(first.resource) +
+        scope_spans_hint
+      let writer = ProtoWriter::with_capacity(32 + resource_spans_hint)
       let resource_spans = writer.take_scratch_with_capacity(
-        288 + group_span_count * 320,
+        32 + resource_spans_hint,
       )
-      encode_resource(resource_spans, group.resource)
-      for scope in group.scopes {
-        let scope_spans = resource_spans.take_scratch_with_capacity(
-          288 + scope.spans.length() * 320,
-        )
-        encode_scope(scope_spans, scope.scope_name, scope.scope_version)
-        for span in scope.spans {
-          encode_span(scope_spans, span)
-        }
-        resource_spans.append_message(2, scope_spans)
+      encode_resource(resource_spans, first.resource)
+      let scope_spans = resource_spans.take_scratch_with_capacity(
+        32 + scope_spans_hint,
+      )
+      encode_scope(scope_spans, first.scope_name, first.scope_version)
+      for span in spans {
+        encode_span(scope_spans, span)
       }
+      resource_spans.append_message(2, scope_spans)
       writer.append_message(1, resource_spans)
+      writer.to_bytes()
+    }
+    None => {
+      let groups = group_spans(spans)
+      let mut total_hint = 32
+      for group in groups {
+        total_hint = total_hint + 32 + resource_size_hint(group.resource)
+        for scope in group.scopes {
+          total_hint = total_hint + scope_size_hint(scope)
+        }
+      }
+      let writer = ProtoWriter::with_capacity(total_hint)
+      for group in groups {
+        let mut scopes_hint = 0
+        for scope in group.scopes {
+          scopes_hint = scopes_hint + scope_size_hint(scope)
+        }
+        let resource_spans = writer.take_scratch_with_capacity(
+          32 + resource_size_hint(group.resource) + scopes_hint,
+        )
+        encode_resource(resource_spans, group.resource)
+        for scope in group.scopes {
+          let scope_spans = resource_spans.take_scratch_with_capacity(
+            32 + scope_size_hint(scope),
+          )
+          encode_scope(scope_spans, scope.scope_name, scope.scope_version)
+          for span in scope.spans {
+            encode_span(scope_spans, span)
+          }
+          resource_spans.append_message(2, scope_spans)
+        }
+        writer.append_message(1, resource_spans)
+      }
+      writer.to_bytes()
     }
   }
-  writer.to_bytes()
 }

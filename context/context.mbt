@@ -43,7 +43,9 @@ pub fn Context::with_baggage(
   values : Map[String, String]
 ) -> Context {
   let mut result = self
-  values.each(fn(key, value) { result = result.with_value(key, value) })
+  for key, value in values {
+    result = result.with_value(key, value)
+  }
   result
 }
 

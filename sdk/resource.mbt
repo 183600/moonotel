@@ -140,17 +140,26 @@ fn resolve_service_name(
 
 // Copy an attribute map so that a `Resource` owns its attributes and callers
 // cannot mutate provider state through a shared map.
+fn copy_attributes_with_capacity(
+  values : Map[String, AttributeValue],
+  capacity : Int
+) -> Map[String, AttributeValue] {
+  let out : Map[String, AttributeValue] = Map([], capacity=capacity)
+  for key, value in values {
+    out.set(key, value)
+  }
+  out
+}
+
 fn copy_attributes(
   values : Map[String, AttributeValue]
 ) -> Map[String, AttributeValue] {
-  let out : Map[String, AttributeValue] = Map([], capacity=values.length())
-  values.each(fn(key, value) { out.set(key, value) })
-  out
+  copy_attributes_with_capacity(values, values.length() * 2)
 }
 
 // An empty resource, carrying no attributes.
 pub fn Resource::empty() -> Resource {
-  { attributes: Map([]) }
+  { attributes: Map([], capacity=1) }
 }
 
 // Create a resource from an attribute map. The map is copied.
@@ -200,7 +209,10 @@ pub fn Resource::with_attribute(
   key : String,
   value : AttributeValue
 ) -> Resource {
-  let attributes = copy_attributes(self.attributes)
+  let attributes = copy_attributes_with_capacity(
+    self.attributes,
+    (self.attributes.length() + 1) * 2,
+  )
   attributes.set(key, value)
   { attributes, }
 }
@@ -208,8 +220,13 @@ pub fn Resource::with_attribute(
 // Merge `other` into this resource. Values from `other` win over values of
 // this resource; neither input is modified.
 pub fn Resource::merge(self : Resource, other : Resource) -> Resource {
-  let attributes = copy_attributes(self.attributes)
-  other.attributes.each(fn(key, value) { attributes.set(key, value) })
+  let attributes = copy_attributes_with_capacity(
+    self.attributes,
+    (self.attributes.length() + other.attributes.length()) * 2,
+  )
+  for key, value in other.attributes {
+    attributes.set(key, value)
+  }
   { attributes, }
 }
 

@@ -156,6 +156,19 @@ fn ProtoWriter::write_bytes_from_int_array(
   let buf = self.buf
   let mut pos = self.len
   let mut i = 0
+  while i + 8 <= len {
+    let word = (values.unsafe_get(i) & 0xFF).to_uint64() |
+      ((values.unsafe_get(i + 1) & 0xFF).to_uint64() << 8) |
+      ((values.unsafe_get(i + 2) & 0xFF).to_uint64() << 16) |
+      ((values.unsafe_get(i + 3) & 0xFF).to_uint64() << 24) |
+      ((values.unsafe_get(i + 4) & 0xFF).to_uint64() << 32) |
+      ((values.unsafe_get(i + 5) & 0xFF).to_uint64() << 40) |
+      ((values.unsafe_get(i + 6) & 0xFF).to_uint64() << 48) |
+      ((values.unsafe_get(i + 7) & 0xFF).to_uint64() << 56)
+    buf.unsafe_write_uint64_le(pos, word)
+    pos = pos + 8
+    i = i + 8
+  }
   while i + 4 <= len {
     let word = ((values.unsafe_get(i) & 0xFF) |
       ((values.unsafe_get(i + 1) & 0xFF) << 8) |

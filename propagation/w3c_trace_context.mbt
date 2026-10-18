@@ -159,6 +159,30 @@ fn write_hex(
   byte_count : Int
 ) -> Unit {
   let mut i = 0
+  while i + 2 <= byte_count {
+    let b0 = bytes.unsafe_get(i)
+    let b1 = bytes.unsafe_get(i + 1)
+    let pos = (start + i * 2) * 2
+    if b0 >= 0 && b0 < 256 && b1 >= 0 && b1 < 256 {
+      let word = hex_pairs.unsafe_get(b0).to_uint64() |
+        (hex_pairs.unsafe_get(b1).to_uint64() << 32)
+      out.unsafe_write_uint64_le(pos, word)
+    } else {
+      let hi0 = b0 >> 4
+      out.unsafe_set(
+        pos,
+        if hi0 >= 0 && hi0 < 16 { hex_ascii.unsafe_get(hi0) } else { b'0' },
+      )
+      out.unsafe_set(pos + 2, hex_ascii.unsafe_get(b0 & 0x0F))
+      let hi1 = b1 >> 4
+      out.unsafe_set(
+        pos + 4,
+        if hi1 >= 0 && hi1 < 16 { hex_ascii.unsafe_get(hi1) } else { b'0' },
+      )
+      out.unsafe_set(pos + 6, hex_ascii.unsafe_get(b1 & 0x0F))
+    }
+    i = i + 2
+  }
   while i < byte_count {
     let b = bytes.unsafe_get(i)
     let pos = (start + i * 2) * 2

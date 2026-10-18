@@ -93,6 +93,21 @@ fn is_alpha(c : Char) -> Bool {
   (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
 }
 
+// The authority of an absolute URL ends at the first `/` (path), `?` (query)
+// or `#` (fragment), or at the end of the string.
+fn find_authority_end(text : StringView) -> Int {
+  let len = text.length()
+  let mut i = 0
+  while i < len {
+    let c = text.unsafe_get(i).unsafe_to_char()
+    if c == '/' || c == '?' || c == '#' {
+      return i
+    }
+    i = i + 1
+  }
+  len
+}
+
 // Split an absolute URL into (scheme, host, port). The scheme is "" when the
 // URL has no valid scheme; the port falls back to the scheme default when it
 // is not explicit; malformed URLs yield `(host, -1)`.
@@ -107,7 +122,7 @@ fn split_url_parts(url : String) -> (String, String, Int) {
         if !is_alpha(candidate.unsafe_get(0).unsafe_to_char()) {
           ""
         } else {
-          let sb = StringBuilder(size_hint=index)
+          let sb = StringBuilder(size_hint=index * 2)
           let mut valid = true
           let mut i = 0
           while i < index {
@@ -134,20 +149,7 @@ fn split_url_parts(url : String) -> (String, String, Int) {
     None => url
   }
   let default_port = if scheme == "https" { 443 } else { 80 }
-  // The authority ends at the first `/` (path), `?` (query) or `#` (fragment).
-  let mut authority_end = after_scheme.length()
-  match after_scheme.find("/") {
-    Some(index) => authority_end = index
-    None => ()
-  }
-  match after_scheme.find("?") {
-    Some(index) => if index < authority_end { authority_end = index }
-    None => ()
-  }
-  match after_scheme.find("#") {
-    Some(index) => if index < authority_end { authority_end = index }
-    None => ()
-  }
+  let authority_end = find_authority_end(after_scheme)
   let authority = after_scheme[:authority_end]
   let host_port = match authority.rev_find("@") {
     Some(index) => authority[index + 1:]
@@ -200,24 +202,11 @@ pub fn redact_url(url : String) -> String {
     None => return url
   }
   let rest = url[scheme_end:]
-  // The authority ends at the first `/` (path), `?` (query) or `#` (fragment).
-  let mut authority_end = rest.length()
-  match rest.find("/") {
-    Some(index) => authority_end = index
-    None => ()
-  }
-  match rest.find("?") {
-    Some(index) => if index < authority_end { authority_end = index }
-    None => ()
-  }
-  match rest.find("#") {
-    Some(index) => if index < authority_end { authority_end = index }
-    None => ()
-  }
+  let authority_end = find_authority_end(rest)
   let authority = rest[:authority_end]
   match authority.rev_find("@") {
     Some(at) => {
-      let sb = StringBuilder(size_hint=url.length())
+      let sb = StringBuilder(size_hint=url.length() * 2)
       sb.write_stringview(url[:scheme_end])
       sb.write_stringview(authority[at + 1:])
       sb.write_stringview(rest[authority_end:])
@@ -228,17 +217,21 @@ pub fn redact_url(url : String) -> String {
 }
 
 fn plain_headers(
-  headers : Map[String, String]?
+  headers : Map[String, String]?,
+  extra? : Int,
 ) -> Map[@http.CaseInsensitiveString, String] {
-  let out = Map([])
+  let extra = extra.unwrap_or(0)
   match headers {
-    Some(values) =>
-      values.each(fn(key, value) {
+    Some(values) => {
+      let total = values.length() + extra
+      let out = Map([], capacity=if total == 0 { 1 } else { total * 2 })
+      for key, value in values {
         out.set(@http.CaseInsensitiveString(key), value)
-      })
-    None => ()
+      }
+      out
+    }
+    None => Map([], capacity=if extra == 0 { 1 } else { (extra + 1) * 2 })
   }
-  out
 }
 
 fn traced_headers(
@@ -246,7 +239,7 @@ fn traced_headers(
   span_context : @api.SpanContext,
   context : @context.Context
 ) -> Map[@http.CaseInsensitiveString, String] {
-  let out = plain_headers(headers)
+  let out = plain_headers(headers, extra=3)
   if span_context.is_valid() {
     out.set(
       @http.CaseInsensitiveString(@propagation.traceparent_header_name()),
@@ -351,13 +344,14 @@ pub async fn request(
         @sdk.IntValue(response.code.to_int64()),
       )
       if response.code >= 400 {
+        let status_text = response.code.to_string()
         span.set_attribute(
           @sdk.ERROR_TYPE,
-          @sdk.StringValue(response.code.to_string()),
+          @sdk.StringValue(status_text),
         )
         span.set_status(
           @api.StatusCode::Error,
-          description=response.code.to_string(),
+          description=status_text,
         )
       }
       (response, response_body)

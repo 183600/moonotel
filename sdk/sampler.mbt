@@ -30,8 +30,18 @@ pub fn sampling_decision_drop() -> SamplingDecision {
 fn trace_id_fraction(trace_id : Array[Int]) -> UInt64 {
   let mut value : UInt64 = 0
   let n = if trace_id.length() < 8 { trace_id.length() } else { 8 }
-  for i = 0; i < n; i = i + 1 {
+  let mut i = 0
+  while i + 4 <= n {
+    let b0 = trace_id.unsafe_get(i).to_uint64() & 0xFF
+    let b1 = trace_id.unsafe_get(i + 1).to_uint64() & 0xFF
+    let b2 = trace_id.unsafe_get(i + 2).to_uint64() & 0xFF
+    let b3 = trace_id.unsafe_get(i + 3).to_uint64() & 0xFF
+    value = (value << 32) | (b0 << 24) | (b1 << 16) | (b2 << 8) | b3
+    i = i + 4
+  }
+  while i < n {
     value = (value << 8) | (trace_id.unsafe_get(i).to_uint64() & 0xFF)
+    i = i + 1
   }
   value
 }
@@ -79,14 +89,16 @@ pub fn Sampler::record_only() -> Sampler {
 // Sample a deterministic fraction of traces based on the trace ID.
 // `ratio` is clamped: values <= 0 never sample, values >= 1 always sample.
 pub fn Sampler::trace_id_ratio_based(ratio : Double) -> Sampler {
+  if ratio <= 0.0 {
+    return Sampler::always_off()
+  }
+  if ratio >= 1.0 {
+    return Sampler::always_on()
+  }
   let threshold = ratio_threshold(ratio)
   {
     sample: fn(_parent, trace_id) {
-      if ratio <= 0.0 {
-        sampling_decision_drop()
-      } else if ratio >= 1.0 {
-        sampling_decision_record_and_sample()
-      } else if (trace_id_fraction(trace_id) >> 1) < threshold {
+      if (trace_id_fraction(trace_id) >> 1) < threshold {
         sampling_decision_record_and_sample()
       } else {
         sampling_decision_drop()
@@ -128,9 +140,10 @@ pub fn Sampler::parent_based(
       match parent {
         Some(ctx) =>
           if ctx.is_valid() {
+            let sampled = (ctx.trace_flags() & 1) != 0
             let delegate = if ctx.is_remote() {
-              if ctx.is_sampled() { remote_sampled } else { remote_not_sampled }
-            } else if ctx.is_sampled() {
+              if sampled { remote_sampled } else { remote_not_sampled }
+            } else if sampled {
               local_sampled
             } else {
               local_not_sampled

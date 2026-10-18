@@ -112,7 +112,7 @@ pub fn Tracestate::get(self : Tracestate, key : String) -> String? {
 
 // The members in order, as fresh `(key, value)` pairs.
 pub fn Tracestate::entries(self : Tracestate) -> Array[(String, String)] {
-  let out : Array[(String, String)] = []
+  let out : Array[(String, String)] = Array(capacity=self.members.length())
   for entry in self.members {
     out.push(entry)
   }
@@ -121,11 +121,14 @@ pub fn Tracestate::entries(self : Tracestate) -> Array[(String, String)] {
 
 // Render the list as a `tracestate` header value. The empty list yields "".
 pub fn Tracestate::to_header(self : Tracestate) -> String {
+  if self.members.length() == 0 {
+    return ""
+  }
   let mut size_hint = 0
   for entry in self.members {
-    size_hint = size_hint + entry.0.length() + entry.1.length() + 1
+    size_hint = size_hint + entry.0.length() + entry.1.length() + 2
   }
-  let sb = StringBuilder(size_hint=size_hint)
+  let sb = StringBuilder(size_hint=size_hint * 2)
   let mut count = 0
   for entry in self.members {
     if count > 0 {
@@ -167,7 +170,14 @@ pub fn Tracestate::add(
   if !is_valid_tracestate_member(key[:], value[:]) {
     return self
   }
-  let members : Array[(String, String)] = [(key, value)]
+  let count = self.members.length()
+  let capacity = if count < TRACESTATE_MAX_MEMBERS {
+    count + 1
+  } else {
+    TRACESTATE_MAX_MEMBERS
+  }
+  let members : Array[(String, String)] = Array(capacity=capacity)
+  members.push((key, value))
   take_members(members, self.members, key)
   { members, }
 }
@@ -186,7 +196,14 @@ pub fn Tracestate::update(
   match self.get(key) {
     None => self
     Some(_) => {
-      let members : Array[(String, String)] = [(key, value)]
+      let count = self.members.length()
+      let capacity = if count < TRACESTATE_MAX_MEMBERS {
+        count + 1
+      } else {
+        TRACESTATE_MAX_MEMBERS
+      }
+      let members : Array[(String, String)] = Array(capacity=capacity)
+      members.push((key, value))
       take_members(members, self.members, key)
       { members, }
     }
@@ -196,7 +213,9 @@ pub fn Tracestate::update(
 // Remove the member with `key`. Removing an absent key leaves the list
 // unchanged.
 pub fn Tracestate::remove(self : Tracestate, key : String) -> Tracestate {
-  let members : Array[(String, String)] = []
+  let members : Array[(String, String)] = Array(
+    capacity=self.members.length(),
+  )
   for entry in self.members {
     if entry.0 != key {
       members.push(entry)

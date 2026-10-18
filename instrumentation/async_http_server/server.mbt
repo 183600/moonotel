@@ -393,12 +393,15 @@ pub async fn ServerCall::respond(
   body? : String,
   headers? : Map[String, String],
 ) -> Unit {
-  let extra_headers : @http.Headers = Map([])
+  let extra_headers : @http.Headers = match headers {
+    Some(values) => Map([], capacity=(values.length() + 1) * 2)
+    None => Map([], capacity=2)
+  }
   match headers {
     Some(values) =>
-      values.each(fn(key, value) {
+      for key, value in values {
         extra_headers.set(@http.CaseInsensitiveString(key), value)
-      })
+      }
     None => ()
   }
   let close_requested = self.connection_close_requested()
@@ -426,13 +429,14 @@ pub async fn ServerCall::respond(
         @sdk.IntValue(status_code.to_int64()),
       )
       if status_code >= 500 {
+        let status_text = status_code.to_string()
         span.set_attribute(
           @sdk.ERROR_TYPE,
-          @sdk.StringValue(status_code.to_string()),
+          @sdk.StringValue(status_text),
         )
         span.set_status(
           @api.StatusCode::Error,
-          description=status_code.to_string(),
+          description=status_text,
         )
       }
     }

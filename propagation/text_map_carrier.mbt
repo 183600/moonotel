@@ -48,13 +48,12 @@ pub fn TextMapCarrier::get(self : TextMapCarrier, key : String) -> String? {
   match self.entries.get(key) {
     Some(value) => Some(value)
     None => {
-      let mut found : String? = None
-      self.entries.each(fn(candidate, value) {
-        if found is None && ascii_case_insensitive_equal(candidate, key) {
-          found = Some(value)
+      for candidate, value in self.entries {
+        if ascii_case_insensitive_equal(candidate, key) {
+          return Some(value)
         }
-      })
-      found
+      }
+      None
     }
   }
 }
@@ -68,11 +67,11 @@ pub fn TextMapCarrier::set(self : TextMapCarrier, key : String, value : String) 
 pub fn TextMapCarrier::remove(self : TextMapCarrier, key : String) -> Unit {
   self.entries.remove(key)
   let matches : Array[String] = []
-  self.entries.each(fn(candidate, _value) {
+  for candidate, _value in self.entries {
     if ascii_case_insensitive_equal(candidate, key) {
       matches.push(candidate)
     }
-  })
+  }
   for candidate in matches {
     self.entries.remove(candidate)
   }

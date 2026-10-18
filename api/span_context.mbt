@@ -169,20 +169,43 @@ pub fn bytes_to_hex(bytes : Array[Int]) -> String {
   // characters needs two bytes (low byte first, high byte zero for ASCII).
   let out = FixedArray::make(len * 4, b'\x00')
   let mut i = 0
+  while i + 2 <= len {
+    let b0 = bytes.unsafe_get(i)
+    let b1 = bytes.unsafe_get(i + 1)
+    let pos = i * 4
+    if b0 >= 0 && b0 < 256 && b1 >= 0 && b1 < 256 {
+      let word = hex_pairs.unsafe_get(b0).to_uint64() |
+        (hex_pairs.unsafe_get(b1).to_uint64() << 32)
+      out.unsafe_write_uint64_le(pos, word)
+    } else {
+      let hi0 = b0 >> 4
+      out.unsafe_set(
+        pos,
+        if hi0 >= 0 && hi0 < 16 { hex_ascii.unsafe_get(hi0) } else { b'0' },
+      )
+      out.unsafe_set(pos + 2, hex_ascii.unsafe_get(b0 & 0x0F))
+      let hi1 = b1 >> 4
+      out.unsafe_set(
+        pos + 4,
+        if hi1 >= 0 && hi1 < 16 { hex_ascii.unsafe_get(hi1) } else { b'0' },
+      )
+      out.unsafe_set(pos + 6, hex_ascii.unsafe_get(b1 & 0x0F))
+    }
+    i = i + 2
+  }
   while i < len {
     let b = bytes.unsafe_get(i)
-    if b >= 0 && b < 256 {
-      out.unsafe_write_uint32_le(i * 4, hex_pairs.unsafe_get(b))
-      i = i + 1
-      continue
-    }
     let pos = i * 4
-    let hi = b >> 4
-    out.unsafe_set(
-      pos,
-      if hi >= 0 && hi < 16 { hex_ascii.unsafe_get(hi) } else { b'0' },
-    )
-    out.unsafe_set(pos + 2, hex_ascii.unsafe_get(b & 0x0F))
+    if b >= 0 && b < 256 {
+      out.unsafe_write_uint32_le(pos, hex_pairs.unsafe_get(b))
+    } else {
+      let hi = b >> 4
+      out.unsafe_set(
+        pos,
+        if hi >= 0 && hi < 16 { hex_ascii.unsafe_get(hi) } else { b'0' },
+      )
+      out.unsafe_set(pos + 2, hex_ascii.unsafe_get(b & 0x0F))
+    }
     i = i + 1
   }
   out.unsafe_reinterpret_as_bytes().to_unchecked_string()

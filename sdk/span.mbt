@@ -48,7 +48,7 @@ pub fn SpanLink::new(
     span_context,
     attributes: match attributes {
       Some(values) => values
-      None => Map([])
+      None => Map([], capacity=1)
     },
     dropped_attributes_count: 0,
   }
@@ -297,15 +297,15 @@ fn limited_attributes(
   } else {
     count_limit
   }
-  let kept : Map[String, AttributeValue] = Map([], capacity=capacity)
+  let kept : Map[String, AttributeValue] = Map([], capacity=capacity * 2)
   let mut dropped = 0
-  attributes.each(fn(key, value) {
+  for key, value in attributes {
     if within_limit(kept.length(), count_limit) {
       kept.set(key, truncate_attribute_value(value, value_length_limit))
     } else {
       dropped = dropped + 1
     }
-  })
+  }
   (kept, dropped)
 }
 
@@ -502,9 +502,9 @@ pub fn SpanSdk::set_attributes(
         self.attributes = Some(Map([], capacity=budget * 2))
       }
     }
-    attributes.each(fn(key, value) {
+    for key, value in attributes {
       self.set_attribute_limited(key, value)
-    })
+    }
   }
 }
 
@@ -584,7 +584,7 @@ pub fn SpanSdk::add_event(
           self.limits.event_attribute_count_limit,
           self.limits.attribute_value_length_limit,
         )
-      None => (Map([]), 0)
+      None => (Map([], capacity=1), 0)
     }
     self.mutable_events().push({
       name,
@@ -693,6 +693,18 @@ pub fn SpanSdk::set_status(
 
 ///|
 fn SpanData::from_span(span : SpanSdk) -> SpanData {
+  let attributes : Map[String, AttributeValue] = match span.attributes {
+    Some(attributes) => attributes
+    None => Map([], capacity=1)
+  }
+  let events : Array[SpanEvent] = match span.events {
+    Some(events) => events
+    None => []
+  }
+  let links : Array[SpanLink] = match span.links {
+    Some(links) => links
+    None => []
+  }
   {
     name: span.name,
     span_context: span.context,
@@ -700,9 +712,9 @@ fn SpanData::from_span(span : SpanSdk) -> SpanData {
     kind: span.kind,
     start_time_unix_nano: span.start_time_unix_nano,
     end_time_unix_nano: span.end_time_unix_nano,
-    attributes: span.mutable_attributes(),
-    events: span.mutable_events(),
-    links: span.mutable_links(),
+    attributes,
+    events,
+    links,
     dropped_attributes_count: span.dropped_attributes,
     dropped_events_count: span.dropped_events,
     dropped_links_count: span.dropped_links,

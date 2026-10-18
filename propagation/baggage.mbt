@@ -168,21 +168,24 @@ fn percent_decode_escaped(value : StringView) -> String? {
     }
     Some(out.unsafe_reinterpret_as_bytes().to_unchecked_string())
   } else {
-    let bytes : Array[Byte] = Array(capacity=decoded_len)
+    let out = FixedArray::make(decoded_len, b'\x00')
     let mut j = 0
+    let mut pos = 0
     while j < len {
       let c = value.unsafe_get(j).unsafe_to_char()
       if c == '%' {
         let hi = hex_digit_value(value.unsafe_get(j + 1).unsafe_to_char())
         let lo = hex_digit_value(value.unsafe_get(j + 2).unsafe_to_char())
-        bytes.push((hi * 16 + lo).to_byte())
+        out.unsafe_set(pos, (hi * 16 + lo).to_byte())
+        pos = pos + 1
         j = j + 3
       } else {
-        bytes.push(c.to_int().to_byte())
+        out.unsafe_set(pos, c.to_int().to_byte())
+        pos = pos + 1
         j = j + 1
       }
     }
-    Some(@utf8.decode_lossy(Bytes::from_array(bytes).exact_view()))
+    Some(@utf8.decode_lossy(out.unsafe_reinterpret_as_bytes().exact_view()))
   }
 }
 
@@ -293,6 +296,9 @@ fn write_percent_encode_counted(sb : StringBuilder, value : String) -> Int {
 // Percent-encode a baggage value, leaving the characters allowed by the
 // specification untouched and encoding everything else as `%XX` (UTF-8).
 pub fn percent_encode(value : String) -> String {
+  if value == "" {
+    return ""
+  }
   let sb = StringBuilder(size_hint=value.length() * 2)
   write_percent_encode(sb, value)
   sb.to_string()
@@ -315,8 +321,7 @@ pub fn percent_encoded_length(value : String) -> Int {
   while i < len {
     let code = value.unsafe_get(i).to_int()
     if code >= 0x80 {
-      let mut total = 0
-      for byte in @utf8.encode(value) {
+      for byte in @utf8.encode(value[i:]) {
         if is_baggage_value_char(byte.to_int() & 0xFF) {
           total = total + 1
         } else {
@@ -446,6 +451,9 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
 // members and `BAGGAGE_MAX_BYTES` bytes are emitted; once a member would
 // exceed either limit it and every following member are dropped.
 pub fn format_baggage(entries : Array[(String, String)]) -> String {
+  if entries.length() == 0 {
+    return ""
+  }
   // Approximate output size: key, value and the `key=` separator per member.
   let mut size_hint = 0
   for entry in entries {
@@ -456,7 +464,7 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
       break
     }
   }
-  let sb = StringBuilder(size_hint=size_hint)
+  let sb = StringBuilder(size_hint=size_hint * 2)
   let mut count = 0
   let mut bytes = 0
   for entry in entries {

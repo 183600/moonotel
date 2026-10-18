@@ -22,7 +22,7 @@ pub fn InMemorySpanExporter::new() -> InMemorySpanExporter {
 pub fn InMemorySpanExporter::exported_batches(
   self : InMemorySpanExporter
 ) -> Array[Array[SpanData]] {
-  let out : Array[Array[SpanData]] = []
+  let out : Array[Array[SpanData]] = Array(capacity=self.batches.length())
   for batch in self.batches {
     out.push(batch.copy())
   }
