@@ -111,6 +111,16 @@ pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
               )
             }
             inner = end2
+          } else if inner_wire == 1 {
+            if partial.length() - inner < 8 {
+              return malformed_response()
+            }
+            inner = inner + 8
+          } else if inner_wire == 5 {
+            if partial.length() - inner < 4 {
+              return malformed_response()
+            }
+            inner = inner + 4
           } else {
             // Wire types 3/4 (groups) and 6/7 cannot occur in this message.
             return malformed_response()

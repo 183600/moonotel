@@ -317,6 +317,14 @@ fn json_write_int32(sb : JsonBuf, value : Int32) -> Unit {
   }
 }
 
+// Append the 32-bit pattern of `value` as its unsigned decimal number, the
+// protobuf JSON representation of `uint32` fields (for example `flags`).
+
+///|
+fn json_write_uint32(sb : JsonBuf, value : Int32) -> Unit {
+  json_write_decimal_digits(sb, value.reinterpret_as_uint().to_uint64())
+}
+
 // Append a 64-bit integer as a JSON string, the protobuf JSON representation
 // of `int64`/`uint64` values.
 
@@ -536,7 +544,7 @@ fn json_write_link(sb : JsonBuf, link : @sdk.SpanLink) -> Unit {
     json_write_int32(sb, link.dropped_attributes_count)
   }
   sb.write_string(",\"flags\":")
-  json_write_int32(sb, link.span_context.trace_flags())
+  json_write_uint32(sb, link.span_context.trace_flags())
   sb.write_char('}')
 }
 
@@ -632,7 +640,7 @@ fn json_write_span(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
   }
   json_write_status(sb, data)
   sb.write_string(",\"flags\":")
-  json_write_int32(sb, data.span_context.trace_flags())
+  json_write_uint32(sb, data.span_context.trace_flags())
   sb.write_char('}')
 }
 

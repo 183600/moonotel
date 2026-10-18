@@ -101,7 +101,6 @@ pub struct SpanSdk {
   mut attributes : Map[String, AttributeValue]?
   mut events : Array[SpanEvent]?
   mut links : Array[SpanLink]?
-  mut empty_event_attributes : Map[String, AttributeValue]?
   mut status : @api.StatusCode
   mut status_description : String
   limits : SpanLimits
@@ -141,7 +140,6 @@ fn create_span(
     attributes: None,
     events: None,
     links: None,
-    empty_event_attributes: None,
     status: @api.StatusCode::Unset,
     status_description: "",
     limits,
@@ -639,7 +637,7 @@ pub fn SpanSdk::add_event(
           self.limits.event_attribute_count_limit,
           self.limits.attribute_value_length_limit,
         )
-      None => (self.empty_event_attribute_map(), 0)
+      None => (Map([], capacity=1), 0)
     }
     self
     .mutable_events()
@@ -649,23 +647,6 @@ pub fn SpanSdk::add_event(
       attributes: event_attributes,
       dropped_attributes_count: dropped,
     })
-  }
-}
-
-// A per-span empty attribute map reused by events added without attributes,
-// avoiding one small allocation per event.
-
-///|
-fn SpanSdk::empty_event_attribute_map(
-  self : SpanSdk,
-) -> Map[String, AttributeValue] {
-  match self.empty_event_attributes {
-    Some(map) => map
-    None => {
-      let map : Map[String, AttributeValue] = Map([], capacity=1)
-      self.empty_event_attributes = Some(map)
-      map
-    }
   }
 }
 

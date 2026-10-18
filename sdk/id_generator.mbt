@@ -138,9 +138,19 @@ fn random_bytes(
 // is created, so that platforms without an entropy source (for example
 // `wasm-gc`) do not allocate a fresh, unused entropy buffer on every draw.
 
+// Sequence number mixed into the fallback seed so that generators created in
+// the same clock tick still start from different states.
+
+///|
+let fallback_seed_counter : Ref[UInt64] = Ref(0)
+
 ///|
 pub fn IdGenerator::random() -> IdGenerator {
-  let state = Ref(@env.now() ^ 88172645463325252)
+  let sequence = fallback_seed_counter.val
+  fallback_seed_counter.val = sequence + 1
+  let state = Ref(
+    @env.now() ^ (sequence * 11400714819323198485) ^ 88172645463325252,
+  )
   if @env.rand(0) is None {
     IdGenerator::new(fn() { pseudo_random_bytes(16, state) }, fn() {
       pseudo_random_bytes(8, state)
