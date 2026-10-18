@@ -404,11 +404,40 @@ pub fn ServerCall::close_connection(self : ServerCall) -> Unit {
   self.connection.close()
 }
 
-// Send a response and record `http.response.status_code` on the SERVER span.
-// 5xx responses set the span status to `Error`. The body, when present, is
-// written before the response is ended. When the request carried
-// `Connection: close`, the connection is closed after the response, as
-// required by HTTP/1.1.
+// Number of UTF-8 bytes a string encodes to, counted without allocating.
+// Surrogate pairs count as one four-byte character.
+
+///|
+fn utf8_byte_length(value : String) -> Int32 {
+  let len = value.length()
+  let mut total = 0
+  let mut i = 0
+  while i < len {
+    let unit = value.unsafe_get(i).to_int()
+    if unit < 0x80 {
+      total = total + 1
+    } else if unit < 0x800 {
+      total = total + 2
+    } else if unit >= 0xD800 &&
+      unit <= 0xDBFF &&
+      i + 1 < len &&
+      value.unsafe_get(i + 1).to_int() >= 0xDC00 &&
+      value.unsafe_get(i + 1).to_int() <= 0xDFFF {
+      total = total + 4
+      i = i + 1
+    } else {
+      total = total + 3
+    }
+    i = i + 1
+  }
+  total
+}
+
+// Send a response and record `http.response.status_code` and
+// `http.response.body.size` on the SERVER span. 5xx responses set the span
+// status to `Error`. The body, when present, is written before the response
+// is ended. When the request carried `Connection: close`, the connection is
+// closed after the response, as required by HTTP/1.1.
 
 ///|
 pub async fn ServerCall::respond(
@@ -440,7 +469,17 @@ pub async fn ServerCall::respond(
     extra_headers~,
   )
   match body {
-    Some(text) => self.connection.write(text)
+    Some(text) => {
+      self.connection.write(text)
+      match self.span {
+        Some(span) =>
+          span.set_attribute(
+            @sdk.HTTP_RESPONSE_BODY_SIZE,
+            @sdk.IntValue(utf8_byte_length(text).to_int64()),
+          )
+        None => ()
+      }
+    }
     None => ()
   }
   self.connection.end_response()
@@ -571,9 +610,14 @@ pub async fn run_server_on(
         Err(error) => {
           match span {
             Some(server_span) => {
+              let type_name = error.to_string()
+              server_span.set_attribute(
+                @sdk.ERROR_TYPE,
+                @sdk.StringValue(type_name),
+              )
               server_span.set_status(
                 @api.StatusCode::Error,
-                description=error.to_string(),
+                description=type_name,
               )
               server_span.record_exception(error)
             }

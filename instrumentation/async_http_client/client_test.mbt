@@ -336,3 +336,39 @@ async test "instrumented client and server produce a connected trace" {
     )
   }
 }
+
+///|
+async test "client span records error.type when the request fails" {
+  let (tracer, exporter) = test_tracer("client-test-exception")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      server.run_forever() <| ((
+        _request,
+        _body,
+        conn,
+        // Drop the connection without a response so the client request fails.
+      ) => conn.close())
+    }
+    let failed = try {
+      let (_response, _body) = @async_http_client.get(
+        "http://127.0.0.1:\{port}/reset",
+        tracer~,
+      )
+      false
+    } catch {
+      _ => true
+    }
+    assert_true(failed)
+    assert_eq(exporter.spans.val.length(), 1)
+    let data = exporter.spans.val[0]
+    assert_eq(data.status, @api.StatusCode::Error)
+    match data.attributes.get(@sdk.ERROR_TYPE) {
+      Some(@sdk.StringValue(name)) => assert_true(name.length() > 0)
+      _ => fail("error.type attribute is missing")
+    }
+    assert_eq(data.events.length(), 1)
+    assert_eq(data.events[0].name, "exception")
+  }
+}

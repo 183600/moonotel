@@ -194,6 +194,10 @@ async test "handler exceptions are recorded and end the span" {
     assert_eq(exporter.spans.val.length(), 1)
     let data = exporter.spans.val[0]
     assert_eq(data.status, @api.StatusCode::Error)
+    match data.attributes.get(@sdk.ERROR_TYPE) {
+      Some(@sdk.StringValue(name)) => assert_true(name.contains("HandlerBoom"))
+      _ => fail("error.type attribute is missing")
+    }
     assert_eq(data.events.length(), 1)
     assert_eq(data.events[0].name, "exception")
     match data.events[0].attributes.get(@sdk.EXCEPTION_MESSAGE) {

@@ -8,6 +8,12 @@ pub const HTTP_REQUEST_METHOD : String = "http.request.method"
 pub const HTTP_RESPONSE_STATUS_CODE : String = "http.response.status_code"
 
 ///|
+pub const HTTP_REQUEST_BODY_SIZE : String = "http.request.body.size"
+
+///|
+pub const HTTP_RESPONSE_BODY_SIZE : String = "http.response.body.size"
+
+///|
 pub const HTTP_ROUTE : String = "http.route"
 
 ///|

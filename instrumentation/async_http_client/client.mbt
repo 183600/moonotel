@@ -353,6 +353,14 @@ pub async fn request(
         @sdk.HTTP_REQUEST_METHOD,
         method_attribute_value(request_method),
       )
+      // The request body is in memory, so its size is always known.
+      let request_size = body.binary().length()
+      if request_size > 0 {
+        span.set_attribute(
+          @sdk.HTTP_REQUEST_BODY_SIZE,
+          @sdk.IntValue(request_size.to_int64()),
+        )
+      }
       // `url.full` must not leak credentials: strip the userinfo component.
       span.set_attribute(@sdk.URL_FULL, @sdk.StringValue(redact_url(url)))
       span.set_attribute(@sdk.NETWORK_PROTOCOL_NAME, protocol_name_http)
@@ -380,7 +388,9 @@ pub async fn request(
       let (response, response_body) = match outcome {
         Ok(result) => result
         Err(error) => {
-          span.set_status(@api.StatusCode::Error, description=error.to_string())
+          let type_name = error.to_string()
+          span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(type_name))
+          span.set_status(@api.StatusCode::Error, description=type_name)
           span.record_exception(error)
           raise error
         }
@@ -389,6 +399,14 @@ pub async fn request(
         @sdk.HTTP_RESPONSE_STATUS_CODE,
         @sdk.IntValue(response.code.to_int64()),
       )
+      // The response body has been fully read, so its size is always known.
+      let response_size = response_body.binary().length()
+      if response_size > 0 {
+        span.set_attribute(
+          @sdk.HTTP_RESPONSE_BODY_SIZE,
+          @sdk.IntValue(response_size.to_int64()),
+        )
+      }
       if response.code >= 400 {
         let status_text = response.code.to_string()
         span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(status_text))

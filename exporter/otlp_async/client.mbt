@@ -51,10 +51,138 @@ async fn gzip_compress(data : Bytes) -> Bytes {
   reader.read_all().binary()
 }
 
-// Parse an HTTP `Retry-After` header value holding a non-negative number of
-// seconds. Returns the delay in milliseconds, capped at 60 seconds so that a
-// misbehaving server cannot stall the exporter indefinitely. The HTTP-date
-// form of the header is not supported and yields `None`.
+// Parse two ASCII digits at `at` into their 0-99 value.
+
+///|
+fn http_date_two_digits(value : StringView, at : Int32) -> Int32? {
+  let hi = value.unsafe_get(at).to_int()
+  let lo = value.unsafe_get(at + 1).to_int()
+  if hi < 0x30 || hi > 0x39 || lo < 0x30 || lo > 0x39 {
+    return None
+  }
+  Some((hi - 0x30) * 10 + (lo - 0x30))
+}
+
+// Number of the month named by a three-letter abbreviation, or `None`.
+
+///|
+fn http_date_month(name : StringView) -> Int32? {
+  if name == "Jan" {
+    Some(1)
+  } else if name == "Feb" {
+    Some(2)
+  } else if name == "Mar" {
+    Some(3)
+  } else if name == "Apr" {
+    Some(4)
+  } else if name == "May" {
+    Some(5)
+  } else if name == "Jun" {
+    Some(6)
+  } else if name == "Jul" {
+    Some(7)
+  } else if name == "Aug" {
+    Some(8)
+  } else if name == "Sep" {
+    Some(9)
+  } else if name == "Oct" {
+    Some(10)
+  } else if name == "Nov" {
+    Some(11)
+  } else if name == "Dec" {
+    Some(12)
+  } else {
+    None
+  }
+}
+
+// Number of days since the Unix epoch of a proleptic Gregorian date, using
+// Howard Hinnant's `days_from_civil` algorithm.
+
+///|
+fn days_from_civil(year : Int32, month : Int32, day : Int32) -> Int64 {
+  let y = if month <= 2 { year - 1 } else { year }
+  let era = if y >= 0 { y / 400 } else { (y - 399) / 400 }
+  let yoe = y - era * 400
+  let mp = (month + 9) % 12
+  let doy = (153 * mp + 2) / 5 + day - 1
+  let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+  (era * 146097 + doe - 719468).to_int64()
+}
+
+// Parse the IMF-fixdate form of an HTTP date (`Sun, 06 Nov 1994 08:49:37 GMT`)
+// into seconds since the Unix epoch. The obsolete RFC 850 and asctime forms
+// and any other value yield `None`.
+
+///|
+fn parse_http_date_seconds(value : StringView) -> Int64? {
+  // `Www, dd Mmm yyyy HH:MM:SS GMT` is exactly 29 characters.
+  if value.length() != 29 {
+    return None
+  }
+  let day_name = value.view(start_offset=0, end_offset=3)
+  let known_day = day_name == "Mon" ||
+    day_name == "Tue" ||
+    day_name == "Wed" ||
+    day_name == "Thu" ||
+    day_name == "Fri" ||
+    day_name == "Sat" ||
+    day_name == "Sun"
+  if !known_day ||
+    value.unsafe_get(3).to_int() != 0x2C ||
+    value.unsafe_get(4).to_int() != 0x20 ||
+    value.unsafe_get(7).to_int() != 0x20 ||
+    value.unsafe_get(11).to_int() != 0x20 ||
+    value.unsafe_get(16).to_int() != 0x20 ||
+    value.unsafe_get(19).to_int() != 0x3A ||
+    value.unsafe_get(22).to_int() != 0x3A ||
+    value.unsafe_get(25).to_int() != 0x20 ||
+    value.unsafe_get(26).unsafe_to_char() != 'G' ||
+    value.unsafe_get(27).unsafe_to_char() != 'M' ||
+    value.unsafe_get(28).unsafe_to_char() != 'T' {
+    return None
+  }
+  let day = match http_date_two_digits(value, 5) {
+    Some(value) => value
+    None => return None
+  }
+  let month = match http_date_month(value.view(start_offset=8, end_offset=11)) {
+    Some(value) => value
+    None => return None
+  }
+  let year = match http_date_two_digits(value, 12) {
+    Some(high) =>
+      match http_date_two_digits(value, 14) {
+        Some(low) => high * 100 + low
+        None => return None
+      }
+    None => return None
+  }
+  let hour = match http_date_two_digits(value, 17) {
+    Some(value) => value
+    None => return None
+  }
+  let minute = match http_date_two_digits(value, 20) {
+    Some(value) => value
+    None => return None
+  }
+  let second = match http_date_two_digits(value, 23) {
+    Some(value) => value
+    None => return None
+  }
+  if day < 1 || day > 31 || hour > 23 || minute > 59 || second > 60 {
+    return None
+  }
+  let days = days_from_civil(year, month, day)
+  Some(days * 86400L + (hour * 3600 + minute * 60 + second).to_int64())
+}
+
+// Parse an HTTP `Retry-After` header value, which is either a non-negative
+// number of seconds or an IMF-fixdate HTTP date (for example
+// `Sun, 06 Nov 1994 08:49:37 GMT`). Returns the delay in milliseconds, capped
+// at 60 seconds so that a misbehaving server cannot stall the exporter
+// indefinitely. Dates in the past yield a zero delay; other values yield
+// `None`.
 
 ///|
 fn retry_after_millis(value : String) -> Int32? {
@@ -62,14 +190,32 @@ fn retry_after_millis(value : String) -> Int32? {
   if trimmed == "" {
     return None
   }
-  let seconds = @string.parse_int(trimmed) catch { _ => return None }
-  if seconds < 0 {
-    return None
-  }
-  if seconds > 60 {
-    Some(60000)
-  } else {
-    Some(seconds * 1000)
+  let parsed = Some(@string.parse_int(trimmed)) catch { _ => None }
+  match parsed {
+    Some(seconds) =>
+      if seconds < 0 {
+        None
+      } else if seconds > 60 {
+        Some(60000)
+      } else {
+        Some(seconds * 1000)
+      }
+    None =>
+      // Not a delta-seconds value: many servers send an IMF-fixdate instead.
+      match parse_http_date_seconds(trimmed[:]) {
+        Some(epoch_seconds) => {
+          let now_seconds = (@env.now() / 1000).reinterpret_as_int64()
+          let delay_seconds = epoch_seconds - now_seconds
+          if delay_seconds <= 0 {
+            Some(0)
+          } else if delay_seconds > 60 {
+            Some(60000)
+          } else {
+            Some((delay_seconds * 1000).to_int())
+          }
+        }
+        None => None
+      }
   }
 }
 
@@ -78,9 +224,10 @@ fn retry_after_millis(value : String) -> Int32? {
 // `http/json` bodies are supported; the response is decoded with the matching
 // encoding. Network errors and retryable statuses (429, 502, 503, 504) are
 // retried up to `config.max_retries` times. The delay before a retry is taken
-// from the response's `Retry-After` header when it holds a number of seconds,
-// and a short linear backoff is used otherwise. When `config.compression` is
-// `gzip` the body is compressed once and sent with `Content-Encoding: gzip`.
+// from the response's `Retry-After` header when it holds a number of seconds
+// or an HTTP date, and a short linear backoff is used otherwise. When
+// `config.compression` is `gzip` the body is compressed once and sent with
+// `Content-Encoding: gzip`.
 
 ///|
 pub async fn post_trace_request(
