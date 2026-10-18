@@ -1,16 +1,27 @@
 // TextMapCarrier is a simple in-memory carrier for text-based propagation
 // formats such as W3C Trace Context. Header names are stored verbatim.
+//
+// A carrier can also view external storage through the callbacks installed by
+// `from_getter`, `from_setter` and `from_getter_setter`. Instrumentations use
+// this to propagate through an existing header map without copying it: reads
+// fall back to the getter and writes are forwarded to the setter. Without an
+// external setter, `set` stores values in the carrier itself; `length`,
+// `to_map` and `remove` always operate on the carrier's own entries only.
 
 ///|
 pub struct TextMapCarrier {
   entries : Map[String, String]
+  // External read view, consulted when a key is not stored locally.
+  getter : ((String) -> String?)?
+  // External write target. When present, `set` forwards to it.
+  setter : ((String, String) -> Unit)?
 }
 
 // Create an empty carrier
 
 ///|
 pub fn TextMapCarrier::new() -> TextMapCarrier {
-  { entries: Map([]), }
+  { entries: Map([]), getter: None, setter: None, }
 }
 
 // Create a carrier backed by an existing map (values are shared, not copied)
@@ -19,7 +30,7 @@ pub fn TextMapCarrier::new() -> TextMapCarrier {
 pub fn TextMapCarrier::from_map(
   entries : Map[String, String],
 ) -> TextMapCarrier {
-  { entries, }
+  { entries, getter: None, setter: None, }
 }
 
 // Create a carrier from an array of key/value pairs
@@ -28,7 +39,38 @@ pub fn TextMapCarrier::from_map(
 pub fn TextMapCarrier::from_entries(
   entries : Array[(String, String)],
 ) -> TextMapCarrier {
-  { entries: Map(entries), }
+  { entries: Map(entries), getter: None, setter: None, }
+}
+
+// Create a read-only carrier that looks up keys through `get` when they are
+// not stored locally. The keys are passed to `get` unchanged, so an external
+// store with its own case rules (for example HTTP headers) keeps them.
+
+///|
+pub fn TextMapCarrier::from_getter(
+  get : (String) -> String?,
+) -> TextMapCarrier {
+  { entries: Map([]), getter: Some(get), setter: None, }
+}
+
+// Create a write-through carrier: `set` forwards every write to `set`.
+// Reads only see values stored locally.
+
+///|
+pub fn TextMapCarrier::from_setter(
+  set : (String, String) -> Unit,
+) -> TextMapCarrier {
+  { entries: Map([]), getter: None, setter: Some(set), }
+}
+
+// Create a carrier that both reads through `get` and writes through `set`.
+
+///|
+pub fn TextMapCarrier::from_getter_setter(
+  get : (String) -> String?,
+  set : (String, String) -> Unit,
+) -> TextMapCarrier {
+  { entries: Map([]), getter: Some(get), setter: Some(set), }
 }
 
 // ASCII-case-insensitive equality. Equivalent to `a.to_lower() == b.to_lower()`
@@ -69,12 +111,16 @@ pub fn TextMapCarrier::get(self : TextMapCarrier, key : String) -> String? {
           return Some(value)
         }
       }
-      None
+      match self.getter {
+        Some(get) => get(key)
+        None => None
+      }
     }
   }
 }
 
-// Set a single header value
+// Set a single header value. Write-through carriers forward the value to their
+// external store instead of keeping it locally.
 
 ///|
 pub fn TextMapCarrier::set(
@@ -82,7 +128,10 @@ pub fn TextMapCarrier::set(
   key : String,
   value : String,
 ) -> Unit {
-  self.entries.set(key, value)
+  match self.setter {
+    Some(set) => set(key, value)
+    None => self.entries.set(key, value)
+  }
 }
 
 // Remove a single header value. Like `get`, the lookup is case-insensitive.

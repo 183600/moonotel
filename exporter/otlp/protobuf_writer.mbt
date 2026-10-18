@@ -21,11 +21,22 @@ fn ProtoWriter::with_capacity(size_hint : Int32) -> ProtoWriter {
 ///|
 let encoder_pool : Ref[ProtoWriter?] = Ref(None)
 
+// Capacity limits above which recycled buffers are dropped. Without them a
+// single oversized batch would pin its peak capacity for the rest of the
+// process lifetime even though encoding afterwards only needs a fraction.
+const MAX_ROOT_BUFFER_BYTES : Int32 = 4 * 1024 * 1024
+
+///|
+const MAX_SCRATCH_BUFFER_BYTES : Int32 = 1024 * 1024
+
 ///|
 fn take_root_writer(size_hint : Int32) -> ProtoWriter {
   match encoder_pool.val {
     Some(writer) => {
       writer.len = 0
+      if writer.buf.length() > MAX_ROOT_BUFFER_BYTES {
+        writer.buf = FixedArray::make(if size_hint < 1 { 1 } else { size_hint }, b'\x00')
+      }
       writer
     }
     None => {
@@ -82,6 +93,9 @@ fn ProtoWriter::release_scratch(
   buffer : ProtoWriter,
 ) -> Unit {
   buffer.len = 0
+  if buffer.buf.length() > MAX_SCRATCH_BUFFER_BYTES {
+    buffer.buf = FixedArray::make(128, b'\x00')
+  }
   self.scratch.push(buffer)
 }
 

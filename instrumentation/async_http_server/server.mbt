@@ -144,13 +144,17 @@ fn split_path_query(path : String) -> (String, String) {
 // the W3C `traceparent`/`tracestate` headers and `baggage`. Request headers
 // are already keyed case-insensitively. The second result reports whether the
 // extracted context carries baggage.
+//
+// The carrier reads the request headers directly instead of copying them, so
+// extraction only touches the keys the propagator actually looks up.
 
 ///|
 fn extract_context_with_baggage(
   headers : Map[@http.CaseInsensitiveString, String],
 ) -> (@context.Context, Bool) {
-  let carrier = @propagation.TextMapCarrier::new()
-  headers.each(fn(key, value) { carrier.set(key.0, value) })
+  let carrier = @propagation.TextMapCarrier::from_getter(fn(key) {
+    headers.get(@http.CaseInsensitiveString(key))
+  })
   let context = @propagation.global_propagator().extract(carrier)
   (context, context.has_baggage())
 }
@@ -216,6 +220,9 @@ pub(all) struct ServerCall {
   connection : @http.ServerConnection
   span : @sdk.SpanSdk?
   tracer : @sdk.Tracer?
+  // Lazily computed `(path, query)` split of the request target, shared by
+  // `path` and `query` so that the request line is parsed at most once.
+  mut path_query : (String, String)?
 }
 
 // Upper-case HTTP method of the request.
@@ -229,14 +236,26 @@ pub fn ServerCall::http_method(self : ServerCall) -> String {
 
 ///|
 pub fn ServerCall::path(self : ServerCall) -> String {
-  split_path_query(self.request.path).0
+  self.path_and_query().0
 }
 
 // Request query string, without the leading `?`.
 
 ///|
 pub fn ServerCall::query(self : ServerCall) -> String {
-  split_path_query(self.request.path).1
+  self.path_and_query().1
+}
+
+///|
+fn ServerCall::path_and_query(self : ServerCall) -> (String, String) {
+  match self.path_query {
+    Some(pair) => pair
+    None => {
+      let pair = split_path_query(self.request.path)
+      self.path_query = Some(pair)
+      pair
+    }
+  }
 }
 
 // Look up a request header by name.
@@ -419,9 +438,9 @@ pub async fn ServerCall::respond(
   }
   match headers {
     Some(values) =>
-      values.each(fn(key, value) {
+      for key, value in values {
         extra_headers.set(@http.CaseInsensitiveString(key), value)
-      })
+      }
     None => ()
   }
   let close_requested = self.connection_close_requested()
@@ -521,6 +540,7 @@ pub async fn run_server_on(
         connection,
         span,
         tracer: active_tracer,
+        path_query: None,
       }
       match span {
         Some(server_span) => {
@@ -538,7 +558,8 @@ pub async fn run_server_on(
             @sdk.NETWORK_PROTOCOL_VERSION,
             protocol_version_http_1_1,
           )
-          let (path, query) = split_path_query(request.path)
+          let path = call.path()
+          let query = call.query()
           server_span.set_attribute(@sdk.URL_PATH, @sdk.StringValue(path))
           if query != "" {
             server_span.set_attribute(@sdk.URL_QUERY, @sdk.StringValue(query))

@@ -19,7 +19,7 @@ const MAX_EXPORT_SPANS : Int32 = 512
 
 ///|
 pub struct OtlpHttpAsyncSpanExporter {
-  config : @otlp.OtlpHttpConfig
+  exporter : @otlp_async.OtlpHttpAsyncExporter
   queue : @aqueue.Queue[Array[@sdk.SpanData]]
   mut shutdown_called : Bool
   mut dropped : UInt64
@@ -40,7 +40,7 @@ pub fn[G] OtlpHttpAsyncSpanExporter::new(
     None => 256
   }
   let exporter : OtlpHttpAsyncSpanExporter = {
-    config,
+    exporter: @otlp_async.OtlpHttpAsyncExporter::new(config),
     queue: @aqueue.Queue(kind=@aqueue.DiscardOldest(size)),
     shutdown_called: false,
     dropped: 0,
@@ -55,7 +55,7 @@ pub fn[G] OtlpHttpAsyncSpanExporter::new(
 pub fn OtlpHttpAsyncSpanExporter::config(
   self : OtlpHttpAsyncSpanExporter,
 ) -> @otlp.OtlpHttpConfig {
-  self.config
+  self.exporter.config()
 }
 
 // Number of batches discarded because the queue was full.
@@ -119,6 +119,7 @@ async fn OtlpHttpAsyncSpanExporter::export_available(
   first : Array[@sdk.SpanData],
 ) -> Unit {
   let batch = first
+  batch.reserve_capacity(MAX_EXPORT_SPANS)
   while batch.length() < MAX_EXPORT_SPANS {
     let next : Array[@sdk.SpanData]? = self.queue.try_get() catch { _ => None }
     match next {
@@ -142,18 +143,18 @@ async fn OtlpHttpAsyncSpanExporter::send(
   if batch.length() == 0 {
     return
   }
-  let timeout = self.config.timeout_millis
+  let timeout = self.exporter.config().timeout_millis
   let _ = @async.protect_from_cancel(() => {
     let outcome : @sdk.ExportResult? = if timeout > 0 {
       Some(
         @async.with_timeout(timeout, () => {
-          @otlp_async.export_spans(self.config, batch)
+          self.exporter.export_batch(batch)
         }),
       ) catch {
         _ => None
       }
     } else {
-      Some(@otlp_async.export_spans(self.config, batch))
+      Some(self.exporter.export_batch(batch))
     }
     let _ = outcome
   })

@@ -354,6 +354,36 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
   )
 }
 
+// Upper bound on the number of memoized `tracestate` parse results. The cache
+// is cleared when it is full, so its memory stays bounded even when the values
+// come from untrusted incoming headers.
+
+///|
+const TRACESTATE_INJECT_CACHE_LIMIT : Int32 = 128
+
+// Memoized result of `parse_tracestate` keyed by the raw `tracestate` value:
+// the normalized value when it is valid, `None` when it is not. A trace keeps
+// the same `tracestate` across all of its outbound requests, so injection
+// would otherwise re-validate the same string for every request.
+
+///|
+let tracestate_inject_cache : Map[String, String?] = Map([])
+
+///|
+fn normalized_tracestate_for_inject(state : String) -> String? {
+  match tracestate_inject_cache.get(state) {
+    Some(normalized) => normalized
+    None => {
+      let normalized = parse_tracestate(state)
+      if tracestate_inject_cache.length() >= TRACESTATE_INJECT_CACHE_LIMIT {
+        tracestate_inject_cache.clear()
+      }
+      tracestate_inject_cache.set(state, normalized)
+      normalized
+    }
+  }
+}
+
 // Inject a SpanContext into the carrier as a `traceparent` header, plus a
 // `tracestate` header when the SpanContext carries a valid one.
 // Does nothing when the SpanContext is invalid.
@@ -364,7 +394,7 @@ pub fn inject(sc : @api.SpanContext, carrier : TextMapCarrier) -> Unit {
     carrier.set(traceparent_header_name(), format_traceparent(sc))
     let state = sc.tracestate()
     if state != "" {
-      match parse_tracestate(state) {
+      match normalized_tracestate_for_inject(state) {
         Some(normalized) => carrier.set(tracestate_header_name(), normalized)
         None => ()
       }

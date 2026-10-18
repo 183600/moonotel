@@ -246,7 +246,7 @@ fn encode_attributes(
   if attributes.length() == 0 {
     return
   }
-  attributes.each(fn(key, value) {
+  for key, value in attributes {
     if !try_encode_scalar_attribute(writer, field, key, value) {
       let kv = writer.take_scratch()
       kv.write_string_field(1, key)
@@ -255,7 +255,7 @@ fn encode_attributes(
       kv.append_message(2, any_value)
       writer.append_message(field, kv)
     }
-  })
+  }
 }
 
 ///|
@@ -443,7 +443,9 @@ fn resource_key(resource : Map[String, @sdk.AttributeValue]) -> String {
   let entries : Array[(String, @sdk.AttributeValue)] = Array(
     capacity=resource.length(),
   )
-  resource.each(fn(key, value) { entries.push((key, value)) })
+  for key, value in resource {
+    entries.push((key, value))
+  }
   entries.sort_by(fn(a, b) { a.0.compare(b.0) })
   let sb = StringBuilder()
   for entry in entries {
@@ -490,18 +492,54 @@ fn find_scope_group(
   None
 }
 
+// Extra bytes contributed by an attribute beyond its count-based allowance:
+// the length of string payloads, which dominate the encoded size of long
+// values (URLs, SQL, error messages).
+
+///|
+fn estimate_attribute_value_size(value : @sdk.AttributeValue) -> Int32 {
+  match value {
+    @sdk.StringValue(text) => text.length()
+    @sdk.StringArrayValue(items) => {
+      let mut size = 0
+      for item in items {
+        size = size + item.length()
+      }
+      size
+    }
+    _ => 0
+  }
+}
+
+///|
+fn estimate_attributes_size(
+  attributes : Map[String, @sdk.AttributeValue],
+) -> Int32 {
+  let mut size = attributes.length() * 40
+  for key, value in attributes {
+    size = size + key.length() + estimate_attribute_value_size(value)
+  }
+  size
+}
+
 // Rough encoded size of one span, used to size the scratch buffers. Attribute
-// values are approximated by their count; for spans with very long values the
-// estimate may be too small.
+// values are approximated by their count plus the length of their string
+// payloads; numeric and boolean arrays may still be over- or under-estimated
+// slightly, which only affects the initial buffer capacity.
 
 ///|
 fn estimate_span_size(data : @sdk.SpanData) -> Int32 {
-  let mut size = 96 + data.name.length() + data.attributes.length() * 40
+  let mut size = 96 + data.name.length() + estimate_attributes_size(
+    data.attributes,
+  )
   for event in data.events {
-    size = size + 64 + event.name.length() + event.attributes.length() * 40
+    size = size +
+      64 +
+      event.name.length() +
+      estimate_attributes_size(event.attributes)
   }
   for link in data.links {
-    size = size + 64 + link.attributes.length() * 40
+    size = size + 64 + estimate_attributes_size(link.attributes)
   }
   size
 }
@@ -619,32 +657,6 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   groups
 }
 
-// If every span shares the same resource (by reference) and the same scope
-// name and version, returning the total estimated encoded span size. The batch
-// can then be encoded as one ResourceSpans with one ScopeSpans.
-
-///|
-fn uniform_batch_size_hint(spans : Array[@sdk.SpanData]) -> Int32? {
-  let len = spans.length()
-  if len == 0 {
-    return None
-  }
-  let first = spans.unsafe_get(0)
-  let mut hint = estimate_span_size(first)
-  let mut i = 1
-  while i < len {
-    let data = spans.unsafe_get(i)
-    if !physical_equal(data.resource, first.resource) ||
-      data.scope_name != first.scope_name ||
-      data.scope_version != first.scope_version {
-      return None
-    }
-    hint = hint + estimate_span_size(data)
-    i = i + 1
-  }
-  Some(hint)
-}
-
 // Estimate encoded size of resource attributes and of a scope group's
 // name/version plus span payloads.
 
@@ -668,63 +680,37 @@ pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
   if spans.length() == 0 {
     return b""
   }
-  match uniform_batch_size_hint(spans) {
-    Some(span_hint) => {
-      let first = spans.unsafe_get(0)
-      let scope_hint = 32 +
-        first.scope_name.length() +
-        first.scope_version.length()
-      let scope_spans_hint = scope_hint + span_hint
-      let resource_spans_hint = resource_size_hint(first.resource) +
-        scope_spans_hint
-      let writer = take_root_writer(32 + resource_spans_hint)
-      let resource_spans = writer.take_scratch_with_capacity(
-        32 + resource_spans_hint,
-      )
-      encode_resource(resource_spans, first.resource)
+  // A single grouping pass both sizes the buffers and orders the output, so
+  // each span's size is estimated exactly once.
+  let groups = group_spans(spans)
+  let mut total_hint = 32
+  for group in groups {
+    total_hint = total_hint + 32 + resource_size_hint(group.resource)
+    for scope in group.scopes {
+      total_hint = total_hint + scope_size_hint(scope)
+    }
+  }
+  let writer = take_root_writer(total_hint)
+  for group in groups {
+    let mut scopes_hint = 0
+    for scope in group.scopes {
+      scopes_hint = scopes_hint + scope_size_hint(scope)
+    }
+    let resource_spans = writer.take_scratch_with_capacity(
+      32 + resource_size_hint(group.resource) + scopes_hint,
+    )
+    encode_resource(resource_spans, group.resource)
+    for scope in group.scopes {
       let scope_spans = resource_spans.take_scratch_with_capacity(
-        32 + scope_spans_hint,
+        32 + scope_size_hint(scope),
       )
-      encode_scope(scope_spans, first.scope_name, first.scope_version)
-      for span in spans {
+      encode_scope(scope_spans, scope.scope_name, scope.scope_version)
+      for span in scope.spans {
         encode_span(scope_spans, span)
       }
       resource_spans.append_message(2, scope_spans)
-      writer.append_message(1, resource_spans)
-      writer.to_bytes()
     }
-    None => {
-      let groups = group_spans(spans)
-      let mut total_hint = 32
-      for group in groups {
-        total_hint = total_hint + 32 + resource_size_hint(group.resource)
-        for scope in group.scopes {
-          total_hint = total_hint + scope_size_hint(scope)
-        }
-      }
-      let writer = take_root_writer(total_hint)
-      for group in groups {
-        let mut scopes_hint = 0
-        for scope in group.scopes {
-          scopes_hint = scopes_hint + scope_size_hint(scope)
-        }
-        let resource_spans = writer.take_scratch_with_capacity(
-          32 + resource_size_hint(group.resource) + scopes_hint,
-        )
-        encode_resource(resource_spans, group.resource)
-        for scope in group.scopes {
-          let scope_spans = resource_spans.take_scratch_with_capacity(
-            32 + scope_size_hint(scope),
-          )
-          encode_scope(scope_spans, scope.scope_name, scope.scope_version)
-          for span in scope.spans {
-            encode_span(scope_spans, span)
-          }
-          resource_spans.append_message(2, scope_spans)
-        }
-        writer.append_message(1, resource_spans)
-      }
-      writer.to_bytes()
-    }
+    writer.append_message(1, resource_spans)
   }
+  writer.to_bytes()
 }

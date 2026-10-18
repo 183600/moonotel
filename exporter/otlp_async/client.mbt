@@ -24,9 +24,9 @@ fn request_headers(
   gzip : Bool,
 ) -> Map[@http.CaseInsensitiveString, String] {
   let headers = Map([], capacity=(config.headers.length() + 2) * 2)
-  config.headers.each(fn(key, value) {
+  for key, value in config.headers {
     headers.set(@http.CaseInsensitiveString(key), value)
-  })
+  }
   headers.set(
     @http.CaseInsensitiveString("content-type"),
     @otlp.content_type_for_protocol(config.protocol),
@@ -240,45 +240,24 @@ fn retry_after_millis(value : String) -> Int32? {
   }
 }
 
-// POST an already encoded `ExportTraceServiceRequest` body to the configured
-// trace endpoint and interpret the response. Both `http/protobuf` and
-// `http/json` bodies are supported; the response is decoded with the matching
-// encoding. Network errors and retryable statuses (429, 502, 503, 504) are
-// retried up to `config.max_retries` times. The delay before a retry is taken
-// from the response's `Retry-After` header when it holds a number of seconds
-// or an HTTP date, and a short linear backoff is used otherwise. When
-// `config.compression` is `gzip` the body is compressed once and sent with
-// `Content-Encoding: gzip`.
+// Shared request loop of `post_trace_request` and
+// `OtlpHttpAsyncExporter::export_batch`: the caller has already validated the
+// configuration, compressed the body when needed and built the headers. Both
+// `http/protobuf` and `http/json` bodies are supported; the response is
+// decoded with the matching encoding. Network errors and retryable statuses
+// (429, 502, 503, 504) are retried up to `config.max_retries` times. The delay
+// before a retry is taken from the response's `Retry-After` header when it
+// holds a number of seconds or an HTTP date, and a short linear backoff is
+// used otherwise.
 
 ///|
-pub async fn post_trace_request(
+async fn post_trace_request_with_headers(
   config : @otlp.OtlpHttpConfig,
   body : Bytes,
+  headers : Map[@http.CaseInsensitiveString, String],
 ) -> @sdk.ExportResult {
-  if !@otlp.is_supported_protocol(config.protocol) {
-    return @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol)
-  }
   let json = config.protocol == @otlp.OTLP_HTTP_JSON_PROTOCOL
-  let gzip = config.compression == "gzip"
-  if !gzip && config.compression != "none" {
-    return @sdk.ExportFailure(
-      "unsupported OTLP compression: " + config.compression,
-    )
-  }
-  let body = if gzip {
-    let compressed : Bytes? = Some(gzip_compress(body)) catch { _ => None }
-    match compressed {
-      Some(payload) => payload
-      None =>
-        return @sdk.ExportFailure(
-          "failed to gzip-compress the OTLP request body",
-        )
-    }
-  } else {
-    body
-  }
   let url = config.traces_url()
-  let headers = request_headers(config, gzip)
   let mut attempt = 0
   let mut last_failure = ""
   let mut retry_after : Int32? = None
@@ -337,6 +316,47 @@ pub async fn post_trace_request(
   @sdk.ExportFailure(last_failure)
 }
 
+// POST an already encoded `ExportTraceServiceRequest` body to the configured
+// trace endpoint and interpret the response, building the request headers
+// from `config` and compressing the body first when `config.compression` is
+// `gzip`.
+
+///|
+pub async fn post_trace_request(
+  config : @otlp.OtlpHttpConfig,
+  body : Bytes,
+) -> @sdk.ExportResult {
+  if !@otlp.is_supported_protocol(config.protocol) {
+    return @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol)
+  }
+  let gzip = config.compression == "gzip"
+  if !gzip && config.compression != "none" {
+    return @sdk.ExportFailure(
+      "unsupported OTLP compression: " + config.compression,
+    )
+  }
+  let body = if gzip {
+    match gzip_body(body) {
+      Some(payload) => payload
+      None =>
+        return @sdk.ExportFailure(
+          "failed to gzip-compress the OTLP request body",
+        )
+    }
+  } else {
+    body
+  }
+  let headers = request_headers(config, gzip)
+  post_trace_request_with_headers(config, body, headers)
+}
+
+// gzip-compress `body`, returning `None` when compression fails.
+
+///|
+async fn gzip_body(body : Bytes) -> Bytes? {
+  Some(gzip_compress(body)) catch { _ => None }
+}
+
 // Encode and export the given spans over OTLP/HTTP, using the encoding
 // selected by `config.protocol`. Exporting an empty array is a no-op success.
 
@@ -362,6 +382,9 @@ pub async fn export_spans(
 ///|
 pub struct OtlpHttpAsyncExporter {
   config : @otlp.OtlpHttpConfig
+  // Request headers derived from `config`, built once because the
+  // configuration is not changed after construction.
+  headers : Map[@http.CaseInsensitiveString, String]
 }
 
 // Create an exporter that sends spans to `config`.
@@ -370,7 +393,7 @@ pub struct OtlpHttpAsyncExporter {
 pub fn OtlpHttpAsyncExporter::new(
   config : @otlp.OtlpHttpConfig,
 ) -> OtlpHttpAsyncExporter {
-  { config, }
+  { config, headers: request_headers(config, config.compression == "gzip"), }
 }
 
 // The exporter configuration.
@@ -389,5 +412,34 @@ pub async fn OtlpHttpAsyncExporter::export_batch(
   self : OtlpHttpAsyncExporter,
   spans : Array[@sdk.SpanData],
 ) -> @sdk.ExportResult {
-  export_spans(self.config, spans)
+  if spans.length() == 0 {
+    return @sdk.ExportSuccess
+  }
+  let config = self.config
+  if !@otlp.is_supported_protocol(config.protocol) {
+    return @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol)
+  }
+  let gzip = config.compression == "gzip"
+  if !gzip && config.compression != "none" {
+    return @sdk.ExportFailure(
+      "unsupported OTLP compression: " + config.compression,
+    )
+  }
+  let body = if config.protocol == @otlp.OTLP_HTTP_JSON_PROTOCOL {
+    @otlp.encode_trace_request_json(spans)
+  } else {
+    @otlp.encode_trace_request(spans)
+  }
+  let body = if gzip {
+    match gzip_body(body) {
+      Some(payload) => payload
+      None =>
+        return @sdk.ExportFailure(
+          "failed to gzip-compress the OTLP request body",
+        )
+    }
+  } else {
+    body
+  }
+  post_trace_request_with_headers(config, body, self.headers)
 }

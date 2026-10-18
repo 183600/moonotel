@@ -304,19 +304,31 @@ pub fn SpanContext::span_id(self : SpanContext) -> Array[Int32] {
 }
 
 // The trace ID bytes backing this context. The returned array is shared with
-// the context and must not be mutated.
+// the context and must not be mutated. Invalid contexts return a copy so that
+// the arrays of the shared `invalid_span_context()` instance cannot be
+// corrupted through a view.
 
 ///|
 pub fn SpanContext::trace_id_view(self : SpanContext) -> Array[Int32] {
-  self.trace_id
+  if self.is_valid {
+    self.trace_id
+  } else {
+    self.trace_id.copy()
+  }
 }
 
 // The span ID bytes backing this context. The returned array is shared with
-// the context and must not be mutated.
+// the context and must not be mutated. Invalid contexts return a copy so that
+// the arrays of the shared `invalid_span_context()` instance cannot be
+// corrupted through a view.
 
 ///|
 pub fn SpanContext::span_id_view(self : SpanContext) -> Array[Int32] {
-  self.span_id
+  if self.is_valid {
+    self.span_id
+  } else {
+    self.span_id.copy()
+  }
 }
 
 // Helper: convert a UTF-16 code unit to its 0-15 hex value, or -1 when the

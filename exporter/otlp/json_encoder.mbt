@@ -39,49 +39,182 @@ fn build_json_hex_digits() -> FixedArray[Char] {
   table
 }
 
-// Lower-case hex pair "00".."ff" of every byte value.
+// UTF-8 bytes of the two lower-case hex characters of every byte value: entry
+// `b` holds the high-nibble character in the low byte and the low-nibble
+// character in the next byte.
 
 ///|
-let json_hex_bytes : FixedArray[String] = build_json_hex_bytes()
+let json_hex_pairs : FixedArray[UInt32] = build_json_hex_pairs()
 
 ///|
-fn build_json_hex_bytes() -> FixedArray[String] {
-  let table : FixedArray[String] = FixedArray::make(256, "00")
-  let mut i = 0
-  while i < 256 {
-    table.unsafe_set(
-      i,
-      String::from_array([
-        json_hex_digits.unsafe_get(i >> 4),
-        json_hex_digits.unsafe_get(i & 0x0F),
-      ]),
-    )
-    i = i + 1
+fn build_json_hex_pairs() -> FixedArray[UInt32] {
+  let table : FixedArray[UInt32] = FixedArray::make(256, 0U)
+  let mut b = 0
+  while b < 256 {
+    let hi = json_hex_digit(b >> 4).to_int()
+    let lo = json_hex_digit(b & 0x0F).to_int()
+    table.unsafe_set(b, (hi | (lo << 8)).reinterpret_as_uint())
+    b = b + 1
   }
   table
 }
 
-// Append `"<hex>"` for a byte array. Out-of-range values are rendered exactly
+// A growable UTF-8 byte buffer for JSON encoding. Writing bytes directly
+// avoids materializing the whole payload as a UTF-16 `String` and then
+// re-encoding it to UTF-8, which previously copied the entire document twice.
+
+///|
+priv struct JsonBuf {
+  mut buf : FixedArray[Byte]
+  mut len : Int32
+}
+
+///|
+fn JsonBuf::new(size_hint : Int32) -> JsonBuf {
+  let capacity = if size_hint < 1 { 1 } else { size_hint }
+  { buf: FixedArray::make(capacity, b'\x00'), len: 0, }
+}
+
+///|
+fn JsonBuf::ensure(self : JsonBuf, extra : Int32) -> Unit {
+  let required = self.len + extra
+  if required > self.buf.length() {
+    let doubled = self.buf.length() * 2
+    let capacity = if doubled > required { doubled } else { required }
+    let grown : FixedArray[Byte] = FixedArray::make(capacity, b'\x00')
+    grown.unsafe_blit(0, self.buf, 0, self.len)
+    self.buf = grown
+  }
+}
+
+///|
+fn JsonBuf::write_bytes(self : JsonBuf, bytes : Bytes) -> Unit {
+  let n = bytes.length()
+  self.ensure(n)
+  self.buf.blit_from_bytes(self.len, bytes, 0, n)
+  self.len = self.len + n
+}
+
+///|
+fn JsonBuf::write_char(self : JsonBuf, c : Char) -> Unit {
+  let code = c.to_int()
+  if code >= 0 && code < 0x80 {
+    self.ensure(1)
+    self.buf.unsafe_set(self.len, code.to_byte())
+    self.len = self.len + 1
+  } else {
+    self.write_bytes(@utf8.encode(String::from_array([c])))
+  }
+}
+
+// Append a string view, copying ASCII runs in bulk and encoding every run of
+// non-ASCII code units with `@utf8.encode` so that surrogate pairs keep the
+// exact same encoding as the rest of the SDK.
+
+///|
+fn JsonBuf::write_view(self : JsonBuf, value : StringView) -> Unit {
+  let len = value.length()
+  let mut i = 0
+  while i < len {
+    let mut ascii_end = i
+    while ascii_end < len && value.unsafe_get(ascii_end).to_int() < 0x80 {
+      ascii_end = ascii_end + 1
+    }
+    if ascii_end > i {
+      self.ensure(ascii_end - i)
+      let buf = self.buf
+      let mut pos = self.len
+      let mut j = i
+      while j + 4 <= ascii_end {
+        let c0 = value.unsafe_get(j).to_int()
+        let c1 = value.unsafe_get(j + 1).to_int()
+        let c2 = value.unsafe_get(j + 2).to_int()
+        let c3 = value.unsafe_get(j + 3).to_int()
+        buf.unsafe_write_uint32_le(
+          pos,
+          (c0 | (c1 << 8) | (c2 << 16) | (c3 << 24)).reinterpret_as_uint(),
+        )
+        pos = pos + 4
+        j = j + 4
+      }
+      while j < ascii_end {
+        buf.unsafe_set(pos, value.unsafe_get(j).to_int().to_byte())
+        pos = pos + 1
+        j = j + 1
+      }
+      self.len = pos
+    }
+    if ascii_end >= len {
+      break
+    }
+    let mut run_end = ascii_end
+    while run_end < len && value.unsafe_get(run_end).to_int() >= 0x80 {
+      run_end = run_end + 1
+    }
+    self.write_bytes(
+      @utf8.encode(value.view(start_offset=ascii_end, end_offset=run_end)),
+    )
+    i = run_end
+  }
+}
+
+///|
+fn JsonBuf::write_string(self : JsonBuf, value : String) -> Unit {
+  self.write_view(value[:])
+}
+
+///|
+fn JsonBuf::to_bytes(self : JsonBuf) -> Bytes {
+  Bytes::from_array(self.buf[:self.len])
+}
+
+// The UTF-8 hex pair of a byte value. Out-of-range values are rendered exactly
 // like `@api.bytes_to_hex` does.
 
 ///|
-fn json_write_hex_quoted(sb : StringBuilder, bytes : Array[Int32]) -> Unit {
-  sb.write_char('"')
-  for byte in bytes {
-    if byte >= 0 && byte < 256 {
-      sb.write_string(json_hex_bytes.unsafe_get(byte))
+fn json_hex_pair_of(value : Int32) -> UInt32 {
+  if value >= 0 && value < 256 {
+    json_hex_pairs.unsafe_get(value)
+  } else {
+    let hi = value >> 4
+    let hi_char = if hi >= 0 && hi < 16 {
+      json_hex_digits.unsafe_get(hi).to_int()
     } else {
-      let hi = byte >> 4
-      sb.write_char(
-        if hi >= 0 && hi < 16 {
-          json_hex_digits.unsafe_get(hi)
-        } else {
-          '0'
-        },
-      )
-      sb.write_char(json_hex_digits.unsafe_get(byte & 0x0F))
+      0x30
     }
+    let lo_char = json_hex_digits.unsafe_get(value & 0x0F).to_int()
+    (hi_char | (lo_char << 8)).reinterpret_as_uint()
   }
+}
+
+// Append `"<hex>"` for a byte array, writing four hex characters (two input
+// bytes) per store.
+
+///|
+fn json_write_hex_quoted(sb : JsonBuf, bytes : Array[Int32]) -> Unit {
+  sb.write_char('"')
+  let len = bytes.length()
+  sb.ensure(len * 2)
+  let buf = sb.buf
+  let mut pos = sb.len
+  let mut i = 0
+  while i + 2 <= len {
+    buf.unsafe_write_uint32_le(
+      pos,
+      json_hex_pair_of(bytes.unsafe_get(i)) |
+      (json_hex_pair_of(bytes.unsafe_get(i + 1)) << 16),
+    )
+    pos = pos + 4
+    i = i + 2
+  }
+  if i < len {
+    buf.unsafe_write_uint16_le(
+      pos,
+      json_hex_pair_of(bytes.unsafe_get(i)).to_uint16(),
+    )
+    pos = pos + 2
+  }
+  sb.len = pos
   sb.write_char('"')
 }
 
@@ -89,7 +222,7 @@ fn json_write_hex_quoted(sb : StringBuilder, bytes : Array[Int32]) -> Unit {
 // RFC 8259. Non-ASCII text is emitted verbatim (JSON documents are UTF-8).
 
 ///|
-fn json_write_escaped(sb : StringBuilder, value : String) -> Unit {
+fn json_write_escaped(sb : JsonBuf, value : String) -> Unit {
   sb.write_char('"')
   let len = value.length()
   let mut i = 0
@@ -101,7 +234,7 @@ fn json_write_escaped(sb : StringBuilder, value : String) -> Unit {
       continue
     }
     if run_start < i {
-      sb.write_stringview(value.view(start_offset=run_start, end_offset=i))
+      sb.write_view(value.view(start_offset=run_start, end_offset=i))
     }
     if code == 0x22 {
       sb.write_string("\\\"")
@@ -126,7 +259,7 @@ fn json_write_escaped(sb : StringBuilder, value : String) -> Unit {
     run_start = i
   }
   if run_start < len {
-    sb.write_stringview(value.view(start_offset=run_start, end_offset=len))
+    sb.write_view(value.view(start_offset=run_start, end_offset=len))
   }
   sb.write_char('"')
 }
@@ -154,7 +287,7 @@ fn build_json_two_digits() -> FixedArray[String] {
 }
 
 ///|
-fn json_write_decimal_digits(sb : StringBuilder, value : UInt64) -> Unit {
+fn json_write_decimal_digits(sb : JsonBuf, value : UInt64) -> Unit {
   if value < 10 {
     sb.write_char((0x30 + value.to_int()).unsafe_to_char())
     return
@@ -172,7 +305,7 @@ fn json_write_decimal_digits(sb : StringBuilder, value : UInt64) -> Unit {
 // `Int32::to_string`.
 
 ///|
-fn json_write_int32(sb : StringBuilder, value : Int32) -> Unit {
+fn json_write_int32(sb : JsonBuf, value : Int32) -> Unit {
   if value < 0 {
     sb.write_char('-')
     json_write_decimal_digits(
@@ -188,7 +321,7 @@ fn json_write_int32(sb : StringBuilder, value : Int32) -> Unit {
 // of `int64`/`uint64` values.
 
 ///|
-fn json_write_int64_string(sb : StringBuilder, value : Int64) -> Unit {
+fn json_write_int64_string(sb : JsonBuf, value : Int64) -> Unit {
   sb.write_char('"')
   if value < 0L {
     sb.write_char('-')
@@ -205,7 +338,7 @@ fn json_write_int64_string(sb : StringBuilder, value : Int64) -> Unit {
 // mapping.
 
 ///|
-fn json_write_double(sb : StringBuilder, value : Double) -> Unit {
+fn json_write_double(sb : JsonBuf, value : Double) -> Unit {
   if value.is_nan() {
     sb.write_string("\"NaN\"")
   } else if value > 1.7976931348623157e308 {
@@ -221,7 +354,7 @@ fn json_write_double(sb : StringBuilder, value : Double) -> Unit {
 
 ///|
 fn json_write_any_value(
-  sb : StringBuilder,
+  sb : JsonBuf,
   value : @sdk.AttributeValue,
 ) -> Unit {
   sb.write_char('{')
@@ -314,12 +447,12 @@ fn json_write_any_value(
 
 ///|
 fn json_write_attributes(
-  sb : StringBuilder,
+  sb : JsonBuf,
   attributes : Map[String, @sdk.AttributeValue],
 ) -> Unit {
   sb.write_char('[')
   let mut first = true
-  attributes.each(fn(key, value) {
+  for key, value in attributes {
     if !first {
       sb.write_char(',')
     }
@@ -329,7 +462,7 @@ fn json_write_attributes(
     sb.write_string(",\"value\":")
     json_write_any_value(sb, value)
     sb.write_char('}')
-  })
+  }
   sb.write_char(']')
 }
 
@@ -337,7 +470,7 @@ fn json_write_attributes(
 
 ///|
 fn json_write_resource(
-  sb : StringBuilder,
+  sb : JsonBuf,
   resource : Map[String, @sdk.AttributeValue],
 ) -> Unit {
   sb.write_string("{\"attributes\":")
@@ -349,7 +482,7 @@ fn json_write_resource(
 
 ///|
 fn json_write_scope(
-  sb : StringBuilder,
+  sb : JsonBuf,
   name : String,
   version : String,
 ) -> Unit {
@@ -365,7 +498,7 @@ fn json_write_scope(
 // Append one `Event` message.
 
 ///|
-fn json_write_event(sb : StringBuilder, event : @sdk.SpanEvent) -> Unit {
+fn json_write_event(sb : JsonBuf, event : @sdk.SpanEvent) -> Unit {
   sb.write_string("{\"timeUnixNano\":")
   json_write_int64_string(sb, event.time_unix_nano)
   sb.write_string(",\"name\":")
@@ -384,7 +517,7 @@ fn json_write_event(sb : StringBuilder, event : @sdk.SpanEvent) -> Unit {
 // Append one `Link` message.
 
 ///|
-fn json_write_link(sb : StringBuilder, link : @sdk.SpanLink) -> Unit {
+fn json_write_link(sb : JsonBuf, link : @sdk.SpanLink) -> Unit {
   sb.write_string("{\"traceId\":")
   json_write_hex_quoted(sb, link.span_context.trace_id_view())
   sb.write_string(",\"spanId\":")
@@ -411,7 +544,7 @@ fn json_write_link(sb : StringBuilder, link : @sdk.SpanLink) -> Unit {
 // description.
 
 ///|
-fn json_write_status(sb : StringBuilder, data : @sdk.SpanData) -> Unit {
+fn json_write_status(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
   if data.status != @api.StatusCode::Unset || data.status_description != "" {
     sb.write_string(",\"status\":{")
     let mut first = true
@@ -435,7 +568,7 @@ fn json_write_status(sb : StringBuilder, data : @sdk.SpanData) -> Unit {
 // Append one `Span` message.
 
 ///|
-fn json_write_span(sb : StringBuilder, data : @sdk.SpanData) -> Unit {
+fn json_write_span(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
   sb.write_string("{\"traceId\":")
   json_write_hex_quoted(sb, data.span_context.trace_id_view())
   sb.write_string(",\"spanId\":")
@@ -515,7 +648,7 @@ pub fn encode_trace_request_json(spans : Array[@sdk.SpanData]) -> Bytes {
   for data in spans {
     size_hint = size_hint + estimate_span_size(data) * 2
   }
-  let sb = StringBuilder(size_hint~)
+  let sb = JsonBuf::new(size_hint)
   sb.write_string("{\"resourceSpans\":[")
   let groups = group_spans(spans)
   let mut first_group = true
@@ -549,5 +682,5 @@ pub fn encode_trace_request_json(spans : Array[@sdk.SpanData]) -> Bytes {
     sb.write_string("]}")
   }
   sb.write_string("]}")
-  @utf8.encode(sb.to_string())
+  sb.to_bytes()
 }

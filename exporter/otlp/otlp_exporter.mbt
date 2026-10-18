@@ -95,7 +95,7 @@ pub fn OtlpHttpConfig::new(
     timeout_millis: timeout_millis.unwrap_or(10000),
     compression: compression.unwrap_or("none"),
     protocol: protocol.unwrap_or(OTLP_HTTP_PROTOBUF_PROTOCOL),
-    max_retries: max_retries.unwrap_or(0),
+    max_retries: max_retries.unwrap_or(DEFAULT_MAX_RETRIES),
   }
 }
 
@@ -231,7 +231,9 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
   match @env.get_env_var("OTEL_EXPORTER_OTLP_TRACES_HEADERS") {
     Some(value) => {
       let specific = parse_headers(value)
-      specific.each(fn(key, header_value) { headers.set(key, header_value) })
+      for key, header_value in specific {
+        headers.set(key, header_value)
+      }
     }
     None => ()
   }
@@ -287,7 +289,7 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
     timeout_millis,
     compression,
     protocol,
-    max_retries: 0,
+    max_retries: DEFAULT_MAX_RETRIES,
   }
 }
 
@@ -334,6 +336,9 @@ pub struct OtlpHttpExporter {
   transport : Transport
   // The trace endpoint URL derived from the config strings.
   url : String
+  // Request headers (configured headers plus `content-type`), built once
+  // because the configuration is not changed after construction.
+  headers : Map[String, String]
 }
 
 // Create an exporter with an injected transport function.
@@ -343,7 +348,12 @@ pub fn OtlpHttpExporter::new(
   config : OtlpHttpConfig,
   transport : Transport,
 ) -> OtlpHttpExporter {
-  { config, transport, url: config.traces_url(), }
+  {
+    config,
+    transport,
+    url: config.traces_url(),
+    headers: exporter_headers(config),
+  }
 }
 
 // The exporter configuration.
@@ -356,7 +366,9 @@ pub fn OtlpHttpExporter::config(self : OtlpHttpExporter) -> OtlpHttpConfig {
 ///|
 fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
   let headers = Map([], capacity=(config.headers.length() + 1) * 2)
-  config.headers.each(fn(key, value) { headers.set(key, value) })
+  for key, value in config.headers {
+    headers.set(key, value)
+  }
   headers.set("content-type", content_type_for_protocol(config.protocol))
   headers
 }
@@ -393,7 +405,7 @@ pub fn OtlpHttpExporter::export_spans_http(
     encode_trace_request(spans)
   }
   let url = self.url
-  let headers = exporter_headers(self.config)
+  let headers = self.headers
   let mut attempt = 0
   let mut last_failure = ""
   while attempt <= self.config.max_retries {

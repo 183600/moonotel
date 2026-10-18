@@ -271,9 +271,9 @@ fn plain_headers(
     Some(values) => {
       let total = values.length() + extra
       let out = Map([], capacity=if total == 0 { 1 } else { total * 2 })
-      values.each(fn(key, value) {
+      for key, value in values {
         out.set(@http.CaseInsensitiveString(key), value)
-      })
+      }
       out
     }
     None => Map([], capacity=if extra == 0 { 1 } else { (extra + 1) * 2 })
@@ -289,15 +289,16 @@ fn traced_headers(
   let out = plain_headers(headers, extra=3)
   // Inject through the process-wide propagator so that the headers written are
   // the ones selected by `OTEL_PROPAGATORS` (by default `traceparent`,
-  // `tracestate` and `baggage`).
-  let carrier = @propagation.TextMapCarrier::new()
+  // `tracestate` and `baggage`). The carrier reads and writes `out` directly,
+  // so no intermediate map or second copy is needed for the injected headers.
+  let carrier = @propagation.TextMapCarrier::from_getter_setter(
+    fn(key) { out.get(@http.CaseInsensitiveString(key)) },
+    fn(key, value) { out.set(@http.CaseInsensitiveString(key), value) },
+  )
   @propagation.global_propagator().inject(
     context.with_span(span_context),
     carrier,
   )
-  carrier.to_map().each(fn(key, value) {
-    out.set(@http.CaseInsensitiveString(key), value)
-  })
   out
 }
 
@@ -340,8 +341,11 @@ pub async fn request(
         @sdk.HTTP_REQUEST_METHOD,
         method_attribute_value(request_method),
       )
-      // The request body is in memory, so its size is always known.
-      let request_size = body.binary().length()
+      // The request body is in memory, so its size is always known. Encoding
+      // it once up front gives the size for free; passing the resulting bytes
+      // to the transport avoids a second encode for string/JSON bodies.
+      let request_body : Bytes = body.binary()
+      let request_size = request_body.length()
       if request_size > 0 {
         span.set_attribute(
           @sdk.HTTP_REQUEST_BODY_SIZE,
@@ -367,7 +371,7 @@ pub async fn request(
           url,
           request_method,
           traced_headers(headers, span.context(), request_context),
-          body,
+          request_body,
         ),
       ) catch {
         error => Err(error)
