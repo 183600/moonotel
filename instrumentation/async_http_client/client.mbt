@@ -1,9 +1,10 @@
 // Tracing instrumentation for `moonbitlang/async/http` client requests.
 //
-// Every request starts a CLIENT span, injects the W3C `traceparent` header so
-// the downstream service can continue the trace, and records the stable HTTP
-// semantic-convention attributes. The span ends when the response headers are
-// available.
+// Every request starts a CLIENT span, injects the current context through the
+// process-wide propagator (the W3C `traceparent` header and `baggage` by
+// default) so the downstream service can continue the trace, and records the
+// stable HTTP semantic-convention attributes. The span ends when the response
+// headers are available.
 //
 // When no TracerProvider has been installed (see
 // `@sdk.set_global_tracer_provider` / `yourname/otel` setup) or no tracer is
@@ -286,31 +287,17 @@ fn traced_headers(
   context : @context.Context,
 ) -> Map[@http.CaseInsensitiveString, String] {
   let out = plain_headers(headers, extra=3)
-  if span_context.is_valid() {
-    out.set(
-      @http.CaseInsensitiveString(@propagation.traceparent_header_name()),
-      @propagation.format_traceparent(span_context),
-    )
-    let tracestate = span_context.tracestate()
-    if tracestate != "" {
-      match @propagation.parse_tracestate(tracestate) {
-        Some(normalized) =>
-          out.set(
-            @http.CaseInsensitiveString(@propagation.tracestate_header_name()),
-            normalized,
-          )
-        None => ()
-      }
-    }
-  }
-  match @propagation.context_baggage_header(context) {
-    Some(value) =>
-      out.set(
-        @http.CaseInsensitiveString(@propagation.baggage_header_name()),
-        value,
-      )
-    None => ()
-  }
+  // Inject through the process-wide propagator so that the headers written are
+  // the ones selected by `OTEL_PROPAGATORS` (by default `traceparent`,
+  // `tracestate` and `baggage`).
+  let carrier = @propagation.TextMapCarrier::new()
+  @propagation.global_propagator().inject(
+    context.with_span(span_context),
+    carrier,
+  )
+  carrier.to_map().each(fn(key, value) {
+    out.set(@http.CaseInsensitiveString(key), value)
+  })
   out
 }
 

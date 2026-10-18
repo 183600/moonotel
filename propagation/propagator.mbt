@@ -194,3 +194,46 @@ pub fn CompositePropagator::from_env() -> CompositePropagator {
   }
   CompositePropagator::new(propagators)
 }
+
+// Process-wide propagator installed with `set_global_propagator`. The cached
+// default is stored in the same slot so that repeated `global_propagator`
+// calls do not rebuild it.
+
+///|
+let global_propagator_slot : Ref[&TextMapPropagator?] = Ref(None)
+
+// Install a process-wide `TextMapPropagator`. Instrumentations resolve the
+// propagator they use through `global_propagator`, so this is the one place to
+// change how context crosses process boundaries. The installed propagator
+// takes precedence over `OTEL_PROPAGATORS` until `reset_global_propagator` is
+// called.
+
+///|
+pub fn set_global_propagator(propagator : &TextMapPropagator) -> Unit {
+  global_propagator_slot.val = Some(propagator)
+}
+
+// The process-wide `TextMapPropagator`. When none has been installed the
+// composite selected by `OTEL_PROPAGATORS` (`tracecontext,baggage` by default)
+// is built and cached on first use.
+
+///|
+pub fn global_propagator() -> &TextMapPropagator {
+  match global_propagator_slot.val {
+    Some(propagator) => propagator
+    None => {
+      let propagator : &TextMapPropagator = CompositePropagator::from_env()
+      global_propagator_slot.val = Some(propagator)
+      propagator
+    }
+  }
+}
+
+// Forget the installed or cached propagator so that the next
+// `global_propagator` call reads `OTEL_PROPAGATORS` again. Intended for tests
+// and for processes that re-initialize their configuration.
+
+///|
+pub fn reset_global_propagator() -> Unit {
+  global_propagator_slot.val = None
+}

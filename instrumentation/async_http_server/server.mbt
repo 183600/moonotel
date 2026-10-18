@@ -1,9 +1,10 @@
 // Tracing instrumentation for `moonbitlang/async/http` servers.
 //
 // `run_server` wraps `@http.Server::run_forever`: every request starts a
-// SERVER span whose parent is extracted from the incoming W3C `traceparent`
-// header, the extracted context is installed as the current context while the
-// handler runs, and the span is ended when the handler returns (or raises).
+// SERVER span whose parent is extracted through the process-wide propagator
+// (the W3C `traceparent` header by default), the extracted context is
+// installed as the current context while the handler runs, and the span is
+// ended when the handler returns (or raises).
 //
 // Use `ServerCall::respond` to send the response and record the status code on
 // the span, and `ServerCall::start_span` to create child spans that are
@@ -138,56 +139,20 @@ fn split_path_query(path : String) -> (String, String) {
   }
 }
 
-// Parse the incoming W3C context of a request: `traceparent` (with a valid
-// `tracestate`) and `baggage`. Request headers are already keyed
-// case-insensitively; a request without trace context or baggage yields the
-// root context.
+// Parse the incoming trace context of a request through the process-wide
+// propagator (see `@propagation.global_propagator`), which by default handles
+// the W3C `traceparent`/`tracestate` headers and `baggage`. Request headers
+// are already keyed case-insensitively. The second result reports whether the
+// extracted context carries baggage.
 
 ///|
 fn extract_context_with_baggage(
   headers : Map[@http.CaseInsensitiveString, String],
 ) -> (@context.Context, Bool) {
-  let traceparent_name = @propagation.traceparent_header_name()
-  let baggage_name = @propagation.baggage_header_name()
-  let traceparent = headers.get(@http.CaseInsensitiveString(traceparent_name))
-  let baggage = headers.get(@http.CaseInsensitiveString(baggage_name))
-  if traceparent is None && baggage is None {
-    return (@context.Context::root(), false)
-  }
-  let mut context = @context.Context::root()
-  let mut has_baggage = false
-  match baggage {
-    Some(value) => {
-      let entries = @propagation.parse_baggage(value)
-      has_baggage = entries.length() > 0
-      for entry in entries {
-        context = context.with_value(entry.0, entry.1)
-      }
-    }
-    None => ()
-  }
-  match traceparent {
-    Some(value) =>
-      match @propagation.parse_traceparent(value) {
-        Some(sc) => {
-          let sc = match
-            headers.get(
-              @http.CaseInsensitiveString(@propagation.tracestate_header_name()),
-            ) {
-            Some(state) =>
-              match @propagation.parse_tracestate(state) {
-                Some(normalized) => sc.with_tracestate(normalized)
-                None => sc
-              }
-            None => sc
-          }
-          context = context.with_span(sc)
-        }
-        None => ()
-      }
-    None => ()
-  }
-  (context, has_baggage)
+  let carrier = @propagation.TextMapCarrier::new()
+  headers.each(fn(key, value) { carrier.set(key.0, value) })
+  let context = @propagation.global_propagator().extract(carrier)
+  (context, context.has_baggage())
 }
 
 ///|
@@ -197,7 +162,8 @@ pub fn extract_context(
   extract_context_with_baggage(headers).0
 }
 
-// Parse the W3C `traceparent` header of an incoming request, if present.
+// Parse the parent SpanContext of an incoming request through the
+// process-wide propagator, if the request carries one.
 
 ///|
 pub fn extract_parent(
