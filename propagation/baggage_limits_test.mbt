@@ -116,6 +116,20 @@ test "context_baggage_header_respects_the_member_limit" {
   }
 }
 
+test "parse_baggage_keeps_valid_members_after_a_long_invalid_prefix" {
+  // The invalid first member is longer than the byte budget but contributes
+  // nothing to the normalized header, so `kept=1` still fits.
+  let sb = StringBuilder()
+  sb.write_string("bad key=")
+  let mut i = 0
+  while i < 8200 {
+    sb.write_char('v')
+    i = i + 1
+  }
+  sb.write_string(",kept=1")
+  assert_eq(@propagation.parse_baggage(sb.to_string()), [("kept", "1")])
+}
+
 test "percent_encoded_length_matches_percent_encode" {
   let cases : Array[String] = [
     "", "abc", "a b", "100%", "a,b;c", "Am\u{00e9}lie", "\u{1F600}",

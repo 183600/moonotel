@@ -357,9 +357,10 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
     if entries.length() >= BAGGAGE_MAX_MEMBERS {
       break
     }
-    // Accepted members are ASCII, so a member starting past the byte budget
-    // can never fit.
-    if start >= BAGGAGE_MAX_BYTES {
+    // Once the budget is exhausted no further member can fit; members that do
+    // not contribute to the normalized header (malformed members, whitespace)
+    // do not count towards it.
+    if bytes >= BAGGAGE_MAX_BYTES {
       break
     }
     // Find the member end (the next `,`) together with the first `;` (which
