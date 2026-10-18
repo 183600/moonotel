@@ -54,13 +54,40 @@ async fn gzip_compress(data : Bytes) -> Bytes {
   reader.read_all().binary()
 }
 
+// Parse an HTTP `Retry-After` header value holding a non-negative number of
+// seconds. Returns the delay in milliseconds, capped at 60 seconds so that a
+// misbehaving server cannot stall the exporter indefinitely. The HTTP-date
+// form of the header is not supported and yields `None`.
+
+///|
+fn retry_after_millis(value : String) -> Int? {
+  let trimmed = value.trim()
+  if trimmed == "" {
+    return None
+  }
+  let seconds = try {
+    @string.parse_int(trimmed)
+  } catch {
+    _ => return None
+  }
+  if seconds < 0 {
+    return None
+  }
+  if seconds > 60 {
+    Some(60000)
+  } else {
+    Some(seconds * 1000)
+  }
+}
+
 // POST an already encoded `ExportTraceServiceRequest` body to the configured
 // trace endpoint and interpret the response. Both `http/protobuf` and
 // `http/json` bodies are supported; the response is decoded with the matching
 // encoding. Network errors and retryable statuses (429, 502, 503, 504) are
-// retried up to `config.max_retries` times with a short linear backoff. When
-// `config.compression` is `gzip` the body is compressed once and sent with
-// `Content-Encoding: gzip`.
+// retried up to `config.max_retries` times. The delay before a retry is taken
+// from the response's `Retry-After` header when it holds a number of seconds,
+// and a short linear backoff is used otherwise. When `config.compression` is
+// `gzip` the body is compressed once and sent with `Content-Encoding: gzip`.
 
 ///|
 pub async fn post_trace_request(
@@ -93,10 +120,18 @@ pub async fn post_trace_request(
   let headers = request_headers(config, gzip)
   let mut attempt = 0
   let mut last_failure = ""
+  let mut retry_after : Int? = None
   while attempt <= config.max_retries {
     if attempt > 0 {
-      @async.sleep(100 * attempt)
+      let delay = match retry_after {
+        Some(value) => value
+        None => 100 * attempt
+      }
+      if delay > 0 {
+        @async.sleep(delay)
+      }
     }
+    retry_after = None
     let timeout = config.timeout_millis
     let outcome = try {
       if timeout > 0 {
@@ -128,6 +163,11 @@ pub async fn post_trace_request(
           response.code.to_string()
         if !is_retryable_status(response.code) {
           return @sdk.ExportFailure(last_failure)
+        }
+        match
+          response.headers.get(@http.CaseInsensitiveString("retry-after")) {
+          Some(value) => retry_after = retry_after_millis(value)
+          None => ()
         }
       }
       None => ()

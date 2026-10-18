@@ -556,6 +556,55 @@ pub fn SpanSdk::set_double_attribute(
   self.set_attribute(key, DoubleValue(value))
 }
 
+// Set a string array attribute. Equivalent to
+// `set_attribute(key, StringArrayValue(...))`; every element is subject to the
+// same count and value length limits as `set_string_attribute`.
+
+///|
+pub fn SpanSdk::set_string_array_attribute(
+  self : SpanSdk,
+  key : String,
+  value : Array[String],
+) -> Unit {
+  self.set_attribute(key, StringArrayValue(value))
+}
+
+// Set an integer array attribute. Equivalent to
+// `set_attribute(key, IntArrayValue(...))`.
+
+///|
+pub fn SpanSdk::set_int_array_attribute(
+  self : SpanSdk,
+  key : String,
+  value : Array[Int64],
+) -> Unit {
+  self.set_attribute(key, IntArrayValue(value))
+}
+
+// Set a boolean array attribute. Equivalent to
+// `set_attribute(key, BoolArrayValue(...))`.
+
+///|
+pub fn SpanSdk::set_bool_array_attribute(
+  self : SpanSdk,
+  key : String,
+  value : Array[Bool],
+) -> Unit {
+  self.set_attribute(key, BoolArrayValue(value))
+}
+
+// Set a double array attribute. Equivalent to
+// `set_attribute(key, DoubleArrayValue(...))`.
+
+///|
+pub fn SpanSdk::set_double_array_attribute(
+  self : SpanSdk,
+  key : String,
+  value : Array[Double],
+) -> Unit {
+  self.set_attribute(key, DoubleArrayValue(value))
+}
+
 // Add an event to the span. No-op for non-recording or ended spans. When the
 // event count limit is reached the event is dropped and counted; attributes
 // beyond the event attribute count limit are dropped and counted on the

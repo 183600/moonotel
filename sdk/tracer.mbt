@@ -160,6 +160,50 @@ pub fn[X] Tracer::with_span(
   f(span)
 }
 
+// Async counterpart of `with_span`: run the async `f` with a new span that
+// becomes the current span until `f` returns or raises, so spans started
+// inside `f` (including ones started after an await) link to it
+// automatically. The span is ended and the previous context restored
+// afterwards. Argument semantics are identical to `with_span`.
+
+///|
+pub async fn[X] Tracer::with_span_async(
+  self : Tracer,
+  name : String,
+  f : async (SpanSdk) -> X,
+  context? : @context.Context,
+  kind? : @api.SpanKind,
+  parent? : @api.SpanContext,
+  attributes? : Map[String, AttributeValue],
+  links? : Array[SpanLink],
+  start_time_unix_nano? : Int64,
+) -> X {
+  let span = match parent {
+    Some(_) =>
+      self.start_span(
+        name,
+        kind?,
+        parent?,
+        attributes?,
+        links?,
+        start_time_unix_nano?,
+      )
+    None =>
+      self.start_span_with_context(
+        name,
+        context?,
+        kind?,
+        attributes?,
+        links?,
+        start_time_unix_nano?,
+      )
+  }
+  let previous = @context.attach(@context.current_context().with_span(span.context()))
+  defer @context.detach(previous)
+  defer span.end()
+  f(span)
+}
+
 // Start a new root span with no parent.
 
 ///|
