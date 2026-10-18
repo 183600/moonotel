@@ -319,17 +319,57 @@ pub fn SpanContext::span_id_view(self : SpanContext) -> Array[Int32] {
   self.span_id
 }
 
-// Helper: convert a hex character to its 0-15 value, or -1 when the character
-// is not a hex digit.
+// Helper: convert a UTF-16 code unit to its 0-15 hex value, or -1 when the
+// code unit is not an ASCII hex digit.
 
 ///|
-fn hex_char_value(c : Char) -> Int32 {
-  let code = c.to_int()
-  if code >= 0 && code < 128 {
-    hex_value.unsafe_get(code)
+fn hex_unit_value(unit : UInt16) -> Int32 {
+  if unit < 128 {
+    hex_value.unsafe_get(unit.to_int())
   } else {
     -1
   }
+}
+
+// Decode one byte per two hex code units of `hex` into `out` (whose length is
+// the number of bytes to decode). The invalid-digit check is accumulated so
+// that valid input needs no branch per character. Returns false on a non-hex
+// code unit.
+
+///|
+fn hex_to_bytes(hex : String, out : Array[Int32]) -> Bool {
+  let n = out.length()
+  let mut bad = 0
+  let mut i = 0
+  while i < n {
+    let hi = hex_unit_value(hex.unsafe_get(i * 2))
+    let lo = hex_unit_value(hex.unsafe_get(i * 2 + 1))
+    bad = bad | hi | lo
+    out.unsafe_set(i, hi * 16 + lo)
+    i = i + 1
+  }
+  bad >= 0
+}
+
+// Like `hex_to_bytes`, but rejects an all-zero result as well. The zero check
+// is accumulated over the same pass.
+
+///|
+fn hex_to_nonzero_bytes(hex : String, start : Int32, out : Array[Int32]) -> Bool {
+  let n = out.length()
+  let mut bad = 0
+  let mut acc = 0
+  let mut i = 0
+  while i < n {
+    let hi = hex_unit_value(hex.unsafe_get(start + i * 2))
+    let lo = hex_unit_value(hex.unsafe_get(start + i * 2 + 1))
+    bad = bad | hi | lo
+    let byte = hi * 16 + lo
+    acc = acc | byte
+    out.unsafe_set(i, byte)
+    i = i + 1
+  }
+  bad >= 0 && acc != 0
 }
 
 // Parse a hex string into a byte array; returns None on odd length or invalid chars
@@ -342,17 +382,11 @@ pub fn bytes_from_hex(hex : String) -> Array[Int32]? {
   }
   // Every element is written before the function returns.
   let out : Array[Int32] = Array::unsafe_make_uninit(len / 2)
-  let mut i = 0
-  while i < len {
-    let hi = hex_char_value(hex.unsafe_get(i).unsafe_to_char())
-    let lo = hex_char_value(hex.unsafe_get(i + 1).unsafe_to_char())
-    if hi < 0 || lo < 0 {
-      return None
-    }
-    out.unsafe_set(i / 2, hi * 16 + lo)
-    i = i + 2
+  if hex_to_bytes(hex, out) {
+    Some(out)
+  } else {
+    None
   }
-  Some(out)
 }
 
 // Build a SpanContext from hex-encoded trace and span IDs
@@ -366,17 +400,12 @@ pub fn span_context_from_hex(
   if trace_id_hex.length() != 32 || span_id_hex.length() != 16 {
     return invalid_span_context()
   }
-  let trace_id = match bytes_from_hex(trace_id_hex) {
-    Some(bytes) => bytes
-    None => return invalid_span_context()
-  }
-  let span_id = match bytes_from_hex(span_id_hex) {
-    Some(bytes) => bytes
-    None => return invalid_span_context()
-  }
-  // Decoding even-length hex already guarantees the 16/8-byte lengths; only
-  // the all-zero rule of `span_context` remains to be checked.
-  if is_zero(trace_id) || is_zero(span_id) {
+  // Decoding validates the hex digits, the 16/8-byte lengths (fixed here) and
+  // the all-zero rule of `span_context` in a single pass per ID.
+  let trace_id : Array[Int32] = Array::unsafe_make_uninit(16)
+  let span_id : Array[Int32] = Array::unsafe_make_uninit(8)
+  if !hex_to_nonzero_bytes(trace_id_hex, 0, trace_id) ||
+    !hex_to_nonzero_bytes(span_id_hex, 0, span_id) {
     return invalid_span_context()
   }
   {

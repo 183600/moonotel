@@ -123,11 +123,19 @@ fn is_baggage_value_char(code : Int32) -> Bool {
 }
 
 // Decode the body of a baggage value that contains at least one `%`.
+// Alongside the decoded string, the byte length of its percent-encoded form is
+// reported, so that callers do not have to scan the decoded value again. In
+// the non-ASCII case (where lossy UTF-8 decoding makes the byte accounting
+// hard to track) the length is recomputed from the decoded string to stay
+// exactly equivalent to `percent_encoded_length`.
 
 ///|
-fn percent_decode_escaped(value : StringView) -> String? {
+fn percent_decode_escaped_with_length(
+  value : StringView,
+) -> (String, Int32)? {
   let len = value.length()
   let mut decoded_len = 0
+  let mut encoded_len = 0
   let mut ascii = true
   let mut i = 0
   while i < len {
@@ -141,8 +149,14 @@ fn percent_decode_escaped(value : StringView) -> String? {
       if hi < 0 || lo < 0 {
         return None
       }
-      if hi * 16 + lo >= 0x80 {
+      let byte = hi * 16 + lo
+      if byte >= 0x80 {
         ascii = false
+        encoded_len = encoded_len + 3
+      } else if is_baggage_value_char(byte) {
+        encoded_len = encoded_len + 1
+      } else {
+        encoded_len = encoded_len + 3
       }
       decoded_len = decoded_len + 1
       i = i + 3
@@ -151,6 +165,7 @@ fn percent_decode_escaped(value : StringView) -> String? {
       if !is_baggage_value_char(code) {
         return None
       }
+      encoded_len = encoded_len + 1
       decoded_len = decoded_len + 1
       i = i + 1
     }
@@ -173,7 +188,7 @@ fn percent_decode_escaped(value : StringView) -> String? {
         j = j + 1
       }
     }
-    Some(out.unsafe_reinterpret_as_bytes().to_unchecked_string())
+    Some((out.unsafe_reinterpret_as_bytes().to_unchecked_string(), encoded_len))
   } else {
     let out = FixedArray::make(decoded_len, b'\x00')
     let mut j = 0
@@ -192,18 +207,35 @@ fn percent_decode_escaped(value : StringView) -> String? {
         j = j + 1
       }
     }
-    Some(@utf8.decode_lossy(out.unsafe_reinterpret_as_bytes().exact_view()))
+    let decoded = @utf8.decode_lossy(
+      out.unsafe_reinterpret_as_bytes().exact_view(),
+    )
+    Some((decoded, percent_encoded_length(decoded)))
   }
 }
 
-// Percent-decode a baggage value held as a view. Returns None when a `%`
-// sequence is truncated or not followed by two hex digits.
+// Decode the body of a baggage value that contains at least one `%`.
 
 ///|
-fn percent_decode_view(value : StringView) -> String? {
+fn percent_decode_escaped(value : StringView) -> String? {
+  match percent_decode_escaped_with_length(value) {
+    Some((decoded, _)) => Some(decoded)
+    None => None
+  }
+}
+
+// Percent-decode a baggage value held as a view, also reporting the byte
+// length of its percent-encoded form. Returns None when a `%` sequence is
+// truncated or not followed by two hex digits.
+
+///|
+fn percent_decode_view_with_length(
+  value : StringView,
+) -> (String, Int32)? {
   let len = value.length()
   // A value without `%` decodes to itself; its characters still need
-  // validating.
+  // validating. Every kept character is allowed literally, so the encoded
+  // length equals the number of characters.
   let mut i = 0
   while i < len {
     let code = value.unsafe_get(i).to_int()
@@ -216,9 +248,9 @@ fn percent_decode_view(value : StringView) -> String? {
     i = i + 1
   }
   if i == len {
-    return Some(value.to_owned())
+    return Some((value.to_owned(), len))
   }
-  percent_decode_escaped(value)
+  percent_decode_escaped_with_length(value)
 }
 
 // Percent-decode a baggage value. Returns None when a `%` sequence is
@@ -445,15 +477,12 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
           value_end = value_end - 1
         }
         match
-          percent_decode_view(
+          percent_decode_view_with_length(
             view.view(start_offset=value_start, end_offset=value_end),
           ) {
-          Some(decoded) => {
+          Some((decoded, encoded_len)) => {
             let key = key_view.to_owned()
             let separator = if entries.length() > 0 { 1 } else { 0 }
-            // The encoded form is ASCII, so its byte count equals the number
-            // of characters written.
-            let encoded_len = percent_encoded_length(decoded)
             let size = key.length() + 1 + encoded_len + separator
             if bytes + size > BAGGAGE_MAX_BYTES {
               break

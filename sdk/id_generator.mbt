@@ -133,15 +133,25 @@ fn random_bytes(
 }
 
 // A generator producing random IDs.
+//
+// Whether the platform can provide entropy is probed once, while the generator
+// is created, so that platforms without an entropy source (for example
+// `wasm-gc`) do not allocate a fresh, unused entropy buffer on every draw.
 
 ///|
 pub fn IdGenerator::random() -> IdGenerator {
   let state = Ref(@env.now() ^ 88172645463325252)
-  let pending : Ref[Bytes] = Ref(b"")
-  let offset : Ref[Int32] = Ref(0)
-  IdGenerator::new(fn() { random_bytes(16, state, pending, offset) }, fn() {
-    random_bytes(8, state, pending, offset)
-  })
+  if @env.rand(0) is None {
+    IdGenerator::new(fn() { pseudo_random_bytes(16, state) }, fn() {
+      pseudo_random_bytes(8, state)
+    })
+  } else {
+    let pending : Ref[Bytes] = Ref(b"")
+    let offset : Ref[Int32] = Ref(0)
+    IdGenerator::new(fn() { random_bytes(16, state, pending, offset) }, fn() {
+      random_bytes(8, state, pending, offset)
+    })
+  }
 }
 
 // A deterministic generator based on splitmix64, useful for tests and demos.

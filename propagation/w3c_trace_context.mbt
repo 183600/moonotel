@@ -147,6 +147,18 @@ fn hex_digit_value(c : Char) -> Int32 {
   }
 }
 
+// Value of a UTF-16 code unit as a hex digit, or -1 when it is not an ASCII
+// hex digit.
+
+///|
+fn hex_unit_value(unit : UInt16) -> Int32 {
+  if unit < 128 {
+    hex_value.unsafe_get(unit.to_int())
+  } else {
+    -1
+  }
+}
+
 // Decode `byte_count` hex byte pairs starting at `start`, validating as it
 // goes and tracking whether any byte is non-zero. Returns None when any
 // character is not a hex digit or when every decoded byte is zero.
@@ -159,22 +171,20 @@ fn decode_hex_nonzero(
 ) -> Array[Int32]? {
   // Every element is written before `Some` is returned.
   let out : Array[Int32] = Array::unsafe_make_uninit(byte_count)
+  // Accumulate both checks so that valid input has no per-character branch.
+  let mut bad = 0
   let mut acc = 0
   let mut i = 0
   while i < byte_count {
-    let hi = hex_digit_value(value.unsafe_get(start + i * 2).unsafe_to_char())
-    let lo = hex_digit_value(
-      value.unsafe_get(start + i * 2 + 1).unsafe_to_char(),
-    )
-    if hi < 0 || lo < 0 {
-      return None
-    }
+    let hi = hex_unit_value(value.unsafe_get(start + i * 2))
+    let lo = hex_unit_value(value.unsafe_get(start + i * 2 + 1))
+    bad = bad | hi | lo
     let byte = hi * 16 + lo
     acc = acc | byte
     out.unsafe_set(i, byte)
     i = i + 1
   }
-  if acc == 0 {
+  if bad < 0 || acc == 0 {
     return None
   }
   Some(out)
