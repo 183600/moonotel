@@ -26,9 +26,9 @@ fn request_headers(
     [],
     capacity=(config.headers.length() + 2) * 2,
   )
-  for key, value in config.headers {
+  config.headers.each(fn(key, value) {
     headers.set(@http.CaseInsensitiveString(key), value)
-  }
+  })
   headers.set(
     @http.CaseInsensitiveString("content-type"),
     "application/x-protobuf",

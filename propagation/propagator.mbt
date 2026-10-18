@@ -127,9 +127,9 @@ pub impl TextMapPropagator for CompositePropagator with extract(
   let mut context = @context.Context::root()
   for propagator in self.propagators {
     let extracted = propagator.extract(carrier)
-    for key, value in extracted.baggage() {
+    extracted.baggage().each(fn(key, value) {
       context = context.with_value(key, value)
-    }
+    })
     match extracted.span_context() {
       Some(sc) => context = context.with_span(sc)
       None => ()

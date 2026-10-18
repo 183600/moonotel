@@ -234,7 +234,7 @@ fn encode_attributes(
   field : Int32,
   attributes : Map[String, @sdk.AttributeValue],
 ) -> Unit {
-  for key, value in attributes {
+  attributes.each(fn(key, value) {
     if !try_encode_scalar_attribute(writer, field, key, value) {
       let kv = writer.take_scratch()
       kv.write_string_field(1, key)
@@ -243,7 +243,7 @@ fn encode_attributes(
       kv.append_message(2, any_value)
       writer.append_message(field, kv)
     }
-  }
+  })
 }
 
 ///|
@@ -429,9 +429,7 @@ fn resource_key(resource : Map[String, @sdk.AttributeValue]) -> String {
   let entries : Array[(String, @sdk.AttributeValue)] = Array(
     capacity=resource.length(),
   )
-  for key, value in resource {
-    entries.push((key, value))
-  }
+  resource.each(fn(key, value) { entries.push((key, value)) })
   entries.sort_by(fn(a, b) { a.0.compare(b.0) })
   let sb = StringBuilder()
   for entry in entries {

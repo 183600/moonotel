@@ -145,9 +145,7 @@ fn copy_attributes_with_capacity(
   capacity : Int
 ) -> Map[String, AttributeValue] {
   let out : Map[String, AttributeValue] = Map([], capacity=capacity)
-  for key, value in values {
-    out.set(key, value)
-  }
+  values.each(fn(key, value) { out.set(key, value) })
   out
 }
 
@@ -224,9 +222,7 @@ pub fn Resource::merge(self : Resource, other : Resource) -> Resource {
     self.attributes,
     (self.attributes.length() + other.attributes.length()) * 2,
   )
-  for key, value in other.attributes {
-    attributes.set(key, value)
-  }
+  other.attributes.each(fn(key, value) { attributes.set(key, value) })
   { attributes, }
 }
 
