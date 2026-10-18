@@ -485,7 +485,7 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
   if entries.length() == 0 {
     return ""
   }
-  // First pass: exact size of the members that fit within the limits (at most
+  // First pass: size of the members that fit within the limits (at most
   // `BAGGAGE_MAX_MEMBERS` members and `BAGGAGE_MAX_BYTES` bytes). Invalid keys
   // are skipped; once a member would exceed the byte budget it and every
   // following member are dropped.
@@ -514,7 +514,7 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
   if count == 0 {
     return ""
   }
-  // Second pass: render exactly the selected members into a UTF-16LE buffer.
+  // Second pass: render the selected members into a UTF-16LE buffer.
   let out : FixedArray[Byte] = FixedArray::make(size * 2, b'\x00')
   let mut pos = 0
   let mut written = 0

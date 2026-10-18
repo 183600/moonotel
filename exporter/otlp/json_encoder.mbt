@@ -131,7 +131,7 @@ fn json_write_escaped(sb : StringBuilder, value : String) -> Unit {
   sb.write_char('"')
 }
 
-// Append the decimal digits of an unsigned magnitude, two digits at a time.
+// Append the decimal digits of an unsigned magnitude.
 
 ///|
 let json_two_digits : FixedArray[String] = build_json_two_digits()

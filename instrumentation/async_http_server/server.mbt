@@ -404,7 +404,7 @@ pub fn ServerCall::close_connection(self : ServerCall) -> Unit {
   self.connection.close()
 }
 
-// Number of UTF-8 bytes a string encodes to, counted without allocating.
+// Number of UTF-8 bytes a string encodes to.
 // Surrogate pairs count as one four-byte character.
 
 ///|
