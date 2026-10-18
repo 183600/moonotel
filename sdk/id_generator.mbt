@@ -49,7 +49,7 @@ fn pseudo_random_bytes(n : Int, state : Ref[UInt64]) -> Array[Int] {
 }
 
 // Bytes requested from the entropy source per draw.
-const RANDOM_DRAW_BYTES : Int = 1920
+const RANDOM_DRAW_BYTES : Int = 8192
 
 // Consume `n` bytes from the buffered draw, if enough remain.
 fn take_buffered(

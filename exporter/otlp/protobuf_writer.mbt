@@ -14,6 +14,26 @@ fn ProtoWriter::with_capacity(size_hint : Int) -> ProtoWriter {
   { buf: FixedArray::make(capacity, b'\x00'), len: 0, scratch: [] }
 }
 
+// Reusable root writer for `encode_trace_request`. Its buffer and the pool of
+// nested-message scratch writers are kept between calls, so repeated encoding
+// allocates only the returned `Bytes`. Encoding never re-enters itself, so the
+// pool is safe to share process-wide.
+let encoder_pool : Ref[ProtoWriter?] = Ref(None)
+
+fn take_root_writer(size_hint : Int) -> ProtoWriter {
+  match encoder_pool.val {
+    Some(writer) => {
+      writer.len = 0
+      writer
+    }
+    None => {
+      let writer = ProtoWriter::with_capacity(size_hint)
+      encoder_pool.val = Some(writer)
+      writer
+    }
+  }
+}
+
 // Grow the buffer to fit `extra` more bytes, doubling the capacity as needed.
 // Call sites check `len + extra <= buf.length()` inline before calling this.
 fn ProtoWriter::reserve(self : ProtoWriter, extra : Int) -> Unit {

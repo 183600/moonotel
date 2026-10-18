@@ -234,6 +234,9 @@ fn encode_attributes(
   field : Int32,
   attributes : Map[String, @sdk.AttributeValue],
 ) -> Unit {
+  if attributes.length() == 0 {
+    return
+  }
   attributes.each(fn(key, value) {
     if !try_encode_scalar_attribute(writer, field, key, value) {
       let kv = writer.take_scratch()
@@ -656,7 +659,7 @@ pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
       let scope_spans_hint = scope_hint + span_hint
       let resource_spans_hint = resource_size_hint(first.resource) +
         scope_spans_hint
-      let writer = ProtoWriter::with_capacity(32 + resource_spans_hint)
+      let writer = take_root_writer(32 + resource_spans_hint)
       let resource_spans = writer.take_scratch_with_capacity(
         32 + resource_spans_hint,
       )
@@ -681,7 +684,7 @@ pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
           total_hint = total_hint + scope_size_hint(scope)
         }
       }
-      let writer = ProtoWriter::with_capacity(total_hint)
+      let writer = take_root_writer(total_hint)
       for group in groups {
         let mut scopes_hint = 0
         for scope in group.scopes {
