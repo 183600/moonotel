@@ -476,8 +476,7 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
       let separator = if count > 0 { 1 } else { 0 }
       let fixed = key.length() + 1 + separator
       // A code unit expands to at most 9 encoded bytes (3 UTF-8 bytes, each
-      // `%XX`). When even that worst case fits, write directly and take the
-      // exact size from the encoding pass.
+      // `%XX`).
       let budget_left = BAGGAGE_MAX_BYTES - bytes
       if fixed <= budget_left && value.length() <= (budget_left - fixed) / 9 {
         if count > 0 {

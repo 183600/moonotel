@@ -430,9 +430,9 @@ fn find_scope_group(
   None
 }
 
-// Rough encoded size of one span, used to size scratch buffers without
-// reallocating. Attribute values are approximated by their count; unusually
-// long values simply let the buffer grow as before.
+// Rough encoded size of one span, used to size the scratch buffers. Attribute
+// values are approximated by their count; for spans with very long values the
+// estimate may be too small.
 ///|
 fn estimate_span_size(data : @sdk.SpanData) -> Int {
   let mut size = 96 + data.name.length() + data.attributes.length() * 40

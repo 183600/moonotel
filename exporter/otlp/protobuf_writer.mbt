@@ -198,8 +198,7 @@ fn ProtoWriter::write_string_field(self : ProtoWriter, field : Int, value : Stri
   let buf = self.buf
   let mut pos = self.len
   let mut i = 0
-  // Pack four ASCII code units per 32-bit store; bail out to the generic
-  // path as soon as a non-ASCII code unit shows up.
+  // Write ASCII code units until a non-ASCII code unit shows up.
   while i + 4 <= len {
     let c0 = value.unsafe_get(i).to_int()
     let c1 = value.unsafe_get(i + 1).to_int()
