@@ -7,4 +7,10 @@ import {
   "moonbitlang/core/encoding/utf8",
 }
 
+import {
+  "moonbitlang/core/bench",
+  "yourname/otel/propagation" @propagation,
+  "yourname/otel/exporter/otlp" @otlp,
+} for "test"
+
 pkgtype(kind: "library")
