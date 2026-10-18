@@ -519,10 +519,6 @@ pub async fn run_server_on(
           if query != "" {
             server_span.set_attribute(@sdk.URL_QUERY, @sdk.StringValue(query))
           }
-          server_span.set_attribute(
-            @sdk.CLIENT_ADDRESS,
-            @sdk.StringValue(connection.client_addr().to_string()),
-          )
           record_host_attributes(server_span, request.headers)
           match
             request.headers.get(@http.CaseInsensitiveString("user-agent")) {
