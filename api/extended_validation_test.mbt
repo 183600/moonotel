@@ -1,12 +1,12 @@
 // Extended validation tests for SpanContext
 
 test "invalid_span_context_has_all_zero_ids" {
-  let invalid_sc = invalid_span_context()
+  let invalid_sc = @api.invalid_span_context()
   assert_false(invalid_sc.is_valid())
   assert_eq(invalid_sc.trace_id.length(), 16)
   assert_eq(invalid_sc.span_id.length(), 8)
-  assert_true(is_zero(invalid_sc.trace_id))
-  assert_true(is_zero(invalid_sc.span_id))
+  assert_true(@api.is_zero(invalid_sc.trace_id))
+  assert_true(@api.is_zero(invalid_sc.span_id))
 }
 
 test "span_context_with_wrong_length_trace_id_is_invalid" {
@@ -14,10 +14,10 @@ test "span_context_with_wrong_length_trace_id_is_invalid" {
   let long_tid = Array::make(17, 1)
   let valid_sid = Array::make(8, 1)
   
-  let sc_short = span_context(short_tid, valid_sid, 0)
+  let sc_short = @api.span_context(short_tid, valid_sid, 0)
   assert_false(sc_short.is_valid())
   
-  let sc_long = span_context(long_tid, valid_sid, 0)
+  let sc_long = @api.span_context(long_tid, valid_sid, 0)
   assert_false(sc_long.is_valid())
 }
 
@@ -26,10 +26,10 @@ test "span_context_with_wrong_length_span_id_is_invalid" {
   let short_sid = Array::make(7, 1)
   let long_sid = Array::make(9, 1)
   
-  let sc_short = span_context(valid_tid, short_sid, 0)
+  let sc_short = @api.span_context(valid_tid, short_sid, 0)
   assert_false(sc_short.is_valid())
   
-  let sc_long = span_context(valid_tid, long_sid, 0)
+  let sc_long = @api.span_context(valid_tid, long_sid, 0)
   assert_false(sc_long.is_valid())
 }
 
@@ -37,13 +37,13 @@ test "trace_flags_preserved_in_span_context" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
   
-  let sc0 = span_context(tid, sid, 0)
+  let sc0 = @api.span_context(tid, sid, 0)
   assert_eq(sc0.trace_flags, 0)
   
-  let sc1 = span_context(tid, sid, 1)
+  let sc1 = @api.span_context(tid, sid, 1)
   assert_eq(sc1.trace_flags, 1)
   
-  let sc255 = span_context(tid, sid, 255)
+  let sc255 = @api.span_context(tid, sid, 255)
   assert_eq(sc255.trace_flags, 255)
 }
 
@@ -93,61 +93,61 @@ test "bytes_to_hex_multiple_bytes" {
 }
 
 test "is_zero_empty_array" {
-  assert_true(is_zero(Array::make(0, 0)))
+  assert_true(@api.is_zero(Array::make(0, 0)))
 }
 
 test "is_zero_various_sizes" {
-  assert_true(is_zero(Array::make(1, 0)))
-  assert_true(is_zero(Array::make(8, 0)))
-  assert_true(is_zero(Array::make(16, 0)))
-  assert_true(is_zero(Array::make(100, 0)))
+  assert_true(@api.is_zero(Array::make(1, 0)))
+  assert_true(@api.is_zero(Array::make(8, 0)))
+  assert_true(@api.is_zero(Array::make(16, 0)))
+  assert_true(@api.is_zero(Array::make(100, 0)))
 }
 
 test "is_zero_with_one_nonzero_at_start" {
   let arr = Array::make(16, 0)
   arr[0] = 1
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "is_zero_with_one_nonzero_at_end" {
   let arr = Array::make(16, 0)
   arr[15] = 1
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "is_zero_with_one_nonzero_in_middle" {
   let arr = Array::make(16, 0)
   arr[8] = 1
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "is_sampled_flag_bit_0" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
   
-  assert_false(span_context(tid, sid, 0).is_sampled())
-  assert_true(span_context(tid, sid, 1).is_sampled())
-  assert_false(span_context(tid, sid, 2).is_sampled())
-  assert_true(span_context(tid, sid, 3).is_sampled())
-  assert_false(span_context(tid, sid, 4).is_sampled())
-  assert_true(span_context(tid, sid, 5).is_sampled())
+  assert_false(@api.span_context(tid, sid, 0).is_sampled())
+  assert_true(@api.span_context(tid, sid, 1).is_sampled())
+  assert_false(@api.span_context(tid, sid, 2).is_sampled())
+  assert_true(@api.span_context(tid, sid, 3).is_sampled())
+  assert_false(@api.span_context(tid, sid, 4).is_sampled())
+  assert_true(@api.span_context(tid, sid, 5).is_sampled())
 }
 
 test "is_sampled_flag_higher_bits_ignored" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
   
-  assert_false(span_context(tid, sid, 0b00000000).is_sampled())
-  assert_true(span_context(tid, sid, 0b00000001).is_sampled())
-  assert_false(span_context(tid, sid, 0b11111110).is_sampled())
-  assert_true(span_context(tid, sid, 0b11111111).is_sampled())
+  assert_false(@api.span_context(tid, sid, 0b00000000).is_sampled())
+  assert_true(@api.span_context(tid, sid, 0b00000001).is_sampled())
+  assert_false(@api.span_context(tid, sid, 0b11111110).is_sampled())
+  assert_true(@api.span_context(tid, sid, 0b11111111).is_sampled())
 }
 
 test "span_context_immutability" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
   
-  let sc = span_context(tid, sid, 1)
+  let sc = @api.span_context(tid, sid, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
   

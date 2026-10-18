@@ -7,7 +7,7 @@ test "create_many_span_contexts" {
     let sid = Array::make(8, 0)
     tid[0] = count % 256
     sid[0] = count % 256
-    let sc = span_context(tid, sid, count % 2)
+    let sc = @api.span_context(tid, sid, count % 2)
     // First iteration has all zeros, which is invalid
     if count == 0 {
       assert_false(sc.is_valid())
@@ -23,10 +23,10 @@ test "alternating_valid_invalid_contexts" {
   while i < 50 {
     let valid_tid = Array::make(16, 1)
     let valid_sid = Array::make(8, 1)
-    let valid_sc = span_context(valid_tid, valid_sid, 0)
+    let valid_sc = @api.span_context(valid_tid, valid_sid, 0)
     assert_true(valid_sc.is_valid())
     
-    let invalid_sc = invalid_span_context()
+    let invalid_sc = @api.invalid_span_context()
     assert_false(invalid_sc.is_valid())
     
     i = i + 1
@@ -39,7 +39,7 @@ test "span_context_with_varying_trace_flags" {
   
   let mut flags = 0
   while flags < 256 {
-    let sc = span_context(tid, sid, flags)
+    let sc = @api.span_context(tid, sid, flags)
     let expected_sampled = (flags & 1) != 0
     assert_eq(sc.is_sampled(), expected_sampled)
     flags = flags + 2
@@ -57,14 +57,14 @@ test "hex_conversion_consistency" {
 
 test "is_zero_with_progressive_fill" {
   let arr = Array::make(16, 0)
-  assert_true(is_zero(arr))
+  assert_true(@api.is_zero(arr))
   
   let mut i = 0
   while i < 16 {
     arr[i] = 1
-    assert_false(is_zero(arr))
+    assert_false(@api.is_zero(arr))
     arr[i] = 0
-    assert_true(is_zero(arr))
+    assert_true(@api.is_zero(arr))
     i = i + 1
   }
 }
@@ -77,7 +77,7 @@ test "span_context_trace_id_variations" {
     let tid = Array::make(16, 0)
     tid[0] = i
     if i > 0 {
-      let sc = span_context(tid, sid, 0)
+      let sc = @api.span_context(tid, sid, 0)
       assert_true(sc.is_valid())
     }
     i = i + 1
@@ -92,7 +92,7 @@ test "span_context_span_id_variations" {
     let sid = Array::make(8, 0)
     sid[0] = i
     if i > 0 {
-      let sc = span_context(tid, sid, 0)
+      let sc = @api.span_context(tid, sid, 0)
       assert_true(sc.is_valid())
     }
     i = i + 1
@@ -113,7 +113,7 @@ test "mixed_zero_nonzero_patterns" {
   let sid = Array::make(8, 1)
   let mut i = 0
   while i < patterns.length() {
-    let sc = span_context(patterns[i], sid, 0)
+    let sc = @api.span_context(patterns[i], sid, 0)
     assert_true(sc.is_valid())
     i = i + 1
   }
@@ -147,7 +147,7 @@ test "trace_flags_bit_masking" {
   
   let mut i = 0
   while i < test_flags.length() {
-    let sc = span_context(tid, sid, test_flags[i])
+    let sc = @api.span_context(tid, sid, test_flags[i])
     let expected = (test_flags[i] & 1) != 0
     assert_eq(sc.is_sampled(), expected)
     i = i + 1
@@ -170,7 +170,7 @@ test "span_context_repeated_creation" {
   
   let mut count = 0
   while count < 100 {
-    let sc = span_context(tid, sid, count % 256)
+    let sc = @api.span_context(tid, sid, count % 256)
     assert_true(sc.is_valid())
     assert_eq(sc.trace_id_hex().length(), 32)
     assert_eq(sc.span_id_hex().length(), 16)

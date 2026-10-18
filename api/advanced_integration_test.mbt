@@ -31,8 +31,8 @@ test "complex_span_context_relationships" {
   let span_id1 = [17, 18, 19, 20, 21, 22, 23, 24]
   let span_id2 = [25, 26, 27, 28, 29, 30, 31, 32]
   
-  let parent_span = span_context(trace_id, span_id1, 1)
-  let child_span = span_context(trace_id, span_id2, 1)
+  let parent_span = @api.span_context(trace_id, span_id1, 1)
+  let child_span = @api.span_context(trace_id, span_id2, 1)
   
   // Same trace ID, different span IDs
   assert_true(parent_span.trace_id_hex() == child_span.trace_id_hex())
@@ -45,8 +45,8 @@ test "span_context_sampling_variations" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [17, 18, 19, 20, 21, 22, 23, 24]
   
-  let sampled_context = span_context(trace_id, span_id, 1)
-  let unsampled_context = span_context(trace_id, span_id, 0)
+  let sampled_context = @api.span_context(trace_id, span_id, 1)
+  let unsampled_context = @api.span_context(trace_id, span_id, 0)
   
   assert_true(sampled_context.is_sampled())
   assert_false(unsampled_context.is_sampled())
@@ -77,16 +77,16 @@ test "span_context_boundary_stress_test" {
   let max_span = [255, 255, 255, 255, 255, 255, 255, 255]
   
   let contexts = [
-    span_context(min_trace, min_span, 0),
-    span_context(min_trace, min_span, 1),
-    span_context(max_trace, max_span, 0),
-    span_context(max_trace, max_span, 1)
+    @api.span_context(min_trace, min_span, 0),
+    @api.span_context(min_trace, min_span, 1),
+    @api.span_context(max_trace, max_span, 0),
+    @api.span_context(max_trace, max_span, 1)
   ]
   
   let mut all_valid = true
   let mut i = 0
   while i < contexts.length() {
-    if not(contexts[i].is_valid()) {
+    if !(contexts[i].is_valid()) {
       all_valid = false
     }
     i = i + 1
@@ -116,7 +116,7 @@ test "span_context_hex_round_trip_conversion" {
   let original_trace = [0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef]
   let original_span = [0xca, 0xfe, 0xba, 0xbe, 0xca, 0xfe, 0xba, 0xbe]
   
-  let sc = span_context(original_trace, original_span, 1)
+  let sc = @api.span_context(original_trace, original_span, 1)
   
   let hex_trace = sc.trace_id_hex()
   let hex_span = sc.span_id_hex()
@@ -147,7 +147,7 @@ test "span_context_flag_variations" {
   let mut sampling_results = []
   let mut i = 0
   while i < 256 {
-    let sc = span_context(trace_id, span_id, i)
+    let sc = @api.span_context(trace_id, span_id, i)
     sampling_results = sampling_results + [sc.is_sampled()]
     i = i + 1
   }
@@ -201,15 +201,15 @@ test "span_context_memory_patterns" {
   
   // Use non-zero span IDs to ensure validity
   let contexts = [
-    span_context(zero_trace, [1, 1, 1, 1, 1, 1, 1, 1], 1),
-    span_context(one_trace, [1, 1, 1, 1, 1, 1, 1, 1], 1),
-    span_context(pattern_trace, [0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55], 1)
+    @api.span_context(zero_trace, [1, 1, 1, 1, 1, 1, 1, 1], 1),
+    @api.span_context(one_trace, [1, 1, 1, 1, 1, 1, 1, 1], 1),
+    @api.span_context(pattern_trace, [0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55], 1)
   ]
   
   let mut all_valid = true
   let mut i = 0
   while i < contexts.length() {
-    if not(contexts[i].is_valid()) {
+    if !(contexts[i].is_valid()) {
       all_valid = false
     }
     i = i + 1
@@ -238,8 +238,8 @@ test "span_context_invalid_trace_patterns" {
   let mut invalid_count = 0
   let mut i = 0
   while i < invalid_patterns.length() {
-    let sc = span_context(invalid_patterns[i], span_id, 1)
-    if not(sc.is_valid()) {
+    let sc = @api.span_context(invalid_patterns[i], span_id, 1)
+    if !(sc.is_valid()) {
       invalid_count = invalid_count + 1
     }
     i = i + 1
@@ -286,9 +286,9 @@ test "span_context_trace_continuity_test" {
   let child_span = [250, 260, 270, 280, 290, 300, 310, 320]
   let grandchild_span = [330, 340, 350, 360, 370, 380, 390, 400]
   
-  let root_context = span_context(root_trace, root_span, 1)
-  let child_context = span_context(root_trace, child_span, 1)
-  let grandchild_context = span_context(root_trace, grandchild_span, 1)
+  let root_context = @api.span_context(root_trace, root_span, 1)
+  let child_context = @api.span_context(root_trace, child_span, 1)
+  let grandchild_context = @api.span_context(root_trace, grandchild_span, 1)
   
   // All should share the same trace ID
   assert_eq(root_context.trace_id_hex(), child_context.trace_id_hex())
@@ -358,7 +358,7 @@ test "span_context_mixed_sampling_scenarios" {
   while i < 20 {
     let span_id = [i, i+1, i+2, i+3, i+4, i+5, i+6, i+7]
     let sampling_flag = i % 2
-    let sc = span_context(trace_id, span_id, sampling_flag)
+    let sc = @api.span_context(trace_id, span_id, sampling_flag)
     contexts = contexts + [sc]
     i = i + 1
   }
@@ -384,7 +384,7 @@ test "comprehensive_hex_encoding_performance" {
   // Performance test for hex encoding operations
   let trace_id = [0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0]
   let span_id = [0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   
   let mut operations = 0
   let mut i = 0
@@ -405,7 +405,7 @@ test "span_context_regression_prevention" {
   let standard_trace = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let standard_span = [17, 18, 19, 20, 21, 22, 23, 24]
   
-  let sc = span_context(standard_trace, standard_span, 1)
+  let sc = @api.span_context(standard_trace, standard_span, 1)
   
   // Verify basic functionality
   assert_true(sc.is_valid())
@@ -455,7 +455,7 @@ test "span_context_concurrent_style_operations" {
   let mut i = 0
   while i < 100 {
     let span_id = [i, i, i, i, i, i, i, i]
-    let sc = span_context(base_trace, span_id, i % 2)
+    let sc = @api.span_context(base_trace, span_id, i % 2)
     rapid_contexts = rapid_contexts + [sc]
     i = i + 1
   }
@@ -509,7 +509,7 @@ test "span_context_extreme_flag_combinations" {
   let mut i = 0
   while i < extreme_flags.length() {
     let flag = extreme_flags[i]
-    let sc = span_context(trace_id, span_id, flag)
+    let sc = @api.span_context(trace_id, span_id, flag)
     
     // All should create valid contexts
     assert_true(sc.is_valid())

@@ -90,7 +90,7 @@ struct IdGenerator {
 
 struct Span {
   name : String
-  context : SpanContext
+  context : @api.SpanContext
 }
 
 fn create_tracer_provider(service_name : String) -> TracerProvider {
@@ -110,7 +110,7 @@ pub fn Tracer::start_span(self : Tracer, name : String) -> Span {
   let counter = self.provider.id_generator.span_counter
   let trace_id = self.provider.id_generator.trace_id
   let span_id = generate_span_id_from_counter(counter, trace_id[0])
-  let context = span_context(trace_id, span_id, 1)
+  let context = @api.span_context(trace_id, span_id, 1)
   Span::{ name: name, context: context }
 }
 

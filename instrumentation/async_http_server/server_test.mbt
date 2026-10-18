@@ -46,7 +46,7 @@ async test "server span continues the propagated trace" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      run_server_on(
+      @async_http_server.run_server_on(
         server,
         call => {
           call.respond(200, body="ok")
@@ -99,7 +99,7 @@ async test "ServerCall::start_span parents children to the request" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      run_server_on(
+      @async_http_server.run_server_on(
         server,
         call => {
           match call.start_span("db.query") {
@@ -142,7 +142,7 @@ async test "5xx responses set the server span status to Error" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      run_server_on(
+      @async_http_server.run_server_on(
         server,
         call => {
           call.respond(500, body="oops")
@@ -172,7 +172,7 @@ async test "handler exceptions are recorded and end the span" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      run_server_on(
+      @async_http_server.run_server_on(
         server,
         call => {
           let _ = call
@@ -217,7 +217,7 @@ test "extract_context parses traceparent, tracestate and baggage" {
     @http.CaseInsensitiveString("baggage"),
     "user.id=42,note=a%2Cb",
   )
-  let context = extract_context(headers)
+  let context = @async_http_server.extract_context(headers)
   let span_context = context.span_context().unwrap()
   assert_eq(span_context.trace_id_hex(), parent.trace_id_hex())
   assert_eq(span_context.span_id_hex(), parent.span_id_hex())
@@ -238,13 +238,13 @@ test "extract_context ignores an invalid tracestate" {
     @propagation.format_traceparent(parent),
   )
   headers.set(@http.CaseInsensitiveString("tracestate"), "not a valid state")
-  let context = extract_context(headers)
+  let context = @async_http_server.extract_context(headers)
   assert_eq(context.span_context().unwrap().tracestate(), "")
 }
 
 test "extract_context is empty without headers" {
   let headers : Map[@http.CaseInsensitiveString, String] = Map([])
-  let context = extract_context(headers)
+  let context = @async_http_server.extract_context(headers)
   assert_true(context.span_context() is None)
   assert_eq(context.baggage().length(), 0)
 }
@@ -255,7 +255,7 @@ async test "server propagates tracestate and baggage headers" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      run_server_on(
+      @async_http_server.run_server_on(
         server,
         call => {
           call.respond(200)
@@ -291,7 +291,7 @@ async test "ServerCall::set_route records http.route and renames the span" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      run_server_on(
+      @async_http_server.run_server_on(
         server,
         call => {
           assert_true(call.set_route("/items/:id"))
@@ -318,7 +318,7 @@ async test "ServerCall::set_route is a no-op without tracing" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      run_server_on(server, call => {
+      @async_http_server.run_server_on(server, call => {
         assert_false(call.set_route("/plain"))
         call.respond(204)
       })
@@ -333,7 +333,7 @@ async test "server runs untraced when no tracer is available" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      run_server_on(server, call => {
+      @async_http_server.run_server_on(server, call => {
         call.respond(204)
       })
     }

@@ -26,33 +26,33 @@ fn test_tracer(scope : String) -> (@sdk.Tracer, RecordingExporter) {
 }
 
 test "split_url handles schemes, ports, userinfo and IPv6 hosts" {
-  assert_eq(split_url("https://example.com/x"), ("example.com", 443))
-  assert_eq(split_url("http://example.com:8080/x"), ("example.com", 8080))
+  assert_eq(@async_http_client.split_url("https://example.com/x"), ("example.com", 443))
+  assert_eq(@async_http_client.split_url("http://example.com:8080/x"), ("example.com", 8080))
   assert_eq(
-    split_url("http://user:pass@host.test:9000/"),
+    @async_http_client.split_url("http://user:pass@host.test:9000/"),
     ("host.test", 9000),
   )
-  assert_eq(split_url("http://[::1]:4318/v1/traces"), ("[::1]", 4318))
-  assert_eq(split_url("example.com"), ("example.com", 80))
-  assert_eq(split_url("HTTPS://example.com/x"), ("example.com", 443))
+  assert_eq(@async_http_client.split_url("http://[::1]:4318/v1/traces"), ("[::1]", 4318))
+  assert_eq(@async_http_client.split_url("example.com"), ("example.com", 80))
+  assert_eq(@async_http_client.split_url("HTTPS://example.com/x"), ("example.com", 443))
 }
 
 test "split_url ignores query and fragment when no path is present" {
-  assert_eq(split_url("http://example.com?x=1"), ("example.com", 80))
-  assert_eq(split_url("https://example.com?x=1"), ("example.com", 443))
-  assert_eq(split_url("http://example.com:8080?x=1"), ("example.com", 8080))
-  assert_eq(split_url("http://example.com#frag"), ("example.com", 80))
-  assert_eq(split_url("http://user:pass@host.test:9000?x=1"), ("host.test", 9000))
-  assert_eq(split_url("http://[::1]?x=1"), ("[::1]", 80))
+  assert_eq(@async_http_client.split_url("http://example.com?x=1"), ("example.com", 80))
+  assert_eq(@async_http_client.split_url("https://example.com?x=1"), ("example.com", 443))
+  assert_eq(@async_http_client.split_url("http://example.com:8080?x=1"), ("example.com", 8080))
+  assert_eq(@async_http_client.split_url("http://example.com#frag"), ("example.com", 80))
+  assert_eq(@async_http_client.split_url("http://user:pass@host.test:9000?x=1"), ("host.test", 9000))
+  assert_eq(@async_http_client.split_url("http://[::1]?x=1"), ("[::1]", 80))
 }
 
 test "split_scheme lower-cases and validates schemes" {
-  assert_eq(split_scheme("https://example.com/x"), "https")
-  assert_eq(split_scheme("HTTP://example.com"), "http")
-  assert_eq(split_scheme("http+unix://sock"), "http+unix")
-  assert_eq(split_scheme("example.com/path"), "")
-  assert_eq(split_scheme("1http://example.com"), "")
-  assert_eq(split_scheme("http://"), "http")
+  assert_eq(@async_http_client.split_scheme("https://example.com/x"), "https")
+  assert_eq(@async_http_client.split_scheme("HTTP://example.com"), "http")
+  assert_eq(@async_http_client.split_scheme("http+unix://sock"), "http+unix")
+  assert_eq(@async_http_client.split_scheme("example.com/path"), "")
+  assert_eq(@async_http_client.split_scheme("1http://example.com"), "")
+  assert_eq(@async_http_client.split_scheme("http://"), "http")
 }
 
 async test "get creates a client span and injects traceparent" {
@@ -70,7 +70,7 @@ async test "get creates a client span and injects traceparent" {
       })
     }
     let url = "http://127.0.0.1:\{port}/hello"
-    let (response, _body) = get(
+    let (response, _body) = @async_http_client.get(
       url,
       tracer=tracer,
       context=@context.Context::root(),
@@ -129,7 +129,7 @@ async test "client span continues the current trace context" {
     )
     let previous = @context.attach(@context.Context::root().with_span(parent))
     defer @context.detach(previous)
-    let (response, _body) = get("http://127.0.0.1:\{port}/child", tracer=tracer)
+    let (response, _body) = @async_http_client.get("http://127.0.0.1:\{port}/child", tracer=tracer)
     assert_eq(response.code, 200)
     let data = exporter.spans.val[0]
     assert_eq(data.span_context.trace_id_hex(), parent.trace_id_hex())
@@ -147,7 +147,7 @@ async test "client span is marked as error for 5xx responses" {
         conn.send_response(503, "Service Unavailable")
       })
     }
-    let (response, _body) = get("http://127.0.0.1:\{port}/down", tracer=tracer)
+    let (response, _body) = @async_http_client.get("http://127.0.0.1:\{port}/down", tracer=tracer)
     assert_eq(response.code, 503)
     let data = exporter.spans.val[0]
     assert_eq(data.status, @api.StatusCode::Error)
@@ -174,7 +174,7 @@ async test "post sends the request body" {
         conn.send_response(201, "Created")
       })
     }
-    let (response, _body) = post(
+    let (response, _body) = @async_http_client.post(
       "http://127.0.0.1:\{port}/items",
       "payload",
       tracer=tracer,
@@ -198,7 +198,7 @@ async test "requests are untraced when no tracer is available" {
         conn.send_response(200, "OK")
       })
     }
-    let (response, _body) = get("http://127.0.0.1:\{port}/plain")
+    let (response, _body) = @async_http_client.get("http://127.0.0.1:\{port}/plain")
     assert_eq(response.code, 200)
   }
 }
@@ -230,7 +230,7 @@ async test "client propagates tracestate and baggage" {
     let request_context = @context.Context::root()
       .with_span(parent)
       .with_value("user.id", "42")
-    let (response, _body) = get(
+    let (response, _body) = @async_http_client.get(
       "http://127.0.0.1:\{port}/state",
       tracer=tracer,
       context=request_context,
@@ -259,7 +259,7 @@ async test "instrumented client and server produce a connected trace" {
       )
     }
     let url = "http://127.0.0.1:\{port}/e2e"
-    let (response, body) = get(url, tracer=tracer)
+    let (response, body) = @async_http_client.get(url, tracer=tracer)
     assert_eq(response.code, 200)
     assert_eq(body.text(), "connected")
     @async.sleep(50)

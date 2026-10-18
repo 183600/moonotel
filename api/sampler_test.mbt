@@ -54,7 +54,7 @@ test "sampler_ratio_0_0_never_samples" {
 test "sampler_parent_based_respects_sampled_parent" {
   let parent_trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let parent_span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let parent_ctx = span_context(parent_trace_id, parent_span_id, 1)
+  let parent_ctx = @api.span_context(parent_trace_id, parent_span_id, 1)
   
   let decision = sampler_parent_based(parent_ctx, false)
   assert_true(decision.is_recorded)
@@ -64,7 +64,7 @@ test "sampler_parent_based_respects_sampled_parent" {
 test "sampler_parent_based_respects_unsampled_parent" {
   let parent_trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let parent_span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let parent_ctx = span_context(parent_trace_id, parent_span_id, 0)
+  let parent_ctx = @api.span_context(parent_trace_id, parent_span_id, 0)
   
   let decision = sampler_parent_based(parent_ctx, true)
   assert_false(decision.is_recorded)
@@ -72,7 +72,7 @@ test "sampler_parent_based_respects_unsampled_parent" {
 }
 
 test "sampler_parent_based_uses_root_for_no_parent" {
-  let invalid_parent = invalid_span_context()
+  let invalid_parent = @api.invalid_span_context()
   
   let decision = sampler_parent_based(invalid_parent, false)
   assert_false(decision.is_recorded)
@@ -112,7 +112,7 @@ fn sampler_ratio(trace_id : Array[Int], ratio : Double) -> SamplingDecision {
   SamplingDecision::{ is_recorded: sampled, is_sampled: sampled }
 }
 
-fn sampler_parent_based(parent_ctx : SpanContext, root_samples : Bool) -> SamplingDecision {
+fn sampler_parent_based(parent_ctx : @api.SpanContext, root_samples : Bool) -> SamplingDecision {
   if parent_ctx.is_valid() {
     if parent_ctx.is_sampled() {
       SamplingDecision::{ is_recorded: true, is_sampled: true }

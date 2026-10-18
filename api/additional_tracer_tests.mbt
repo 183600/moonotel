@@ -6,12 +6,12 @@ struct Tracer {
   provider : TracerProvider
 }
 
-struct TracerProvider {
+priv struct TracerProvider {
   service_name : String
   id_generator : IdGenerator
 }
 
-struct IdGenerator {
+priv struct IdGenerator {
   trace_id : Array[Int]
   mut span_counter : Int
 }

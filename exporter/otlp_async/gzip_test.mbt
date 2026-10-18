@@ -28,7 +28,7 @@ async test "export_spans sends a gzipped body with content-encoding" {
       compression="gzip",
     )
     let spans = [test_span_data()]
-    let result = export_spans(config, spans)
+    let result = @otlp_async.export_spans(config, spans)
     assert_true(result.is_success())
     assert_eq(encoding.val, "gzip")
     let decoded = gunzip(received.val)
@@ -52,7 +52,7 @@ async test "export_spans sends an uncompressed body by default" {
       })
     }
     let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:\{port}")
-    let result = export_spans(config, [test_span_data()])
+    let result = @otlp_async.export_spans(config, [test_span_data()])
     assert_true(result.is_success())
     assert_eq(encoding.val, "")
   }
@@ -64,7 +64,7 @@ async test "post_trace_request rejects unsupported compression" {
     endpoint="http://127.0.0.1:1",
     compression="zstd",
   )
-  let result = export_spans(config, [test_span_data()])
+  let result = @otlp_async.export_spans(config, [test_span_data()])
   match result {
     @sdk.ExportFailure(message) => assert_true(message.contains("compression"))
     @sdk.ExportSuccess => fail("expected unsupported compression to fail")

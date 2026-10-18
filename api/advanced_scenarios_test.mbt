@@ -4,7 +4,7 @@
 test "context_with_identical_trace_and_span_prefixes" {
   let trace_id = [0xAB, 0xCD, 0xEF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d]
   let span_id = [0xAB, 0xCD, 0xEF, 0x01, 0x02, 0x03, 0x04, 0x05]
-  let ctx = span_context(trace_id, span_id, 1)
+  let ctx = @api.span_context(trace_id, span_id, 1)
   assert_true(ctx.is_valid())
   assert_true(ctx.is_sampled())
 }
@@ -12,14 +12,14 @@ test "context_with_identical_trace_and_span_prefixes" {
 test "context_with_complementary_ids" {
   let trace_id = [0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00]
   let span_id = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]
-  let ctx = span_context(trace_id, span_id, 0)
+  let ctx = @api.span_context(trace_id, span_id, 0)
   assert_true(ctx.is_valid())
 }
 
 test "context_with_mirror_pattern_ids" {
   let trace_id = [0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0xF0, 0xED, 0xCB, 0xA9, 0x87, 0x65, 0x43, 0x21]
   let span_id = [0x12, 0x34, 0x56, 0x78, 0x87, 0x65, 0x43, 0x21]
-  let ctx = span_context(trace_id, span_id, 1)
+  let ctx = @api.span_context(trace_id, span_id, 1)
   assert_true(ctx.is_valid())
 }
 
@@ -57,50 +57,50 @@ test "hex_lower_nibble_variations" {
 // Test is_zero with various patterns
 test "is_zero_with_negative_values" {
   let bytes = [-1, -2, -3]
-  assert_false(is_zero(bytes))
+  assert_false(@api.is_zero(bytes))
 }
 
 test "is_zero_with_large_values" {
   let bytes = [256, 512, 1024]
-  assert_false(is_zero(bytes))
+  assert_false(@api.is_zero(bytes))
 }
 
 test "is_zero_mixed_zeros_and_nonzeros" {
   let bytes = [0, 0, 1, 0, 0]
-  assert_false(is_zero(bytes))
+  assert_false(@api.is_zero(bytes))
 }
 
 test "is_zero_very_long_zero_array" {
   let bytes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-  assert_true(is_zero(bytes))
+  assert_true(@api.is_zero(bytes))
 }
 
 // Test trace flags with comprehensive bit patterns
 test "trace_flags_all_odd_bits_set" {
   let trace_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10]
   let span_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
-  let ctx = span_context(trace_id, span_id, 0x55)
+  let ctx = @api.span_context(trace_id, span_id, 0x55)
   assert_true(ctx.is_sampled())
 }
 
 test "trace_flags_all_even_bits_set" {
   let trace_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10]
   let span_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
-  let ctx = span_context(trace_id, span_id, 0xAA)
+  let ctx = @api.span_context(trace_id, span_id, 0xAA)
   assert_false(ctx.is_sampled())
 }
 
 test "trace_flags_lower_nibble_set" {
   let trace_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10]
   let span_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
-  let ctx = span_context(trace_id, span_id, 0x0F)
+  let ctx = @api.span_context(trace_id, span_id, 0x0F)
   assert_true(ctx.is_sampled())
 }
 
 test "trace_flags_upper_nibble_set" {
   let trace_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10]
   let span_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
-  let ctx = span_context(trace_id, span_id, 0xF0)
+  let ctx = @api.span_context(trace_id, span_id, 0xF0)
   assert_false(ctx.is_sampled())
 }
 
@@ -108,14 +108,14 @@ test "trace_flags_upper_nibble_set" {
 test "context_validation_with_near_zero_trace_id" {
   let trace_id = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
   let span_id = [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-  let ctx = span_context(trace_id, span_id, 0)
+  let ctx = @api.span_context(trace_id, span_id, 0)
   assert_true(ctx.is_valid())
 }
 
 test "context_validation_with_near_zero_span_id" {
   let trace_id = [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
   let span_id = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]
-  let ctx = span_context(trace_id, span_id, 0)
+  let ctx = @api.span_context(trace_id, span_id, 0)
   assert_true(ctx.is_valid())
 }
 
@@ -142,7 +142,7 @@ test "hex_mixed_high_low_nibbles" {
 test "context_properties_remain_consistent_after_creation" {
   let trace_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10]
   let span_id = [0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18]
-  let ctx = span_context(trace_id, span_id, 1)
+  let ctx = @api.span_context(trace_id, span_id, 1)
   
   assert_true(ctx.is_valid())
   assert_true(ctx.is_sampled())
@@ -151,7 +151,7 @@ test "context_properties_remain_consistent_after_creation" {
 }
 
 test "invalid_context_properties_remain_consistent" {
-  let ctx = invalid_span_context()
+  let ctx = @api.invalid_span_context()
   
   assert_false(ctx.is_valid())
   assert_false(ctx.is_sampled())
@@ -162,28 +162,28 @@ test "invalid_context_properties_remain_consistent" {
 test "trace_id_length_15_is_invalid" {
   let trace_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]
   let span_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
-  let ctx = span_context(trace_id, span_id, 1)
+  let ctx = @api.span_context(trace_id, span_id, 1)
   assert_false(ctx.is_valid())
 }
 
 test "trace_id_length_17_is_invalid" {
   let trace_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11]
   let span_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
-  let ctx = span_context(trace_id, span_id, 1)
+  let ctx = @api.span_context(trace_id, span_id, 1)
   assert_false(ctx.is_valid())
 }
 
 test "span_id_length_7_is_invalid" {
   let trace_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10]
   let span_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]
-  let ctx = span_context(trace_id, span_id, 1)
+  let ctx = @api.span_context(trace_id, span_id, 1)
   assert_false(ctx.is_valid())
 }
 
 test "span_id_length_9_is_invalid" {
   let trace_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10]
   let span_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09]
-  let ctx = span_context(trace_id, span_id, 1)
+  let ctx = @api.span_context(trace_id, span_id, 1)
   assert_false(ctx.is_valid())
 }
 
@@ -191,14 +191,14 @@ test "span_id_length_9_is_invalid" {
 test "trace_id_fibonacci_like_pattern" {
   let trace_id = [0x01, 0x01, 0x02, 0x03, 0x05, 0x08, 0x0D, 0x15, 0x22, 0x37, 0x59, 0x01, 0x01, 0x01, 0x01, 0x01]
   let span_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
-  let ctx = span_context(trace_id, span_id, 0)
+  let ctx = @api.span_context(trace_id, span_id, 0)
   assert_true(ctx.is_valid())
 }
 
 test "span_id_prime_like_pattern" {
   let trace_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10]
   let span_id = [0x02, 0x03, 0x05, 0x07, 0x0B, 0x0D, 0x11, 0x13]
-  let ctx = span_context(trace_id, span_id, 0)
+  let ctx = @api.span_context(trace_id, span_id, 0)
   assert_true(ctx.is_valid())
 }
 
@@ -206,7 +206,7 @@ test "span_id_prime_like_pattern" {
 test "context_creates_readable_hex_pattern" {
   let trace_id = [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0]
   let span_id = [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE]
-  let ctx = span_context(trace_id, span_id, 1)
+  let ctx = @api.span_context(trace_id, span_id, 1)
   assert_true(ctx.is_valid())
   assert_eq(ctx.span_id_hex(), "deadbeefcafebabe")
 }
@@ -214,7 +214,7 @@ test "context_creates_readable_hex_pattern" {
 test "context_with_ascii_like_values" {
   let trace_id = [0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F, 0x50]
   let span_id = [0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58]
-  let ctx = span_context(trace_id, span_id, 0)
+  let ctx = @api.span_context(trace_id, span_id, 0)
   assert_true(ctx.is_valid())
 }
 
@@ -231,8 +231,8 @@ test "multiple_contexts_different_sampling" {
   let span_id1 = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
   let span_id2 = [0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18]
   
-  let ctx1 = span_context(trace_id, span_id1, 1)
-  let ctx2 = span_context(trace_id, span_id2, 0)
+  let ctx1 = @api.span_context(trace_id, span_id1, 1)
+  let ctx2 = @api.span_context(trace_id, span_id2, 0)
   
   assert_true(ctx1.is_sampled())
   assert_false(ctx2.is_sampled())
@@ -240,27 +240,27 @@ test "multiple_contexts_different_sampling" {
 
 // Test is_zero with various array sizes
 test "is_zero_array_size_1_zero" {
-  assert_true(is_zero([0]))
+  assert_true(@api.is_zero([0]))
 }
 
 test "is_zero_array_size_2_zeros" {
-  assert_true(is_zero([0, 0]))
+  assert_true(@api.is_zero([0, 0]))
 }
 
 test "is_zero_array_size_8_zeros" {
-  assert_true(is_zero([0, 0, 0, 0, 0, 0, 0, 0]))
+  assert_true(@api.is_zero([0, 0, 0, 0, 0, 0, 0, 0]))
 }
 
 test "is_zero_array_size_16_zeros" {
-  assert_true(is_zero([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
+  assert_true(@api.is_zero([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
 }
 
 test "is_zero_array_size_1_nonzero" {
-  assert_false(is_zero([1]))
+  assert_false(@api.is_zero([1]))
 }
 
 test "is_zero_array_size_2_one_nonzero" {
-  assert_false(is_zero([0, 1]))
+  assert_false(@api.is_zero([0, 1]))
 }
 
 // Test hex encoding with single bytes
@@ -296,7 +296,7 @@ test "hex_four_bytes" {
 test "context_preserves_trace_id_values" {
   let original_trace_id = [0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0x00]
   let span_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
-  let ctx = span_context(original_trace_id, span_id, 0)
+  let ctx = @api.span_context(original_trace_id, span_id, 0)
   
   assert_eq(ctx.trace_id_hex(), "aabbccddeeff112233445566778899" + "00")
 }
@@ -304,7 +304,7 @@ test "context_preserves_trace_id_values" {
 test "context_preserves_span_id_values" {
   let trace_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10]
   let original_span_id = [0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x11, 0x22]
-  let ctx = span_context(trace_id, original_span_id, 0)
+  let ctx = @api.span_context(trace_id, original_span_id, 0)
   
   assert_eq(ctx.span_id_hex(), "aabbccddeeff1122")
 }
@@ -313,7 +313,7 @@ test "context_preserves_span_id_values" {
 test "trace_flags_value_preserved_0x00" {
   let trace_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10]
   let span_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
-  let ctx = span_context(trace_id, span_id, 0x00)
+  let ctx = @api.span_context(trace_id, span_id, 0x00)
   
   assert_eq(ctx.trace_flags, 0x00)
 }
@@ -321,7 +321,7 @@ test "trace_flags_value_preserved_0x00" {
 test "trace_flags_value_preserved_0xFF" {
   let trace_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10]
   let span_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
-  let ctx = span_context(trace_id, span_id, 0xFF)
+  let ctx = @api.span_context(trace_id, span_id, 0xFF)
   
   assert_eq(ctx.trace_flags, 0xFF)
 }
@@ -329,7 +329,7 @@ test "trace_flags_value_preserved_0xFF" {
 test "trace_flags_value_preserved_0x55" {
   let trace_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10]
   let span_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
-  let ctx = span_context(trace_id, span_id, 0x55)
+  let ctx = @api.span_context(trace_id, span_id, 0x55)
   
   assert_eq(ctx.trace_flags, 0x55)
 }

@@ -65,59 +65,59 @@ test "bytes_to_hex_alternating_pattern" {
 // Test is_zero with various array lengths and patterns
 test "is_zero_single_element_zero" {
   let arr = [0]
-  assert_true(is_zero(arr))
+  assert_true(@api.is_zero(arr))
 }
 
 test "is_zero_single_element_nonzero" {
   let arr = [1]
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "is_zero_two_elements_both_zero" {
   let arr = [0, 0]
-  assert_true(is_zero(arr))
+  assert_true(@api.is_zero(arr))
 }
 
 test "is_zero_two_elements_first_nonzero" {
   let arr = [1, 0]
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "is_zero_two_elements_second_nonzero" {
   let arr = [0, 1]
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "is_zero_three_elements_all_zero" {
   let arr = [0, 0, 0]
-  assert_true(is_zero(arr))
+  assert_true(@api.is_zero(arr))
 }
 
 test "is_zero_three_elements_middle_nonzero" {
   let arr = [0, 5, 0]
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "is_zero_seven_elements_last_nonzero" {
   let arr = [0, 0, 0, 0, 0, 0, 1]
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "is_zero_sixteen_elements_all_zero" {
   let arr = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-  assert_true(is_zero(arr))
+  assert_true(@api.is_zero(arr))
 }
 
 test "is_zero_sixteen_elements_mixed" {
   let arr = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255]
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 // Test span_context validation with various trace_id patterns
 test "span_context_trace_id_all_zeros_length_16" {
   let trace_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
   assert_false(sc.is_sampled())
 }
@@ -125,7 +125,7 @@ test "span_context_trace_id_all_zeros_length_16" {
 test "span_context_trace_id_single_nonzero_at_start" {
   let trace_id = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -133,7 +133,7 @@ test "span_context_trace_id_single_nonzero_at_start" {
 test "span_context_trace_id_single_nonzero_at_end" {
   let trace_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -141,7 +141,7 @@ test "span_context_trace_id_single_nonzero_at_end" {
 test "span_context_trace_id_single_nonzero_in_middle" {
   let trace_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 0]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -149,7 +149,7 @@ test "span_context_trace_id_single_nonzero_in_middle" {
 test "span_context_trace_id_alternating_zeros_and_nonzeros" {
   let trace_id = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -157,7 +157,7 @@ test "span_context_trace_id_alternating_zeros_and_nonzeros" {
 test "span_context_trace_id_all_255" {
   let trace_id = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -166,7 +166,7 @@ test "span_context_trace_id_all_255" {
 test "span_context_span_id_all_zeros_length_8" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [0, 0, 0, 0, 0, 0, 0, 0]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
   assert_false(sc.is_sampled())
 }
@@ -174,7 +174,7 @@ test "span_context_span_id_all_zeros_length_8" {
 test "span_context_span_id_single_nonzero_at_start" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [255, 0, 0, 0, 0, 0, 0, 0]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -182,7 +182,7 @@ test "span_context_span_id_single_nonzero_at_start" {
 test "span_context_span_id_single_nonzero_at_end" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [0, 0, 0, 0, 0, 0, 0, 255]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -190,7 +190,7 @@ test "span_context_span_id_single_nonzero_at_end" {
 test "span_context_span_id_single_nonzero_in_middle" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [0, 0, 100, 0, 0, 0, 0, 0]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -198,7 +198,7 @@ test "span_context_span_id_single_nonzero_in_middle" {
 test "span_context_span_id_alternating_zeros_and_nonzeros" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [0, 170, 0, 170, 0, 170, 0, 170]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -206,7 +206,7 @@ test "span_context_span_id_alternating_zeros_and_nonzeros" {
 test "span_context_span_id_all_170" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [170, 170, 170, 170, 170, 170, 170, 170]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -215,7 +215,7 @@ test "span_context_span_id_all_170" {
 test "span_context_trace_flags_0" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 0)
+  let sc = @api.span_context(trace_id, span_id, 0)
   assert_true(sc.is_valid())
   assert_false(sc.is_sampled())
 }
@@ -223,7 +223,7 @@ test "span_context_trace_flags_0" {
 test "span_context_trace_flags_1" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -231,7 +231,7 @@ test "span_context_trace_flags_1" {
 test "span_context_trace_flags_2" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 2)
+  let sc = @api.span_context(trace_id, span_id, 2)
   assert_true(sc.is_valid())
   assert_false(sc.is_sampled())
 }
@@ -239,7 +239,7 @@ test "span_context_trace_flags_2" {
 test "span_context_trace_flags_3" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 3)
+  let sc = @api.span_context(trace_id, span_id, 3)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -247,7 +247,7 @@ test "span_context_trace_flags_3" {
 test "span_context_trace_flags_4" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 4)
+  let sc = @api.span_context(trace_id, span_id, 4)
   assert_true(sc.is_valid())
   assert_false(sc.is_sampled())
 }
@@ -255,7 +255,7 @@ test "span_context_trace_flags_4" {
 test "span_context_trace_flags_5" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 5)
+  let sc = @api.span_context(trace_id, span_id, 5)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -263,7 +263,7 @@ test "span_context_trace_flags_5" {
 test "span_context_trace_flags_6" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 6)
+  let sc = @api.span_context(trace_id, span_id, 6)
   assert_true(sc.is_valid())
   assert_false(sc.is_sampled())
 }
@@ -271,7 +271,7 @@ test "span_context_trace_flags_6" {
 test "span_context_trace_flags_7" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 7)
+  let sc = @api.span_context(trace_id, span_id, 7)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -279,7 +279,7 @@ test "span_context_trace_flags_7" {
 test "span_context_trace_flags_8" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 8)
+  let sc = @api.span_context(trace_id, span_id, 8)
   assert_true(sc.is_valid())
   assert_false(sc.is_sampled())
 }
@@ -287,7 +287,7 @@ test "span_context_trace_flags_8" {
 test "span_context_trace_flags_9" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 9)
+  let sc = @api.span_context(trace_id, span_id, 9)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -295,7 +295,7 @@ test "span_context_trace_flags_9" {
 test "span_context_trace_flags_10" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 10)
+  let sc = @api.span_context(trace_id, span_id, 10)
   assert_true(sc.is_valid())
   assert_false(sc.is_sampled())
 }
@@ -303,7 +303,7 @@ test "span_context_trace_flags_10" {
 test "span_context_trace_flags_11" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 11)
+  let sc = @api.span_context(trace_id, span_id, 11)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -311,7 +311,7 @@ test "span_context_trace_flags_11" {
 test "span_context_trace_flags_12" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 12)
+  let sc = @api.span_context(trace_id, span_id, 12)
   assert_true(sc.is_valid())
   assert_false(sc.is_sampled())
 }
@@ -319,7 +319,7 @@ test "span_context_trace_flags_12" {
 test "span_context_trace_flags_13" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 13)
+  let sc = @api.span_context(trace_id, span_id, 13)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -327,7 +327,7 @@ test "span_context_trace_flags_13" {
 test "span_context_trace_flags_14" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 14)
+  let sc = @api.span_context(trace_id, span_id, 14)
   assert_true(sc.is_valid())
   assert_false(sc.is_sampled())
 }
@@ -335,7 +335,7 @@ test "span_context_trace_flags_14" {
 test "span_context_trace_flags_15" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 15)
+  let sc = @api.span_context(trace_id, span_id, 15)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -343,7 +343,7 @@ test "span_context_trace_flags_15" {
 test "span_context_trace_flags_16" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 16)
+  let sc = @api.span_context(trace_id, span_id, 16)
   assert_true(sc.is_valid())
   assert_false(sc.is_sampled())
 }
@@ -351,7 +351,7 @@ test "span_context_trace_flags_16" {
 test "span_context_trace_flags_17" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 17)
+  let sc = @api.span_context(trace_id, span_id, 17)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -359,7 +359,7 @@ test "span_context_trace_flags_17" {
 test "span_context_trace_flags_18" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 18)
+  let sc = @api.span_context(trace_id, span_id, 18)
   assert_true(sc.is_valid())
   assert_false(sc.is_sampled())
 }
@@ -367,7 +367,7 @@ test "span_context_trace_flags_18" {
 test "span_context_trace_flags_19" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 19)
+  let sc = @api.span_context(trace_id, span_id, 19)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -375,7 +375,7 @@ test "span_context_trace_flags_19" {
 test "span_context_trace_flags_negatives" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, -1)
+  let sc = @api.span_context(trace_id, span_id, -1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -383,7 +383,7 @@ test "span_context_trace_flags_negatives" {
 test "span_context_trace_flags_negative_odd" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, -3)
+  let sc = @api.span_context(trace_id, span_id, -3)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -391,7 +391,7 @@ test "span_context_trace_flags_negative_odd" {
 test "span_context_trace_flags_negative_even" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, -2)
+  let sc = @api.span_context(trace_id, span_id, -2)
   assert_true(sc.is_valid())
   assert_false(sc.is_sampled())
 }
@@ -400,42 +400,42 @@ test "span_context_trace_flags_negative_even" {
 test "span_context_trace_id_wrong_length_15" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
 }
 
 test "span_context_trace_id_wrong_length_17" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
 }
 
 test "span_context_span_id_wrong_length_7" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
 }
 
 test "span_context_span_id_wrong_length_9" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
 }
 
 test "span_context_both_ids_wrong_length" {
   let trace_id = [1, 2, 3, 4, 5]
   let span_id = [1, 2, 3]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
 }
 
 test "span_context_both_ids_correct_length_all_valid_bytes" {
   let trace_id = [255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0]
   let span_id = [170, 85, 170, 85, 170, 85, 170, 85]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -444,7 +444,7 @@ test "span_context_both_ids_correct_length_all_valid_bytes" {
 test "span_context_hex_encoding_consistency" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [17, 18, 19, 20, 21, 22, 23, 24]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_eq(sc.trace_id_hex(), "0102030405060708090a0b0c0d0e0f10")
   assert_eq(sc.span_id_hex(), "1112131415161718")
   assert_eq(sc.trace_id_hex(), sc.trace_id_hex())
@@ -452,7 +452,7 @@ test "span_context_hex_encoding_consistency" {
 }
 
 test "invalid_span_context_hex_encoding" {
-  let sc = invalid_span_context()
+  let sc = @api.invalid_span_context()
   assert_eq(sc.trace_id_hex(), "00000000000000000000000000000000")
   assert_eq(sc.span_id_hex(), "0000000000000000")
   assert_eq(sc.trace_flags, 0)
@@ -463,13 +463,13 @@ test "invalid_span_context_hex_encoding" {
 test "span_context_is_sampled_consistency" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_eq(sc.is_sampled(), sc.is_sampled())
   assert_eq(sc.is_sampled(), true)
 }
 
 test "span_context_is_sampled_false_consistency" {
-  let sc = invalid_span_context()
+  let sc = @api.invalid_span_context()
   assert_eq(sc.is_sampled(), sc.is_sampled())
   assert_eq(sc.is_sampled(), false)
 }

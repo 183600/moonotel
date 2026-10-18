@@ -69,81 +69,81 @@ test "bytes_to_hex_high_nibble_f" {
 
 test "is_zero_empty_edge_case" {
   let empty : Array[Int] = []
-  assert_true(is_zero(empty))
+  assert_true(@api.is_zero(empty))
 }
 
 test "is_zero_single_zero" {
   let arr = [0]
-  assert_true(is_zero(arr))
+  assert_true(@api.is_zero(arr))
 }
 
 test "is_zero_single_nonzero" {
   let arr = [1]
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "is_zero_two_zeros" {
   let arr = [0, 0]
-  assert_true(is_zero(arr))
+  assert_true(@api.is_zero(arr))
 }
 
 test "is_zero_two_first_nonzero" {
   let arr = [1, 0]
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "is_zero_two_second_nonzero" {
   let arr = [0, 1]
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "is_zero_long_array_all_zeros" {
   let arr = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-  assert_true(is_zero(arr))
+  assert_true(@api.is_zero(arr))
 }
 
 test "is_zero_long_array_last_nonzero" {
   let arr = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "span_context_trace_flags_bit_0" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_sampled())
 }
 
 test "span_context_trace_flags_bit_1" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 2)
+  let sc = @api.span_context(trace_id, span_id, 2)
   assert_false(sc.is_sampled())
 }
 
 test "span_context_trace_flags_bit_0_and_1" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 3)
+  let sc = @api.span_context(trace_id, span_id, 3)
   assert_true(sc.is_sampled())
 }
 
 test "span_context_trace_flags_all_even" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 254)
+  let sc = @api.span_context(trace_id, span_id, 254)
   assert_false(sc.is_sampled())
 }
 
 test "span_context_trace_flags_all_odd" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 255)
+  let sc = @api.span_context(trace_id, span_id, 255)
   assert_true(sc.is_sampled())
 }
 
 test "invalid_span_context_properties" {
-  let sc = invalid_span_context()
+  let sc = @api.invalid_span_context()
   assert_eq(sc.trace_flags, 0)
   assert_false(sc.is_valid())
   assert_false(sc.is_sampled())
@@ -154,28 +154,28 @@ test "invalid_span_context_properties" {
 test "span_context_with_empty_arrays" {
   let trace_id : Array[Int] = []
   let span_id : Array[Int] = []
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
 }
 
 test "span_context_trace_id_empty" {
   let trace_id : Array[Int] = []
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
 }
 
 test "span_context_span_id_empty" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id : Array[Int] = []
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
 }
 
 test "span_context_exact_length_validation" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 0)
+  let sc = @api.span_context(trace_id, span_id, 0)
   assert_true(sc.is_valid())
 }
 
@@ -212,13 +212,13 @@ test "hex_encoding_byte_0x55" {
 test "span_context_hex_methods_consistency" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_eq(sc.trace_id_hex().length(), 32)
   assert_eq(sc.span_id_hex().length(), 16)
 }
 
 test "invalid_span_context_hex_output" {
-  let sc = invalid_span_context()
+  let sc = @api.invalid_span_context()
   assert_eq(sc.trace_id_hex(), "00000000000000000000000000000000")
   assert_eq(sc.span_id_hex(), "0000000000000000")
 }
@@ -226,7 +226,7 @@ test "invalid_span_context_hex_output" {
 test "trace_id_all_same_byte" {
   let trace_id = [123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   assert_eq(sc.trace_id_hex(), "7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b")
 }
@@ -234,7 +234,7 @@ test "trace_id_all_same_byte" {
 test "span_id_all_same_byte" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [100, 100, 100, 100, 100, 100, 100, 100]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   assert_eq(sc.span_id_hex(), "6464646464646464")
 }

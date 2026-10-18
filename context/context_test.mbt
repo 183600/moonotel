@@ -76,12 +76,12 @@ test "attach_and_detach" {
 test "with_context_scopes_nested_blocks" {
   let outer = @context.Context::root().with_span(span_context_a())
   let inner = @context.Context::root().with_span(span_context_b())
-  @context.with_context(outer, fn() {
+  @context.with_context(outer, () => {
     assert_eq(
       @context.current_span_context().unwrap().span_id_hex(),
       "00f067aa0ba902b7",
     )
-    @context.with_context(inner, fn() {
+    @context.with_context(inner, () => {
       assert_eq(
         @context.current_span_context().unwrap().span_id_hex(),
         "0000000000000001",
@@ -96,7 +96,7 @@ test "with_context_scopes_nested_blocks" {
 }
 
 test "with_span_context_helper" {
-  @context.with_span_context(span_context_a(), fn() {
+  @context.with_span_context(span_context_a(), () => {
     assert_eq(
       @context.current_span_context().unwrap().trace_id_hex(),
       "4bf92f359d1e75b7618a2d1f3c4e5a6b",
@@ -107,8 +107,8 @@ test "with_span_context_helper" {
 
 test "with_span_context_keeps_the_current_baggage" {
   let current = @context.Context::root().with_value("user.id", "42")
-  @context.with_context(current, fn() {
-    @context.with_span_context(span_context_b(), fn() {
+  @context.with_context(current, () => {
+    @context.with_span_context(span_context_b(), () => {
       assert_eq(@context.current_context().value("user.id"), Some("42"))
       assert_eq(@context.current_context().baggage().get("user.id"), Some("42"))
       assert_eq(

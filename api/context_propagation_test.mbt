@@ -3,10 +3,10 @@
 test "parent_child_same_trace_id" {
   let parent_trace_id = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160]
   let parent_span_id = [11, 22, 33, 44, 55, 66, 77, 88]
-  let parent_ctx = span_context(parent_trace_id, parent_span_id, 1)
+  let parent_ctx = @api.span_context(parent_trace_id, parent_span_id, 1)
   
   let child_span_id = [99, 88, 77, 66, 55, 44, 33, 22]
-  let child_ctx = span_context(parent_trace_id, child_span_id, 1)
+  let child_ctx = @api.span_context(parent_trace_id, child_span_id, 1)
   
   assert_eq(parent_ctx.trace_id_hex(), child_ctx.trace_id_hex())
   assert_true(parent_ctx.span_id_hex() != child_ctx.span_id_hex())
@@ -19,9 +19,9 @@ test "sibling_spans_different_span_ids" {
   let sibling2_span_id = [11, 21, 31, 41, 51, 61, 71, 81]
   let sibling3_span_id = [12, 22, 32, 42, 52, 62, 72, 82]
   
-  let ctx1 = span_context(trace_id, sibling1_span_id, 1)
-  let ctx2 = span_context(trace_id, sibling2_span_id, 1)
-  let ctx3 = span_context(trace_id, sibling3_span_id, 1)
+  let ctx1 = @api.span_context(trace_id, sibling1_span_id, 1)
+  let ctx2 = @api.span_context(trace_id, sibling2_span_id, 1)
+  let ctx3 = @api.span_context(trace_id, sibling3_span_id, 1)
   
   assert_eq(ctx1.trace_id_hex(), ctx2.trace_id_hex())
   assert_eq(ctx2.trace_id_hex(), ctx3.trace_id_hex())
@@ -34,10 +34,10 @@ test "sibling_spans_different_span_ids" {
 test "sampling_propagation_sampled_parent" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let parent_span_id = [10, 20, 30, 40, 50, 60, 70, 80]
-  let parent_ctx = span_context(trace_id, parent_span_id, 1)
+  let parent_ctx = @api.span_context(trace_id, parent_span_id, 1)
   
   let child_span_id = [11, 21, 31, 41, 51, 61, 71, 81]
-  let child_ctx = span_context(trace_id, child_span_id, 1)
+  let child_ctx = @api.span_context(trace_id, child_span_id, 1)
   
   assert_true(parent_ctx.is_sampled())
   assert_true(child_ctx.is_sampled())
@@ -46,10 +46,10 @@ test "sampling_propagation_sampled_parent" {
 test "sampling_propagation_unsampled_parent" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let parent_span_id = [10, 20, 30, 40, 50, 60, 70, 80]
-  let parent_ctx = span_context(trace_id, parent_span_id, 0)
+  let parent_ctx = @api.span_context(trace_id, parent_span_id, 0)
   
   let child_span_id = [11, 21, 31, 41, 51, 61, 71, 81]
-  let child_ctx = span_context(trace_id, child_span_id, 0)
+  let child_ctx = @api.span_context(trace_id, child_span_id, 0)
   
   assert_false(parent_ctx.is_sampled())
   assert_false(child_ctx.is_sampled())
@@ -69,7 +69,7 @@ test "deep_nesting_trace_id_consistency" {
   let mut contexts = []
   let mut i = 0
   while i < span_ids.length() {
-    let ctx = span_context(trace_id, span_ids[i], 1)
+    let ctx = @api.span_context(trace_id, span_ids[i], 1)
     contexts = contexts + [ctx]
     i = i + 1
   }
@@ -91,16 +91,16 @@ test "context_validity_propagation" {
   let valid_trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let valid_span_id = [10, 20, 30, 40, 50, 60, 70, 80]
   
-  let parent_ctx = span_context(valid_trace_id, valid_span_id, 1)
+  let parent_ctx = @api.span_context(valid_trace_id, valid_span_id, 1)
   assert_true(parent_ctx.is_valid())
   
   let child_span_id = [11, 21, 31, 41, 51, 61, 71, 81]
-  let child_ctx = span_context(valid_trace_id, child_span_id, 1)
+  let child_ctx = @api.span_context(valid_trace_id, child_span_id, 1)
   assert_true(child_ctx.is_valid())
 }
 
 test "invalid_parent_invalid_propagation" {
-  let invalid_ctx = invalid_span_context()
+  let invalid_ctx = @api.invalid_span_context()
   assert_false(invalid_ctx.is_valid())
 }
 
@@ -111,9 +111,9 @@ test "mixed_sampling_across_spans" {
   let span2_id = [11, 21, 31, 41, 51, 61, 71, 81]
   let span3_id = [12, 22, 32, 42, 52, 62, 72, 82]
   
-  let ctx1 = span_context(trace_id, span1_id, 1)
-  let ctx2 = span_context(trace_id, span2_id, 0)
-  let ctx3 = span_context(trace_id, span3_id, 1)
+  let ctx1 = @api.span_context(trace_id, span1_id, 1)
+  let ctx2 = @api.span_context(trace_id, span2_id, 0)
+  let ctx3 = @api.span_context(trace_id, span3_id, 1)
   
   assert_true(ctx1.is_sampled())
   assert_false(ctx2.is_sampled())
@@ -128,15 +128,15 @@ test "trace_id_preservation_across_boundaries" {
   let trace_id_hex_expected = bytes_to_hex(trace_id)
   
   let span_id1 = [1, 1, 1, 1, 1, 1, 1, 1]
-  let ctx1 = span_context(trace_id, span_id1, 1)
+  let ctx1 = @api.span_context(trace_id, span_id1, 1)
   assert_eq(ctx1.trace_id_hex(), trace_id_hex_expected)
   
   let span_id2 = [2, 2, 2, 2, 2, 2, 2, 2]
-  let ctx2 = span_context(trace_id, span_id2, 0)
+  let ctx2 = @api.span_context(trace_id, span_id2, 0)
   assert_eq(ctx2.trace_id_hex(), trace_id_hex_expected)
   
   let span_id3 = [3, 3, 3, 3, 3, 3, 3, 3]
-  let ctx3 = span_context(trace_id, span_id3, 255)
+  let ctx3 = @api.span_context(trace_id, span_id3, 255)
   assert_eq(ctx3.trace_id_hex(), trace_id_hex_expected)
 }
 
@@ -147,7 +147,7 @@ test "span_id_uniqueness_within_trace" {
   let mut i = 0
   while i < 20 {
     let span_id = [i, i+1, i+2, i+3, i+4, i+5, i+6, i+7]
-    let ctx = span_context(trace_id, span_id, 1)
+    let ctx = @api.span_context(trace_id, span_id, 1)
     span_id_hexes = span_id_hexes + [ctx.span_id_hex()]
     i = i + 1
   }
@@ -172,8 +172,8 @@ test "context_equality_same_ids" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [10, 20, 30, 40, 50, 60, 70, 80]
   
-  let ctx1 = span_context(trace_id, span_id, 1)
-  let ctx2 = span_context(trace_id, span_id, 1)
+  let ctx1 = @api.span_context(trace_id, span_id, 1)
+  let ctx2 = @api.span_context(trace_id, span_id, 1)
   
   assert_eq(ctx1.trace_id_hex(), ctx2.trace_id_hex())
   assert_eq(ctx1.span_id_hex(), ctx2.span_id_hex())
@@ -185,22 +185,22 @@ test "context_inequality_different_trace_ids" {
   let trace_id2 = [16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
   let span_id = [10, 20, 30, 40, 50, 60, 70, 80]
   
-  let ctx1 = span_context(trace_id1, span_id, 1)
-  let ctx2 = span_context(trace_id2, span_id, 1)
+  let ctx1 = @api.span_context(trace_id1, span_id, 1)
+  let ctx2 = @api.span_context(trace_id2, span_id, 1)
   
   assert_true(ctx1.trace_id_hex() != ctx2.trace_id_hex())
 }
 
 test "fan_out_pattern_single_parent_multiple_children" {
   let parent_trace_id = [99, 98, 97, 96, 95, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85, 84]
-  let parent_span_id = [50, 51, 52, 53, 54, 55, 56, 57]
+  let _parent_span_id = [50, 51, 52, 53, 54, 55, 56, 57]
   
   let child_count = 5
   let mut children = []
   let mut i = 0
   while i < child_count {
     let child_span_id = [100+i, 101+i, 102+i, 103+i, 104+i, 105+i, 106+i, 107+i]
-    let child_ctx = span_context(parent_trace_id, child_span_id, 1)
+    let child_ctx = @api.span_context(parent_trace_id, child_span_id, 1)
     children = children + [child_ctx]
     i = i + 1
   }
@@ -227,7 +227,7 @@ test "sequential_span_creation_pattern" {
   let mut i = 0
   while i < operations.length() {
     let span_id = [i*10, i*10+1, i*10+2, i*10+3, i*10+4, i*10+5, i*10+6, i*10+7]
-    let ctx = span_context(trace_id, span_id, 1)
+    let ctx = @api.span_context(trace_id, span_id, 1)
     sequence = sequence + [(operations[i], ctx)]
     i = i + 1
   }

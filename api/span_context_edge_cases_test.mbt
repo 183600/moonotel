@@ -41,20 +41,20 @@ test "bytes_to_hex_single_byte_roundtrip_0_255" {
 }
 
 test "is_zero_empty_is_true" {
-  assert_true(is_zero([]))
+  assert_true(@api.is_zero([]))
 }
 
 test "span_context_invalid_trace_id_wrong_length" {
   let trace_id = Array::make(15, 1)
   let span_id = Array::make(8, 1)
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
 }
 
 test "span_context_invalid_span_id_wrong_length" {
   let trace_id = Array::make(16, 1)
   let span_id = Array::make(7, 1)
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
 }
 
@@ -65,7 +65,7 @@ test "span_context_valid_minimal_nonzero_ids" {
   let span_id = Array::make(8, 0)
   span_id[7] = 1
 
-  let sc = span_context(trace_id, span_id, 0)
+  let sc = @api.span_context(trace_id, span_id, 0)
   assert_true(sc.is_valid())
   assert_false(sc.is_sampled())
   assert_eq(sc.trace_id_hex(), "00000000000000000000000000000001")

@@ -131,6 +131,17 @@ test "span_context_sampled_flag_false" {
   assert_false(context.is_sampled())
 }
 
+test "span_context_retains_identity_fields" {
+  let trace_id = Array::make(16, 7)
+  let span_id = Array::make(8, 9)
+  let context = test_span_context(trace_id, span_id, 1)
+  assert_eq(context.trace_id.length(), 16)
+  assert_eq(context.span_id.length(), 8)
+  assert_eq(context.flags, 1)
+  assert_eq(context.trace_id_hex.length(), 32)
+  assert_eq(context.span_id_hex.length(), 16)
+}
+
 test "span_context_valid_with_zero_values" {
   let trace_id = Array::make(16, 0)
   let span_id = Array::make(8, 0)

@@ -37,7 +37,7 @@ async test "head patch and options use the right methods" {
     let methods : Ref[Array[String]] = Ref([])
     group.spawn_bg(no_wait=true) <| () => {
       server.run_forever() <| ((request, body, conn) => {
-        methods.val.push(http_method_name(request.meth))
+        methods.val.push(@async_http_client.http_method_name(request.meth))
         if request.meth == @http.RequestMethod::Patch {
           let _ = body.read_all()
         }
@@ -45,9 +45,9 @@ async test "head patch and options use the right methods" {
       })
     }
     let url = "http://127.0.0.1:\{port}/methods"
-    let (head_response, _) = head(url, tracer=tracer)
-    let (patch_response, _) = patch(url, "payload", tracer=tracer)
-    let (options_response, _) = options(url, tracer=tracer)
+    let (head_response, _) = @async_http_client.head(url, tracer=tracer)
+    let (patch_response, _) = @async_http_client.patch(url, "payload", tracer=tracer)
+    let (options_response, _) = @async_http_client.options(url, tracer=tracer)
     assert_eq(head_response.code, 200)
     assert_eq(patch_response.code, 200)
     assert_eq(options_response.code, 200)

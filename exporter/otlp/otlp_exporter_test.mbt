@@ -31,7 +31,7 @@ fn MockTransport::as_transport(self : MockTransport) -> @otlp.Transport {
 
 ///|
 fn test_span() -> @sdk.SpanData {
-  let resource : Map[String, @sdk.AttributeValue] = Map::new()
+  let resource : Map[String, @sdk.AttributeValue] = Map([], capacity=1)
   resource.set(@sdk.SERVICE_NAME, @sdk.StringValue("exporter-test"))
   {
     name: "op",
@@ -44,7 +44,7 @@ fn test_span() -> @sdk.SpanData {
     kind: @api.SpanKind::Internal,
     start_time_unix_nano: 1L,
     end_time_unix_nano: 2L,
-    attributes: Map::new(),
+    attributes: Map([], capacity=1),
     events: [],
     links: [],
     dropped_attributes_count: 0,
@@ -95,7 +95,7 @@ test "explicit_traces_endpoint_is_used_verbatim" {
 ///|
 test "export_passes_custom_headers" {
   let mock = mock_transport(200)
-  let headers : Map[String, String] = Map::new()
+  let headers : Map[String, String] = Map([], capacity=1)
   headers.set("authorization", "Bearer token")
   let config = @otlp.OtlpHttpConfig::new(
     endpoint="http://collector:4318",

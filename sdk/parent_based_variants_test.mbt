@@ -48,9 +48,9 @@ test "parent_based_local_not_sampled_delegate_only_applies_locally" {
     @sdk.Sampler::always_on(),
     local_parent_not_sampled=@sdk.Sampler::record_only(),
   )
-  let local = sampler.should_sample(Some(pbv_parent(false, false)), pbv_trace_id(1))
-  assert_true(local.is_recorded)
-  assert_false(local.is_sampled)
+  let local_decision = sampler.should_sample(Some(pbv_parent(false, false)), pbv_trace_id(1))
+  assert_true(local_decision.is_recorded)
+  assert_false(local_decision.is_sampled)
   let remote = sampler.should_sample(Some(pbv_parent(false, true)), pbv_trace_id(1))
   assert_false(remote.is_recorded)
   assert_false(remote.is_sampled)

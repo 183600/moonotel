@@ -62,7 +62,7 @@ test "hex_encoding_large_array_length" {
   let large = Array::make(100, 0x42)
   let result = bytes_to_hex(large)
   assert_eq(result.length(), 200)
-  assert_eq(result.substring(start=0, end=2), "42")
+  assert_eq(result[:2], "42")
 }
 
 test "byte_to_hex_char_boundaries" {
@@ -89,21 +89,21 @@ test "byte_to_hex_char_invalid_negative_values" {
 test "span_context_valid_minimal_trace_id" {
   let trace_id = Array::make(16, 0x01)
   let span_id = Array::make(8, 0x01)
-  let context = span_context(trace_id, span_id, 1)
+  let context = @api.span_context(trace_id, span_id, 1)
   assert_true(context.is_valid())
 }
 
 test "span_context_valid_maximal_trace_id" {
   let trace_id = Array::make(16, 0xFF)
   let span_id = Array::make(8, 0xFF)
-  let context = span_context(trace_id, span_id, 1)
+  let context = @api.span_context(trace_id, span_id, 1)
   assert_true(context.is_valid())
 }
 
 test "span_context_unsampled_flag" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let context = span_context(trace_id, span_id, 0)
+  let context = @api.span_context(trace_id, span_id, 0)
   assert_true(context.is_valid())
   assert_false(context.is_sampled())
 }
@@ -111,7 +111,7 @@ test "span_context_unsampled_flag" {
 test "span_context_sampled_flag" {
   let trace_id = [16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
   let span_id = [8, 7, 6, 5, 4, 3, 2, 1]
-  let context = span_context(trace_id, span_id, 1)
+  let context = @api.span_context(trace_id, span_id, 1)
   assert_true(context.is_valid())
   assert_true(context.is_sampled())
 }
@@ -119,35 +119,35 @@ test "span_context_sampled_flag" {
 test "span_context_all_sample_flags" {
   let trace_id = Array::make(16, 0xAA)
   let span_id = Array::make(8, 0x55)
-  let context = span_context(trace_id, span_id, 255)
+  let context = @api.span_context(trace_id, span_id, 255)
   assert_true(context.is_sampled())
 }
 
 test "span_context_trace_id_hex_length" {
   let trace_id = Array::make(16, 0xFF)
   let span_id = Array::make(8, 0x00)
-  let context = span_context(trace_id, span_id, 1)
+  let context = @api.span_context(trace_id, span_id, 1)
   assert_eq(context.trace_id_hex().length(), 32)
 }
 
 test "span_context_span_id_hex_length" {
   let trace_id = Array::make(16, 0x00)
   let span_id = Array::make(8, 0xFF)
-  let context = span_context(trace_id, span_id, 1)
+  let context = @api.span_context(trace_id, span_id, 1)
   assert_eq(context.span_id_hex().length(), 16)
 }
 
 test "span_context_empty_trace_id_invalid" {
   let trace_id = []
   let span_id = Array::make(8, 0xFF)
-  let context = span_context(trace_id, span_id, 1)
+  let context = @api.span_context(trace_id, span_id, 1)
   assert_false(context.is_valid())
 }
 
 test "span_context_empty_span_id_invalid" {
   let trace_id = Array::make(16, 0xFF)
   let span_id = []
-  let context = span_context(trace_id, span_id, 1)
+  let context = @api.span_context(trace_id, span_id, 1)
   assert_false(context.is_valid())
 }
 

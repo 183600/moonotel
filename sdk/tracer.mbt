@@ -115,6 +115,51 @@ pub fn Tracer::start_span_with_context(
   )
 }
 
+// Run `f` with a new span that becomes the current span for the duration of
+// the call, so spans started inside `f` link to it automatically. When
+// `parent` is omitted the span is a child of the current context's span (or a
+// root span); an explicit `context` is used only when `parent` is absent.
+// The span is ended and the previous context restored when `f` returns or
+// raises.
+
+///|
+pub fn[X] Tracer::with_span(
+  self : Tracer,
+  name : String,
+  f : (SpanSdk) -> X raise?,
+  context? : @context.Context,
+  kind? : @api.SpanKind,
+  parent? : @api.SpanContext,
+  attributes? : Map[String, AttributeValue],
+  links? : Array[SpanLink],
+  start_time_unix_nano? : Int64,
+) -> X raise? {
+  let span = match parent {
+    Some(_) =>
+      self.start_span(
+        name,
+        kind?,
+        parent?,
+        attributes?,
+        links?,
+        start_time_unix_nano?,
+      )
+    None =>
+      self.start_span_with_context(
+        name,
+        context?,
+        kind?,
+        attributes?,
+        links?,
+        start_time_unix_nano?,
+      )
+  }
+  let previous = @context.attach(@context.current_context().with_span(span.context()))
+  defer @context.detach(previous)
+  defer span.end()
+  f(span)
+}
+
 // Start a new root span with no parent.
 
 ///|

@@ -21,7 +21,7 @@ async test "Connection: close closes the socket after the response" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      run_server_on(server, call => {
+      @async_http_server.run_server_on(server, call => {
         call.respond(200, body="bye")
       })
     }
@@ -48,7 +48,7 @@ async test "keep-alive connections serve a second request" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      run_server_on(server, call => {
+      @async_http_server.run_server_on(server, call => {
         call.respond(200, body=call.path())
       })
     }
@@ -88,7 +88,7 @@ async test "server spans carry the network protocol attributes" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      run_server_on(
+      @async_http_server.run_server_on(
         server,
         call => {
           call.respond(200, body="ok")

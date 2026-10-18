@@ -15,7 +15,7 @@ fn probe_span_with(
     kind: @api.SpanKind::Internal,
     start_time_unix_nano: 1L,
     end_time_unix_nano: 2L,
-    attributes: Map::new(),
+    attributes: Map([], capacity=1),
     events: [],
     links: [],
     dropped_attributes_count: 0,

@@ -15,7 +15,7 @@ test "span_context_stress_test" {
     j = j + 1
   }
 
-  let sc_max = span_context(max_trace, max_span, 1)
+  let sc_max = @api.span_context(max_trace, max_span, 1)
   assert_true(sc_max.is_valid())
   assert_true(sc_max.is_sampled())
 }
@@ -36,7 +36,7 @@ test "span_context_stress_unsampled" {
     j = j + 1
   }
 
-  let sc = span_context(trace_id, span_id, 0)
+  let sc = @api.span_context(trace_id, span_id, 0)
   assert_true(sc.is_valid())
   assert_false(sc.is_sampled())
 }

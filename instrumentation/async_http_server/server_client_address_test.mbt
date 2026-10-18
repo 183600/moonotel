@@ -27,7 +27,7 @@ async test "server span does not record the listen address as client.address" {
     let port = server.addr.port()
     let seen_client_addr : Ref[String?] = Ref(None)
     group.spawn_bg(no_wait=true) <| () => {
-      run_server_on(
+      @async_http_server.run_server_on(
         server,
         call => {
           seen_client_addr.val = Some(call.connection.client_addr().to_string())

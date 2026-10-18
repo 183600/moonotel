@@ -31,7 +31,7 @@ fn probe_span(name : String) -> @sdk.SpanData {
     kind: @api.SpanKind::Internal,
     start_time_unix_nano: 1L,
     end_time_unix_nano: 2L,
-    attributes: Map::new(),
+    attributes: Map([], capacity=1),
     events: [],
     links: [],
     dropped_attributes_count: 0,
@@ -39,7 +39,7 @@ fn probe_span(name : String) -> @sdk.SpanData {
     dropped_links_count: 0,
     status: @api.StatusCode::Unset,
     status_description: "",
-    resource: Map::new(),
+    resource: Map([], capacity=1),
     scope_name: "scope",
     scope_version: "",
   }

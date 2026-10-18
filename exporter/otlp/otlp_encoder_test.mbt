@@ -138,10 +138,10 @@ fn attribute_value(span_fields : Array[Field], key : String) -> String? {
 
 ///|
 fn sample_span() -> @sdk.SpanData {
-  let attributes : Map[String, @sdk.AttributeValue] = Map::new()
+  let attributes : Map[String, @sdk.AttributeValue] = Map([], capacity=1)
   attributes.set("http.request.method", @sdk.StringValue("GET"))
   attributes.set("http.response.status_code", @sdk.IntValue(200L))
-  let resource : Map[String, @sdk.AttributeValue] = Map::new()
+  let resource : Map[String, @sdk.AttributeValue] = Map([], capacity=1)
   resource.set(@sdk.SERVICE_NAME, @sdk.StringValue("encoder-test"))
   {
     name: "GET /users",
@@ -159,7 +159,7 @@ fn sample_span() -> @sdk.SpanData {
       {
         name: "retry",
         time_unix_nano: 1600000000250000000L,
-        attributes: Map::new(),
+        attributes: Map([], capacity=1),
         dropped_attributes_count: 0,
       },
     ],

@@ -26,6 +26,8 @@ test "span_shape_and_context" {
     .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
     .with_sampler(@sdk.Sampler::always_on())
   let tracer = provider.get_tracer("test-scope", version="1.0.0")
+  assert_eq(tracer.scope_name(), "test-scope")
+  assert_eq(tracer.scope_version(), "1.0.0")
   let span = tracer.start_root_span(
     "operation",
     start_time_unix_nano=100,
@@ -108,7 +110,7 @@ test "attributes_events_and_status" {
   let provider = @sdk.TracerProviderSdk::new(service_name="svc")
     .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
   let tracer = provider.get_tracer("t")
-  let attributes : Map[String, @sdk.AttributeValue] = Map::new()
+  let attributes : Map[String, @sdk.AttributeValue] = Map([], capacity=1)
   attributes.set("http.request.method", @sdk.StringValue("GET"))
   attributes.set("http.response.status_code", @sdk.IntValue(200L))
   let span = tracer.start_root_span(
@@ -286,4 +288,77 @@ test "span_stays_non_recording_after_second_end" {
   span.end(end_time_unix_nano=2L)
   assert_false(span.is_recording())
   assert_eq(exporter.spans.length(), 0)
+}
+
+test "with_span_scopes_current_context_and_ends_span" {
+  let exporter = recording_exporter()
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
+    .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+    .with_sampler(@sdk.Sampler::always_on())
+  let tracer = provider.get_tracer("t")
+  assert_true(@context.current_span_context() is None)
+  let result = tracer.with_span("outer", (outer) => {
+    assert_true(outer.is_recording())
+    let current = @context.current_span_context().unwrap()
+    assert_eq(current.trace_id_hex(), outer.context().trace_id_hex())
+    assert_eq(current.span_id_hex(), outer.context().span_id_hex())
+    let inner = tracer.start_span_with_context("inner")
+    assert_eq(inner.parent_span_id().length(), 8)
+    assert_eq(
+      @api.bytes_to_hex(inner.parent_span_id()),
+      outer.context().span_id_hex(),
+    )
+    inner.end(end_time_unix_nano=5L)
+    7
+  })
+  assert_eq(result, 7)
+  assert_true(@context.current_span_context() is None)
+  assert_eq(exporter.spans.length(), 2)
+  assert_eq(exporter.spans[0].name, "inner")
+  assert_eq(exporter.spans[1].name, "outer")
+}
+
+test "with_span_uses_explicit_parent" {
+  let exporter = recording_exporter()
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
+    .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+    .with_sampler(@sdk.Sampler::always_on())
+  let tracer = provider.get_tracer("t")
+  let parent = @api.span_context(
+    @api.bytes_from_hex("0102030405060708090a0b0c0d0e0f10").unwrap(),
+    @api.bytes_from_hex("1112131415161718").unwrap(),
+    @api.TRACE_FLAGS_SAMPLED,
+  )
+  tracer.with_span(
+    "child",
+    (span) => {
+      assert_eq(span.context().trace_id_hex(), parent.trace_id_hex())
+      assert_eq(@api.bytes_to_hex(span.parent_span_id()), "1112131415161718")
+      assert_true(span.is_recording())
+    },
+    parent=parent,
+  )
+  assert_eq(exporter.spans.length(), 1)
+  assert_eq(
+    @api.bytes_to_hex(exporter.spans[0].parent_span_id),
+    "1112131415161718",
+  )
+}
+
+test "with_span_ends_span_and_restores_context_when_raising" {
+  let exporter = recording_exporter()
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
+    .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+    .with_sampler(@sdk.Sampler::always_on())
+  let tracer = provider.get_tracer("t")
+  let raised = try {
+    tracer.with_span("failing", (_span) => { raise Failure("boom") })
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(raised)
+  assert_true(@context.current_span_context() is None)
+  assert_eq(exporter.spans.length(), 1)
+  assert_eq(exporter.spans[0].name, "failing")
 }

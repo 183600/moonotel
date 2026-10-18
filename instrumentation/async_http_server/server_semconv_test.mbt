@@ -26,7 +26,7 @@ async test "server records url.scheme and user_agent.original" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      run_server_on(
+      @async_http_server.run_server_on(
         server,
         call => {
           call.respond(200, body="ok")
@@ -63,7 +63,7 @@ async test "server omits user_agent.original when the header is absent" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      run_server_on(
+      @async_http_server.run_server_on(
         server,
         call => {
           call.respond(204)

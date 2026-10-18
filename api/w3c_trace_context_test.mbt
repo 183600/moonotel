@@ -44,9 +44,9 @@ test "string_split_basic" {
   let text = "a-b-c"
   let parts = text.split("-").collect()
   assert_eq(parts.length(), 3)
-  assert_eq(parts[0].to_string(), "a")
-  assert_eq(parts[1].to_string(), "b")
-  assert_eq(parts[2].to_string(), "c")
+  assert_eq(parts[0].to_owned(), "a")
+  assert_eq(parts[1].to_owned(), "b")
+  assert_eq(parts[2].to_owned(), "c")
 }
 
 test "string_find_basic" {
@@ -83,7 +83,7 @@ test "string_to_lower_basic" {
 
 // Test map operations
 test "map_basic_operations" {
-  let map = Map::new()
+  let map = Map([], capacity=1)
   map.set("key1", "value1")
   map.set("key2", "value2")
   
@@ -93,7 +93,7 @@ test "map_basic_operations" {
 }
 
 test "map_case_sensitivity" {
-  let map = Map::new()
+  let map = Map([], capacity=1)
   map.set("Key", "value")
   
   // Note: Map keys may be case-sensitive in this implementation
@@ -105,7 +105,7 @@ test "map_case_sensitivity" {
 
 // Test basic SpanContext operations
 test "span_context_invalid_with_zeros" {
-  let sc = invalid_span_context()
+  let sc = @api.invalid_span_context()
   assert_false(sc.is_valid())
   assert_eq(sc.trace_id_hex(), "00000000000000000000000000000000")
   assert_eq(sc.span_id_hex(), "0000000000000000")
@@ -114,7 +114,7 @@ test "span_context_invalid_with_zeros" {
 test "span_context_valid_with_nonzero" {
   let trace_id = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -122,7 +122,7 @@ test "span_context_valid_with_nonzero" {
 test "span_context_unsampled" {
   let trace_id = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 0)
+  let sc = @api.span_context(trace_id, span_id, 0)
   assert_true(sc.is_valid())
   assert_false(sc.is_sampled())
 }
@@ -130,7 +130,7 @@ test "span_context_unsampled" {
 test "span_context_hex_conversion" {
   let trace_id = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]
   let span_id = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   
   assert_eq(sc.trace_id_hex(), "000102030405060708090a0b0c0d0e0f")
   assert_eq(sc.span_id_hex(), "0102030405060708")

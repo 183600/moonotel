@@ -32,16 +32,16 @@ test "property_valid_span_context_requires_nonzero_ids" {
   let zero_tid = Array::make(16, 0)
   let zero_sid = Array::make(8, 0)
 
-  let sc_ok = span_context(valid_tid, valid_sid, 0)
+  let sc_ok = @api.span_context(valid_tid, valid_sid, 0)
   assert_true(sc_ok.is_valid())
 
-  let sc_zero_tid = span_context(zero_tid, valid_sid, 0)
+  let sc_zero_tid = @api.span_context(zero_tid, valid_sid, 0)
   assert_false(sc_zero_tid.is_valid())
 
-  let sc_zero_sid = span_context(valid_tid, zero_sid, 0)
+  let sc_zero_sid = @api.span_context(valid_tid, zero_sid, 0)
   assert_false(sc_zero_sid.is_valid())
 
-  let sc_both_zero = span_context(zero_tid, zero_sid, 0)
+  let sc_both_zero = @api.span_context(zero_tid, zero_sid, 0)
   assert_false(sc_both_zero.is_valid())
 }
 
@@ -51,7 +51,7 @@ test "property_sampled_flag_only_depends_on_bit_0" {
 
   let mut flags = 0
   while flags < 256 {
-    let sc = span_context(trace_id, span_id, flags)
+    let sc = @api.span_context(trace_id, span_id, flags)
     let expected_sampled = (flags & 1) != 0
     assert_eq(sc.is_sampled(), expected_sampled)
     flags = flags + 1
@@ -60,20 +60,20 @@ test "property_sampled_flag_only_depends_on_bit_0" {
 
 test "property_is_zero_iff_all_elements_zero" {
   // all zeros => is_zero
-  assert_true(is_zero(Array::make(0, 0)))
-  assert_true(is_zero(Array::make(1, 0)))
-  assert_true(is_zero(Array::make(10, 0)))
-  assert_true(is_zero(Array::make(16, 0)))
+  assert_true(@api.is_zero(Array::make(0, 0)))
+  assert_true(@api.is_zero(Array::make(1, 0)))
+  assert_true(@api.is_zero(Array::make(10, 0)))
+  assert_true(@api.is_zero(Array::make(16, 0)))
 
   // any non-zero => not is_zero
   let arr = Array::make(16, 0)
-  assert_true(is_zero(arr))
+  assert_true(@api.is_zero(arr))
   arr[0] = 1
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 
   let arr2 = Array::make(16, 0)
   arr2[15] = 1
-  assert_false(is_zero(arr2))
+  assert_false(@api.is_zero(arr2))
 }
 
 fn is_lower_hex_char(c : Char) -> Bool {

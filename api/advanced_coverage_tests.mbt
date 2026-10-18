@@ -157,9 +157,9 @@ test "hex_concatenation_stress" {
   assert_eq(hex.length(), 100) // 50 bytes = 100 hex chars
   
   // Verify some specific hex string positions by checking expected values
-  assert_true(hex.starts_with("00")) // byte 0 = 0 -> "00"
-  assert_eq(hex[2:4].to_string(), "01") // byte 1 = 1 -> "01"
-  assert_eq(hex[98:100].to_string(), "31") // byte 49 = 49 -> "31" in hex = 49 decimal
+  assert_true(hex.has_prefix("00")) // byte 0 = 0 -> "00"
+  assert_eq(hex[2:4].to_owned(), "01") // byte 1 = 1 -> "01"
+  assert_eq(hex[98:100].to_owned(), "31") // byte 49 = 49 -> "31" in hex = 49 decimal
 }
 
 test "span_context_regression_checks" {

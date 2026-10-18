@@ -13,8 +13,8 @@ test "span_context_max_trace_flags" {
 }
 
 test "span_context_alternating_bit_patterns" {
-  let tid = Array::make(16, 0)
-  let sid = Array::make(8, 0)
+  let _tid = Array::make(16, 0)
+  let _sid = Array::make(8, 0)
   
   // Test alternating patterns for validity
   let tid_pattern1 = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]

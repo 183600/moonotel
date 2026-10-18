@@ -1,7 +1,7 @@
 // Additional comprehensive tests for OpenTelemetry tracing
 
 // Helper types and functions for sampler tests
-struct SamplingDecision {
+priv struct SamplingDecision {
   is_recorded : Bool
   is_sampled : Bool
 }
@@ -111,7 +111,7 @@ test "sampler_parent_based_sampled_parent_with_children" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let parent_span_id = [1, 2, 3, 4, 5, 6, 7, 8]
   let parent_ctx = span_context(trace_id, parent_span_id, 1)
-  let child_span_id = [2, 3, 4, 5, 6, 7, 8, 9]
+  let _child_span_id = [2, 3, 4, 5, 6, 7, 8, 9]
   let decision = sampler_parent_based(parent_ctx, false)
   assert_true(decision.is_sampled)
 }
@@ -644,7 +644,7 @@ test "sampler_always_off_idempotent" {
 test "parent_based_sampler_sibling_consistency" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let parent_span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let parent_ctx = span_context(trace_id, parent_span_id, 1)
+  let _parent_ctx = span_context(trace_id, parent_span_id, 1)
   
   let sibling1_span_id = [2, 3, 4, 5, 6, 7, 8, 9]
   let sibling1_ctx = span_context(trace_id, sibling1_span_id, 1)

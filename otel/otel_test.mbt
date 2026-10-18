@@ -76,7 +76,7 @@ test "tracer_start_span_with_context_parents_into_trace" {
   let tracer = @otel.global_tracer("ctx-scope")
   let parent = tracer.start_root_span("parent-op")
   let parent_context = @otel.Context::root().with_span(parent.context())
-  @otel.with_context(parent_context, fn() {
+  @otel.with_context(parent_context, () => {
     let child = tracer.start_span_with_context("child-op")
     assert_eq(child.context().trace_id_hex(), parent.context().trace_id_hex())
     assert_eq(child.parent_span_id(), parent.context().span_id())
@@ -93,7 +93,7 @@ test "tracer_explicit_context_overrides_current" {
   let tracer = @otel.global_tracer("ctx-scope")
   let outer = tracer.start_root_span("outer-op")
   let explicit_parent = tracer.start_root_span("explicit-op")
-  @otel.with_context(@otel.Context::root().with_span(outer.context()), fn() {
+  @otel.with_context(@otel.Context::root().with_span(outer.context()), () => {
     let child = tracer.start_span_with_context(
       "child-op",
       context=@otel.Context::root().with_span(explicit_parent.context()),

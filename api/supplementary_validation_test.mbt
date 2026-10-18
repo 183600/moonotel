@@ -3,7 +3,7 @@
 test "trace_id_alternating_bits" {
   let tid = [0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55]
   let sid = Array::make(8, 1)
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_true(sc.is_valid())
   assert_eq(sc.trace_id_hex(), "aa55aa55aa55aa55aa55aa55aa55aa55")
 }
@@ -11,7 +11,7 @@ test "trace_id_alternating_bits" {
 test "span_id_alternating_bits" {
   let tid = Array::make(16, 1)
   let sid = [0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55]
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_true(sc.is_valid())
   assert_eq(sc.span_id_hex(), "aa55aa55aa55aa55")
 }
@@ -19,14 +19,14 @@ test "span_id_alternating_bits" {
 test "trace_id_fibonacci_like_sequence" {
   let tid = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 121, 98, 219]
   let sid = Array::make(8, 1)
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_true(sc.is_valid())
 }
 
 test "span_id_fibonacci_like_sequence" {
   let tid = Array::make(16, 1)
   let sid = [1, 1, 2, 3, 5, 8, 13, 21]
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_true(sc.is_valid())
 }
 
@@ -41,31 +41,31 @@ test "trace_flags_power_of_two" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
   
-  assert_true(span_context(tid, sid, 1).is_sampled())
-  assert_false(span_context(tid, sid, 2).is_sampled())
-  assert_false(span_context(tid, sid, 4).is_sampled())
-  assert_false(span_context(tid, sid, 8).is_sampled())
-  assert_false(span_context(tid, sid, 16).is_sampled())
-  assert_false(span_context(tid, sid, 32).is_sampled())
-  assert_false(span_context(tid, sid, 64).is_sampled())
-  assert_false(span_context(tid, sid, 128).is_sampled())
+  assert_true(@api.span_context(tid, sid, 1).is_sampled())
+  assert_false(@api.span_context(tid, sid, 2).is_sampled())
+  assert_false(@api.span_context(tid, sid, 4).is_sampled())
+  assert_false(@api.span_context(tid, sid, 8).is_sampled())
+  assert_false(@api.span_context(tid, sid, 16).is_sampled())
+  assert_false(@api.span_context(tid, sid, 32).is_sampled())
+  assert_false(@api.span_context(tid, sid, 64).is_sampled())
+  assert_false(@api.span_context(tid, sid, 128).is_sampled())
 }
 
 test "trace_flags_combined_bits" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
   
-  assert_true(span_context(tid, sid, 0b00000001).is_sampled())
-  assert_true(span_context(tid, sid, 0b00000011).is_sampled())
-  assert_true(span_context(tid, sid, 0b00000101).is_sampled())
-  assert_true(span_context(tid, sid, 0b11111111).is_sampled())
-  assert_false(span_context(tid, sid, 0b00000000).is_sampled())
-  assert_false(span_context(tid, sid, 0b00000010).is_sampled())
-  assert_false(span_context(tid, sid, 0b11111110).is_sampled())
+  assert_true(@api.span_context(tid, sid, 0b00000001).is_sampled())
+  assert_true(@api.span_context(tid, sid, 0b00000011).is_sampled())
+  assert_true(@api.span_context(tid, sid, 0b00000101).is_sampled())
+  assert_true(@api.span_context(tid, sid, 0b11111111).is_sampled())
+  assert_false(@api.span_context(tid, sid, 0b00000000).is_sampled())
+  assert_false(@api.span_context(tid, sid, 0b00000010).is_sampled())
+  assert_false(@api.span_context(tid, sid, 0b11111110).is_sampled())
 }
 
 test "invalid_span_context_properties" {
-  let invalid = invalid_span_context()
+  let invalid = @api.invalid_span_context()
   assert_false(invalid.is_valid())
   assert_false(invalid.is_sampled())
   assert_eq(invalid.trace_id.length(), 16)
@@ -74,7 +74,7 @@ test "invalid_span_context_properties" {
 }
 
 test "invalid_span_context_hex_output" {
-  let invalid = invalid_span_context()
+  let invalid = @api.invalid_span_context()
   assert_eq(invalid.trace_id_hex(), "00000000000000000000000000000000")
   assert_eq(invalid.span_id_hex(), "0000000000000000")
 }
@@ -82,26 +82,26 @@ test "invalid_span_context_hex_output" {
 test "span_context_with_mixed_zero_nonzero" {
   let tid = [1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 0]
   let sid = [1, 0, 2, 0, 3, 0, 4, 0]
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_true(sc.is_valid())
 }
 
 test "is_zero_with_various_sizes" {
-  assert_true(is_zero(Array::make(1, 0)))
-  assert_true(is_zero(Array::make(8, 0)))
-  assert_true(is_zero(Array::make(16, 0)))
-  assert_true(is_zero(Array::make(32, 0)))
-  assert_true(is_zero(Array::make(64, 0)))
+  assert_true(@api.is_zero(Array::make(1, 0)))
+  assert_true(@api.is_zero(Array::make(8, 0)))
+  assert_true(@api.is_zero(Array::make(16, 0)))
+  assert_true(@api.is_zero(Array::make(32, 0)))
+  assert_true(@api.is_zero(Array::make(64, 0)))
 }
 
 test "is_zero_empty_array" {
-  assert_true(is_zero([]))
+  assert_true(@api.is_zero([]))
 }
 
 test "is_zero_single_element_nonzero" {
-  assert_false(is_zero([1]))
-  assert_false(is_zero([255]))
-  assert_false(is_zero([128]))
+  assert_false(@api.is_zero([1]))
+  assert_false(@api.is_zero([255]))
+  assert_false(@api.is_zero([128]))
 }
 
 test "bytes_to_hex_nibble_combinations" {
@@ -121,7 +121,7 @@ test "hex_with_utf8_like_boundaries" {
 test "span_context_with_descending_values" {
   let tid = [255, 254, 253, 252, 251, 250, 249, 248, 247, 246, 245, 244, 243, 242, 241, 240]
   let sid = [255, 254, 253, 252, 251, 250, 249, 248]
-  let sc = span_context(tid, sid, 255)
+  let sc = @api.span_context(tid, sid, 255)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -129,7 +129,7 @@ test "span_context_with_descending_values" {
 test "span_context_with_ascending_values" {
   let tid = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let sid = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(tid, sid, 1)
+  let sc = @api.span_context(tid, sid, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -175,47 +175,47 @@ test "hex_with_repeating_nibbles" {
 test "span_context_trace_id_length_validation" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_eq(sc.trace_id.length(), 16)
 }
 
 test "span_context_span_id_length_validation" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_eq(sc.span_id.length(), 8)
 }
 
 test "hex_output_length_for_trace_id" {
   let tid = Array::make(16, 0xAB)
   let sid = Array::make(8, 1)
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_eq(sc.trace_id_hex().length(), 32)
 }
 
 test "hex_output_length_for_span_id" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 0xCD)
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_eq(sc.span_id_hex().length(), 16)
 }
 
 test "is_zero_first_element_nonzero" {
   let arr = Array::make(16, 0)
   arr[0] = 1
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "is_zero_middle_element_nonzero" {
   let arr = Array::make(16, 0)
   arr[8] = 1
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "is_zero_last_element_nonzero" {
   let arr = Array::make(16, 0)
   arr[15] = 1
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "bytes_to_hex_single_byte_all_values" {
@@ -230,7 +230,7 @@ test "bytes_to_hex_single_byte_all_values" {
 test "span_context_with_mirror_pattern" {
   let tid = [1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 3, 2, 1]
   let sid = [1, 2, 3, 4, 4, 3, 2, 1]
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_true(sc.is_valid())
 }
 
@@ -238,10 +238,10 @@ test "span_context_flags_preserve_value" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
   
-  let sc1 = span_context(tid, sid, 42)
+  let sc1 = @api.span_context(tid, sid, 42)
   assert_eq(sc1.trace_flags, 42)
   
-  let sc2 = span_context(tid, sid, 123)
+  let sc2 = @api.span_context(tid, sid, 123)
   assert_eq(sc2.trace_flags, 123)
 }
 
@@ -253,14 +253,14 @@ test "hex_with_classic_test_patterns" {
 }
 
 test "is_zero_alternating_zeros_nonzeros" {
-  assert_false(is_zero([0, 1, 0, 1]))
-  assert_false(is_zero([1, 0, 1, 0]))
+  assert_false(@api.is_zero([0, 1, 0, 1]))
+  assert_false(@api.is_zero([1, 0, 1, 0]))
 }
 
 test "span_context_with_prime_numbers" {
   let tid = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53]
   let sid = [2, 3, 5, 7, 11, 13, 17, 19]
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_true(sc.is_valid())
 }
 
@@ -274,10 +274,10 @@ test "trace_flags_sampled_bit_isolation" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
   
-  assert_true(span_context(tid, sid, 0b00000001).is_sampled())
-  assert_true(span_context(tid, sid, 0b11111111).is_sampled())
-  assert_false(span_context(tid, sid, 0b11111110).is_sampled())
-  assert_false(span_context(tid, sid, 0b00000000).is_sampled())
+  assert_true(@api.span_context(tid, sid, 0b00000001).is_sampled())
+  assert_true(@api.span_context(tid, sid, 0b11111111).is_sampled())
+  assert_false(@api.span_context(tid, sid, 0b11111110).is_sampled())
+  assert_false(@api.span_context(tid, sid, 0b00000000).is_sampled())
 }
 
 test "hex_with_gray_code_pattern" {
@@ -291,7 +291,7 @@ test "hex_with_gray_code_pattern" {
 test "span_context_all_ones_trace_id" {
   let tid = Array::make(16, 0xFF)
   let sid = Array::make(8, 1)
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_true(sc.is_valid())
   assert_eq(sc.trace_id_hex(), "ffffffffffffffffffffffffffffffff")
 }
@@ -299,7 +299,7 @@ test "span_context_all_ones_trace_id" {
 test "span_context_all_ones_span_id" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 0xFF)
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_true(sc.is_valid())
   assert_eq(sc.span_id_hex(), "ffffffffffffffff")
 }
@@ -312,14 +312,14 @@ test "bytes_to_hex_complementary_pairs" {
 }
 
 test "is_zero_very_small_nonzero_value" {
-  assert_false(is_zero([1]))
-  assert_false(is_zero([0, 0, 0, 1]))
+  assert_false(@api.is_zero([1]))
+  assert_false(@api.is_zero([0, 0, 0, 1]))
 }
 
 test "span_context_checksum_like_values" {
   let tid = [0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88]
   let sid = [0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00]
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_true(sc.is_valid())
 }
 
@@ -343,7 +343,7 @@ test "hex_with_nybble_rotation" {
 test "span_context_with_zero_flags" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_eq(sc.trace_flags, 0)
   assert_false(sc.is_sampled())
 }
@@ -351,7 +351,7 @@ test "span_context_with_zero_flags" {
 test "span_context_with_max_flags" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
-  let sc = span_context(tid, sid, 255)
+  let sc = @api.span_context(tid, sid, 255)
   assert_eq(sc.trace_flags, 255)
   assert_true(sc.is_sampled())
 }
@@ -364,19 +364,19 @@ test "bytes_to_hex_octet_boundaries" {
 }
 
 test "is_zero_multiple_positions_nonzero" {
-  assert_false(is_zero([1, 0, 1]))
-  assert_false(is_zero([0, 1, 0, 1, 0]))
-  assert_false(is_zero([1, 1, 1, 1]))
+  assert_false(@api.is_zero([1, 0, 1]))
+  assert_false(@api.is_zero([0, 1, 0, 1, 0]))
+  assert_false(@api.is_zero([1, 1, 1, 1]))
 }
 
 test "span_context_trace_id_span_id_independence" {
   let tid1 = Array::make(16, 1)
   let sid1 = Array::make(8, 2)
-  let sc1 = span_context(tid1, sid1, 0)
+  let sc1 = @api.span_context(tid1, sid1, 0)
   
   let tid2 = Array::make(16, 3)
   let sid2 = Array::make(8, 4)
-  let sc2 = span_context(tid2, sid2, 0)
+  let sc2 = @api.span_context(tid2, sid2, 0)
   
   assert_true(sc1.is_valid())
   assert_true(sc2.is_valid())
@@ -391,26 +391,26 @@ test "span_context_odd_sampled_flags" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
   
-  assert_true(span_context(tid, sid, 1).is_sampled())
-  assert_true(span_context(tid, sid, 7).is_sampled())
-  assert_true(span_context(tid, sid, 15).is_sampled())
-  assert_true(span_context(tid, sid, 31).is_sampled())
-  assert_true(span_context(tid, sid, 63).is_sampled())
-  assert_true(span_context(tid, sid, 127).is_sampled())
-  assert_true(span_context(tid, sid, 255).is_sampled())
+  assert_true(@api.span_context(tid, sid, 1).is_sampled())
+  assert_true(@api.span_context(tid, sid, 7).is_sampled())
+  assert_true(@api.span_context(tid, sid, 15).is_sampled())
+  assert_true(@api.span_context(tid, sid, 31).is_sampled())
+  assert_true(@api.span_context(tid, sid, 63).is_sampled())
+  assert_true(@api.span_context(tid, sid, 127).is_sampled())
+  assert_true(@api.span_context(tid, sid, 255).is_sampled())
 }
 
 test "span_context_even_not_sampled_flags" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
   
-  assert_false(span_context(tid, sid, 0).is_sampled())
-  assert_false(span_context(tid, sid, 6).is_sampled())
-  assert_false(span_context(tid, sid, 14).is_sampled())
-  assert_false(span_context(tid, sid, 30).is_sampled())
-  assert_false(span_context(tid, sid, 62).is_sampled())
-  assert_false(span_context(tid, sid, 126).is_sampled())
-  assert_false(span_context(tid, sid, 254).is_sampled())
+  assert_false(@api.span_context(tid, sid, 0).is_sampled())
+  assert_false(@api.span_context(tid, sid, 6).is_sampled())
+  assert_false(@api.span_context(tid, sid, 14).is_sampled())
+  assert_false(@api.span_context(tid, sid, 30).is_sampled())
+  assert_false(@api.span_context(tid, sid, 62).is_sampled())
+  assert_false(@api.span_context(tid, sid, 126).is_sampled())
+  assert_false(@api.span_context(tid, sid, 254).is_sampled())
 }
 
 test "bytes_to_hex_with_magic_numbers" {
@@ -422,13 +422,13 @@ test "bytes_to_hex_with_magic_numbers" {
 test "is_zero_with_large_value_at_end" {
   let arr = Array::make(100, 0)
   arr[99] = 255
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "span_context_hex_case_consistency" {
   let tid = [0xAB, 0xCD, 0xEF, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x11, 0x22, 0x33, 0x44, 0x55]
   let sid = Array::make(8, 0xAF)
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   
   let trace_hex = sc.trace_id_hex()
   let span_hex = sc.span_id_hex()
@@ -451,9 +451,9 @@ test "byte_to_hex_char_positive_boundary" {
 }
 
 test "span_context_multiple_valid_instances" {
-  let sc1 = span_context(Array::make(16, 1), Array::make(8, 1), 0)
-  let sc2 = span_context(Array::make(16, 2), Array::make(8, 2), 1)
-  let sc3 = span_context(Array::make(16, 3), Array::make(8, 3), 2)
+  let sc1 = @api.span_context(Array::make(16, 1), Array::make(8, 1), 0)
+  let sc2 = @api.span_context(Array::make(16, 2), Array::make(8, 2), 1)
+  let sc3 = @api.span_context(Array::make(16, 3), Array::make(8, 3), 2)
   
   assert_true(sc1.is_valid())
   assert_true(sc2.is_valid())
@@ -472,30 +472,30 @@ test "hex_with_bit_masking_patterns" {
 }
 
 test "is_zero_comprehensive_false_cases" {
-  assert_false(is_zero([255]))
-  assert_false(is_zero([0, 255]))
-  assert_false(is_zero([255, 0]))
-  assert_false(is_zero([128, 64, 32]))
+  assert_false(@api.is_zero([255]))
+  assert_false(@api.is_zero([0, 255]))
+  assert_false(@api.is_zero([255, 0]))
+  assert_false(@api.is_zero([128, 64, 32]))
 }
 
 test "span_context_validation_trace_id_zeros" {
   let tid = Array::make(16, 0)
   let sid = Array::make(8, 1)
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_false(sc.is_valid())
 }
 
 test "span_context_validation_span_id_zeros" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 0)
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_false(sc.is_valid())
 }
 
 test "span_context_validation_both_zeros" {
   let tid = Array::make(16, 0)
   let sid = Array::make(8, 0)
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_false(sc.is_valid())
 }
 
@@ -510,9 +510,9 @@ test "trace_flags_bit_field_behavior" {
   let tid = Array::make(16, 1)
   let sid = Array::make(8, 1)
   
-  let sc_bit0 = span_context(tid, sid, 0b00000001)
-  let sc_bit1 = span_context(tid, sid, 0b00000010)
-  let sc_both = span_context(tid, sid, 0b00000011)
+  let sc_bit0 = @api.span_context(tid, sid, 0b00000001)
+  let sc_bit1 = @api.span_context(tid, sid, 0b00000010)
+  let sc_both = @api.span_context(tid, sid, 0b00000011)
   
   assert_true(sc_bit0.is_sampled())
   assert_false(sc_bit1.is_sampled())
@@ -528,13 +528,13 @@ test "hex_symmetry_check" {
 }
 
 test "is_zero_edge_case_single_zero" {
-  assert_true(is_zero([0]))
+  assert_true(@api.is_zero([0]))
 }
 
 test "span_context_realistic_trace_id" {
   let tid = [0x4b, 0xf9, 0x2f, 0x35, 0x77, 0xb3, 0x4d, 0xa6, 0xa3, 0xce, 0x92, 0x9d, 0x0e, 0x0e, 0x47, 0x26]
   let sid = [0x00, 0xf0, 0x67, 0xaa, 0x0b, 0xa9, 0x02, 0xb7]
-  let sc = span_context(tid, sid, 1)
+  let sc = @api.span_context(tid, sid, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
 }
@@ -542,7 +542,7 @@ test "span_context_realistic_trace_id" {
 test "span_context_realistic_not_sampled" {
   let tid = [0x4b, 0xf9, 0x2f, 0x35, 0x77, 0xb3, 0x4d, 0xa6, 0xa3, 0xce, 0x92, 0x9d, 0x0e, 0x0e, 0x47, 0x26]
   let sid = [0x00, 0xf0, 0x67, 0xaa, 0x0b, 0xa9, 0x02, 0xb7]
-  let sc = span_context(tid, sid, 0)
+  let sc = @api.span_context(tid, sid, 0)
   assert_true(sc.is_valid())
   assert_false(sc.is_sampled())
 }
@@ -565,7 +565,7 @@ test "span_context_flags_preservation_full_range" {
   
   let mut flag = 0
   while flag < 256 {
-    let sc = span_context(tid, sid, flag)
+    let sc = @api.span_context(tid, sid, flag)
     assert_eq(sc.trace_flags, flag)
     flag = flag + 1
   }
@@ -573,7 +573,7 @@ test "span_context_flags_preservation_full_range" {
 
 test "is_zero_middle_nonzero_element" {
   let arr = [0, 0, 0, 0, 1, 0, 0, 0]
-  assert_false(is_zero(arr))
+  assert_false(@api.is_zero(arr))
 }
 
 test "hex_with_repetitive_increments" {

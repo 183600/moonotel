@@ -9,7 +9,7 @@ fn tracestate_span_id() -> Array[Int] {
 }
 
 test "span_context_carries_tracestate" {
-  let sc = span_context(
+  let sc = @api.span_context(
     tracestate_trace_id(),
     tracestate_span_id(),
     1,
@@ -20,13 +20,13 @@ test "span_context_carries_tracestate" {
 }
 
 test "span_context_default_tracestate_is_empty" {
-  let sc = span_context(tracestate_trace_id(), tracestate_span_id(), 1)
+  let sc = @api.span_context(tracestate_trace_id(), tracestate_span_id(), 1)
   assert_eq(sc.tracestate(), "")
-  assert_eq(invalid_span_context().tracestate(), "")
+  assert_eq(@api.invalid_span_context().tracestate(), "")
 }
 
 test "with_tracestate_returns_a_copy" {
-  let sc = span_context(tracestate_trace_id(), tracestate_span_id(), 1)
+  let sc = @api.span_context(tracestate_trace_id(), tracestate_span_id(), 1)
   let updated = sc.with_tracestate("other=state")
   assert_eq(updated.tracestate(), "other=state")
   assert_eq(sc.tracestate(), "")

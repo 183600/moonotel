@@ -35,98 +35,98 @@ test "hex_alternating" {
 test "trace_id_min_valid" {
   let trace_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
   let span_id = [1, 0, 0, 0, 0, 0, 0, 0]
-  let ctx = span_context(trace_id, span_id, 0)
+  let ctx = @api.span_context(trace_id, span_id, 0)
   assert_true(ctx.is_valid())
 }
 
 test "trace_id_max_valid" {
   let trace_id = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
   let span_id = [1, 0, 0, 0, 0, 0, 0, 0]
-  let ctx = span_context(trace_id, span_id, 0)
+  let ctx = @api.span_context(trace_id, span_id, 0)
   assert_true(ctx.is_valid())
 }
 
 test "span_id_min_valid" {
   let trace_id = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let span_id = [0, 0, 0, 0, 0, 0, 0, 1]
-  let ctx = span_context(trace_id, span_id, 0)
+  let ctx = @api.span_context(trace_id, span_id, 0)
   assert_true(ctx.is_valid())
 }
 
 test "span_id_max_valid" {
   let trace_id = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let span_id = [255, 255, 255, 255, 255, 255, 255, 255]
-  let ctx = span_context(trace_id, span_id, 0)
+  let ctx = @api.span_context(trace_id, span_id, 0)
   assert_true(ctx.is_valid())
 }
 
 test "trace_flags_lsb_check_0" {
   let trace_id = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let span_id = [1, 0, 0, 0, 0, 0, 0, 0]
-  let ctx = span_context(trace_id, span_id, 0b00000000)
+  let ctx = @api.span_context(trace_id, span_id, 0b00000000)
   assert_false(ctx.is_sampled())
 }
 
 test "trace_flags_lsb_check_1" {
   let trace_id = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let span_id = [1, 0, 0, 0, 0, 0, 0, 0]
-  let ctx = span_context(trace_id, span_id, 0b00000001)
+  let ctx = @api.span_context(trace_id, span_id, 0b00000001)
   assert_true(ctx.is_sampled())
 }
 
 test "trace_flags_msb_only" {
   let trace_id = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let span_id = [1, 0, 0, 0, 0, 0, 0, 0]
-  let ctx = span_context(trace_id, span_id, 0b10000000)
+  let ctx = @api.span_context(trace_id, span_id, 0b10000000)
   assert_false(ctx.is_sampled())
 }
 
 test "trace_flags_all_except_lsb" {
   let trace_id = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let span_id = [1, 0, 0, 0, 0, 0, 0, 0]
-  let ctx = span_context(trace_id, span_id, 0b11111110)
+  let ctx = @api.span_context(trace_id, span_id, 0b11111110)
   assert_false(ctx.is_sampled())
 }
 
 test "context_invalid_zero_trace_id" {
   let trace_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let span_id = [1, 0, 0, 0, 0, 0, 0, 0]
-  let ctx = span_context(trace_id, span_id, 1)
+  let ctx = @api.span_context(trace_id, span_id, 1)
   assert_false(ctx.is_valid())
 }
 
 test "context_invalid_zero_span_id" {
   let trace_id = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let span_id = [0, 0, 0, 0, 0, 0, 0, 0]
-  let ctx = span_context(trace_id, span_id, 1)
+  let ctx = @api.span_context(trace_id, span_id, 1)
   assert_false(ctx.is_valid())
 }
 
 test "context_invalid_both_zero" {
   let trace_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let span_id = [0, 0, 0, 0, 0, 0, 0, 0]
-  let ctx = span_context(trace_id, span_id, 1)
+  let ctx = @api.span_context(trace_id, span_id, 1)
   assert_false(ctx.is_valid())
 }
 
 test "is_zero_empty_array" {
-  assert_true(is_zero([]))
+  assert_true(@api.is_zero([]))
 }
 
 test "is_zero_single_zero" {
-  assert_true(is_zero([0]))
+  assert_true(@api.is_zero([0]))
 }
 
 test "is_zero_multiple_zeros" {
-  assert_true(is_zero([0, 0, 0, 0]))
+  assert_true(@api.is_zero([0, 0, 0, 0]))
 }
 
 test "is_zero_single_nonzero" {
-  assert_false(is_zero([1]))
+  assert_false(@api.is_zero([1]))
 }
 
 test "is_zero_mixed_with_one_nonzero" {
-  assert_false(is_zero([0, 0, 1, 0]))
+  assert_false(@api.is_zero([0, 0, 1, 0]))
 }
 
 test "bytes_to_hex_empty" {

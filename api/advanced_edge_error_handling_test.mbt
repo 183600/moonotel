@@ -5,14 +5,14 @@
 test "span_context_with_all_zeros_trace_id" {
   let trace_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
 }
 
 test "span_context_with_all_zeros_span_id" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [0, 0, 0, 0, 0, 0, 0, 0]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
 }
 
@@ -20,35 +20,35 @@ test "span_context_with_negative_trace_id_values" {
   // Simulate negative values by using high byte values
   let trace_id = [255, 254, 253, 252, 251, 250, 249, 248, 247, 246, 245, 244, 243, 242, 241, 240]
   let span_id = [239, 238, 237, 236, 235, 234, 233, 232]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid()) // Should still be valid as bytes are unsigned
 }
 
 test "span_context_with_negative_span_id_values" {
   let trace_id = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
   let span_id = [255, 254, 253, 252, 251, 250, 249, 248]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid()) // Should still be valid as bytes are unsigned
 }
 
 test "span_context_with_oversized_values" {
   let trace_id = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
   let span_id = [255, 255, 255, 255, 255, 255, 255, 255]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
 }
 
 test "span_context_with_single_bit_set" {
   let trace_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
   let span_id = [0, 0, 0, 0, 0, 0, 0, 1]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
 }
 
 test "span_context_with_alternating_bits" {
   let trace_id = [170, 85, 170, 85, 170, 85, 170, 85, 170, 85, 170, 85, 170, 85, 170, 85] // 0xAA alternating pattern
   let span_id = [170, 85, 170, 85, 170, 85, 170, 85]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
 }
 
@@ -102,28 +102,28 @@ test "hex_conversion_very_long_string" {
 test "span_context_minimum_valid_trace_id" {
   let trace_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
 }
 
 test "span_context_minimum_valid_span_id" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [0, 0, 0, 0, 0, 0, 0, 1]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
 }
 
 test "span_context_maximum_trace_id" {
   let trace_id = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
   let span_id = [1, 2, 3, 4, 5, 6, 7, 8]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
 }
 
 test "span_context_maximum_span_id" {
   let trace_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let span_id = [255, 255, 255, 255, 255, 255, 255, 255]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
 }
 
@@ -159,7 +159,7 @@ test "span_context_creation_stress_test" {
   while i < 500 {
     let trace_id = [i % 256, (i + 1) % 256, (i + 2) % 256, (i + 3) % 256, (i + 4) % 256, (i + 5) % 256, (i + 6) % 256, (i + 7) % 256, (i + 8) % 256, (i + 9) % 256, (i + 10) % 256, (i + 11) % 256, (i + 12) % 256, (i + 13) % 256, (i + 14) % 256, (i + 15) % 256]
     let span_id = [(i + 16) % 256, (i + 17) % 256, (i + 18) % 256, (i + 19) % 256, (i + 20) % 256, (i + 21) % 256, (i + 22) % 256, (i + 23) % 256]
-    let sc = span_context(trace_id, span_id, 1)
+    let sc = @api.span_context(trace_id, span_id, 1)
     if sc.is_valid() {
       valid_count = valid_count + 1
     }
@@ -185,7 +185,7 @@ test "span_context_array_modification_safety" {
   let original_trace = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
   let original_span = [17, 18, 19, 20, 21, 22, 23, 24]
   
-  let sc = span_context(original_trace, original_span, 1)
+  let sc = @api.span_context(original_trace, original_span, 1)
   
   // Modify original arrays to ensure span context doesn't depend on them
   let mut i = 0
@@ -226,7 +226,7 @@ test "span_context_trace_id_variations" {
   
   let mut i = 0
   while i < patterns.length() {
-    let sc = span_context(patterns[i], standard_span, 1)
+    let sc = @api.span_context(patterns[i], standard_span, 1)
     assert_true(sc.is_valid())
     i = i + 1
   }
@@ -257,8 +257,8 @@ test "span_context_sampling_variations" {
   let span_id = [17, 18, 19, 20, 21, 22, 23, 24]
   
   // Test different sampling values
-  let sc0 = span_context(trace_id, span_id, 0)
-  let sc1 = span_context(trace_id, span_id, 1)
+  let sc0 = @api.span_context(trace_id, span_id, 0)
+  let sc1 = @api.span_context(trace_id, span_id, 1)
   
   assert_true(sc0.is_valid())
   assert_true(sc1.is_valid())

@@ -3,11 +3,11 @@
 test "span_context_equality_test" {
   let trace_id1 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
   let span_id1 = [16, 17, 18, 19, 20, 21, 22, 23]
-  let sc1 = span_context(trace_id1, span_id1, 1)
+  let sc1 = @api.span_context(trace_id1, span_id1, 1)
   
   let trace_id2 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
   let span_id2 = [16, 17, 18, 19, 20, 21, 22, 23]
-  let sc2 = span_context(trace_id2, span_id2, 1)
+  let sc2 = @api.span_context(trace_id2, span_id2, 1)
   
   // Same trace and span IDs should create equivalent contexts
   assert_eq(sc1.is_valid(), sc2.is_valid())
@@ -18,31 +18,31 @@ test "span_context_boundary_conditions" {
   // Test minimum valid values
   let trace_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
   let span_id = [0, 0, 0, 0, 0, 0, 0, 1]
-  let sc = span_context(trace_id, span_id, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
   assert_true(sc.is_valid())
   
   // Test maximum values
   let trace_id_max = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
   let span_id_max = [255, 255, 255, 255, 255, 255, 255, 255]
-  let sc_max = span_context(trace_id_max, span_id_max, 1)
+  let sc_max = @api.span_context(trace_id_max, span_id_max, 1)
   assert_true(sc_max.is_valid())
 }
 
 test "span_context_invalid_edge_cases" {
   // All zeros (invalid)
-  let sc_all_zeros = invalid_span_context()
+  let sc_all_zeros = @api.invalid_span_context()
   assert_false(sc_all_zeros.is_valid())
   
   // Wrong trace_id length
   let wrong_trace_id = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
   let span_id = [16, 17, 18, 19, 20, 21, 22, 23]
-  let sc_wrong_length = span_context(wrong_trace_id, span_id, 1)
+  let sc_wrong_length = @api.span_context(wrong_trace_id, span_id, 1)
   assert_false(sc_wrong_length.is_valid())
   
   // Wrong span_id length
   let trace_id = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
   let wrong_span_id = [16, 17, 18, 19, 20, 21, 22]
-  let sc_wrong_span = span_context(trace_id, wrong_span_id, 1)
+  let sc_wrong_span = @api.span_context(trace_id, wrong_span_id, 1)
   assert_false(sc_wrong_span.is_valid())
 }
 
@@ -117,7 +117,7 @@ test "span_context_integration_test" {
   assert_eq(span_bytes.length(), 4)
   
   // Create span context
-  let sc = span_context(trace_bytes + trace_bytes, span_bytes + span_bytes, 1)
+  let sc = @api.span_context(trace_bytes + trace_bytes, span_bytes + span_bytes, 1)
   assert_true(sc.is_valid())
   assert_true(sc.is_sampled())
   

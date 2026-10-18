@@ -44,7 +44,7 @@ async test "export_spans posts a protobuf body and accepts HTTP 200" {
       })
     }
     let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:\{port}")
-    let result = export_spans(config, [test_span_data()])
+    let result = @otlp_async.export_spans(config, [test_span_data()])
     assert_true(result.is_success())
     assert_true(received.val.length() > 0)
   }
@@ -53,7 +53,7 @@ async test "export_spans posts a protobuf body and accepts HTTP 200" {
 ///|
 async test "export_spans of an empty batch succeeds without a request" {
   let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:1")
-  let result = export_spans(config, [])
+  let result = @otlp_async.export_spans(config, [])
   assert_true(result.is_success())
 }
 
@@ -77,7 +77,7 @@ async test "post_trace_request retries retryable statuses" {
       endpoint="http://127.0.0.1:\{port}",
       max_retries=3,
     )
-    let result = export_spans(config, [test_span_data()])
+    let result = @otlp_async.export_spans(config, [test_span_data()])
     assert_true(result.is_success())
     assert_eq(requests.val, 3)
   }
@@ -99,7 +99,7 @@ async test "post_trace_request does not retry non-retryable statuses" {
       endpoint="http://127.0.0.1:\{port}",
       max_retries=3,
     )
-    let result = export_spans(config, [test_span_data()])
+    let result = @otlp_async.export_spans(config, [test_span_data()])
     assert_false(result.is_success())
     assert_eq(requests.val, 1)
   }
@@ -117,7 +117,7 @@ async test "post_trace_request reports partial success as a failure" {
       })
     }
     let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:\{port}")
-    let result = export_spans(config, [test_span_data()])
+    let result = @otlp_async.export_spans(config, [test_span_data()])
     assert_false(result.is_success())
   }
 }
@@ -125,7 +125,7 @@ async test "post_trace_request reports partial success as a failure" {
 ///|
 async test "post_trace_request fails when the endpoint is unreachable" {
   let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:1")
-  let result = export_spans(config, [test_span_data()])
+  let result = @otlp_async.export_spans(config, [test_span_data()])
   assert_false(result.is_success())
 }
 
@@ -147,7 +147,7 @@ async test "post_trace_request times out a collector that never responds" {
       timeout_millis=100,
       max_retries=0,
     )
-    let result = export_spans(config, [test_span_data()])
+    let result = @otlp_async.export_spans(config, [test_span_data()])
     match result {
       @sdk.ExportFailure(message) =>
         assert_true(message.contains("TimeoutError"))
@@ -171,7 +171,7 @@ async test "request headers include the OTLP content type" {
       })
     }
     let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:\{port}")
-    let result = export_spans(config, [test_span_data()])
+    let result = @otlp_async.export_spans(config, [test_span_data()])
     assert_true(result.is_success())
     assert_eq(observed.val, "application/x-protobuf")
   }

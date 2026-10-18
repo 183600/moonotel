@@ -30,7 +30,7 @@ async test "client spans carry the network protocol attributes" {
         conn.send_response(200, "OK")
       })
     }
-    let (response, _body) = get("http://127.0.0.1:\{port}/protocol", tracer=tracer)
+    let (response, _body) = @async_http_client.get("http://127.0.0.1:\{port}/protocol", tracer=tracer)
     assert_eq(response.code, 200)
     assert_eq(exporter.spans.val.length(), 1)
     let data = exporter.spans.val[0]
