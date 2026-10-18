@@ -209,3 +209,12 @@ pub fn shutdown_global_tracer_provider() -> Unit {
     None => ()
   }
 }
+
+// Force-flush the process-wide provider, if any. Useful before an orderly
+// process exit so that spans buffered by batch processors are exported.
+pub fn force_flush_global_tracer_provider() -> Unit {
+  match global_provider.val {
+    Some(provider) => provider.force_flush()
+    None => ()
+  }
+}

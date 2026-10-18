@@ -2,6 +2,7 @@ import {
   "yourname/otel/api" @api,
   "yourname/otel/context" @context,
   "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/env",
 }
 
 pkgtype(kind: "library")

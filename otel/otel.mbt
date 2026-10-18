@@ -40,6 +40,7 @@ pub using @sdk {
   global_tracer_provider,
   set_global_tracer_provider,
   shutdown_global_tracer_provider,
+  force_flush_global_tracer_provider,
   SDK_VERSION,
   TELEMETRY_SDK_NAME,
   TELEMETRY_SDK_LANGUAGE,
@@ -61,6 +62,10 @@ pub using @context {
 pub using @propagation {
   type TextMapCarrier,
   type Tracestate,
+  trait TextMapPropagator,
+  type TraceContextPropagator,
+  type BaggagePropagator,
+  type CompositePropagator,
   TRACESTATE_MAX_MEMBERS,
   BAGGAGE_MAX_MEMBERS,
   BAGGAGE_MAX_BYTES,
