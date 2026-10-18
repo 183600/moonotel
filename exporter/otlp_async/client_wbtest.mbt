@@ -41,6 +41,47 @@ test "parse_http_date_seconds rejects non-IMF-fixdate values" {
 }
 
 ///|
+test "parse_http_date_seconds rejects impossible calendar days" {
+  let invalid : Array[String] = [
+    "Sun, 31 Feb 2024 00:00:00 GMT",
+    "Sun, 30 Feb 2024 00:00:00 GMT",
+    "Tue, 31 Apr 2024 00:00:00 GMT",
+    "Fri, 31 Jun 1994 08:49:37 GMT",
+    "Sat, 31 Sep 1994 08:49:37 GMT",
+    "Mon, 31 Nov 1994 08:49:37 GMT",
+  ]
+  for value in invalid {
+    assert_eq(parse_http_date_seconds(value[:]), None)
+  }
+}
+
+///|
+test "parse_http_date_seconds honors month lengths and leap years" {
+  // February ends on the 29th in a leap year and on the 28th otherwise.
+  assert_eq(
+    parse_http_date_seconds("Thu, 29 Feb 2024 00:00:00 GMT"[:]),
+    Some(1709164800L),
+  )
+  assert_eq(
+    parse_http_date_seconds("Tue, 28 Feb 2023 00:00:00 GMT"[:]),
+    Some(1677542400L),
+  )
+  // The 29th of February exists in 2024 but not in 2023 or 2100 (century
+  // years are leap years only when divisible by 400).
+  assert_eq(parse_http_date_seconds("Wed, 29 Feb 2023 00:00:00 GMT"[:]), None)
+  assert_eq(parse_http_date_seconds("Mon, 29 Feb 2100 00:00:00 GMT"[:]), None)
+  // 30-day months end on the 30th; 31-day months on the 31st.
+  assert_eq(
+    parse_http_date_seconds("Tue, 30 Apr 2024 00:00:00 GMT"[:]),
+    Some(1714435200L),
+  )
+  assert_eq(
+    parse_http_date_seconds("Sun, 31 Dec 2023 00:00:00 GMT"[:]),
+    Some(1703980800L),
+  )
+}
+
+///|
 test "retry_after_millis handles seconds and dates" {
   assert_eq(retry_after_millis("0"), Some(0))
   assert_eq(retry_after_millis(" 5 "), Some(5000))

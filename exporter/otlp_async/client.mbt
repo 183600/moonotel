@@ -110,6 +110,23 @@ fn days_from_civil(year : Int32, month : Int32, day : Int32) -> Int64 {
   (era * 146097 + doe - 719468).to_int64()
 }
 
+// Number of days of a proleptic Gregorian month, honoring the leap-year
+// rules (divisible by 4, except centuries not divisible by 400).
+
+///|
+fn days_in_month(year : Int32, month : Int32) -> Int32 {
+  match month {
+    2 =>
+      if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) {
+        29
+      } else {
+        28
+      }
+    4 | 6 | 9 | 11 => 30
+    _ => 31
+  }
+}
+
 // Parse the IMF-fixdate form of an HTTP date (`Sun, 06 Nov 1994 08:49:37 GMT`)
 // into seconds since the Unix epoch. The obsolete RFC 850 and asctime forms
 // and any other value yield `None`.
@@ -170,7 +187,11 @@ fn parse_http_date_seconds(value : StringView) -> Int64? {
     Some(value) => value
     None => return None
   }
-  if day < 1 || day > 31 || hour > 23 || minute > 59 || second > 60 {
+  if day < 1 ||
+    day > days_in_month(year, month) ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 60 {
     return None
   }
   let days = days_from_civil(year, month, day)
