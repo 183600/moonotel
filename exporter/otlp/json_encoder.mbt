@@ -21,6 +21,34 @@ fn json_hex_digit(nibble : Int) -> Char {
   }
 }
 
+// Lower-case hex digit of every nibble value 0-15.
+let json_hex_digits : FixedArray[Char] = build_json_hex_digits()
+
+fn build_json_hex_digits() -> FixedArray[Char] {
+  let table : FixedArray[Char] = FixedArray::make(16, '0')
+  let mut i = 0
+  while i < 16 {
+    table.unsafe_set(i, json_hex_digit(i))
+    i = i + 1
+  }
+  table
+}
+
+// Append `"<hex>"` for a byte array without materializing an intermediate hex
+// string: hex digits need no JSON escaping. Out-of-range values are rendered
+// exactly like `@api.bytes_to_hex` does.
+fn json_write_hex_quoted(sb : StringBuilder, bytes : Array[Int]) -> Unit {
+  sb.write_char('"')
+  for byte in bytes {
+    let hi = byte >> 4
+    sb.write_char(
+      if hi >= 0 && hi < 16 { json_hex_digits.unsafe_get(hi) } else { '0' },
+    )
+    sb.write_char(json_hex_digits.unsafe_get(byte & 0x0F))
+  }
+  sb.write_char('"')
+}
+
 // Append `value` as a JSON string literal, escaping the characters required by
 // RFC 8259. Non-ASCII text is emitted verbatim (JSON documents are UTF-8).
 // Runs of characters that need no escaping are appended in one slice.
@@ -66,11 +94,25 @@ fn json_write_escaped(sb : StringBuilder, value : String) -> Unit {
   sb.write_char('"')
 }
 
+// Append the decimal digits of an unsigned magnitude.
+fn json_write_decimal_digits(sb : StringBuilder, value : UInt64) -> Unit {
+  if value >= 10 {
+    json_write_decimal_digits(sb, value / 10)
+  }
+  sb.write_char((0x30 + (value % 10).to_int()).unsafe_to_char())
+}
+
 // Append a 64-bit integer as a JSON string, the protobuf JSON representation
 // of `int64`/`uint64` values.
 fn json_write_int64_string(sb : StringBuilder, value : Int64) -> Unit {
   sb.write_char('"')
-  sb.write_string(value.to_string())
+  if value < 0L {
+    sb.write_char('-')
+    // `0L - value` wraps for the minimum value and yields its magnitude.
+    json_write_decimal_digits(sb, (0L - value).reinterpret_as_uint64())
+  } else {
+    json_write_decimal_digits(sb, value.reinterpret_as_uint64())
+  }
   sb.write_char('"')
 }
 
@@ -177,7 +219,7 @@ fn json_write_attributes(
 ) -> Unit {
   sb.write_char('[')
   let mut first = true
-  attributes.each(fn(key, value) {
+  for key, value in attributes.iter2() {
     if !first {
       sb.write_char(',')
     }
@@ -187,7 +229,7 @@ fn json_write_attributes(
     sb.write_string(",\"value\":")
     json_write_any_value(sb, value)
     sb.write_char('}')
-  })
+  }
   sb.write_char(']')
 }
 
@@ -232,9 +274,9 @@ fn json_write_event(sb : StringBuilder, event : @sdk.SpanEvent) -> Unit {
 // Append one `Link` message.
 fn json_write_link(sb : StringBuilder, link : @sdk.SpanLink) -> Unit {
   sb.write_string("{\"traceId\":")
-  json_write_escaped(sb, @api.bytes_to_hex(link.span_context.trace_id_view()))
+  json_write_hex_quoted(sb, link.span_context.trace_id_view())
   sb.write_string(",\"spanId\":")
-  json_write_escaped(sb, @api.bytes_to_hex(link.span_context.span_id_view()))
+  json_write_hex_quoted(sb, link.span_context.span_id_view())
   let tracestate = link.span_context.tracestate()
   if tracestate != "" {
     sb.write_string(",\"traceState\":")
@@ -279,9 +321,9 @@ fn json_write_status(sb : StringBuilder, data : @sdk.SpanData) -> Unit {
 // Append one `Span` message.
 fn json_write_span(sb : StringBuilder, data : @sdk.SpanData) -> Unit {
   sb.write_string("{\"traceId\":")
-  json_write_escaped(sb, @api.bytes_to_hex(data.span_context.trace_id_view()))
+  json_write_hex_quoted(sb, data.span_context.trace_id_view())
   sb.write_string(",\"spanId\":")
-  json_write_escaped(sb, @api.bytes_to_hex(data.span_context.span_id_view()))
+  json_write_hex_quoted(sb, data.span_context.span_id_view())
   let tracestate = data.span_context.tracestate()
   if tracestate != "" {
     sb.write_string(",\"traceState\":")
@@ -289,7 +331,7 @@ fn json_write_span(sb : StringBuilder, data : @sdk.SpanData) -> Unit {
   }
   if data.parent_span_id.length() > 0 {
     sb.write_string(",\"parentSpanId\":")
-    json_write_escaped(sb, @api.bytes_to_hex(data.parent_span_id))
+    json_write_hex_quoted(sb, data.parent_span_id)
   }
   sb.write_string(",\"name\":")
   json_write_escaped(sb, data.name)

@@ -244,7 +244,7 @@ fn encode_attributes(
   if attributes.length() == 0 {
     return
   }
-  attributes.each(fn(key, value) {
+  for key, value in attributes.iter2() {
     if !try_encode_scalar_attribute(writer, field, key, value) {
       let kv = writer.take_scratch()
       kv.write_string_field(1, key)
@@ -253,7 +253,7 @@ fn encode_attributes(
       kv.append_message(2, any_value)
       writer.append_message(field, kv)
     }
-  })
+  }
 }
 
 ///|
@@ -439,7 +439,9 @@ fn resource_key(resource : Map[String, @sdk.AttributeValue]) -> String {
   let entries : Array[(String, @sdk.AttributeValue)] = Array(
     capacity=resource.length(),
   )
-  resource.each(fn(key, value) { entries.push((key, value)) })
+  for key, value in resource.iter2() {
+    entries.push((key, value))
+  }
   entries.sort_by(fn(a, b) { a.0.compare(b.0) })
   let sb = StringBuilder()
   for entry in entries {

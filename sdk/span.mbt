@@ -299,13 +299,13 @@ fn limited_attributes(
   }
   let kept : Map[String, AttributeValue] = Map([], capacity=capacity * 2)
   let mut dropped = 0
-  attributes.each(fn(key, value) {
+  for key, value in attributes.iter2() {
     if within_limit(kept.length(), count_limit) {
       kept.set(key, truncate_attribute_value(value, value_length_limit))
     } else {
       dropped = dropped + 1
     }
-  })
+  }
   (kept, dropped)
 }
 

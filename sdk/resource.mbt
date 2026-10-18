@@ -145,7 +145,9 @@ fn copy_attributes_with_capacity(
   capacity : Int
 ) -> Map[String, AttributeValue] {
   let out : Map[String, AttributeValue] = Map([], capacity=capacity)
-  values.each(fn(key, value) { out.set(key, value) })
+  for key, value in values.iter2() {
+    out.set(key, value)
+  }
   out
 }
 
