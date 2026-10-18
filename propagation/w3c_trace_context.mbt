@@ -422,14 +422,50 @@ fn is_digit_char(c : Char) -> Bool {
   c >= '0' && c <= '9'
 }
 
+// Whether each ASCII code unit (0-127) may appear in a `tracestate` key
+// besides `@`: `lcalpha`, digit, `_`, `-`, `*` or `/`.
+
+///|
+let tracestate_key_char_table : FixedArray[Bool] = build_tracestate_key_char_table()
+
+///|
+fn build_tracestate_key_char_table() -> FixedArray[Bool] {
+  let table : FixedArray[Bool] = FixedArray::make(128, false)
+  let mut code = 0
+  while code < 128 {
+    let allowed = (code >= 48 && code <= 57) ||
+      (code >= 97 && code <= 122) ||
+      code == 0x5F ||
+      code == 0x2D ||
+      code == 0x2A ||
+      code == 0x2F
+    table.unsafe_set(code, allowed)
+    code = code + 1
+  }
+  table
+}
+
 ///|
 fn is_tracestate_key_tail(c : Char) -> Bool {
-  is_lcalpha(c) ||
-  is_digit_char(c) ||
-  c == '_' ||
-  c == '-' ||
-  c == '*' ||
-  c == '/'
+  let code = c.to_int()
+  code >= 0 && code < 128 && tracestate_key_char_table.unsafe_get(code)
+}
+
+// Whether each ASCII code unit (0-127) may appear in a `tracestate` value:
+// printable ASCII without `,` or `=`.
+
+///|
+let tracestate_value_char_table : FixedArray[Bool] = build_tracestate_value_char_table()
+
+///|
+fn build_tracestate_value_char_table() -> FixedArray[Bool] {
+  let table : FixedArray[Bool] = FixedArray::make(128, false)
+  let mut code = 0
+  while code < 128 {
+    table.unsafe_set(code, code >= 0x20 && code <= 0x7E && code != 0x2C && code != 0x3D)
+    code = code + 1
+  }
+  table
 }
 
 // Validate a `tracestate` key: either a simple key (`lcalpha` followed by up to
@@ -486,7 +522,7 @@ fn is_valid_tracestate_value(value : StringView) -> Bool {
   let mut i = 0
   while i < len {
     let code = value.unsafe_get(i).unsafe_to_char().to_int()
-    if code < 0x20 || code > 0x7E || code == 0x2C || code == 0x3D {
+    if code >= 128 || !tracestate_value_char_table.unsafe_get(code) {
       return false
     }
     i = i + 1

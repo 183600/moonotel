@@ -278,6 +278,18 @@ fn ProtoWriter::write_bytes_from_int_array(
   let buf = self.buf
   let mut pos = self.len
   let mut i = 0
+  while i + 4 <= len {
+    let v0 = values.unsafe_get(i) & 0xFF
+    let v1 = values.unsafe_get(i + 1) & 0xFF
+    let v2 = values.unsafe_get(i + 2) & 0xFF
+    let v3 = values.unsafe_get(i + 3) & 0xFF
+    buf.unsafe_write_uint32_le(
+      pos,
+      (v0 | (v1 << 8) | (v2 << 16) | (v3 << 24)).reinterpret_as_uint(),
+    )
+    pos = pos + 4
+    i = i + 4
+  }
   while i < len {
     buf.unsafe_set(pos, (values.unsafe_get(i) & 0xFF).to_byte())
     pos = pos + 1
