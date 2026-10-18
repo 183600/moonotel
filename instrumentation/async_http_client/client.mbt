@@ -3,8 +3,8 @@
 // Every request starts a CLIENT span, injects the current context through the
 // process-wide propagator (the W3C `traceparent` header and `baggage` by
 // default) so the downstream service can continue the trace, and records the
-// stable HTTP semantic-convention attributes. The span ends when the response
-// headers are available.
+// stable HTTP semantic-convention attributes. The span ends once the response
+// body has been fully read.
 //
 // When no TracerProvider has been installed (see
 // `@sdk.set_global_tracer_provider` / `yourname/otel` setup) or no tracer is
@@ -144,7 +144,7 @@ fn find_authority_end(text : StringView) -> Int32 {
 
 // Split an absolute URL into (scheme, host, port). The scheme is "" when the
 // URL has no valid scheme; the port falls back to the scheme default when it
-// is not explicit; malformed URLs yield `(host, -1)`.
+// is not explicit; an explicit but unparsable port yields -1.
 
 ///|
 fn split_url_parts(url : String) -> (String, String, Int32) {
@@ -226,8 +226,8 @@ pub fn split_scheme(url : String) -> String {
 }
 
 // Best-effort split of an absolute URL into (host, port). The port falls back
-// to the scheme default when it is not explicit; malformed URLs yield
-// `(host, -1)` and are still traced.
+// to the scheme default when it is not explicit; an explicit but unparsable
+// port yields -1 and the URL is still traced.
 
 ///|
 pub fn split_url(url : String) -> (String, Int32) {
@@ -365,7 +365,9 @@ pub async fn request(
         span.set_attribute(@sdk.URL_SCHEME, @sdk.StringValue(scheme))
       }
       span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(host))
-      span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
+      if port > 0 {
+        span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
+      }
       let outcome = Ok(
         @http.request(
           url,

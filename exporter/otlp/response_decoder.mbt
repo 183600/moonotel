@@ -30,6 +30,11 @@ fn read_response_varint(data : BytesView, offset : Int32) -> (UInt64, Int32)? {
     if shift >= 64 {
       return None
     }
+    if shift == 63 && byte > 1 {
+      // The tenth byte only has room for bit 63; anything above it (or a
+      // continuation that would make the varint longer) overflows 64 bits.
+      return None
+    }
     result = result | ((byte & 0x7F).to_uint64() << shift)
     pos = pos + 1
     if byte < 0x80 {

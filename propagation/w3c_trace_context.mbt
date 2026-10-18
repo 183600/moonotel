@@ -1,5 +1,5 @@
-// W3C Trace Context (Level 2) propagator for the `traceparent` and
-// `tracestate` headers.
+// Propagator for the W3C Trace Context `traceparent` and `tracestate`
+// headers (based on Level 2, with the trace-flags handling described below).
 //
 // `traceparent` layout: `version-trace-id-parent-id-trace-flags`
 //   - version: 2 hex chars, `ff` is invalid

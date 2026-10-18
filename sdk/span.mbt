@@ -769,20 +769,22 @@ pub fn SpanSdk::set_status(
   }
 }
 
-// Build the immutable export snapshot of a span.
+// Build the immutable export snapshot of a span. The top-level attribute,
+// event and link containers are copied so that the snapshot cannot be changed
+// through the span after `end` (or across multiple processors).
 
 ///|
 fn SpanData::from_span(span : SpanSdk) -> SpanData {
   let attributes : Map[String, AttributeValue] = match span.attributes {
-    Some(attributes) => attributes
+    Some(attributes) => attributes.copy()
     None => Map([], capacity=1)
   }
   let events : Array[SpanEvent] = match span.events {
-    Some(events) => events
+    Some(events) => events.copy()
     None => []
   }
   let links : Array[SpanLink] = match span.links {
-    Some(links) => links
+    Some(links) => links.copy()
     None => []
   }
   {

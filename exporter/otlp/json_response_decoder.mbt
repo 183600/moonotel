@@ -166,19 +166,30 @@ fn json_parse_decimal_int64(value : String) -> Int64? {
   if pos >= len {
     return None
   }
-  let mut result : Int64 = 0L
+  let mut magnitude : UInt64 = 0
   while pos < len {
     let code = value.unsafe_get(pos).to_int()
     if code < 0x30 || code > 0x39 {
       return None
     }
-    result = result * 10L + (code - 0x30).to_int64()
+    let digit = (code - 0x30).to_uint64()
+    if magnitude > (18446744073709551615UL - digit) / 10UL {
+      // `magnitude * 10 + digit` would wrap around.
+      return None
+    }
+    magnitude = magnitude * 10UL + digit
     pos = pos + 1
   }
   if negative {
-    Some(-result)
+    if magnitude > 9223372036854775808UL {
+      return None
+    }
+    Some((0UL - magnitude).reinterpret_as_int64())
   } else {
-    Some(result)
+    if magnitude > 9223372036854775807UL {
+      return None
+    }
+    Some(magnitude.reinterpret_as_int64())
   }
 }
 

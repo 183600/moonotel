@@ -184,15 +184,54 @@ fn parse_headers(value : String) -> Map[String, String] {
   let headers = Map([])
   for pair in value.split(",") {
     match pair.trim().split_once("=") {
-      Some((key, header_value)) =>
-        headers.set(
-          key.trim().to_owned(),
-          decode_header_value(header_value.trim()),
-        )
+      Some((key, header_value)) => {
+        let trimmed_key = key.trim()
+        if trimmed_key != "" {
+          headers.set(
+            trimmed_key.to_owned(),
+            decode_header_value(header_value.trim()),
+          )
+        }
+      }
       None => ()
     }
   }
   headers
+}
+
+// The value of the environment variable `name` when it is set and not blank,
+// `None` otherwise (an empty value is treated as unset, as OTLP requires).
+
+///|
+fn non_blank_env_value(name : String) -> String? {
+  match @env.get_env_var(name) {
+    Some(value) =>
+      if value.trim() != "" {
+        Some(value.trim().to_owned())
+      } else {
+        None
+      }
+    None => None
+  }
+}
+
+// Parse the timeout environment variable `name`. `None` when the variable is
+// unset, blank or not a positive integer, so that the caller can continue with
+// the next fallback.
+
+///|
+fn parse_timeout_env(name : String) -> Int32? {
+  match @env.get_env_var(name) {
+    Some(value) => {
+      let parsed = @string.parse_int(value.trim()) catch { _ => 0 }
+      if parsed > 0 {
+        Some(parsed)
+      } else {
+        None
+      }
+    }
+    None => None
+  }
 }
 
 // Build a configuration from the standard OTLP environment variables:
@@ -207,15 +246,8 @@ fn parse_headers(value : String) -> Map[String, String] {
 ///|
 pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
   // An empty (or blank) environment variable is treated as unset.
-  let traces_endpoint = match
-    @env.get_env_var("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") {
-    Some(value) => if value.trim() != "" { Some(value) } else { None }
-    None => None
-  }
-  let generic_endpoint = match @env.get_env_var("OTEL_EXPORTER_OTLP_ENDPOINT") {
-    Some(value) => if value.trim() != "" { Some(value) } else { None }
-    None => None
-  }
+  let traces_endpoint = non_blank_env_value("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+  let generic_endpoint = non_blank_env_value("OTEL_EXPORTER_OTLP_ENDPOINT")
   let endpoint = match generic_endpoint {
     Some(value) => value
     None =>
@@ -237,48 +269,30 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
     }
     None => ()
   }
-  let specific_compression = match
-    @env.get_env_var("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION") {
-    Some(value) => value.trim().to_owned()
-    None => ""
-  }
-  let compression = if specific_compression != "" {
-    specific_compression
-  } else {
-    match @env.get_env_var("OTEL_EXPORTER_OTLP_COMPRESSION") {
-      Some(value) =>
-        if value.trim() != "" {
-          value.trim().to_owned()
-        } else {
-          "none"
-        }
-      None => "none"
-    }
-  }
-  let protocol = match @env.get_env_var("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL") {
-    Some(value) =>
-      if value.trim() != "" {
-        value.trim().to_owned()
-      } else {
-        OTLP_HTTP_PROTOBUF_PROTOCOL
-      }
+  let compression = match
+    non_blank_env_value("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION") {
+    Some(value) => value
     None =>
-      match @env.get_env_var("OTEL_EXPORTER_OTLP_PROTOCOL") {
-        Some(value) =>
-          if value.trim() != "" {
-            value.trim().to_owned()
-          } else {
-            OTLP_HTTP_PROTOBUF_PROTOCOL
-          }
+      match non_blank_env_value("OTEL_EXPORTER_OTLP_COMPRESSION") {
+        Some(value) => value
+        None => "none"
+      }
+  }
+  let protocol = match
+    non_blank_env_value("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL") {
+    Some(value) => value
+    None =>
+      match non_blank_env_value("OTEL_EXPORTER_OTLP_PROTOCOL") {
+        Some(value) => value
         None => OTLP_HTTP_PROTOBUF_PROTOCOL
       }
   }
   let timeout_millis = match
-    @env.get_env_var("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT") {
-    Some(value) => parse_timeout(value)
+    parse_timeout_env("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT") {
+    Some(value) => value
     None =>
-      match @env.get_env_var("OTEL_EXPORTER_OTLP_TIMEOUT") {
-        Some(value) => parse_timeout(value)
+      match parse_timeout_env("OTEL_EXPORTER_OTLP_TIMEOUT") {
+        Some(value) => value
         None => 10000
       }
   }
@@ -290,16 +304,6 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
     compression,
     protocol,
     max_retries: DEFAULT_MAX_RETRIES,
-  }
-}
-
-///|
-fn parse_timeout(value : String) -> Int32 {
-  let parsed = @string.parse_int(value.trim()) catch { _ => 0 }
-  if parsed > 0 {
-    parsed
-  } else {
-    10000
   }
 }
 

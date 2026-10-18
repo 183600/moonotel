@@ -34,7 +34,9 @@ pub fn sampling_decision_drop() -> SamplingDecision {
 }
 
 // Compose the trace ID's leading 8 bytes into an unsigned 64-bit integer.
-// This is the value used by ratio-based sampling (consistent across SDKs).
+// This is the value used by ratio-based sampling; the OpenTelemetry
+// specification does not mandate a particular byte range or algorithm, so
+// different SDKs may hash different bytes.
 
 ///|
 fn trace_id_fraction(trace_id : Array[Int32]) -> UInt64 {
