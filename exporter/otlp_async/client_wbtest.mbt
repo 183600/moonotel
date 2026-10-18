@@ -43,12 +43,8 @@ test "parse_http_date_seconds rejects non-IMF-fixdate values" {
 ///|
 test "parse_http_date_seconds rejects impossible calendar days" {
   let invalid : Array[String] = [
-    "Sun, 31 Feb 2024 00:00:00 GMT",
-    "Sun, 30 Feb 2024 00:00:00 GMT",
-    "Tue, 31 Apr 2024 00:00:00 GMT",
-    "Fri, 31 Jun 1994 08:49:37 GMT",
-    "Sat, 31 Sep 1994 08:49:37 GMT",
-    "Mon, 31 Nov 1994 08:49:37 GMT",
+    "Sun, 31 Feb 2024 00:00:00 GMT", "Sun, 30 Feb 2024 00:00:00 GMT", "Tue, 31 Apr 2024 00:00:00 GMT",
+    "Fri, 31 Jun 1994 08:49:37 GMT", "Sat, 31 Sep 1994 08:49:37 GMT", "Mon, 31 Nov 1994 08:49:37 GMT",
   ]
   for value in invalid {
     assert_eq(parse_http_date_seconds(value[:]), None)

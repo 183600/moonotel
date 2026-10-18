@@ -256,10 +256,7 @@ fn build_hex_ascii_upper_bytes() -> FixedArray[Byte] {
   let table : FixedArray[Byte] = FixedArray::make(16, b'0')
   let mut i = 0
   while i < 16 {
-    table.unsafe_set(
-      i,
-      (if i < 10 { i + 48 } else { i + 55 }).to_byte(),
-    )
+    table.unsafe_set(i, (if i < 10 { i + 48 } else { i + 55 }).to_byte())
     i = i + 1
   }
   table
@@ -502,7 +499,10 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
     let (key, value) = entry
     if is_valid_baggage_key(key) {
       let separator = if count > 0 { 1 } else { 0 }
-      let member_size = key.length() + 1 + separator + percent_encoded_length(value)
+      let member_size = key.length() +
+        1 +
+        separator +
+        percent_encoded_length(value)
       if bytes + member_size > BAGGAGE_MAX_BYTES {
         break
       }
