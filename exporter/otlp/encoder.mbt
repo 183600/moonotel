@@ -109,7 +109,6 @@ fn write_scalar_attribute_header(
       if writer.len + total > writer.buf.length() {
         writer.reserve(total)
       }
-      // The whole 4-byte header fits in one little-endian word.
       writer.buf.unsafe_write_uint32_le(
         writer.len,
         ((field << 3) | 2).reinterpret_as_uint() |
@@ -157,8 +156,6 @@ fn try_encode_scalar_attribute(
         return false
       }
       if any_size < 0x80 {
-        // The header reserved room for the whole attribute, and both the
-        // AnyValue size and the value length fit in one varint byte.
         writer.buf.unsafe_write_uint32_le(
           writer.len,
           (0x12 : UInt32) |

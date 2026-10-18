@@ -149,8 +149,7 @@ fn hex_digit_value(c : Char) -> Int32 {
 
 // Decode `byte_count` hex byte pairs starting at `start`, validating as it
 // goes and tracking whether any byte is non-zero. Returns None when any
-// character is not a hex digit or when every decoded byte is zero, so the
-// caller never needs a second pass over the decoded ID.
+// character is not a hex digit or when every decoded byte is zero.
 
 ///|
 fn decode_hex_nonzero(

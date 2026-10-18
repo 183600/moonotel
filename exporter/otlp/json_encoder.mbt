@@ -39,9 +39,8 @@ fn build_json_hex_digits() -> FixedArray[Char] {
   table
 }
 
-// Append `"<hex>"` for a byte array without materializing an intermediate hex
-// string: hex digits need no JSON escaping. Out-of-range values are rendered
-// exactly like `@api.bytes_to_hex` does.
+// Append `"<hex>"` for a byte array. Out-of-range values are rendered exactly
+// like `@api.bytes_to_hex` does.
 
 ///|
 fn json_write_hex_quoted(sb : StringBuilder, bytes : Array[Int32]) -> Unit {
@@ -62,7 +61,6 @@ fn json_write_hex_quoted(sb : StringBuilder, bytes : Array[Int32]) -> Unit {
 
 // Append `value` as a JSON string literal, escaping the characters required by
 // RFC 8259. Non-ASCII text is emitted verbatim (JSON documents are UTF-8).
-// Runs of characters that need no escaping are appended in one slice.
 
 ///|
 fn json_write_escaped(sb : StringBuilder, value : String) -> Unit {

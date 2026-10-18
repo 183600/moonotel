@@ -16,10 +16,7 @@ fn ProtoWriter::with_capacity(size_hint : Int32) -> ProtoWriter {
   { buf: FixedArray::make(capacity, b'\x00'), len: 0, scratch: [], }
 }
 
-// Reusable root writer for `encode_trace_request`. Its buffer and the pool of
-// nested-message scratch writers are kept between calls, so repeated encoding
-// allocates only the returned `Bytes`. Encoding never re-enters itself, so the
-// pool is safe to share process-wide.
+// Root writer used by `encode_trace_request`.
 
 ///|
 let encoder_pool : Ref[ProtoWriter?] = Ref(None)
@@ -61,8 +58,7 @@ fn ProtoWriter::take_scratch(self : ProtoWriter) -> ProtoWriter {
 }
 
 // Like `take_scratch`, but ensures the returned writer's buffer can hold at
-// least `hint` bytes. A recycled writer carries no data: its length is reset
-// when it is released.
+// least `hint` bytes.
 
 ///|
 fn ProtoWriter::take_scratch_with_capacity(
@@ -138,9 +134,7 @@ fn ProtoWriter::write_tag(
   self.write_varint(tag.to_uint64())
 }
 
-// Write the tag and length prefix of a length-delimited field. The fast path
-// covers the common case of a one-byte tag and a one-byte length, which is
-// what most OTLP fields need.
+// Write the tag and length prefix of a length-delimited field.
 
 ///|
 fn ProtoWriter::write_message_header(
@@ -284,8 +278,6 @@ fn ProtoWriter::write_bytes_from_int_array(
   let buf = self.buf
   let mut pos = self.len
   let mut i = 0
-  // Trace and span IDs are 8 or 16 bytes; storing byte by byte beats packing
-  // words for these short lengths.
   while i < len {
     buf.unsafe_set(pos, (values.unsafe_get(i) & 0xFF).to_byte())
     pos = pos + 1
