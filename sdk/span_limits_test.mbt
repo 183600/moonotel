@@ -353,6 +353,26 @@ test "span_specific_variables_take_precedence_over_generic_ones" {
 }
 
 ///|
+test "event_and_link_attribute_limits_fall_back_to_the_generic_limit" {
+  clear_limit_env()
+  @env.set_env_var("OTEL_ATTRIBUTE_COUNT_LIMIT", "7")
+  let generic = @sdk.SpanLimits::from_env()
+  @env.set_env_var("OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT", "3")
+  @env.set_env_var("OTEL_LINK_ATTRIBUTE_COUNT_LIMIT", "4")
+  let specific = @sdk.SpanLimits::from_env()
+  @env.set_env_var("OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT", "")
+  @env.set_env_var("OTEL_LINK_ATTRIBUTE_COUNT_LIMIT", "oops")
+  let malformed = @sdk.SpanLimits::from_env()
+  clear_limit_env()
+  assert_eq(generic.event_attribute_count_limit(), 7)
+  assert_eq(generic.link_attribute_count_limit(), 7)
+  assert_eq(specific.event_attribute_count_limit(), 3)
+  assert_eq(specific.link_attribute_count_limit(), 4)
+  assert_eq(malformed.event_attribute_count_limit(), 7)
+  assert_eq(malformed.link_attribute_count_limit(), 7)
+}
+
+///|
 test "provider_reads_span_limits_from_the_environment_by_default" {
   clear_limit_env()
   @env.set_env_var("OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT", "2")

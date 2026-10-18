@@ -769,6 +769,36 @@ pub fn SpanSdk::set_status(
   }
 }
 
+// Copy an attribute value, cloning the payload of array-valued attributes so
+// that the snapshot does not share mutable state with the caller.
+
+///|
+fn copy_attribute_value(value : AttributeValue) -> AttributeValue {
+  match value {
+    StringArrayValue(items) => StringArrayValue(items.copy())
+    BoolArrayValue(items) => BoolArrayValue(items.copy())
+    IntArrayValue(items) => IntArrayValue(items.copy())
+    DoubleArrayValue(items) => DoubleArrayValue(items.copy())
+    _ => value
+  }
+}
+
+// Deep-copy an attribute map (keys and string values are immutable, so only
+// the map and array-valued payloads need to be copied).
+
+///|
+fn copy_attribute_map(
+  attributes : Map[String, AttributeValue],
+) -> Map[String, AttributeValue] {
+  let out : Map[String, AttributeValue] = Map(
+    [], capacity=attributes.length() * 2,
+  )
+  for key, value in attributes {
+    out.set(key, copy_attribute_value(value))
+  }
+  out
+}
+
 // Build the immutable export snapshot of a span. The top-level attribute,
 // event and link containers are copied so that the snapshot cannot be changed
 // through the span after `end` (or across multiple processors).
@@ -776,21 +806,42 @@ pub fn SpanSdk::set_status(
 ///|
 fn SpanData::from_span(span : SpanSdk) -> SpanData {
   let attributes : Map[String, AttributeValue] = match span.attributes {
-    Some(attributes) => attributes.copy()
+    Some(attributes) => copy_attribute_map(attributes)
     None => Map([], capacity=1)
   }
   let events : Array[SpanEvent] = match span.events {
-    Some(events) => events.copy()
+    Some(events) => {
+      let out : Array[SpanEvent] = []
+      for event in events {
+        out.push({
+          name: event.name,
+          time_unix_nano: event.time_unix_nano,
+          attributes: copy_attribute_map(event.attributes),
+          dropped_attributes_count: event.dropped_attributes_count,
+        })
+      }
+      out
+    }
     None => []
   }
   let links : Array[SpanLink] = match span.links {
-    Some(links) => links.copy()
+    Some(links) => {
+      let out : Array[SpanLink] = []
+      for link in links {
+        out.push({
+          span_context: link.span_context,
+          attributes: copy_attribute_map(link.attributes),
+          dropped_attributes_count: link.dropped_attributes_count,
+        })
+      }
+      out
+    }
     None => []
   }
   {
     name: span.name,
     span_context: span.context,
-    parent_span_id: span.parent_span_id,
+    parent_span_id: span.parent_span_id.copy(),
     kind: span.kind,
     start_time_unix_nano: span.start_time_unix_nano,
     end_time_unix_nano: span.end_time_unix_nano,
@@ -802,7 +853,7 @@ fn SpanData::from_span(span : SpanSdk) -> SpanData {
     dropped_links_count: span.dropped_links,
     status: span.status,
     status_description: span.status_description,
-    resource: span.resource,
+    resource: copy_attribute_map(span.resource),
     scope_name: span.scope_name,
     scope_version: span.scope_version,
   }

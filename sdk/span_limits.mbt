@@ -139,13 +139,28 @@ fn env_limit(name : String, default : Int32) -> Int32 {
   }
 }
 
+// Read a non-negative integer from `name`, falling back to the generic
+// `OTEL_ATTRIBUTE_COUNT_LIMIT` (then to 128) when the specific variable is
+// absent, empty, malformed or negative.
+
+///|
+fn env_attribute_count_limit(name : String) -> Int32 {
+  match env_limit_opt(name) {
+    Some(value) => value
+    None => env_limit("OTEL_ATTRIBUTE_COUNT_LIMIT", 128)
+  }
+}
+
 // Build span limits from the standard environment variables:
 //
-// - `OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT` (default 128)
+// - `OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT`, falling back to
+//   `OTEL_ATTRIBUTE_COUNT_LIMIT` (default 128)
 // - `OTEL_SPAN_EVENT_COUNT_LIMIT` (default 128)
 // - `OTEL_SPAN_LINK_COUNT_LIMIT` (default 128)
-// - `OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT` (default 128)
-// - `OTEL_LINK_ATTRIBUTE_COUNT_LIMIT` (default 128)
+// - `OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT`, falling back to
+//   `OTEL_ATTRIBUTE_COUNT_LIMIT` (default 128)
+// - `OTEL_LINK_ATTRIBUTE_COUNT_LIMIT`, falling back to
+//   `OTEL_ATTRIBUTE_COUNT_LIMIT` (default 128)
 // - `OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT`, falling back to
 //   `OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT` (default: no limit)
 //
@@ -155,25 +170,22 @@ fn env_limit(name : String, default : Int32) -> Int32 {
 
 ///|
 pub fn SpanLimits::from_env() -> SpanLimits {
-  let attribute_count_limit = match
-    env_limit_opt("OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT") {
-    Some(value) => value
-    None => env_limit("OTEL_ATTRIBUTE_COUNT_LIMIT", 128)
-  }
   let attribute_value_length_limit = match
     env_limit_opt("OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT") {
     Some(value) => value
     None => env_limit("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", -1)
   }
   {
-    attribute_count_limit,
+    attribute_count_limit: env_attribute_count_limit(
+      "OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT",
+    ),
     event_count_limit: env_limit("OTEL_SPAN_EVENT_COUNT_LIMIT", 128),
     link_count_limit: env_limit("OTEL_SPAN_LINK_COUNT_LIMIT", 128),
-    event_attribute_count_limit: env_limit(
-      "OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT", 128,
+    event_attribute_count_limit: env_attribute_count_limit(
+      "OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT",
     ),
-    link_attribute_count_limit: env_limit(
-      "OTEL_LINK_ATTRIBUTE_COUNT_LIMIT", 128,
+    link_attribute_count_limit: env_attribute_count_limit(
+      "OTEL_LINK_ATTRIBUTE_COUNT_LIMIT",
     ),
     attribute_value_length_limit,
   }

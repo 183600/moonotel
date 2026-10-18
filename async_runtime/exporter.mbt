@@ -46,6 +46,12 @@ pub fn[G] OtlpHttpAsyncSpanExporter::new(
     dropped: 0,
   }
   group.spawn_bg(no_wait=true) <| () => { exporter.run() }
+  // The background sender is cancelled when the group exits, before the group
+  // defers run. Defer a final drain as well so that batches queued by later
+  // defers (for example a `spawn_flush_loop` force-flush registered after this
+  // exporter was created, which runs first because defers run last-in-first-out)
+  // are still exported.
+  group.add_defer(() => @async.protect_from_cancel(() => exporter.drain()))
   exporter
 }
 
