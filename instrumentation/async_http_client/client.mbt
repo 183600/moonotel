@@ -262,6 +262,16 @@ pub fn redact_url(url : String) -> String {
 }
 
 ///|
+fn map_capacity_for_entries(entries : Int) -> Int {
+  let capacity = entries.next_power_of_two()
+  if entries > capacity * 13 / 16 {
+    capacity * 2
+  } else {
+    capacity
+  }
+}
+
+///|
 fn plain_headers(
   headers : Map[String, String]?,
   extra? : Int32,
@@ -270,13 +280,13 @@ fn plain_headers(
   match headers {
     Some(values) => {
       let total = values.length() + extra
-      let out = Map([], capacity=if total == 0 { 1 } else { total * 2 })
+      let out = Map([], capacity=map_capacity_for_entries(total))
       for key, value in values {
         out.set(@http.CaseInsensitiveString(key), value)
       }
       out
     }
-    None => Map([], capacity=if extra == 0 { 1 } else { (extra + 1) * 2 })
+    None => Map([], capacity=map_capacity_for_entries(extra + 1))
   }
 }
 

@@ -22,6 +22,16 @@ let invalid_context : SpanContext = {
   is_remote: false,
 }
 
+// Zero-filled arrays handed out by `trace_id_view`/`span_id_view` for the
+// shared `invalid_span_context()` instance, so that mutating a view can never
+// corrupt the singleton's own arrays.
+
+///|
+let invalid_trace_id_view : Array[Int32] = Array::make(16, 0)
+
+///|
+let invalid_span_id_view : Array[Int32] = Array::make(8, 0)
+
 ///|
 pub fn invalid_span_context() -> SpanContext {
   invalid_context
@@ -304,30 +314,30 @@ pub fn SpanContext::span_id(self : SpanContext) -> Array[Int32] {
 }
 
 // The trace ID bytes backing this context. The returned array is shared with
-// the context and must not be mutated. Invalid contexts return a copy so that
-// the arrays of the shared `invalid_span_context()` instance cannot be
-// corrupted through a view.
+// the context and must not be mutated. The shared `invalid_span_context()`
+// instance hands out a dedicated zero-filled array so that its own arrays
+// cannot be corrupted through a view.
 
 ///|
 pub fn SpanContext::trace_id_view(self : SpanContext) -> Array[Int32] {
-  if self.is_valid {
-    self.trace_id
+  if !self.is_valid && physical_equal(self.trace_id, invalid_context.trace_id) {
+    invalid_trace_id_view
   } else {
-    self.trace_id.copy()
+    self.trace_id
   }
 }
 
 // The span ID bytes backing this context. The returned array is shared with
-// the context and must not be mutated. Invalid contexts return a copy so that
-// the arrays of the shared `invalid_span_context()` instance cannot be
-// corrupted through a view.
+// the context and must not be mutated. The shared `invalid_span_context()`
+// instance hands out a dedicated zero-filled array so that its own arrays
+// cannot be corrupted through a view.
 
 ///|
 pub fn SpanContext::span_id_view(self : SpanContext) -> Array[Int32] {
-  if self.is_valid {
-    self.span_id
+  if !self.is_valid && physical_equal(self.span_id, invalid_context.span_id) {
+    invalid_span_id_view
   } else {
-    self.span_id.copy()
+    self.span_id
   }
 }
 

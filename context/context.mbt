@@ -9,7 +9,23 @@ pub struct Context {
   span_ctx : @api.SpanContext?
   key : String?
   value : String?
+  // Batch baggage carried by a single chain node, used by `with_baggage` so
+  // that extracting many pairs does not build one node per pair.
+  baggage_map : Map[String, String]?
   parent : Context?
+}
+
+// Smallest power-of-two map capacity that holds `entries` entries without a
+// rehash, accounting for the map's 13/16 grow threshold.
+
+///|
+fn map_capacity_for_entries(entries : Int) -> Int {
+  let capacity = entries.next_power_of_two()
+  if entries > capacity * 13 / 16 {
+    capacity * 2
+  } else {
+    capacity
+  }
 }
 
 // The empty root context.
@@ -19,6 +35,7 @@ let root_context : Context = {
   span_ctx: None,
   key: None,
   value: None,
+  baggage_map: None,
   parent: None,
 }
 
@@ -33,7 +50,13 @@ pub fn Context::root() -> Context {
 
 ///|
 pub fn Context::with_span(self : Context, sc : @api.SpanContext) -> Context {
-  { span_ctx: Some(sc), key: None, value: None, parent: Some(self), }
+  {
+    span_ctx: Some(sc),
+    key: None,
+    value: None,
+    baggage_map: None,
+    parent: Some(self),
+  }
 }
 
 // Derive a context carrying a string baggage value.
@@ -44,7 +67,13 @@ pub fn Context::with_value(
   key : String,
   value : String,
 ) -> Context {
-  { span_ctx: None, key: Some(key), value: Some(value), parent: Some(self), }
+  {
+    span_ctx: None,
+    key: Some(key),
+    value: Some(value),
+    baggage_map: None,
+    parent: Some(self),
+  }
 }
 
 // Derive a context in which `key` no longer has a baggage value: values
@@ -53,7 +82,13 @@ pub fn Context::with_value(
 
 ///|
 pub fn Context::without_value(self : Context, key : String) -> Context {
-  { span_ctx: None, key: Some(key), value: None, parent: Some(self), }
+  {
+    span_ctx: None,
+    key: Some(key),
+    value: None,
+    baggage_map: None,
+    parent: Some(self),
+  }
 }
 
 // Derive a context carrying every key/value pair of `values` as baggage.
@@ -64,11 +99,22 @@ pub fn Context::with_baggage(
   self : Context,
   values : Map[String, String],
 ) -> Context {
-  let mut result = self
-  for key, value in values {
-    result = result.with_value(key, value)
+  if values.length() == 0 {
+    return self
   }
-  result
+  let baggage : Map[String, String] = Map(
+    [], capacity=map_capacity_for_entries(values.length()),
+  )
+  for key, value in values {
+    baggage.set(key, value)
+  }
+  {
+    span_ctx: None,
+    key: None,
+    value: None,
+    baggage_map: Some(baggage),
+    parent: Some(self),
+  }
 }
 
 // The nearest span context in the chain, if any.
@@ -105,7 +151,15 @@ pub fn Context::value(self : Context, key : String) -> String? {
             } else {
               cursor = context.parent
             }
-          None => cursor = context.parent
+          None =>
+            match context.baggage_map {
+              Some(map) =>
+                match map.get(key) {
+                  Some(value) => return Some(value)
+                  None => cursor = context.parent
+                }
+              None => cursor = context.parent
+            }
         }
       None => break
     }
@@ -143,6 +197,19 @@ pub fn Context::has_baggage(self : Context) -> Bool {
                     seen = Some(keys)
                   }
                 }
+            }
+          None => ()
+        }
+        match context.baggage_map {
+          Some(map) =>
+            for key, _ in map {
+              match seen {
+                Some(keys) =>
+                  if keys.get(key) is None {
+                    return true
+                  }
+                None => return true
+              }
             }
           None => ()
         }
@@ -192,6 +259,25 @@ pub fn Context::baggage(self : Context) -> Map[String, String] {
               }
             }
           }
+          None => ()
+        }
+        match context.baggage_map {
+          Some(map) =>
+            for key, value in map {
+              let mut visible = values.get(key) is None
+              if visible {
+                match deleted {
+                  Some(removed) =>
+                    if removed.get(key) is Some(_) {
+                      visible = false
+                    }
+                  None => ()
+                }
+              }
+              if visible {
+                values.set(key, value)
+              }
+            }
           None => ()
         }
         cursor = context.parent

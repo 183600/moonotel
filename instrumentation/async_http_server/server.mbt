@@ -14,6 +14,16 @@
 ///|
 const INSTRUMENTATION_SCOPE : String = "yourname/otel/instrumentation/async_http_server"
 
+///|
+fn map_capacity_for_entries(entries : Int) -> Int {
+  let capacity = entries.next_power_of_two()
+  if entries > capacity * 13 / 16 {
+    capacity * 2
+  } else {
+    capacity
+  }
+}
+
 // Constant semantic-convention attribute values.
 
 ///|
@@ -439,7 +449,8 @@ pub async fn ServerCall::respond(
   headers? : Map[String, String],
 ) -> Unit {
   let extra_headers : @http.Headers = match headers {
-    Some(values) => Map([], capacity=(values.length() + 1) * 2)
+    Some(values) =>
+      Map([], capacity=map_capacity_for_entries(values.length() + 1))
     None => Map([], capacity=2)
   }
   match headers {

@@ -16,10 +16,12 @@ fn ProtoWriter::with_capacity(size_hint : Int32) -> ProtoWriter {
   { buf: FixedArray::make(capacity, b'\x00'), len: 0, scratch: [], }
 }
 
-// Root writer used by `encode_trace_request`.
+// Root writers used by `encode_trace_request`. Writers are taken from a
+// bounded pool while encoding and released when their bytes have been
+// produced, so concurrent encodings never share a buffer.
 
 ///|
-let encoder_pool : Ref[ProtoWriter?] = Ref(None)
+let encoder_pool : Array[ProtoWriter] = []
 
 // Capacity limits above which recycled buffers are dropped. Without them a
 // single oversized batch would pin its peak capacity for the rest of the
@@ -30,8 +32,11 @@ const MAX_ROOT_BUFFER_BYTES : Int32 = 4 * 1024 * 1024
 const MAX_SCRATCH_BUFFER_BYTES : Int32 = 1024 * 1024
 
 ///|
+const MAX_ENCODER_POOL_SIZE : Int = 8
+
+///|
 fn take_root_writer(size_hint : Int32) -> ProtoWriter {
-  match encoder_pool.val {
+  match encoder_pool.pop() {
     Some(writer) => {
       writer.len = 0
       if writer.buf.length() > MAX_ROOT_BUFFER_BYTES {
@@ -39,11 +44,18 @@ fn take_root_writer(size_hint : Int32) -> ProtoWriter {
       }
       writer
     }
-    None => {
-      let writer = ProtoWriter::with_capacity(size_hint)
-      encoder_pool.val = Some(writer)
-      writer
+    None => ProtoWriter::with_capacity(size_hint)
+  }
+}
+
+///|
+fn release_root_writer(writer : ProtoWriter) -> Unit {
+  if encoder_pool.length() < MAX_ENCODER_POOL_SIZE {
+    writer.len = 0
+    if writer.buf.length() > MAX_ROOT_BUFFER_BYTES {
+      writer.buf = FixedArray::make(1, b'\x00')
     }
+    encoder_pool.push(writer)
   }
 }
 
@@ -53,7 +65,8 @@ fn take_root_writer(size_hint : Int32) -> ProtoWriter {
 ///|
 fn ProtoWriter::reserve(self : ProtoWriter, extra : Int32) -> Unit {
   let required = self.len + extra
-  let doubled = self.buf.length() * 2
+  let current = self.buf.length()
+  let doubled = if current > 0x3FFFFFFF { required } else { current * 2 }
   let capacity = if doubled > required { doubled } else { required }
   let grown : FixedArray[Byte] = FixedArray::make(capacity, b'\x00')
   grown.unsafe_blit(0, self.buf, 0, self.len)

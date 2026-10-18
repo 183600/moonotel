@@ -664,6 +664,46 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
           }
           None => ()
         }
+        match node.baggage_map {
+          Some(map) =>
+            for key, value in map {
+              let mut insert = true
+              match seen {
+                Some(keys) => {
+                  let mut i = 0
+                  let n = keys.length()
+                  while i < n {
+                    if keys.unsafe_get(i) == key {
+                      insert = false
+                      break
+                    }
+                    i = i + 1
+                  }
+                  if insert {
+                    keys.push(key)
+                  }
+                }
+                None =>
+                  match first_key {
+                    Some(existing) =>
+                      if existing == key {
+                        insert = false
+                      } else {
+                        let keys : Array[String] = [existing, key]
+                        seen = Some(keys)
+                      }
+                    None => first_key = Some(key)
+                  }
+              }
+              if insert {
+                match entries {
+                  Some(list) => list.push((key, value))
+                  None => entries = Some([(key, value)])
+                }
+              }
+            }
+          None => ()
+        }
         cursor = node.parent
       }
       None => break
@@ -723,14 +763,33 @@ pub fn extract_baggage(carrier : TextMapCarrier) -> Array[(String, String)] {
   }
 }
 
+// Smallest power-of-two map capacity that holds `entries` entries without a
+// rehash, accounting for the map's 13/16 grow threshold.
+
+///|
+fn map_capacity_for_entries(entries : Int) -> Int {
+  let capacity = entries.next_power_of_two()
+  if entries > capacity * 13 / 16 {
+    capacity * 2
+  } else {
+    capacity
+  }
+}
+
 // Extract the baggage of a carrier as a Context carrying each pair.
 
 ///|
 pub fn extract_baggage_context(carrier : TextMapCarrier) -> @context.Context {
-  let mut context = @context.Context::root()
-  for entry in extract_baggage(carrier) {
-    let (key, value) = entry
-    context = context.with_value(key, value)
+  let entries = extract_baggage(carrier)
+  if entries.length() == 0 {
+    return @context.Context::root()
   }
-  context
+  let values : Map[String, String] = Map(
+    [], capacity=map_capacity_for_entries(entries.length()),
+  )
+  for entry in entries {
+    let (key, value) = entry
+    values.set(key, value)
+  }
+  @context.Context::root().with_baggage(values)
 }

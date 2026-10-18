@@ -472,6 +472,9 @@ priv struct ResourceGroup {
   resource : Map[String, @sdk.AttributeValue]
   scopes : Array[ScopeGroup]
   mut size_hint : Int32
+  // Index of `(scope_name, scope_version)` into `scopes`, built lazily when a
+  // group with several interleaved scopes is first looked up.
+  mut scope_index : Map[(String, String), Int32]?
 }
 
 // Find the scope group with the given name and version inside a resource
@@ -484,12 +487,27 @@ fn find_scope_group(
   scope_name : String,
   scope_version : String,
 ) -> ScopeGroup? {
-  for scope in group.scopes {
-    if scope.scope_name == scope_name && scope.scope_version == scope_version {
-      return Some(scope)
+  match group.scope_index {
+    Some(index) =>
+      match index.get((scope_name, scope_version)) {
+        Some(at) => Some(group.scopes[at])
+        None => None
+      }
+    None => {
+      let index : Map[(String, String), Int32] = Map([])
+      let mut found : ScopeGroup? = None
+      for at, scope in group.scopes {
+        index.set((scope.scope_name, scope.scope_version), at)
+        if found is None &&
+          scope.scope_name == scope_name &&
+          scope.scope_version == scope_version {
+          found = Some(scope)
+        }
+      }
+      group.scope_index = Some(index)
+      found
     }
   }
-  None
 }
 
 // Extra bytes contributed by an attribute beyond its count-based allowance:
@@ -561,63 +579,62 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   let mut cached_scope : ScopeGroup? = None
   for data in spans {
     let index = match last_resource {
-      Some(resource) if physical_equal(resource, data.resource) => last_index
-      _ => {
-        if unindexed {
-          let index_map : Map[String, Int32] = match resource_index {
-            Some(map) => map
-            None => {
-              let map : Map[String, Int32] = Map([])
-              resource_index = Some(map)
-              map
-            }
-          }
-          let key = match last_resource_key {
-            Some(key) => key
-            None => resource_key(groups[last_index].resource)
-          }
-          index_map.set(key, last_index)
-          unindexed = false
-        }
-        let resolved = match last_resource {
-          None => {
-            let created : ResourceGroup = {
-              resource: data.resource,
-              scopes: [],
-              size_hint: 0,
-            }
-            groups.push(created)
-            unindexed = true
-            last_resource_key = None
-            groups.length() - 1
-          }
-          Some(_) => {
-            let key = resource_key(data.resource)
-            let known : Int32? = match resource_index {
-              Some(map) => map.get(key)
-              None => None
-            }
-            match known {
-              Some(index) => index
+      Some(resource) =>
+        if physical_equal(resource, data.resource) || resource == data.resource {
+          last_index
+        } else {
+          if unindexed {
+            let index_map : Map[String, Int32] = match resource_index {
+              Some(map) => map
               None => {
-                let created : ResourceGroup = {
-                  resource: data.resource,
-                  scopes: [],
-                  size_hint: 0,
-                }
-                groups.push(created)
-                unindexed = true
-                last_resource_key = Some(key)
-                groups.length() - 1
+                let map : Map[String, Int32] = Map([])
+                resource_index = Some(map)
+                map
               }
             }
+            let key = match last_resource_key {
+              Some(key) => key
+              None => resource_key(groups[last_index].resource)
+            }
+            index_map.set(key, last_index)
+            unindexed = false
+          }
+          let key = resource_key(data.resource)
+          let known : Int32? = match resource_index {
+            Some(map) => map.get(key)
+            None => None
+          }
+          match known {
+            Some(index) => index
+            None => {
+              let created : ResourceGroup = {
+                resource: data.resource,
+                scopes: [],
+                size_hint: 0,
+                scope_index: None,
+              }
+              groups.push(created)
+              unindexed = true
+              last_resource_key = Some(key)
+              groups.length() - 1
+            }
           }
         }
-        last_resource = Some(data.resource)
-        last_index = resolved
-        resolved
+      None => {
+        let created : ResourceGroup = {
+          resource: data.resource,
+          scopes: [],
+          size_hint: 0,
+          scope_index: None,
+        }
+        groups.push(created)
+        unindexed = true
+        last_resource_key = None
+        groups.length() - 1
       }
     }
+    last_resource = Some(data.resource)
+    last_index = index
     let target = groups[index]
     let span_hint = estimate_span_size(data)
     let cached_hit = match cached_scope {
@@ -648,6 +665,14 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
           size_hint: span_hint,
         }
         target.scopes.push(created)
+        match target.scope_index {
+          Some(scope_index) =>
+            scope_index.set(
+              (created.scope_name, created.scope_version),
+              target.scopes.length() - 1,
+            )
+          None => ()
+        }
         cached_scope = Some(created)
         cached_group_index = index
       }
@@ -712,5 +737,7 @@ pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
     }
     writer.append_message(1, resource_spans)
   }
-  writer.to_bytes()
+  let bytes = writer.to_bytes()
+  release_root_writer(writer)
+  bytes
 }

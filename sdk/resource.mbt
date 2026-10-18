@@ -146,7 +146,7 @@ fn resolve_service_name(
 ///|
 fn copy_attributes_with_capacity(
   values : Map[String, AttributeValue],
-  capacity : Int32,
+  capacity : Int,
 ) -> Map[String, AttributeValue] {
   let out : Map[String, AttributeValue] = Map([], capacity~)
   for key, value in values {
@@ -159,7 +159,10 @@ fn copy_attributes_with_capacity(
 fn copy_attributes(
   values : Map[String, AttributeValue],
 ) -> Map[String, AttributeValue] {
-  copy_attributes_with_capacity(values, values.length() * 2)
+  copy_attributes_with_capacity(
+    values,
+    map_capacity_for_entries(values.length()),
+  )
 }
 
 // An empty resource, carrying no attributes.
@@ -226,7 +229,7 @@ pub fn Resource::with_attribute(
 ) -> Resource {
   let attributes = copy_attributes_with_capacity(
     self.attributes,
-    (self.attributes.length() + 1) * 2,
+    map_capacity_for_entries(self.attributes.length() + 1),
   )
   attributes.set(key, value)
   { attributes, }
@@ -239,7 +242,7 @@ pub fn Resource::with_attribute(
 pub fn Resource::merge(self : Resource, other : Resource) -> Resource {
   let attributes = copy_attributes_with_capacity(
     self.attributes,
-    (self.attributes.length() + other.attributes.length()) * 2,
+    map_capacity_for_entries(self.attributes.length() + other.attributes.length()),
   )
   for key, value in other.attributes {
     attributes.set(key, value)

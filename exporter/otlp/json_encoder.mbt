@@ -644,13 +644,15 @@ pub fn encode_trace_request_json(spans : Array[@sdk.SpanData]) -> Bytes {
   if spans.length() == 0 {
     return b""
   }
+  let groups = group_spans(spans)
   let mut size_hint = 64
-  for data in spans {
-    size_hint = size_hint + estimate_span_size(data) * 2
+  for group in groups {
+    for scope in group.scopes {
+      size_hint = size_hint + scope.size_hint * 2
+    }
   }
   let sb = JsonBuf::new(size_hint)
   sb.write_string("{\"resourceSpans\":[")
-  let groups = group_spans(spans)
   let mut first_group = true
   for group in groups {
     if !first_group {

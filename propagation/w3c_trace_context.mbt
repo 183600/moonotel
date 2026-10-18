@@ -354,9 +354,9 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
   )
 }
 
-// Upper bound on the number of memoized `tracestate` parse results. The cache
-// is cleared when it is full, so its memory stays bounded even when the values
-// come from untrusted incoming headers.
+// Upper bound on the number of memoized `tracestate` parse results. The least
+// recently used entry is evicted when the cache is full, so its memory stays
+// bounded even when the values come from untrusted incoming headers.
 
 ///|
 const TRACESTATE_INJECT_CACHE_LIMIT : Int32 = 128
@@ -372,11 +372,19 @@ let tracestate_inject_cache : Map[String, String?] = Map([])
 ///|
 fn normalized_tracestate_for_inject(state : String) -> String? {
   match tracestate_inject_cache.get(state) {
-    Some(normalized) => normalized
+    Some(normalized) => {
+      // Re-insert to mark the entry as most recently used.
+      tracestate_inject_cache.remove(state)
+      tracestate_inject_cache.set(state, normalized)
+      normalized
+    }
     None => {
       let normalized = parse_tracestate(state)
       if tracestate_inject_cache.length() >= TRACESTATE_INJECT_CACHE_LIMIT {
-        tracestate_inject_cache.clear()
+        for key, _ in tracestate_inject_cache {
+          tracestate_inject_cache.remove(key)
+          break
+        }
       }
       tracestate_inject_cache.set(state, normalized)
       normalized

@@ -117,23 +117,43 @@ fn OtlpHttpAsyncSpanExporter::enqueue(
   }
 }
 
-// Export `first` plus every batch that is already queued.
+// Export `first` plus batches already queued, sending at most
+// `MAX_EXPORT_SPANS` spans per request. A queued batch that does not fit in
+// the room left is split so no request exceeds the limit.
 
 ///|
 async fn OtlpHttpAsyncSpanExporter::export_available(
   self : OtlpHttpAsyncSpanExporter,
   first : Array[@sdk.SpanData],
 ) -> Unit {
-  let batch = first
-  batch.reserve_capacity(MAX_EXPORT_SPANS)
-  while batch.length() < MAX_EXPORT_SPANS {
-    let next : Array[@sdk.SpanData]? = self.queue.try_get() catch { _ => None }
-    match next {
-      Some(items) => batch.append(items)
-      None => break
+  let mut pending = first
+  let mut split = false
+  while pending.length() > 0 {
+    let batch = pending
+    batch.reserve_capacity(MAX_EXPORT_SPANS)
+    while batch.length() < MAX_EXPORT_SPANS {
+      let next : Array[@sdk.SpanData]? = self.queue.try_get() catch { _ => None }
+      match next {
+        Some(items) => {
+          let remaining = MAX_EXPORT_SPANS - batch.length()
+          if items.length() <= remaining {
+            batch.append(items)
+          } else {
+            batch.append(items[:remaining])
+            pending = items[remaining:].to_owned()
+            split = true
+            break
+          }
+        }
+        None => break
+      }
     }
+    self.send(batch)
+    if !split {
+      break
+    }
+    split = false
   }
-  self.send(batch)
 }
 
 // Send one OTLP request. The request is protected from cancellation so that a

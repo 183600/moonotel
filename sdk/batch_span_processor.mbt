@@ -18,39 +18,14 @@ pub struct BatchSpanProcessor {
   flush_interval_millis : Int32
   // Fixed-capacity ring buffer: `head` is the index of the oldest buffered
   // span and `count` is how many spans are live. Once full, the oldest span is
-  // overwritten in place; consumed slots are reset to `empty_slot`.
-  queue : Array[SpanData]
-  empty_slot : SpanData
+  // overwritten in place; consumed slots are reset to `None`.
+  queue : Array[SpanData?]
   mut head : Int32
   mut count : Int32
   mut last_flush_time_millis : UInt64
   mut shutdown_called : Bool
   mut dropped_spans : UInt64
-}
-
-// Placeholder written over consumed queue slots.
-
-///|
-fn empty_span_data() -> SpanData {
-  {
-    name: "",
-    span_context: @api.invalid_span_context(),
-    parent_span_id: [],
-    kind: @api.SpanKind::Internal,
-    start_time_unix_nano: 0L,
-    end_time_unix_nano: 0L,
-    attributes: Map([], capacity=1),
-    events: [],
-    links: [],
-    dropped_attributes_count: 0,
-    dropped_events_count: 0,
-    dropped_links_count: 0,
-    status: @api.StatusCode::Unset,
-    status_description: "",
-    resource: Map([], capacity=1),
-    scope_name: "",
-    scope_version: "",
-  }
+  mut export_failures : UInt64
 }
 
 // Create a batch processor. Defaults: queue size 2048, batch size 512,
@@ -84,12 +59,12 @@ pub fn BatchSpanProcessor::new(
       interval
     },
     queue: [],
-    empty_slot: empty_span_data(),
     head: 0,
     count: 0,
     last_flush_time_millis: @env.now(),
     shutdown_called: false,
     dropped_spans: 0,
+    export_failures: 0,
   }
 }
 
@@ -148,6 +123,16 @@ pub fn BatchSpanProcessor::dropped_spans(self : BatchSpanProcessor) -> UInt64 {
   self.dropped_spans
 }
 
+// Number of export attempts that failed. Failures are not retried; a non-zero
+// value lets callers react (for example by logging or backing off).
+
+///|
+pub fn BatchSpanProcessor::export_failures(
+  self : BatchSpanProcessor,
+) -> UInt64 {
+  self.export_failures
+}
+
 // Number of buffered spans, ignoring consumed slots at the front.
 
 ///|
@@ -164,7 +149,7 @@ fn BatchSpanProcessor::push_span(
 ) -> Unit {
   let capacity = self.max_queue_size
   if self.count >= capacity {
-    self.queue.unsafe_set(self.head, data)
+    self.queue.unsafe_set(self.head, Some(data))
     let next = self.head + 1
     self.head = if next >= capacity { 0 } else { next }
     self.dropped_spans = self.dropped_spans + 1
@@ -173,9 +158,9 @@ fn BatchSpanProcessor::push_span(
   let index = self.head + self.count
   let index = if index >= capacity { index - capacity } else { index }
   if index >= self.queue.length() {
-    self.queue.push(data)
+    self.queue.push(Some(data))
   } else {
-    self.queue.unsafe_set(index, data)
+    self.queue.unsafe_set(index, Some(data))
   }
   self.count = self.count + 1
 }
@@ -206,13 +191,15 @@ fn BatchSpanProcessor::flush_batch_at(
   }
   let capacity = self.max_queue_size
   let queue = self.queue
-  let empty = self.empty_slot
   let batch : Array[SpanData] = Array::unsafe_make_uninit(n)
   let mut index = self.head
   let mut i = 0
   while i < n {
-    batch.unsafe_set(i, queue.unsafe_get(index))
-    queue.unsafe_set(index, empty)
+    match queue.unsafe_get(index) {
+      Some(data) => batch.unsafe_set(i, data)
+      None => ()
+    }
+    queue.unsafe_set(index, None)
     index = index + 1
     if index >= capacity {
       index = 0
@@ -222,7 +209,10 @@ fn BatchSpanProcessor::flush_batch_at(
   self.head = index
   self.count = available - n
   self.last_flush_time_millis = now
-  let _ = self.exporter.export_spans(batch)
+  match self.exporter.export_spans(batch) {
+    ExportSuccess => ()
+    ExportFailure(_) => self.export_failures = self.export_failures + 1
+  }
 }
 
 // Export the queue when the scheduled flush interval has elapsed. This is a
@@ -258,9 +248,9 @@ pub impl SpanProcessor for BatchSpanProcessor with fn on_end(self, data) {
   }
   self.push_span(data)
   if self.live_count() >= self.max_export_batch_size {
-    self.flush_batch_at(current_millis())
+    self.flush_batch_at(@env.now())
   } else if self.flush_interval_millis > 0 {
-    let now = current_millis()
+    let now = @env.now()
     if now - self.last_flush_time_millis >=
       self.flush_interval_millis.to_uint64() {
       self.flush_batch_at(now)

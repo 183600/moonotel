@@ -85,27 +85,6 @@ fn unix_nano_now() -> Int64 {
   (@env.now() * 1000000).reinterpret_as_int64()
 }
 
-// Wall-clock milliseconds read by the span `end` call that is currently
-// notifying processors. `end_clock_fresh` is true only while that
-// notification runs.
-
-///|
-let end_clock_millis : Ref[UInt64] = Ref(0)
-
-///|
-let end_clock_fresh : Ref[Bool] = Ref(false)
-
-// The current wall-clock milliseconds.
-
-///|
-fn current_millis() -> UInt64 {
-  if end_clock_fresh.val {
-    end_clock_millis.val
-  } else {
-    @env.now()
-  }
-}
-
 // A recording span. Non-recording spans (sampler decision DROP) discard
 // attributes and events and are never exported.
 
@@ -122,6 +101,7 @@ pub struct SpanSdk {
   mut attributes : Map[String, AttributeValue]?
   mut events : Array[SpanEvent]?
   mut links : Array[SpanLink]?
+  mut empty_event_attributes : Map[String, AttributeValue]?
   mut status : @api.StatusCode
   mut status_description : String
   limits : SpanLimits
@@ -161,6 +141,7 @@ fn create_span(
     attributes: None,
     events: None,
     links: None,
+    empty_event_attributes: None,
     status: @api.StatusCode::Unset,
     status_description: "",
     limits,
@@ -318,7 +299,9 @@ fn limited_attributes(
   } else {
     count_limit
   }
-  let kept : Map[String, AttributeValue] = Map([], capacity=capacity * 2)
+  let kept : Map[String, AttributeValue] = Map(
+    [], capacity=map_capacity_for_entries(capacity),
+  )
   let mut dropped = 0
   for key, value in attributes {
     if within_limit(kept.length(), count_limit) {
@@ -522,7 +505,7 @@ pub fn SpanSdk::set_attributes(
         attributes.length()
       }
       if budget > 0 {
-        self.attributes = Some(Map([], capacity=budget * 2))
+        self.attributes = Some(Map([], capacity=map_capacity_for_entries(budget)))
       }
     }
     for key, value in attributes {
@@ -656,7 +639,7 @@ pub fn SpanSdk::add_event(
           self.limits.event_attribute_count_limit,
           self.limits.attribute_value_length_limit,
         )
-      None => (Map([], capacity=1), 0)
+      None => (self.empty_event_attribute_map(), 0)
     }
     self
     .mutable_events()
@@ -666,6 +649,23 @@ pub fn SpanSdk::add_event(
       attributes: event_attributes,
       dropped_attributes_count: dropped,
     })
+  }
+}
+
+// A per-span empty attribute map reused by events added without attributes,
+// avoiding one small allocation per event.
+
+///|
+fn SpanSdk::empty_event_attribute_map(
+  self : SpanSdk,
+) -> Map[String, AttributeValue] {
+  match self.empty_event_attributes {
+    Some(map) => map
+    None => {
+      let map : Map[String, AttributeValue] = Map([], capacity=1)
+      self.empty_event_attributes = Some(map)
+      map
+    }
   }
 }
 
@@ -783,6 +783,19 @@ fn copy_attribute_value(value : AttributeValue) -> AttributeValue {
   }
 }
 
+// Smallest power-of-two map capacity that holds `entries` entries without a
+// rehash, accounting for the map's 13/16 grow threshold.
+
+///|
+fn map_capacity_for_entries(entries : Int) -> Int {
+  let capacity = entries.next_power_of_two()
+  if entries > capacity * 13 / 16 {
+    capacity * 2
+  } else {
+    capacity
+  }
+}
+
 // Deep-copy an attribute map (keys and string values are immutable, so only
 // the map and array-valued payloads need to be copied).
 
@@ -791,7 +804,7 @@ fn copy_attribute_map(
   attributes : Map[String, AttributeValue],
 ) -> Map[String, AttributeValue] {
   let out : Map[String, AttributeValue] = Map(
-    [], capacity=attributes.length() * 2,
+    [], capacity=map_capacity_for_entries(attributes.length()),
   )
   for key, value in attributes {
     out.set(key, copy_attribute_value(value))
@@ -868,29 +881,15 @@ pub fn SpanSdk::end(self : SpanSdk, end_time_unix_nano? : Int64) -> Unit {
     return
   }
   self.ended = true
-  let mut clock_millis : UInt64 = 0
-  let read_clock = match end_time_unix_nano {
-    Some(value) => {
-      self.end_time_unix_nano = value
-      false
-    }
-    None => {
-      clock_millis = @env.now()
-      self.end_time_unix_nano = (clock_millis * 1000000).reinterpret_as_int64()
-      true
-    }
+  match end_time_unix_nano {
+    Some(value) => self.end_time_unix_nano = value
+    None =>
+      self.end_time_unix_nano = (@env.now() * 1000000).reinterpret_as_int64()
   }
   if self.recording && self.processors.length() > 0 {
-    if read_clock {
-      end_clock_millis.val = clock_millis
-      end_clock_fresh.val = true
-    }
     let data = SpanData::from_span(self)
     for processor in self.processors {
       processor.on_end(data)
-    }
-    if read_clock {
-      end_clock_fresh.val = false
     }
   }
 }

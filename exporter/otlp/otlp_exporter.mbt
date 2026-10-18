@@ -368,13 +368,34 @@ pub fn OtlpHttpExporter::config(self : OtlpHttpExporter) -> OtlpHttpConfig {
 }
 
 ///|
+fn map_capacity_for_entries(entries : Int) -> Int {
+  let capacity = entries.next_power_of_two()
+  if entries > capacity * 13 / 16 {
+    capacity * 2
+  } else {
+    capacity
+  }
+}
+
+///|
 fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
-  let headers = Map([], capacity=(config.headers.length() + 1) * 2)
+  let headers = Map(
+    [], capacity=map_capacity_for_entries(config.headers.length() + 1),
+  )
   for key, value in config.headers {
     headers.set(key, value)
   }
   headers.set("content-type", content_type_for_protocol(config.protocol))
   headers
+}
+
+// Bounded blocking backoff between retries. The synchronous exporter has no
+// scheduler to yield to, so the wait is a capped busy loop; retryable failures
+// are rare, which keeps the cost bounded.
+fn retry_backoff(attempt : Int32) -> Unit {
+  let delay = if attempt > 5 { 250 } else { attempt * 50 }
+  let deadline = @env.now() + delay.to_uint64()
+  while @env.now() < deadline {}
 }
 
 // Encode and POST the given spans. HTTP 200 (including partial success) is a
@@ -413,6 +434,9 @@ pub fn OtlpHttpExporter::export_spans_http(
   let mut attempt = 0
   let mut last_failure = ""
   while attempt <= self.config.max_retries {
+    if attempt > 0 {
+      retry_backoff(attempt)
+    }
     let response = (self.transport)(url, headers, body)
     if response.status_code == 200 {
       if json {

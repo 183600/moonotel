@@ -19,11 +19,24 @@ fn is_retryable_status(status_code : Int32) -> Bool {
 }
 
 ///|
+fn map_capacity_for_entries(entries : Int) -> Int {
+  let capacity = entries.next_power_of_two()
+  if entries > capacity * 13 / 16 {
+    capacity * 2
+  } else {
+    capacity
+  }
+}
+
+///|
 fn request_headers(
   config : @otlp.OtlpHttpConfig,
   gzip : Bool,
 ) -> Map[@http.CaseInsensitiveString, String] {
-  let headers = Map([], capacity=(config.headers.length() + 2) * 2)
+  let headers = Map(
+    [],
+    capacity=map_capacity_for_entries(config.headers.length() + 2),
+  )
   for key, value in config.headers {
     headers.set(@http.CaseInsensitiveString(key), value)
   }
