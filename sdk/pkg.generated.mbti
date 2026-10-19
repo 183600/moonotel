@@ -3,6 +3,7 @@ package "yourname/otel/sdk"
 
 import {
   "moonbitlang/core/debug",
+  "moonbitlang/core/ref",
   "yourname/otel/api",
   "yourname/otel/context",
 }
@@ -225,10 +226,12 @@ pub fn ResourceAttributes::to_array(Self) -> Array[(String, AttributeValue)]
 pub fn ResourceAttributes::values(Self) -> Iter[AttributeValue]
 
 pub struct Sampler {
+  description : String
   sample : (@api.SpanContext?, Array[Int32]) -> SamplingDecision
 }
 pub fn Sampler::always_off() -> Self
 pub fn Sampler::always_on() -> Self
+pub fn Sampler::description(Self) -> String
 pub fn Sampler::from_env() -> Self
 pub fn Sampler::parent_based(Self, remote_parent_sampled? : Self, remote_parent_not_sampled? : Self, local_parent_sampled? : Self, local_parent_not_sampled? : Self) -> Self
 pub fn Sampler::record_only() -> Self
@@ -371,6 +374,7 @@ pub struct Tracer {
   scope_name : String
   scope_version : String
 }
+pub fn Tracer::enabled(Self) -> Bool
 pub fn Tracer::scope_name(Self) -> String
 pub fn Tracer::scope_version(Self) -> String
 pub fn Tracer::start_root_span(Self, String, kind? : @api.SpanKind, attributes? : Map[String, AttributeValue], links? : Array[SpanLink], start_time_unix_nano? : Int64) -> SpanSdk
@@ -385,7 +389,8 @@ pub struct TracerProviderSdk {
   id_generator : IdGenerator
   span_limits : SpanLimits
   processors : Array[&SpanProcessor]
-  mut shutdown_called : Bool
+  disabled : Bool
+  shutdown_called : @ref.Ref[Bool]
 }
 pub fn TracerProviderSdk::force_flush(Self) -> Unit
 pub fn TracerProviderSdk::get_tracer(Self, String, version? : String) -> Tracer

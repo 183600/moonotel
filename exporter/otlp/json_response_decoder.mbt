@@ -1,11 +1,12 @@
 // Decodes OTLP/JSON `ExportTraceServiceResponse` bodies.
 //
 // The protobuf JSON mapping is accepted leniently: unknown fields (with any
-// JSON value) are skipped, `rejectedSpans` may be a string or a number, and
-// object members may carry optional whitespace. An empty body is a full
-// success, exactly like the protobuf encoding. A `partialSuccess` field
-// reports rejected spans; per the OTLP spec a partial success must not be
-// retried.
+// JSON value) are skipped, `rejectedSpans` may be a string, a number or a
+// number in exponent/decimal form, and object members may use either the
+// lowerCamelCase name or the original proto field name. Object members may
+// carry optional whitespace. An empty body is a full success, exactly like
+// the protobuf encoding. A `partialSuccess` field reports rejected spans; per
+// the OTLP spec a partial success must not be retried.
 
 ///|
 fn malformed_json_response() -> @sdk.ExportResult {
@@ -192,8 +193,31 @@ fn json_parse_decimal_int64(value : String) -> Int64? {
   }
 }
 
+// Parse an int64 field that arrives as a bare JSON number. Integers are
+// accepted directly; exponent/decimal forms (`2e2`, `2.0`) are accepted when
+// they denote a whole number, matching the goog.protobuf JSON parser.
+
+///|
+fn json_parse_numeric_int64(token : String) -> Int64? {
+  match json_parse_decimal_int64(token) {
+    Some(value) => Some(value)
+    None => {
+      let value = @string.parse_double(token) catch { _ => return None }
+      if value.is_nan() || value.is_inf() {
+        return None
+      }
+      let truncated = value.to_int64()
+      if truncated.to_double() != value {
+        return None
+      }
+      Some(truncated)
+    }
+  }
+}
+
 // Parse a `rejectedSpans` value: either a JSON string holding a decimal
-// integer (the canonical proto3 JSON form) or a bare JSON number.
+// integer (the canonical proto3 JSON form) or a bare JSON number. `null`
+// means the default value (zero).
 
 ///|
 fn json_parse_rejected_spans(text : String, start : Int32) -> (Int64, Int32)? {
@@ -222,7 +246,12 @@ fn json_parse_rejected_spans(text : String, start : Int32) -> (Int64, Int32)? {
     let mut cursor = pos
     while cursor < len {
       let code = text.unsafe_get(cursor).to_int()
-      if (code >= 0x30 && code <= 0x39) || code == 0x2D || code == 0x2B {
+      if (code >= 0x30 && code <= 0x39) ||
+        code == 0x2D ||
+        code == 0x2B ||
+        code == 0x2E ||
+        code == 0x65 ||
+        code == 0x45 {
         cursor = cursor + 1
       } else {
         break
@@ -231,7 +260,7 @@ fn json_parse_rejected_spans(text : String, start : Int32) -> (Int64, Int32)? {
     if cursor == pos {
       return None
     }
-    match json_parse_decimal_int64(text[pos:cursor].to_owned()) {
+    match json_parse_numeric_int64(text[pos:cursor].to_owned()) {
       Some(value) => Some((value, cursor))
       None => None
     }
@@ -392,8 +421,8 @@ fn json_skip_value(text : String, start : Int32, depth : Int32) -> Int32? {
   }
 }
 
-// Parse a `partialSuccess` message. Returns the rejected span count, the
-// error message and the index just past the closing brace.
+// Parse a `partialSuccess` (`partial_success`) message. Returns the rejected
+// span count, the error message and the index just past the closing brace.
 
 ///|
 fn json_parse_partial_success(
@@ -432,14 +461,14 @@ fn json_parse_partial_success(
       return None
     }
     cursor = json_skip_ws(text, cursor + 1)
-    if key == "rejectedSpans" {
+    if key == "rejectedSpans" || key == "rejected_spans" {
       let (value, after) = match json_parse_rejected_spans(text, cursor) {
         Some(pair) => pair
         None => return None
       }
       rejected = value
       cursor = after
-    } else if key == "errorMessage" {
+    } else if key == "errorMessage" || key == "error_message" {
       if cursor < len && text.unsafe_get(cursor).to_int() == 0x6E {
         // A JSON `null` is accepted for any field and means the default value.
         cursor = match json_skip_value(text, cursor, 0) {
@@ -514,7 +543,7 @@ pub fn decode_export_response_json(body : Bytes) -> @sdk.ExportResult {
       return malformed_json_response()
     }
     pos = json_skip_ws(text, pos + 1)
-    if key == "partialSuccess" {
+    if key == "partialSuccess" || key == "partial_success" {
       let (count, text_message, after) = match
         json_parse_partial_success(text, pos) {
         Some(triple) => triple

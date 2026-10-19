@@ -158,7 +158,8 @@ fn create_span(
     scope_version,
   }
   // Links provided at span creation are subject to the same limits as links
-  // added later; invalid links are ignored.
+  // added later; invalid links are ignored unless they carry attributes or a
+  // non-empty tracestate.
   match links {
     Some(values) =>
       for link in values {
@@ -709,14 +710,18 @@ fn SpanSdk::link_count(self : SpanSdk) -> Int32 {
   }
 }
 
-// Add a link to another span. Links with an invalid SpanContext are
-// ignored. No-op for non-recording or ended spans. When the link count limit
-// is reached the link is dropped and counted; attributes beyond the link
-// attribute count limit are dropped and counted on the link.
+// Add a link to another span. Links whose SpanContext is invalid are ignored
+// unless they carry attributes or a non-empty tracestate, as specified by the
+// OpenTelemetry specification. No-op for non-recording or ended spans. When
+// the link count limit is reached the link is dropped and counted; attributes
+// beyond the link attribute count limit are dropped and counted on the link.
 
 ///|
 pub fn SpanSdk::add_link(self : SpanSdk, link : SpanLink) -> Unit {
-  if self.recording && !self.ended && link.span_context.is_valid() {
+  let record = link.span_context.is_valid() ||
+    link.attributes.length() > 0 ||
+    link.span_context.tracestate() != ""
+  if self.recording && !self.ended && record {
     if !within_limit(self.link_count(), self.limits.link_count_limit) {
       self.dropped_links = self.dropped_links + 1
       return

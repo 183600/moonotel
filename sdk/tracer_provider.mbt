@@ -9,7 +9,8 @@ pub struct TracerProviderSdk {
   id_generator : IdGenerator
   span_limits : SpanLimits
   processors : Array[&SpanProcessor]
-  mut shutdown_called : Bool
+  disabled : Bool
+  shutdown_called : Ref[Bool]
 }
 
 // Version reported as `telemetry.sdk.version` in the resource.
@@ -114,9 +115,10 @@ pub fn exporter_selected(exporters : Array[String]?, name : String) -> Bool {
 
 ///|
 pub fn TracerProviderSdk::new(service_name? : String) -> TracerProviderSdk {
+  let disabled = sdk_disabled()
   {
     resource: Resource::from_env(service_name?),
-    sampler: if sdk_disabled() {
+    sampler: if disabled {
       Sampler::always_off()
     } else {
       Sampler::from_env()
@@ -124,7 +126,8 @@ pub fn TracerProviderSdk::new(service_name? : String) -> TracerProviderSdk {
     id_generator: IdGenerator::random(),
     span_limits: SpanLimits::from_env(),
     processors: [],
-    shutdown_called: false,
+    disabled,
+    shutdown_called: Ref(false),
   }
 }
 
@@ -242,11 +245,12 @@ pub fn TracerProviderSdk::processor_count(self : TracerProviderSdk) -> Int32 {
   self.processors.length()
 }
 
-// Whether `shutdown` has been called.
+// Whether `shutdown` has been called. The flag is shared by every copy of
+// the provider, so tracers created before the shutdown observe it too.
 
 ///|
 pub fn TracerProviderSdk::is_shutdown(self : TracerProviderSdk) -> Bool {
-  self.shutdown_called
+  self.shutdown_called.val
 }
 
 // Create a tracer for the given instrumentation scope.
@@ -273,10 +277,10 @@ pub fn TracerProviderSdk::force_flush(self : TracerProviderSdk) -> Unit {
 
 ///|
 pub fn TracerProviderSdk::shutdown(self : TracerProviderSdk) -> Unit {
-  if self.shutdown_called {
+  if self.shutdown_called.val {
     return
   }
-  self.shutdown_called = true
+  self.shutdown_called.val = true
   for processor in self.processors {
     processor.shutdown()
   }

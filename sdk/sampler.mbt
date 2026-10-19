@@ -68,47 +68,75 @@ fn ratio_threshold(ratio : Double) -> UInt64 {
   (ratio * 9223372036854775808.0).to_uint64()
 }
 
-// A Sampler is a function from (parent SpanContext?, trace ID) to a decision.
+// A Sampler is a function from (parent SpanContext?, trace ID) to a decision,
+// together with a human-readable description of its configuration.
 
 ///|
 pub struct Sampler {
+  description : String
   sample : (@api.SpanContext?, Array[Int32]) -> SamplingDecision
+}
+
+// The description of this sampler, following the format required by the
+// OpenTelemetry specification (e.g. `AlwaysOnSampler`,
+// `TraceIdRatioBased{0.5}`).
+
+///|
+pub fn Sampler::description(self : Sampler) -> String {
+  self.description
 }
 
 // Always sample every span.
 
 ///|
 pub fn Sampler::always_on() -> Sampler {
-  { sample: fn(_parent, _trace_id) { sampling_decision_record_and_sample() }, }
+  {
+    description: "AlwaysOnSampler",
+    sample: fn(_parent, _trace_id) { sampling_decision_record_and_sample() },
+  }
 }
 
 // Never sample any span.
 
 ///|
 pub fn Sampler::always_off() -> Sampler {
-  { sample: fn(_parent, _trace_id) { sampling_decision_drop() }, }
+  {
+    description: "AlwaysOffSampler",
+    sample: fn(_parent, _trace_id) { sampling_decision_drop() },
+  }
 }
 
 // Record every span locally but never sample (never export).
 
 ///|
 pub fn Sampler::record_only() -> Sampler {
-  { sample: fn(_parent, _trace_id) { sampling_decision_record_only() }, }
+  {
+    description: "RecordOnlySampler",
+    sample: fn(_parent, _trace_id) { sampling_decision_record_only() },
+  }
 }
 
 // Sample a deterministic fraction of traces based on the trace ID.
-// `ratio` is clamped: values <= 0 never sample, values >= 1 always sample.
+// `ratio` is clamped into `[0..1]`: values <= 0 (and -Infinity) never sample,
+// values >= 1 (and +Infinity) always sample, and NaN behaves like 1.0,
+// matching the environment-variable path. The description keeps the
+// `TraceIdRatioBased` identity of the sampler, as required by the
+// specification.
 
 ///|
 pub fn Sampler::trace_id_ratio_based(ratio : Double) -> Sampler {
-  if ratio <= 0.0 {
-    return Sampler::always_off()
+  let clamped = if ratio.is_nan() {
+    1.0
+  } else if ratio < 0.0 {
+    0.0
+  } else if ratio > 1.0 {
+    1.0
+  } else {
+    ratio
   }
-  if ratio >= 1.0 {
-    return Sampler::always_on()
-  }
-  let threshold = ratio_threshold(ratio)
+  let threshold = ratio_threshold(clamped)
   {
+    description: "TraceIdRatioBased{" + clamped.to_string() + "}",
     sample: fn(_parent, trace_id) {
       if trace_id_fraction(trace_id) >> 1 < threshold {
         sampling_decision_record_and_sample()
@@ -150,6 +178,7 @@ pub fn Sampler::parent_based(
     None => Sampler::always_off()
   }
   {
+    description: "ParentBased{" + root.description() + "}",
     sample: fn(parent, trace_id) {
       match parent {
         Some(ctx) =>

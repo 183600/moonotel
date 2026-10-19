@@ -22,9 +22,24 @@ pub fn Tracer::scope_version(self : Tracer) -> String {
   self.scope_version
 }
 
+// Whether this tracer will record and export spans. False when the SDK is
+// disabled through `OTEL_SDK_DISABLED`, when no span processor is registered
+// and after the provider has been shut down, as specified by the OpenTelemetry
+// tracing SDK.
+
+///|
+pub fn Tracer::enabled(self : Tracer) -> Bool {
+  !self.provider.disabled &&
+  !self.provider.is_shutdown() &&
+  self.provider.processor_count() > 0
+}
+
 // Start a new span. When `parent` is a valid SpanContext, the new span joins
 // that trace; otherwise the span is the root of a new trace. `links` may
 // associate the new span with other spans in the same or a different trace.
+// When the SDK is disabled or the provider has been shut down, the tracer acts
+// as a no-op tracer: the returned span is non-recording and wraps the parent
+// SpanContext (or an empty SpanContext for root spans).
 
 ///|
 pub fn Tracer::start_span(
@@ -40,6 +55,30 @@ pub fn Tracer::start_span(
     Some(ctx) => if ctx.is_valid() { Some(ctx) } else { None }
     None => None
   }
+  let start_time = match start_time_unix_nano {
+    Some(value) => value
+    None => unix_nano_now()
+  }
+  if self.provider.disabled || self.provider.is_shutdown() {
+    let (context, parent_span_id) = match valid_parent {
+      Some(ctx) => (ctx, ctx.span_id_view())
+      None => (@api.invalid_span_context(), no_parent_span_id)
+    }
+    return create_span(
+      name,
+      context,
+      parent_span_id,
+      kind.unwrap_or(@api.SpanKind::Internal),
+      start_time,
+      false,
+      None,
+      self.provider.span_limits(),
+      self.provider.processors,
+      self.provider.resource.attributes_shared(),
+      self.scope_name,
+      self.scope_version,
+    )
+  }
   let (trace_id, parent_span_id, tracestate) = match valid_parent {
     Some(ctx) => (ctx.trace_id_view(), ctx.span_id_view(), ctx.tracestate())
     None => (self.provider.id_generator.generate_trace_id(), no_parent_span_id, "")
@@ -48,14 +87,11 @@ pub fn Tracer::start_span(
   let decision = self.provider.sampler.should_sample(valid_parent, trace_id)
   let flags = if decision.is_sampled { @api.TRACE_FLAGS_SAMPLED } else { 0 }
   let span_context = @api.span_context(trace_id, span_id, flags, tracestate~)
-  let start_time = match start_time_unix_nano {
-    Some(value) => value
-    None => unix_nano_now()
-  }
   // Non-recording spans (DROP) keep no links, matching the SDK spec;
-  // `create_span` ignores links for non-recording spans. Links with an
-  // invalid SpanContext are dropped, and the link count/attribute limits are
-  // enforced, as required by the specification.
+  // `create_span` ignores links for non-recording spans. Links whose
+  // SpanContext is invalid are dropped unless they carry attributes or a
+  // non-empty tracestate, and the link count/attribute limits are enforced,
+  // as specified.
   let span_links : Array[SpanLink]? = if decision.is_recorded {
     links
   } else {
