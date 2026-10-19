@@ -351,9 +351,8 @@ pub async fn request(
         @sdk.HTTP_REQUEST_METHOD,
         method_attribute_value(request_method),
       )
-      // The request body is in memory, so its size is always known. Encoding
-      // it once up front gives the size for free; passing the resulting bytes
-      // to the transport avoids a second encode for string/JSON bodies.
+      // The request body is in memory, so its size is always known. It is
+      // encoded once and the resulting bytes are passed to the transport.
       let request_body : Bytes = body.binary()
       let request_size = request_body.length()
       if request_size > 0 {

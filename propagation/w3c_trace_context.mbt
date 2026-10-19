@@ -362,9 +362,7 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
 const TRACESTATE_INJECT_CACHE_LIMIT : Int32 = 128
 
 // Memoized result of `parse_tracestate` keyed by the raw `tracestate` value:
-// the normalized value when it is valid, `None` when it is not. A trace keeps
-// the same `tracestate` across all of its outbound requests, so injection
-// would otherwise re-validate the same string for every request.
+// the normalized value when it is valid, `None` when it is not.
 
 ///|
 let tracestate_inject_cache : Map[String, String?] = Map([])

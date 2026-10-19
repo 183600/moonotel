@@ -135,8 +135,8 @@ fn random_bytes(
 // A generator producing random IDs.
 //
 // Whether the platform can provide entropy is probed once, while the generator
-// is created, so that platforms without an entropy source (for example
-// `wasm-gc`) do not allocate a fresh, unused entropy buffer on every draw.
+// is created. On platforms without an entropy source (for example `wasm-gc`)
+// a splitmix64 PRNG is used instead.
 
 // Sequence number mixed into the fallback seed so that generators created in
 // the same clock tick still start from different states.

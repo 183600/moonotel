@@ -9,8 +9,7 @@ pub struct Context {
   span_ctx : @api.SpanContext?
   key : String?
   value : String?
-  // Batch baggage carried by a single chain node, used by `with_baggage` so
-  // that extracting many pairs does not build one node per pair.
+  // Baggage map carried by a single chain node, used by `with_baggage`.
   baggage_map : Map[String, String]?
   parent : Context?
 }

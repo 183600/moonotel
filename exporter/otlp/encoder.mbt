@@ -705,8 +705,7 @@ pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
   if spans.length() == 0 {
     return b""
   }
-  // A single grouping pass both sizes the buffers and orders the output, so
-  // each span's size is estimated exactly once.
+  // Group the spans by resource and scope before encoding.
   let groups = group_spans(spans)
   let mut total_hint = 32
   for group in groups {

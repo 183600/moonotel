@@ -154,9 +154,6 @@ fn split_path_query(path : String) -> (String, String) {
 // the W3C `traceparent`/`tracestate` headers and `baggage`. Request headers
 // are already keyed case-insensitively. The second result reports whether the
 // extracted context carries baggage.
-//
-// The carrier reads the request headers directly instead of copying them, so
-// extraction only touches the keys the propagator actually looks up.
 
 ///|
 fn extract_context_with_baggage(

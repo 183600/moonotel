@@ -354,9 +354,8 @@ fn hex_unit_value(unit : UInt16) -> Int32 {
 }
 
 // Decode one byte per two hex code units of `hex` into `out` (whose length is
-// the number of bytes to decode). The invalid-digit check is accumulated so
-// that valid input needs no branch per character. Returns false on a non-hex
-// code unit.
+// the number of bytes to decode). Invalid digits are accumulated across the
+// loop. Returns false on a non-hex code unit.
 
 ///|
 fn hex_to_bytes(hex : String, out : Array[Int32]) -> Bool {
@@ -422,8 +421,8 @@ pub fn span_context_from_hex(
   if trace_id_hex.length() != 32 || span_id_hex.length() != 16 {
     return invalid_span_context()
   }
-  // Decoding validates the hex digits, the 16/8-byte lengths (fixed here) and
-  // the all-zero rule of `span_context` in a single pass per ID.
+  // Decoding validates the hex digits, the 16/8-byte lengths and the all-zero
+  // rule of `span_context`.
   let trace_id : Array[Int32] = Array::unsafe_make_uninit(16)
   let span_id : Array[Int32] = Array::unsafe_make_uninit(8)
   if !hex_to_nonzero_bytes(trace_id_hex, 0, trace_id) ||

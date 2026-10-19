@@ -23,9 +23,7 @@ fn ProtoWriter::with_capacity(size_hint : Int32) -> ProtoWriter {
 ///|
 let encoder_pool : Array[ProtoWriter] = []
 
-// Capacity limits above which recycled buffers are dropped. Without them a
-// single oversized batch would pin its peak capacity for the rest of the
-// process lifetime even though encoding afterwards only needs a fraction.
+// Capacity limits above which recycled buffers are not pooled.
 const MAX_ROOT_BUFFER_BYTES : Int32 = 4 * 1024 * 1024
 
 ///|

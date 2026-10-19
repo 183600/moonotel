@@ -156,11 +156,10 @@ fn is_baggage_value_char(code : Int32) -> Bool {
 }
 
 // Decode the body of a baggage value that contains at least one `%`.
-// Alongside the decoded string, the byte length of its percent-encoded form is
-// reported, so that callers do not have to scan the decoded value again. In
-// the non-ASCII case (where lossy UTF-8 decoding makes the byte accounting
-// hard to track) the length is recomputed from the decoded string to stay
-// exactly equivalent to `percent_encoded_length`.
+// Returns the decoded string together with the byte length of its
+// percent-encoded form. In the non-ASCII case (where lossy UTF-8 decoding
+// makes the byte accounting hard to track) the length is recomputed from the
+// decoded string to stay exactly equivalent to `percent_encoded_length`.
 
 ///|
 fn percent_decode_escaped_with_length(
@@ -911,8 +910,8 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
     Some(list) => list
     None => return None
   }
-  // Small lists (the common case) are sorted with an allocation-free
-  // insertion sort; larger lists use the O(n log n) generic sort.
+  // Small lists are sorted with an insertion sort; larger lists use the
+  // generic sort.
   let entry_count = entries.length()
   if entry_count > 16 {
     entries.sort_by(fn(a, b) { a.0.compare(b.0) })

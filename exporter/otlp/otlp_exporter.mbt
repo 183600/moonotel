@@ -390,8 +390,7 @@ fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
 }
 
 // Bounded blocking backoff between retries. The synchronous exporter has no
-// scheduler to yield to, so the wait is a capped busy loop; retryable failures
-// are rare, which keeps the cost bounded.
+// scheduler to yield to, so the wait is a capped busy loop.
 fn retry_backoff(attempt : Int32) -> Unit {
   let delay = if attempt > 5 { 250 } else { attempt * 50 }
   let deadline = @env.now() + delay.to_uint64()

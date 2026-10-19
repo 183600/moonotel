@@ -59,9 +59,8 @@ fn build_json_hex_pairs() -> FixedArray[UInt32] {
   table
 }
 
-// A growable UTF-8 byte buffer for JSON encoding. Writing bytes directly
-// avoids materializing the whole payload as a UTF-16 `String` and then
-// re-encoding it to UTF-8, which previously copied the entire document twice.
+// A growable UTF-8 byte buffer for JSON encoding. Values are written into the
+// buffer as UTF-8 bytes.
 
 ///|
 priv struct JsonBuf {
@@ -107,9 +106,9 @@ fn JsonBuf::write_char(self : JsonBuf, c : Char) -> Unit {
   }
 }
 
-// Append a string view, copying ASCII runs in bulk and encoding every run of
-// non-ASCII code units with `@utf8.encode` so that surrogate pairs keep the
-// exact same encoding as the rest of the SDK.
+// Append a string view as UTF-8: ASCII runs are copied directly and every run
+// of non-ASCII code units is encoded with `@utf8.encode` so that surrogate
+// pairs keep the exact same encoding as the rest of the SDK.
 
 ///|
 fn JsonBuf::write_view(self : JsonBuf, value : StringView) -> Unit {

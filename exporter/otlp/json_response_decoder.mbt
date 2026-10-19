@@ -49,9 +49,8 @@ fn json_parse_string_at(text : String, start : Int32) -> (String, Int32)? {
   if start >= len || text.unsafe_get(start).to_int() != 0x22 {
     return None
   }
-  // Fast path: strings without escapes or control characters make up the
-  // bulk of response field names and messages; they are copied in a single
-  // slice instead of being appended character by character.
+  // Most response field names and messages contain no escapes or control
+  // characters; such strings are copied as a single slice.
   let mut pos = start + 1
   while pos < len {
     let code = text.unsafe_get(pos).to_int()
