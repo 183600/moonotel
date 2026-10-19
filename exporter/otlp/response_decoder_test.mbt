@@ -38,6 +38,14 @@ test "decode_empty_partial_success_is_success" {
 }
 
 ///|
+test "decode_repeated_partial_success_last_wins" {
+  // Repeated `partial_success` messages merge; later scalar fields overwrite
+  // earlier ones, including an explicit zero and an empty message.
+  let body : Bytes = b"\x0a\x07\x08\x03\x12\x03bad\x0a\x04\x08\x00\x12\x00"
+  assert_eq(@otlp.decode_export_response(body), @sdk.ExportSuccess)
+}
+
+///|
 test "decode_truncated_body_is_failure" {
   assert_false(@otlp.decode_export_response(b"\x0a").is_success())
   assert_false(@otlp.decode_export_response(b"\x0a\x05\x08").is_success())

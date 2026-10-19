@@ -139,14 +139,6 @@ pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
             return malformed_response()
           }
         }
-        if rejected > 0 || error_message != "" {
-          return @sdk.ExportFailure(
-            "partial success: rejected " +
-            rejected.to_string() +
-            " span(s) " +
-            error_message,
-          )
-        }
       }
       pos = end
     } else if wire == 0 {
@@ -170,5 +162,14 @@ pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
       return malformed_response()
     }
   }
-  @sdk.ExportSuccess
+  if rejected > 0 || error_message != "" {
+    @sdk.ExportFailure(
+      "partial success: rejected " +
+      rejected.to_string() +
+      " span(s) " +
+      error_message,
+    )
+  } else {
+    @sdk.ExportSuccess
+  }
 }
