@@ -135,7 +135,7 @@ pub impl TextMapPropagator for CompositePropagator with fn extract(
   for propagator in self.propagators {
     let extracted = propagator.extract(carrier)
     // Flatten the baggage only when there is any, and hand the resulting map
-    // to the context without copying it a second time.
+    // to the context.
     if extracted.has_baggage() {
       context = context.with_baggage_owned(extracted.baggage())
     }
@@ -197,9 +197,8 @@ pub fn CompositePropagator::from_env() -> CompositePropagator {
   CompositePropagator::new(propagators)
 }
 
-// Process-wide propagator installed with `set_global_propagator`. The cached
-// default is stored in the same slot so that repeated `global_propagator`
-// calls do not rebuild it.
+// Process-wide propagator installed with `set_global_propagator`. The default
+// propagator is stored in the same slot.
 
 ///|
 let global_propagator_slot : Ref[&TextMapPropagator?] = Ref(None)
@@ -217,7 +216,7 @@ pub fn set_global_propagator(propagator : &TextMapPropagator) -> Unit {
 
 // The process-wide `TextMapPropagator`. When none has been installed the
 // composite selected by `OTEL_PROPAGATORS` (`tracecontext,baggage` by default)
-// is built and cached on first use.
+// is built on first use.
 
 ///|
 pub fn global_propagator() -> &TextMapPropagator {
@@ -231,7 +230,7 @@ pub fn global_propagator() -> &TextMapPropagator {
   }
 }
 
-// Forget the installed or cached propagator so that the next
+// Forget the installed or default propagator so that the next
 // `global_propagator` call reads `OTEL_PROPAGATORS` again. Intended for tests
 // and for processes that re-initialize their configuration.
 

@@ -65,9 +65,9 @@ fn method_attribute_value(
   }
 }
 
-// The tracer derived from the global provider, cached together with the
-// provider it was built from. Tracers are immutable, so the request path can
-// reuse one until the global provider is replaced.
+// The tracer derived from the global provider, stored together with the
+// provider it was built from. Tracers are immutable; a tracer is derived again
+// when the global provider is replaced.
 
 ///|
 let default_tracer_cache : Ref[(@sdk.TracerProviderSdk, @sdk.Tracer)?] = Ref(

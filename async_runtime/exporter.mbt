@@ -6,11 +6,10 @@
 // queue and a background task created in the caller's `TaskGroup` drains the
 // queue and performs the HTTP request with `@otlp_async`.
 //
-// The queue is bounded (oldest batches are discarded when full) so that a slow
-// or unavailable collector cannot grow the process without bound. When the
-// exporter is shut down, or when the surrounding task group is cancelled, the
-// pending queue is drained before the background task exits, so shutdown does
-// not lose spans that were already accepted.
+// The queue is bounded: the oldest batches are discarded when it is full.
+// When the exporter is shut down, or when the surrounding task group is
+// cancelled, the pending queue is drained before the background task exits,
+// so shutdown does not lose spans that were already accepted.
 
 // Most spans coalesced into a single OTLP request.
 

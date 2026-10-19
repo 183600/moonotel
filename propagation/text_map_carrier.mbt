@@ -139,7 +139,7 @@ pub fn TextMapCarrier::set(
 ///|
 pub fn TextMapCarrier::remove(self : TextMapCarrier, key : String) -> Unit {
   self.entries.remove(key)
-  // Allocate the variant list only when a case-insensitive match is found.
+  // Collect the keys that match `key` case-insensitively, then remove them.
   let mut matches : Array[String]? = None
   for candidate, _value in self.entries.iter2() {
     if ascii_case_insensitive_equal(candidate, key) {

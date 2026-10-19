@@ -400,8 +400,7 @@ pub async fn export_spans(
 ///|
 pub struct OtlpHttpAsyncExporter {
   config : @otlp.OtlpHttpConfig
-  // Request headers derived from `config`, built once because the
-  // configuration is not changed after construction.
+  // Request headers derived from `config`.
   headers : Map[@http.CaseInsensitiveString, String]
 }
 

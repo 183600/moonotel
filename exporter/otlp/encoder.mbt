@@ -472,8 +472,8 @@ priv struct ResourceGroup {
   resource : Map[String, @sdk.AttributeValue]
   scopes : Array[ScopeGroup]
   mut size_hint : Int32
-  // Index of `(scope_name, scope_version)` into `scopes`, built lazily when a
-  // group with several interleaved scopes is first looked up.
+  // Index of `(scope_name, scope_version)` into `scopes`, built when a group
+  // with several interleaved scopes is looked up.
   mut scope_index : Map[(String, String), Int32]?
 }
 
@@ -563,8 +563,7 @@ fn estimate_span_size(data : @sdk.SpanData) -> Int32 {
 }
 
 // Canonical keys of resources already seen while grouping a batch, matched by
-// physical identity. Switching back and forth between resources therefore does
-// not rebuild the canonical key string for every span.
+// physical identity.
 
 ///|
 fn cached_resource_key(
@@ -613,8 +612,8 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
                 map
               }
             }
-            // The key of a newly created group is computed lazily, on the
-            // first switch away from it.
+            // The key of a newly created group is computed on the first
+            // switch away from it.
             let key = cached_resource_key(
               groups[last_index].resource,
               known_resource_keys,

@@ -171,7 +171,7 @@ fn decode_hex_nonzero(
 ) -> Array[Int32]? {
   // Every element is written before `Some` is returned.
   let out : Array[Int32] = Array::unsafe_make_uninit(byte_count)
-  // Accumulate both checks so that valid input has no per-character branch.
+  // Accumulate both checks across the loop.
   let mut bad = 0
   let mut acc = 0
   let mut i = 0
@@ -354,16 +354,15 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
   )
 }
 
-// Upper bound on the number of memoized `tracestate` parse results. The oldest
-// entry (in insertion order) is evicted when the cache is full, so its memory
-// stays bounded even when the values come from untrusted incoming headers.
+// Upper bound on the number of cached `tracestate` parse results. The oldest
+// entry (in insertion order) is evicted when the cache is full.
 
 ///|
 const TRACESTATE_INJECT_CACHE_LIMIT : Int32 = 128
 
-// Memoized result of `parse_tracestate` keyed by the raw `tracestate` value:
-// the normalized value when it is valid, `None` when it is not. A bounded FIFO:
-// hits do not write to the cache, and eviction removes the first inserted key.
+// Cached result of `parse_tracestate` keyed by the raw `tracestate` value:
+// the normalized value when it is valid, `None` when it is not. Hits do not
+// write to the cache, and eviction removes the first inserted key.
 
 ///|
 let tracestate_inject_cache : Map[String, String?] = Map([])

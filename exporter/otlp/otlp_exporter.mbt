@@ -339,8 +339,8 @@ fn is_retryable_status(status_code : Int32) -> Bool {
 
 // Wait strategy invoked before retry attempt `attempt` (1-based). The
 // synchronous exporter has no scheduler to yield to, so the default performs
-// no wait instead of spinning on the clock. Callers that run inside an event
-// loop can inject a cooperative wait (for example `@async.sleep`).
+// no wait. Callers that run inside an event loop can inject a cooperative
+// wait (for example `@async.sleep`).
 
 ///|
 pub type RetryWait = (Int32) -> Unit
@@ -353,8 +353,7 @@ pub struct OtlpHttpExporter {
   transport : Transport
   // The trace endpoint URL derived from the config strings.
   url : String
-  // Request headers (configured headers plus `content-type`), built once
-  // because the configuration is not changed after construction.
+  // Request headers (configured headers plus `content-type`).
   headers : Map[String, String]
   retry_wait : RetryWait
 }

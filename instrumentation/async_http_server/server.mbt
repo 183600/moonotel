@@ -242,8 +242,8 @@ pub(all) struct ServerCall {
   connection : @http.ServerConnection
   span : @sdk.SpanSdk?
   tracer : @sdk.Tracer?
-  // Lazily computed `(path, query)` split of the request target, shared by
-  // `path` and `query` so that the request line is parsed at most once.
+  // `(path, query)` split of the request target, computed on first use and
+  // shared by `path` and `query`.
   mut path_query : (String, String)?
   // Whether `respond` has completely sent a response for this request.
   mut responded : Bool

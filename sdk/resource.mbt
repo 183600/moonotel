@@ -280,8 +280,7 @@ pub fn Resource::service_name(self : Resource) -> String {
 // A copy-on-write attribute map used for the resource carried by span
 // snapshots. Every snapshot of a provider shares the provider's immutable
 // resource map; the first `set` copies the outer map so that mutating one
-// snapshot can never change the provider or any other span. Reads, iteration
-// and encoding of an unmodified snapshot stay allocation-free.
+// snapshot can never change the provider or any other span.
 
 ///|
 pub struct ResourceAttributes {

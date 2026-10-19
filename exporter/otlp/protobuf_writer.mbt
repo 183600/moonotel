@@ -32,9 +32,7 @@ const MAX_SCRATCH_BUFFER_BYTES : Int32 = 1024 * 1024
 ///|
 const MAX_ENCODER_POOL_SIZE : Int = 8
 
-// Buffers above this size are trimmed before a writer goes back into the pool,
-// so a single large export does not pin its peak capacity for the lifetime of
-// the process. Small buffers are kept as-is to avoid re-growing them.
+// Buffers above this size are trimmed before a writer goes back into the pool.
 
 ///|
 const POOLED_BUFFER_BYTES : Int32 = 64 * 1024
@@ -60,8 +58,7 @@ fn release_root_writer(writer : ProtoWriter) -> Unit {
     if writer.buf.length() > POOLED_BUFFER_BYTES {
       writer.buf = FixedArray::make(POOLED_BUFFER_BYTES, b'\x00')
     }
-    // The nested writers retained on the scratch stack would otherwise keep
-    // their own peak buffers alive along with the pooled root writer.
+    // The nested writers retained on the scratch stack are trimmed as well.
     for buffer in writer.scratch {
       buffer.len = 0
       if buffer.buf.length() > POOLED_BUFFER_BYTES {
