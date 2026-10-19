@@ -236,21 +236,21 @@ fn json_write_escaped(sb : JsonBuf, value : String) -> Unit {
       sb.write_view(value.view(start_offset=run_start, end_offset=i))
     }
     if code == 0x22 {
-      sb.write_string("\\\"")
+      sb.write_bytes(b"\\\"")
     } else if code == 0x5C {
-      sb.write_string("\\\\")
+      sb.write_bytes(b"\\\\")
     } else if code == 0x08 {
-      sb.write_string("\\b")
+      sb.write_bytes(b"\\b")
     } else if code == 0x0C {
-      sb.write_string("\\f")
+      sb.write_bytes(b"\\f")
     } else if code == 0x0A {
-      sb.write_string("\\n")
+      sb.write_bytes(b"\\n")
     } else if code == 0x0D {
-      sb.write_string("\\r")
+      sb.write_bytes(b"\\r")
     } else if code == 0x09 {
-      sb.write_string("\\t")
+      sb.write_bytes(b"\\t")
     } else {
-      sb.write_string("\\u00")
+      sb.write_bytes(b"\\u00")
       sb.write_char(json_hex_digit(code >> 4))
       sb.write_char(json_hex_digit(code & 0x0F))
     }
@@ -370,11 +370,11 @@ fn json_write_int64_string(sb : JsonBuf, value : Int64) -> Unit {
 ///|
 fn json_write_double(sb : JsonBuf, value : Double) -> Unit {
   if value.is_nan() {
-    sb.write_string("\"NaN\"")
+    sb.write_bytes(b"\"NaN\"")
   } else if value > 1.7976931348623157e308 {
-    sb.write_string("\"Infinity\"")
+    sb.write_bytes(b"\"Infinity\"")
   } else if value < -1.7976931348623157e308 {
-    sb.write_string("\"-Infinity\"")
+    sb.write_bytes(b"\"-Infinity\"")
   } else {
     sb.write_string(value.to_string())
   }
@@ -390,84 +390,84 @@ fn json_write_any_value(
   sb.write_char('{')
   match value {
     @sdk.StringValue(text) => {
-      sb.write_string("\"stringValue\":")
+      sb.write_bytes(b"\"stringValue\":")
       json_write_escaped(sb, text)
     }
     @sdk.BoolValue(flag) =>
-      sb.write_string(
+      sb.write_bytes(
         if flag {
-          "\"boolValue\":true"
+          b"\"boolValue\":true"
         } else {
-          "\"boolValue\":false"
+          b"\"boolValue\":false"
         },
       )
     @sdk.IntValue(number) => {
-      sb.write_string("\"intValue\":")
+      sb.write_bytes(b"\"intValue\":")
       json_write_int64_string(sb, number)
     }
     @sdk.DoubleValue(number) => {
-      sb.write_string("\"doubleValue\":")
+      sb.write_bytes(b"\"doubleValue\":")
       json_write_double(sb, number)
     }
     @sdk.StringArrayValue(items) => {
-      sb.write_string("\"arrayValue\":{\"values\":[")
+      sb.write_bytes(b"\"arrayValue\":{\"values\":[")
       let mut first = true
       for item in items {
         if !first {
           sb.write_char(',')
         }
         first = false
-        sb.write_string("{\"stringValue\":")
+        sb.write_bytes(b"{\"stringValue\":")
         json_write_escaped(sb, item)
         sb.write_char('}')
       }
-      sb.write_string("]}")
+      sb.write_bytes(b"]}")
     }
     @sdk.BoolArrayValue(items) => {
-      sb.write_string("\"arrayValue\":{\"values\":[")
+      sb.write_bytes(b"\"arrayValue\":{\"values\":[")
       let mut first = true
       for item in items {
         if !first {
           sb.write_char(',')
         }
         first = false
-        sb.write_string(
+        sb.write_bytes(
           if item {
-            "{\"boolValue\":true}"
+            b"{\"boolValue\":true}"
           } else {
-            "{\"boolValue\":false}"
+            b"{\"boolValue\":false}"
           },
         )
       }
-      sb.write_string("]}")
+      sb.write_bytes(b"]}")
     }
     @sdk.IntArrayValue(items) => {
-      sb.write_string("\"arrayValue\":{\"values\":[")
+      sb.write_bytes(b"\"arrayValue\":{\"values\":[")
       let mut first = true
       for item in items {
         if !first {
           sb.write_char(',')
         }
         first = false
-        sb.write_string("{\"intValue\":")
+        sb.write_bytes(b"{\"intValue\":")
         json_write_int64_string(sb, item)
         sb.write_char('}')
       }
-      sb.write_string("]}")
+      sb.write_bytes(b"]}")
     }
     @sdk.DoubleArrayValue(items) => {
-      sb.write_string("\"arrayValue\":{\"values\":[")
+      sb.write_bytes(b"\"arrayValue\":{\"values\":[")
       let mut first = true
       for item in items {
         if !first {
           sb.write_char(',')
         }
         first = false
-        sb.write_string("{\"doubleValue\":")
+        sb.write_bytes(b"{\"doubleValue\":")
         json_write_double(sb, item)
         sb.write_char('}')
       }
-      sb.write_string("]}")
+      sb.write_bytes(b"]}")
     }
   }
   sb.write_char('}')
@@ -487,9 +487,9 @@ fn json_write_attributes(
       sb.write_char(',')
     }
     first = false
-    sb.write_string("{\"key\":")
+    sb.write_bytes(b"{\"key\":")
     json_write_escaped(sb, key)
-    sb.write_string(",\"value\":")
+    sb.write_bytes(b",\"value\":")
     json_write_any_value(sb, value)
     sb.write_char('}')
   }
@@ -503,7 +503,7 @@ fn json_write_resource(
   sb : JsonBuf,
   resource : Map[String, @sdk.AttributeValue],
 ) -> Unit {
-  sb.write_string("{\"attributes\":")
+  sb.write_bytes(b"{\"attributes\":")
   json_write_attributes(sb, resource)
   sb.write_char('}')
 }
@@ -516,10 +516,10 @@ fn json_write_scope(
   name : String,
   version : String,
 ) -> Unit {
-  sb.write_string("{\"name\":")
+  sb.write_bytes(b"{\"name\":")
   json_write_escaped(sb, name)
   if version != "" {
-    sb.write_string(",\"version\":")
+    sb.write_bytes(b",\"version\":")
     json_write_escaped(sb, version)
   }
   sb.write_char('}')
@@ -529,16 +529,16 @@ fn json_write_scope(
 
 ///|
 fn json_write_event(sb : JsonBuf, event : @sdk.SpanEvent) -> Unit {
-  sb.write_string("{\"timeUnixNano\":")
+  sb.write_bytes(b"{\"timeUnixNano\":")
   json_write_int64_string(sb, event.time_unix_nano)
-  sb.write_string(",\"name\":")
+  sb.write_bytes(b",\"name\":")
   json_write_escaped(sb, event.name)
   if event.attributes.length() > 0 {
-    sb.write_string(",\"attributes\":")
+    sb.write_bytes(b",\"attributes\":")
     json_write_attributes(sb, event.attributes)
   }
   if event.dropped_attributes_count > 0 {
-    sb.write_string(",\"droppedAttributesCount\":")
+    sb.write_bytes(b",\"droppedAttributesCount\":")
     json_write_int32(sb, event.dropped_attributes_count)
   }
   sb.write_char('}')
@@ -548,24 +548,24 @@ fn json_write_event(sb : JsonBuf, event : @sdk.SpanEvent) -> Unit {
 
 ///|
 fn json_write_link(sb : JsonBuf, link : @sdk.SpanLink) -> Unit {
-  sb.write_string("{\"traceId\":")
+  sb.write_bytes(b"{\"traceId\":")
   json_write_hex_quoted(sb, link.span_context.trace_id_view())
-  sb.write_string(",\"spanId\":")
+  sb.write_bytes(b",\"spanId\":")
   json_write_hex_quoted(sb, link.span_context.span_id_view())
   let tracestate = link.span_context.tracestate()
   if tracestate != "" {
-    sb.write_string(",\"traceState\":")
+    sb.write_bytes(b",\"traceState\":")
     json_write_escaped(sb, tracestate)
   }
   if link.attributes.length() > 0 {
-    sb.write_string(",\"attributes\":")
+    sb.write_bytes(b",\"attributes\":")
     json_write_attributes(sb, link.attributes)
   }
   if link.dropped_attributes_count > 0 {
-    sb.write_string(",\"droppedAttributesCount\":")
+    sb.write_bytes(b",\"droppedAttributesCount\":")
     json_write_int32(sb, link.dropped_attributes_count)
   }
-  sb.write_string(",\"flags\":")
+  sb.write_bytes(b",\"flags\":")
   json_write_uint32(sb, link.span_context.trace_flags())
   sb.write_char('}')
 }
@@ -576,10 +576,10 @@ fn json_write_link(sb : JsonBuf, link : @sdk.SpanLink) -> Unit {
 ///|
 fn json_write_status(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
   if data.status != @api.StatusCode::Unset || data.status_description != "" {
-    sb.write_string(",\"status\":{")
+    sb.write_bytes(b",\"status\":{")
     let mut first = true
     if data.status_description != "" {
-      sb.write_string("\"message\":")
+      sb.write_bytes(b"\"message\":")
       json_write_escaped(sb, data.status_description)
       first = false
     }
@@ -588,7 +588,7 @@ fn json_write_status(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
       if !first {
         sb.write_char(',')
       }
-      sb.write_string("\"code\":")
+      sb.write_bytes(b"\"code\":")
       json_write_int32(sb, code)
     }
     sb.write_char('}')
@@ -599,37 +599,37 @@ fn json_write_status(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
 
 ///|
 fn json_write_span(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
-  sb.write_string("{\"traceId\":")
+  sb.write_bytes(b"{\"traceId\":")
   json_write_hex_quoted(sb, data.span_context.trace_id_view())
-  sb.write_string(",\"spanId\":")
+  sb.write_bytes(b",\"spanId\":")
   json_write_hex_quoted(sb, data.span_context.span_id_view())
   let tracestate = data.span_context.tracestate()
   if tracestate != "" {
-    sb.write_string(",\"traceState\":")
+    sb.write_bytes(b",\"traceState\":")
     json_write_escaped(sb, tracestate)
   }
   if data.parent_span_id.length() > 0 {
-    sb.write_string(",\"parentSpanId\":")
+    sb.write_bytes(b",\"parentSpanId\":")
     json_write_hex_quoted(sb, data.parent_span_id)
   }
-  sb.write_string(",\"name\":")
+  sb.write_bytes(b",\"name\":")
   json_write_escaped(sb, data.name)
-  sb.write_string(",\"kind\":")
+  sb.write_bytes(b",\"kind\":")
   json_write_int32(sb, data.kind.otlp_value())
-  sb.write_string(",\"startTimeUnixNano\":")
+  sb.write_bytes(b",\"startTimeUnixNano\":")
   json_write_int64_string(sb, data.start_time_unix_nano)
-  sb.write_string(",\"endTimeUnixNano\":")
+  sb.write_bytes(b",\"endTimeUnixNano\":")
   json_write_int64_string(sb, data.end_time_unix_nano)
   if data.attributes.length() > 0 {
-    sb.write_string(",\"attributes\":")
+    sb.write_bytes(b",\"attributes\":")
     json_write_attributes(sb, data.attributes)
   }
   if data.dropped_attributes_count > 0 {
-    sb.write_string(",\"droppedAttributesCount\":")
+    sb.write_bytes(b",\"droppedAttributesCount\":")
     json_write_int32(sb, data.dropped_attributes_count)
   }
   if data.events.length() > 0 {
-    sb.write_string(",\"events\":[")
+    sb.write_bytes(b",\"events\":[")
     let mut first = true
     for event in data.events {
       if !first {
@@ -641,11 +641,11 @@ fn json_write_span(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
     sb.write_char(']')
   }
   if data.dropped_events_count > 0 {
-    sb.write_string(",\"droppedEventsCount\":")
+    sb.write_bytes(b",\"droppedEventsCount\":")
     json_write_int32(sb, data.dropped_events_count)
   }
   if data.links.length() > 0 {
-    sb.write_string(",\"links\":[")
+    sb.write_bytes(b",\"links\":[")
     let mut first = true
     for link in data.links {
       if !first {
@@ -657,11 +657,11 @@ fn json_write_span(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
     sb.write_char(']')
   }
   if data.dropped_links_count > 0 {
-    sb.write_string(",\"droppedLinksCount\":")
+    sb.write_bytes(b",\"droppedLinksCount\":")
     json_write_int32(sb, data.dropped_links_count)
   }
   json_write_status(sb, data)
-  sb.write_string(",\"flags\":")
+  sb.write_bytes(b",\"flags\":")
   json_write_uint32(sb, data.span_context.trace_flags())
   sb.write_char('}')
 }
@@ -685,25 +685,25 @@ pub fn encode_trace_request_json(spans : Array[@sdk.SpanData]) -> Bytes {
     }
   }
   let sb = JsonBuf::new(size_hint)
-  sb.write_string("{\"resourceSpans\":[")
+  sb.write_bytes(b"{\"resourceSpans\":[")
   let mut first_group = true
   for group in groups {
     if !first_group {
       sb.write_char(',')
     }
     first_group = false
-    sb.write_string("{\"resource\":")
+    sb.write_bytes(b"{\"resource\":")
     json_write_resource(sb, group.resource)
-    sb.write_string(",\"scopeSpans\":[")
+    sb.write_bytes(b",\"scopeSpans\":[")
     let mut first_scope = true
     for scope in group.scopes {
       if !first_scope {
         sb.write_char(',')
       }
       first_scope = false
-      sb.write_string("{\"scope\":")
+      sb.write_bytes(b"{\"scope\":")
       json_write_scope(sb, scope.scope_name, scope.scope_version)
-      sb.write_string(",\"spans\":[")
+      sb.write_bytes(b",\"spans\":[")
       let mut first_span = true
       for span in scope.spans {
         if !first_span {
@@ -712,10 +712,10 @@ pub fn encode_trace_request_json(spans : Array[@sdk.SpanData]) -> Bytes {
         first_span = false
         json_write_span(sb, span)
       }
-      sb.write_string("]}")
+      sb.write_bytes(b"]}")
     }
-    sb.write_string("]}")
+    sb.write_bytes(b"]}")
   }
-  sb.write_string("]}")
+  sb.write_bytes(b"]}")
   sb.to_bytes()
 }
