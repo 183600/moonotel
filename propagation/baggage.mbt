@@ -915,125 +915,32 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
 
 // Format the baggage of `context` as a `baggage` header value, or `None` when
 // the context carries no (valid) baggage. Keys are emitted in sorted order for
-// a deterministic header.
-//
-// The chain is walked once, collecting the innermost value of every key.
+// a deterministic header. Baggage properties stored in the context are
+// preserved.
 
 ///|
 pub fn context_baggage_header(context : @context.Context) -> String? {
-  let mut entries : Array[(String, String)]? = None
-  let mut seen : Array[String]? = None
-  let mut first_key : String? = None
-  let mut cursor : @context.Context? = Some(context)
-  while true {
-    match cursor {
-      Some(node) => {
-        match node.key {
-          Some(key) => {
-            // `insert` stays true when this is the first (innermost) occurrence
-            // of `key` in the chain; later occurrences are hidden.
-            let mut insert = true
-            match seen {
-              Some(keys) => {
-                let mut i = 0
-                let n = keys.length()
-                while i < n {
-                  if keys.unsafe_get(i) == key {
-                    insert = false
-                    break
-                  }
-                  i = i + 1
-                }
-                if insert {
-                  keys.push(key)
-                }
-              }
-              None =>
-                match first_key {
-                  Some(existing) =>
-                    if existing == key {
-                      insert = false
-                    } else {
-                      let keys : Array[String] = [existing, key]
-                      seen = Some(keys)
-                    }
-                  None => first_key = Some(key)
-                }
-            }
-            if insert {
-              match node.value {
-                Some(value) =>
-                  match entries {
-                    Some(list) => list.push((key, value))
-                    None => entries = Some([(key, value)])
-                  }
-                None => ()
-              }
-            }
-          }
-          None => ()
-        }
-        match node.baggage_map {
-          Some(map) =>
-            for entry in map.to_array() {
-              let (key, value) = entry
-              let mut insert = true
-              match seen {
-                Some(keys) => {
-                  let mut i = 0
-                  let n = keys.length()
-                  while i < n {
-                    if keys.unsafe_get(i) == key {
-                      insert = false
-                      break
-                    }
-                    i = i + 1
-                  }
-                  if insert {
-                    keys.push(key)
-                  }
-                }
-                None =>
-                  match first_key {
-                    Some(existing) =>
-                      if existing == key {
-                        insert = false
-                      } else {
-                        let keys : Array[String] = [existing, key]
-                        seen = Some(keys)
-                      }
-                    None => first_key = Some(key)
-                  }
-              }
-              if insert {
-                match entries {
-                  Some(list) => list.push((key, value))
-                  None => entries = Some([(key, value)])
-                }
-              }
-            }
-          None => ()
-        }
-        cursor = node.parent
-      }
-      None => break
-    }
+  let baggage = context.baggage_entries()
+  if baggage.length() == 0 {
+    return None
   }
-  let entries = match entries {
-    Some(list) => list
-    None => return None
+  let entries : Array[BaggageEntry] = []
+  for entry in baggage {
+    entries.push(
+      BaggageEntry::new(entry.key, entry.value, properties=entry.properties),
+    )
   }
   // Small lists are sorted with an insertion sort; larger lists use the
   // generic sort.
   let entry_count = entries.length()
   if entry_count > 16 {
-    entries.sort_by(fn(a, b) { a.0.compare(b.0) })
+    entries.sort_by(fn(a, b) { a.key.compare(b.key) })
   } else if entry_count > 1 {
     let mut i = 1
     while i < entry_count {
       let current = entries.unsafe_get(i)
       let mut j = i
-      while j > 0 && current.0.compare(entries.unsafe_get(j - 1).0) < 0 {
+      while j > 0 && current.key.compare(entries.unsafe_get(j - 1).key) < 0 {
         entries.unsafe_set(j, entries.unsafe_get(j - 1))
         j = j - 1
       }
@@ -1041,7 +948,7 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
       i = i + 1
     }
   }
-  let formatted = format_baggage(entries)
+  let formatted = format_baggage_entries(entries)
   if formatted == "" {
     None
   } else {
@@ -1101,35 +1008,26 @@ pub fn inject_baggage_entries(
   }
 }
 
-// Smallest power-of-two map capacity that holds `entries` entries without a
-// rehash, accounting for the map's 13/16 grow threshold.
-
-///|
-fn map_capacity_for_entries(entries : Int) -> Int {
-  let capacity = entries.next_power_of_two()
-  if entries > capacity * 13 / 16 {
-    capacity * 2
-  } else {
-    capacity
-  }
-}
-
-// Extract the baggage of a carrier as a Context carrying each pair.
+// Extract the baggage of a carrier as a Context carrying each member,
+// including its W3C baggage properties.
 
 ///|
 pub fn extract_baggage_context(carrier : TextMapCarrier) -> @context.Context {
-  let entries = extract_baggage(carrier)
+  let entries = extract_baggage_entries(carrier)
   if entries.length() == 0 {
     return @context.Context::root()
   }
-  let values : Map[String, String] = Map(
-    [], capacity=map_capacity_for_entries(entries.length()),
-  )
+  let context_entries : Array[@context.BaggageEntry] = []
   for entry in entries {
-    let (key, value) = entry
-    values.set(key, value)
+    context_entries.push(
+      @context.BaggageEntry::new(
+        entry.key,
+        entry.value,
+        properties=entry.properties,
+      ),
+    )
   }
-  @context.Context::root().with_baggage(values)
+  @context.Context::root().with_baggage_entries(context_entries)
 }
 
 ///|

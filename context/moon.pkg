@@ -1,5 +1,6 @@
 import {
   "yourname/otel/api",
+  "moonbitlang/core/debug",
 }
 
 pkgtype(kind: "library")

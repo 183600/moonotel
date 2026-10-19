@@ -2,6 +2,7 @@
 package "yourname/otel/context"
 
 import {
+  "moonbitlang/core/debug",
   "yourname/otel/api",
 }
 
@@ -23,20 +24,35 @@ pub fn[X] with_span_context(@api.SpanContext, () -> X raise?) -> X raise?
 // Errors
 
 // Types and methods
+pub(all) struct BaggageEntry {
+  key : String
+  value : String
+  properties : Array[(String, String)]
+} derive(Eq, @debug.Debug)
+pub fn BaggageEntry::equal(Self, Self) -> Bool
+pub fn BaggageEntry::new(String, String, properties? : Array[(String, String)]) -> Self
+pub fn BaggageEntry::not_equal(Self, Self) -> Bool
+pub fn BaggageEntry::to_repr(Self) -> @debug.Repr
+
 pub struct Context {
   span_ctx : @api.SpanContext?
   key : String?
   value : String?
+  properties : Array[(String, String)]?
   baggage_map : Map[String, String]?
   parent : Context?
 }
 pub fn Context::baggage(Self) -> Map[String, String]
+pub fn Context::baggage_entries(Self) -> Array[BaggageEntry]
+pub fn Context::baggage_entry(Self, String) -> BaggageEntry?
 pub fn Context::has_baggage(Self) -> Bool
 pub fn Context::parent(Self) -> Self?
 pub fn Context::root() -> Self
 pub fn Context::span_context(Self) -> @api.SpanContext?
 pub fn Context::value(Self, String) -> String?
 pub fn Context::with_baggage(Self, Map[String, String]) -> Self
+pub fn Context::with_baggage_entries(Self, Array[BaggageEntry]) -> Self
+pub fn Context::with_baggage_entry(Self, String, String, properties? : Array[(String, String)]) -> Self
 pub fn Context::with_baggage_owned(Self, Map[String, String]) -> Self
 pub fn Context::with_span(Self, @api.SpanContext) -> Self
 pub fn Context::with_value(Self, String, String) -> Self

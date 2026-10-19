@@ -134,10 +134,10 @@ pub impl TextMapPropagator for CompositePropagator with fn extract(
   let mut context = @context.Context::root()
   for propagator in self.propagators {
     let extracted = propagator.extract(carrier)
-    // Flatten the baggage only when there is any, and hand the resulting map
-    // to the context.
+    // Flatten the baggage only when there is any, preserving its members and
+    // their properties.
     if extracted.has_baggage() {
-      context = context.with_baggage_owned(extracted.baggage())
+      context = context.with_baggage_entries(extracted.baggage_entries())
     }
     match extracted.span_context() {
       Some(sc) => context = context.with_span(sc)
