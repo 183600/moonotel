@@ -73,7 +73,7 @@ pub(all) struct SpanData {
   dropped_links_count : Int32
   status : @api.StatusCode
   status_description : String
-  resource : Map[String, AttributeValue]
+  resource : ResourceAttributes
   scope_name : String
   scope_version : String
 }
@@ -495,13 +495,10 @@ pub fn SpanSdk::set_attributes(
   attributes : Map[String, AttributeValue],
 ) -> Unit {
   if self.recording && !self.ended {
-    if self.attributes is None && attributes.length() > 0 {
+    let count = attributes.length()
+    if self.attributes is None && count > 0 {
       let limit = self.limits.attribute_count_limit
-      let budget = if limit >= 0 && limit < attributes.length() {
-        limit
-      } else {
-        attributes.length()
-      }
+      let budget = if limit >= 0 && limit < count { limit } else { count }
       if budget > 0 {
         self.attributes = Some(Map([], capacity=map_capacity_for_entries(budget)))
       }
@@ -805,7 +802,7 @@ fn SpanData::from_span(span : SpanSdk) -> SpanData {
   }
   let events : Array[SpanEvent] = match span.events {
     Some(events) => {
-      let out : Array[SpanEvent] = []
+      let out : Array[SpanEvent] = Array(capacity=events.length())
       for event in events {
         out.push({
           name: event.name,
@@ -820,7 +817,7 @@ fn SpanData::from_span(span : SpanSdk) -> SpanData {
   }
   let links : Array[SpanLink] = match span.links {
     Some(links) => {
-      let out : Array[SpanLink] = []
+      let out : Array[SpanLink] = Array(capacity=links.length())
       for link in links {
         out.push({
           span_context: link.span_context,
@@ -847,7 +844,7 @@ fn SpanData::from_span(span : SpanSdk) -> SpanData {
     dropped_links_count: span.dropped_links,
     status: span.status,
     status_description: span.status_description,
-    resource: copy_attribute_map(span.resource),
+    resource: ResourceAttributes::new(span.resource),
     scope_name: span.scope_name,
     scope_version: span.scope_version,
   }

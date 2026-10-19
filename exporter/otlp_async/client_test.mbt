@@ -25,7 +25,7 @@ fn test_span_data() -> @sdk.SpanData {
     dropped_links_count: 0,
     status: @api.StatusCode::Unset,
     status_description: "",
-    resource: Map([]),
+    resource: @sdk.ResourceAttributes::new(Map([])),
     scope_name: "otlp-async-test",
     scope_version: "",
   }

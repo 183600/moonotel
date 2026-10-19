@@ -197,7 +197,12 @@ fn BatchSpanProcessor::flush_batch_at(
   while i < n {
     match queue.unsafe_get(index) {
       Some(data) => batch.unsafe_set(i, data)
-      None => ()
+      // Every slot in the live range must hold a span; fail loudly instead of
+      // leaving an uninitialized element in the exported batch.
+      None =>
+        abort(
+          "BatchSpanProcessor queue invariant violated: empty slot in live range",
+        )
     }
     queue.unsafe_set(index, None)
     index = index + 1

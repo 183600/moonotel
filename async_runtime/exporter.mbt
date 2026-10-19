@@ -127,6 +127,12 @@ async fn OtlpHttpAsyncSpanExporter::export_available(
   first : Array[@sdk.SpanData],
 ) -> Unit {
   let mut pending = first
+  // The queue loop below only enforces the limit on spans appended from the
+  // queue, so split an oversized initial batch first.
+  while pending.length() > MAX_EXPORT_SPANS {
+    self.send(pending[:MAX_EXPORT_SPANS].to_owned())
+    pending = pending[MAX_EXPORT_SPANS:].to_owned()
+  }
   let mut split = false
   while pending.length() > 0 {
     let batch = pending

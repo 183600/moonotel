@@ -277,6 +277,188 @@ pub fn Resource::service_name(self : Resource) -> String {
 // `telemetry.sdk.version` attributes are always added and take precedence
 // over same-named values from the environment.
 
+// A copy-on-write attribute map used for the resource carried by span
+// snapshots. Every snapshot of a provider shares the provider's immutable
+// resource map; the first `set` copies the outer map so that mutating one
+// snapshot can never change the provider or any other span. Reads, iteration
+// and encoding of an unmodified snapshot stay allocation-free.
+
+///|
+pub struct ResourceAttributes {
+  shared : Map[String, AttributeValue]
+  mut own : Map[String, AttributeValue]?
+}
+
+// Wrap an attribute map as a resource snapshot. The map is not copied; the
+// caller must not mutate it after handing it over (the SDK only hands over the
+// provider's private resource map).
+
+///|
+pub fn ResourceAttributes::new(
+  attributes : Map[String, AttributeValue],
+) -> ResourceAttributes {
+  { shared: attributes, own: None }
+}
+
+// The map backing this snapshot. The result is the shared map when the
+// snapshot has not been written to, so callers must treat it as read-only.
+
+///|
+pub fn ResourceAttributes::as_map(
+  self : ResourceAttributes,
+) -> Map[String, AttributeValue] {
+  match self.own {
+    Some(map) => map
+    None => self.shared
+  }
+}
+
+// The value stored under `key`, if any.
+
+///|
+pub fn ResourceAttributes::get(
+  self : ResourceAttributes,
+  key : String,
+) -> AttributeValue? {
+  match self.own {
+    Some(map) => map.get(key)
+    None => self.shared.get(key)
+  }
+}
+
+// Store `value` under `key`. The first write copies the shared map, so a
+// snapshot can be mutated without affecting the provider or other spans.
+
+///|
+pub fn ResourceAttributes::set(
+  self : ResourceAttributes,
+  key : String,
+  value : AttributeValue,
+) -> Unit {
+  let map = match self.own {
+    Some(map) => map
+    None => {
+      let copied : Map[String, AttributeValue] = Map(
+        [], capacity=map_capacity_for_entries(self.shared.length() + 1),
+      )
+      for entry_key, entry_value in self.shared {
+        copied.set(entry_key, entry_value)
+      }
+      self.own = Some(copied)
+      copied
+    }
+  }
+  map.set(key, value)
+}
+
+// Number of attributes in this snapshot.
+
+///|
+pub fn ResourceAttributes::length(self : ResourceAttributes) -> Int32 {
+  self.as_map().length()
+}
+
+// Whether this snapshot carries no attributes.
+
+///|
+pub fn ResourceAttributes::is_empty(self : ResourceAttributes) -> Bool {
+  self.as_map().length() == 0
+}
+
+// Iterate the attributes of this snapshot in insertion order.
+
+///|
+pub fn ResourceAttributes::iter(
+  self : ResourceAttributes,
+) -> Iter[(String, AttributeValue)] {
+  self.as_map().iter()
+}
+
+///|
+pub fn ResourceAttributes::iter2(
+  self : ResourceAttributes,
+) -> Iter2[String, AttributeValue] {
+  self.as_map().iter2()
+}
+
+// Whether this snapshot stores a value under `key`.
+
+///|
+pub fn ResourceAttributes::contains(
+  self : ResourceAttributes,
+  key : String,
+) -> Bool {
+  self.as_map().contains(key)
+}
+
+// The value under `key`, or `default` when it is absent.
+
+///|
+pub fn ResourceAttributes::get_or_default(
+  self : ResourceAttributes,
+  key : String,
+  default : AttributeValue,
+) -> AttributeValue {
+  self.as_map().get_or_default(key, default)
+}
+
+// Remove `key` from this snapshot, copying the shared map first when needed.
+
+///|
+pub fn ResourceAttributes::remove(
+  self : ResourceAttributes,
+  key : String,
+) -> Unit {
+  match self.own {
+    Some(map) => map.remove(key)
+    None =>
+      if self.shared.contains(key) {
+        let copied : Map[String, AttributeValue] = self.shared.copy()
+        copied.remove(key)
+        self.own = Some(copied)
+      }
+  }
+}
+
+// Remove every attribute from this snapshot.
+
+///|
+pub fn ResourceAttributes::clear(self : ResourceAttributes) -> Unit {
+  if self.as_map().length() > 0 {
+    self.own = Some(Map([]))
+  }
+}
+
+// A copy of this snapshot whose mutations are independent.
+
+///|
+pub fn ResourceAttributes::copy(
+  self : ResourceAttributes,
+) -> ResourceAttributes {
+  { shared: self.as_map().copy(), own: None }
+}
+
+// Iterators over the snapshot's keys and values, and its pairs as an array.
+
+///|
+pub fn ResourceAttributes::keys(self : ResourceAttributes) -> Iter[String] {
+  self.as_map().keys()
+}
+
+///|
+pub fn ResourceAttributes::values(
+  self : ResourceAttributes,
+) -> Iter[AttributeValue] {
+  self.as_map().values()
+}
+
+///|
+pub fn ResourceAttributes::to_array(
+  self : ResourceAttributes,
+) -> Array[(String, AttributeValue)] {
+  self.as_map().to_array()
+}
+
 ///|
 pub fn Resource::from_env(service_name? : String) -> Resource {
   let attributes : Map[String, AttributeValue] = Map([])

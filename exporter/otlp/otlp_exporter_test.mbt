@@ -52,7 +52,7 @@ fn test_span() -> @sdk.SpanData {
     dropped_links_count: 0,
     status: @api.StatusCode::Unset,
     status_description: "",
-    resource,
+    resource: @sdk.ResourceAttributes::new(resource),
     scope_name: "scope",
     scope_version: "",
   }

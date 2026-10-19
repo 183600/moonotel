@@ -102,4 +102,4 @@ pub impl SpanExporter for InMemorySpanExporter with fn shutdown(self) {
 }
 
 ///|
-pub extend InMemorySpanExporter with SpanExporter::{export_spans, shutdown}
+pub extend InMemorySpanExporter with SpanExporter::{export_spans, export_span, shutdown}

@@ -332,6 +332,14 @@ fn is_retryable_status(status_code : Int32) -> Bool {
   }
 }
 
+// Wait strategy invoked before retry attempt `attempt` (1-based). The
+// synchronous exporter has no scheduler to yield to, so the default performs
+// no wait instead of spinning on the clock. Callers that run inside an event
+// loop can inject a cooperative wait (for example `@async.sleep`).
+
+///|
+pub type RetryWait = (Int32) -> Unit
+
 // An exporter that sends spans in OTLP/HTTP protobuf format.
 
 ///|
@@ -343,20 +351,24 @@ pub struct OtlpHttpExporter {
   // Request headers (configured headers plus `content-type`), built once
   // because the configuration is not changed after construction.
   headers : Map[String, String]
+  retry_wait : RetryWait
 }
 
-// Create an exporter with an injected transport function.
+// Create an exporter with an injected transport function and an optional wait
+// strategy used between retries.
 
 ///|
 pub fn OtlpHttpExporter::new(
   config : OtlpHttpConfig,
   transport : Transport,
+  retry_wait? : RetryWait,
 ) -> OtlpHttpExporter {
   {
     config,
     transport,
     url: config.traces_url(),
     headers: exporter_headers(config),
+    retry_wait: retry_wait.unwrap_or(fn(_attempt) { () }),
   }
 }
 
@@ -387,14 +399,6 @@ fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
   }
   headers.set("content-type", content_type_for_protocol(config.protocol))
   headers
-}
-
-// Bounded blocking backoff between retries. The synchronous exporter has no
-// scheduler to yield to, so the wait is a capped busy loop.
-fn retry_backoff(attempt : Int32) -> Unit {
-  let delay = if attempt > 5 { 250 } else { attempt * 50 }
-  let deadline = @env.now() + delay.to_uint64()
-  while @env.now() < deadline {}
 }
 
 // Encode and POST the given spans. HTTP 200 (including partial success) is a
@@ -434,7 +438,7 @@ pub fn OtlpHttpExporter::export_spans_http(
   let mut last_failure = ""
   while attempt <= self.config.max_retries {
     if attempt > 0 {
-      retry_backoff(attempt)
+      (self.retry_wait)(attempt)
     }
     let response = (self.transport)(url, headers, body)
     if response.status_code == 200 {
@@ -468,4 +472,4 @@ pub impl @sdk.SpanExporter for OtlpHttpExporter with fn shutdown(self) {
 }
 
 ///|
-pub extend OtlpHttpExporter with @sdk.SpanExporter::{export_spans, shutdown}
+pub extend OtlpHttpExporter with @sdk.SpanExporter::{export_spans, export_span, shutdown}

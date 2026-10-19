@@ -39,7 +39,7 @@ fn probe_span(name : String) -> @sdk.SpanData {
     dropped_links_count: 0,
     status: @api.StatusCode::Unset,
     status_description: "",
-    resource: Map([], capacity=1),
+    resource: @sdk.ResourceAttributes::new(Map([], capacity=1)),
     scope_name: "scope",
     scope_version: "",
   }

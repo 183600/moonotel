@@ -562,6 +562,25 @@ fn estimate_span_size(data : @sdk.SpanData) -> Int32 {
   size
 }
 
+// Canonical keys of resources already seen while grouping a batch, matched by
+// physical identity. Switching back and forth between resources therefore does
+// not rebuild the canonical key string for every span.
+
+///|
+fn cached_resource_key(
+  resource : Map[String, @sdk.AttributeValue],
+  cache : Array[(Map[String, @sdk.AttributeValue], String)],
+) -> String {
+  for entry in cache {
+    if physical_equal(entry.0, resource) {
+      return entry.1
+    }
+  }
+  let key = resource_key(resource)
+  cache.push((resource, key))
+  key
+}
+
 ///|
 fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   let groups : Array[ResourceGroup] = []
@@ -569,18 +588,20 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   let mut last_resource : Map[String, @sdk.AttributeValue]? = None
   // Index of the group for `last_resource`.
   let mut last_index = -1
-  // Canonical key of `groups[last_index]` when it has already been computed.
-  let mut last_resource_key : String? = None
   // Whether the key of `groups[last_index]` has not been registered in
   // `resource_index` yet.
   let mut unindexed = false
+  // Keys of resources already seen, keyed by physical identity.
+  let known_resource_keys : Array[(Map[String, @sdk.AttributeValue], String)] = []
   // Scope group of the last matched span.
   let mut cached_group_index = -1
   let mut cached_scope : ScopeGroup? = None
   for data in spans {
+    let data_resource = data.resource.as_map()
     let index = match last_resource {
       Some(resource) =>
-        if physical_equal(resource, data.resource) || resource == data.resource {
+        if physical_equal(resource, data_resource) ||
+          resource == data_resource {
           last_index
         } else {
           if unindexed {
@@ -592,14 +613,16 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
                 map
               }
             }
-            let key = match last_resource_key {
-              Some(key) => key
-              None => resource_key(groups[last_index].resource)
-            }
+            // The key of a newly created group is computed lazily, on the
+            // first switch away from it.
+            let key = cached_resource_key(
+              groups[last_index].resource,
+              known_resource_keys,
+            )
             index_map.set(key, last_index)
             unindexed = false
           }
-          let key = resource_key(data.resource)
+          let key = cached_resource_key(data_resource, known_resource_keys)
           let known : Int32? = match resource_index {
             Some(map) => map.get(key)
             None => None
@@ -608,32 +631,30 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
             Some(index) => index
             None => {
               let created : ResourceGroup = {
-                resource: data.resource,
+                resource: data_resource,
                 scopes: [],
                 size_hint: 0,
                 scope_index: None,
               }
               groups.push(created)
               unindexed = true
-              last_resource_key = Some(key)
               groups.length() - 1
             }
           }
         }
       None => {
         let created : ResourceGroup = {
-          resource: data.resource,
+          resource: data_resource,
           scopes: [],
           size_hint: 0,
           scope_index: None,
         }
         groups.push(created)
         unindexed = true
-        last_resource_key = None
         groups.length() - 1
       }
     }
-    last_resource = Some(data.resource)
+    last_resource = Some(data_resource)
     last_index = index
     let target = groups[index]
     let span_hint = estimate_span_size(data)

@@ -27,7 +27,15 @@ pub fn ExportResult::is_success(self : ExportResult) -> Bool {
 ///|
 pub(open) trait SpanExporter {
   fn export_spans(Self, Array[SpanData]) -> ExportResult
+  // Export a single span. The default wraps it in a one-element batch;
+  // exporters that can avoid the intermediate array may override this.
+  fn export_span(Self, SpanData) -> ExportResult = _
   fn shutdown(Self) -> Unit
+}
+
+///|
+impl SpanExporter with export_span(self, data) {
+  self.export_spans([data])
 }
 
 // Hook invoked as spans start and end.

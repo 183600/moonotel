@@ -41,7 +41,7 @@ pub impl SpanProcessor for SimpleSpanProcessor with fn on_start(self, _span) {
 ///|
 pub impl SpanProcessor for SimpleSpanProcessor with fn on_end(self, data) {
   if !self.shutdown_called && data.span_context.is_sampled() {
-    match self.exporter.export_spans([data]) {
+    match self.exporter.export_span(data) {
       ExportSuccess => ()
       ExportFailure(_) => self.export_failures = self.export_failures + 1
     }

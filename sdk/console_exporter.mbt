@@ -97,4 +97,4 @@ pub impl SpanExporter for ConsoleSpanExporter with fn shutdown(self) {
 }
 
 ///|
-pub extend ConsoleSpanExporter with SpanExporter::{export_spans, shutdown}
+pub extend ConsoleSpanExporter with SpanExporter::{export_spans, export_span, shutdown}

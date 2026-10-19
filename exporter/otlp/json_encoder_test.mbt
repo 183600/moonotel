@@ -130,7 +130,7 @@ fn json_test_span() -> @sdk.SpanData {
     dropped_links_count: 3,
     status: @api.StatusCode::Error,
     status_description: "boom",
-    resource,
+    resource: @sdk.ResourceAttributes::new(resource),
     scope_name: "otel-test",
     scope_version: "1.0.0",
   }
@@ -361,7 +361,7 @@ test "json_encoder_groups_by_resource_and_scope" {
   let third : @sdk.SpanData = {
     ..json_test_span(),
     name: "three",
-    resource: second_resource,
+    resource: @sdk.ResourceAttributes::new(second_resource),
   }
   let root = encode_json([first, second, third])
   let resource_spans = json_array_value(json_member(root, "resourceSpans"))

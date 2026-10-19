@@ -116,6 +116,26 @@ pub fn Context::with_baggage(
   }
 }
 
+// Like `with_baggage`, but takes ownership of `values` instead of copying it.
+// Callers must not mutate the map afterwards.
+
+///|
+pub fn Context::with_baggage_owned(
+  self : Context,
+  values : Map[String, String],
+) -> Context {
+  if values.length() == 0 {
+    return self
+  }
+  {
+    span_ctx: None,
+    key: None,
+    value: None,
+    baggage_map: Some(values),
+    parent: Some(self),
+  }
+}
+
 // The nearest span context in the chain, if any.
 
 ///|

@@ -354,15 +354,16 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
   )
 }
 
-// Upper bound on the number of memoized `tracestate` parse results. The least
-// recently used entry is evicted when the cache is full, so its memory stays
-// bounded even when the values come from untrusted incoming headers.
+// Upper bound on the number of memoized `tracestate` parse results. The oldest
+// entry (in insertion order) is evicted when the cache is full, so its memory
+// stays bounded even when the values come from untrusted incoming headers.
 
 ///|
 const TRACESTATE_INJECT_CACHE_LIMIT : Int32 = 128
 
 // Memoized result of `parse_tracestate` keyed by the raw `tracestate` value:
-// the normalized value when it is valid, `None` when it is not.
+// the normalized value when it is valid, `None` when it is not. A bounded FIFO:
+// hits do not write to the cache, and eviction removes the first inserted key.
 
 ///|
 let tracestate_inject_cache : Map[String, String?] = Map([])
@@ -370,18 +371,19 @@ let tracestate_inject_cache : Map[String, String?] = Map([])
 ///|
 fn normalized_tracestate_for_inject(state : String) -> String? {
   match tracestate_inject_cache.get(state) {
-    Some(normalized) => {
-      // Re-insert to mark the entry as most recently used.
-      tracestate_inject_cache.remove(state)
-      tracestate_inject_cache.set(state, normalized)
-      normalized
-    }
+    Some(normalized) => normalized
     None => {
       let normalized = parse_tracestate(state)
       if tracestate_inject_cache.length() >= TRACESTATE_INJECT_CACHE_LIMIT {
+        // `Map` iterates in insertion order, so the first key is the oldest.
+        let mut oldest : String? = None
         for key, _ in tracestate_inject_cache {
-          tracestate_inject_cache.remove(key)
+          oldest = Some(key)
           break
+        }
+        match oldest {
+          Some(key) => tracestate_inject_cache.remove(key)
+          None => ()
         }
       }
       tracestate_inject_cache.set(state, normalized)

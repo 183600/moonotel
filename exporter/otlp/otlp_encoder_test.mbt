@@ -169,7 +169,7 @@ fn sample_span() -> @sdk.SpanData {
     dropped_links_count: 0,
     status: @api.StatusCode::Ok,
     status_description: "",
-    resource,
+    resource: @sdk.ResourceAttributes::new(resource),
     scope_name: "encoder-scope",
     scope_version: "1.2.3",
   }
