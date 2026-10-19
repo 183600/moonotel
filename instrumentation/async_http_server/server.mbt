@@ -518,9 +518,10 @@ pub async fn ServerCall::respond(
   }
 }
 
-// Run an HTTP server that traces every request. The handler receives a
-// `ServerCall` and is responsible for sending exactly one response (usually
-// via `ServerCall::respond`).
+// Run an HTTP server that traces every request. The address of the TCP peer
+// of each connection is recorded as `client.address`/`client.port` on the
+// SERVER span. The handler receives a `ServerCall` and is responsible for
+// sending exactly one response (usually via `ServerCall::respond`).
 
 ///|
 pub async fn run_server(
@@ -530,9 +531,13 @@ pub async fn run_server(
   allow_failure? : Bool,
   max_connections? : Int32,
 ) -> Unit {
-  let server = @http.Server(addr)
-  defer server.close()
-  run_server_on(server, handler, tracer?, allow_failure?, max_connections?)
+  run_server_with_client_address(
+    addr,
+    handler,
+    tracer?,
+    allow_failure?,
+    max_connections?,
+  )
 }
 
 // Like `run_server`, but on an already constructed server (for example one

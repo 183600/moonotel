@@ -144,8 +144,8 @@ fn json_parse_string_at(text : String, start : Int32) -> (String, Int32)? {
   None
 }
 
-// Parse a decimal integer, optionally signed. No whitespace or `+` sign is
-// accepted inside `value`.
+// Parse a decimal integer, optionally signed. An optional leading `-` or `+`
+// sign is accepted; no whitespace or other non-digit inside `value` is.
 
 ///|
 fn json_parse_decimal_int64(value : String) -> Int64? {
