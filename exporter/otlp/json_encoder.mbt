@@ -263,41 +263,64 @@ fn json_write_escaped(sb : JsonBuf, value : String) -> Unit {
   sb.write_char('"')
 }
 
-// Append the decimal digits of an unsigned magnitude.
+// ASCII byte pairs of the two digits of 0-99: the low byte holds the tens
+// digit and the high byte the ones digit.
 
 ///|
-let json_two_digits : FixedArray[String] = build_json_two_digits()
+let json_two_digits : FixedArray[UInt16] = build_json_two_digits()
 
 ///|
-fn build_json_two_digits() -> FixedArray[String] {
-  let table : FixedArray[String] = FixedArray::make(100, "00")
+fn build_json_two_digits() -> FixedArray[UInt16] {
+  let table : FixedArray[UInt16] = FixedArray::make(100, (0 : UInt16))
   let mut i = 0
   while i < 100 {
     table.unsafe_set(
       i,
-      String::from_array([
-        (0x30 + i / 10).unsafe_to_char(),
-        (0x30 + i % 10).unsafe_to_char(),
-      ]),
+      ((0x30 + i / 10) | ((0x30 + i % 10) << 8)).to_uint16(),
     )
     i = i + 1
   }
   table
 }
 
+// Append the decimal digits of an unsigned magnitude. Two digits are produced
+// per division by writing pairs backwards into a 20-byte window (the maximum
+// width of a 64-bit integer); the window is then moved to the front of the
+// buffer.
+
 ///|
 fn json_write_decimal_digits(sb : JsonBuf, value : UInt64) -> Unit {
   if value < 10 {
-    sb.write_char((0x30 + value.to_int()).unsafe_to_char())
+    sb.ensure(1)
+    sb.buf.unsafe_set(sb.len, (0x30 + value.to_int()).to_byte())
+    sb.len = sb.len + 1
     return
   }
-  if value < 100 {
-    sb.write_string(json_two_digits.unsafe_get(value.to_int()))
-    return
+  sb.ensure(20)
+  let buf = sb.buf
+  let start = sb.len
+  let mut pos = start + 20
+  let mut v = value
+  while v >= 100 {
+    pos = pos - 2
+    buf.unsafe_write_uint16_le(
+      pos,
+      json_two_digits.unsafe_get((v % 100).to_int()),
+    )
+    v = v / 100
   }
-  let high = value / 100
-  json_write_decimal_digits(sb, high)
-  sb.write_string(json_two_digits.unsafe_get((value - high * 100).to_int()))
+  if v >= 10 {
+    pos = pos - 2
+    buf.unsafe_write_uint16_le(pos, json_two_digits.unsafe_get(v.to_int()))
+  } else {
+    pos = pos - 1
+    buf.unsafe_set(pos, (0x30 + v.to_int()).to_byte())
+  }
+  let digits = start + 20 - pos
+  if pos != start {
+    buf.unsafe_blit(start, buf, pos, digits)
+  }
+  sb.len = start + digits
 }
 
 // Append a 32-bit integer as a JSON number, spelled exactly like
