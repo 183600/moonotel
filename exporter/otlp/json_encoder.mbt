@@ -482,7 +482,8 @@ fn json_write_attributes(
 ) -> Unit {
   sb.write_char('[')
   let mut first = true
-  for key, value in attributes {
+  for entry in attributes.to_array() {
+    let (key, value) = entry
     if !first {
       sb.write_char(',')
     }

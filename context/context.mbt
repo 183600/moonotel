@@ -104,7 +104,8 @@ pub fn Context::with_baggage(
   let baggage : Map[String, String] = Map(
     [], capacity=map_capacity_for_entries(values.length()),
   )
-  for key, value in values {
+  for entry in values.to_array() {
+    let (key, value) = entry
     baggage.set(key, value)
   }
   {
@@ -221,7 +222,8 @@ pub fn Context::has_baggage(self : Context) -> Bool {
         }
         match context.baggage_map {
           Some(map) =>
-            for key, _ in map {
+            for entry in map.to_array() {
+              let (key, _) = entry
               match seen {
                 Some(keys) =>
                   if keys.get(key) is None {
@@ -282,7 +284,8 @@ pub fn Context::baggage(self : Context) -> Map[String, String] {
         }
         match context.baggage_map {
           Some(map) =>
-            for key, value in map {
+            for entry in map.to_array() {
+              let (key, value) = entry
               let mut visible = values.get(key) is None
               if visible {
                 match deleted {

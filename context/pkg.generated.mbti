@@ -1,0 +1,52 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "yourname/otel/context"
+
+import {
+  "yourname/otel/api",
+}
+
+// Values
+pub fn attach(Context) -> Context
+
+pub fn current_context() -> Context
+
+pub fn current_span_context() -> @api.SpanContext?
+
+pub fn detach(Context) -> Unit
+
+pub fn set_context_storage(ContextStorage) -> ContextStorage
+
+pub fn[X] with_context(Context, () -> X raise?) -> X raise?
+
+pub fn[X] with_span_context(@api.SpanContext, () -> X raise?) -> X raise?
+
+// Errors
+
+// Types and methods
+pub struct Context {
+  span_ctx : @api.SpanContext?
+  key : String?
+  value : String?
+  baggage_map : Map[String, String]?
+  parent : Context?
+}
+pub fn Context::baggage(Self) -> Map[String, String]
+pub fn Context::has_baggage(Self) -> Bool
+pub fn Context::parent(Self) -> Self?
+pub fn Context::root() -> Self
+pub fn Context::span_context(Self) -> @api.SpanContext?
+pub fn Context::value(Self, String) -> String?
+pub fn Context::with_baggage(Self, Map[String, String]) -> Self
+pub fn Context::with_baggage_owned(Self, Map[String, String]) -> Self
+pub fn Context::with_span(Self, @api.SpanContext) -> Self
+pub fn Context::with_value(Self, String, String) -> Self
+pub fn Context::without_value(Self, String) -> Self
+
+pub(all) struct ContextStorage {
+  current : () -> Context
+  set : (Context) -> Unit
+}
+
+// Type aliases
+
+// Traits

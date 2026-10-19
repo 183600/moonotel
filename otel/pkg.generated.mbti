@@ -1,0 +1,202 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "yourname/otel/otel"
+
+import {
+  "yourname/otel/api",
+  "yourname/otel/context",
+  "yourname/otel/exporter/otlp",
+  "yourname/otel/propagation",
+  "yourname/otel/sdk",
+}
+
+// Values
+pub const BAGGAGE_MAX_BYTES : Int32 = 8192
+
+pub const BAGGAGE_MAX_MEMBERS : Int32 = 64
+
+pub const OTLP_HTTP_JSON_PROTOCOL : String = "http/json"
+
+pub const OTLP_HTTP_PROTOBUF_PROTOCOL : String = "http/protobuf"
+
+pub const SDK_VERSION : String = "0.1.0"
+
+pub const TELEMETRY_SDK_LANGUAGE : String = "telemetry.sdk.language"
+
+pub const TELEMETRY_SDK_NAME : String = "telemetry.sdk.name"
+
+pub const TELEMETRY_SDK_VERSION : String = "telemetry.sdk.version"
+
+pub const TRACESTATE_MAX_MEMBERS : Int32 = 32
+
+pub const TRACE_FLAGS_SAMPLED : Int32 = 1
+
+pub fn attach(@context.Context) -> @context.Context
+
+pub fn baggage_header_name() -> String
+
+pub fn bytes_from_hex(String) -> Array[Int32]?
+
+pub fn bytes_to_hex(Array[Int32]) -> String
+
+pub fn content_type_for_protocol(String) -> String
+
+pub fn context_baggage_header(@context.Context) -> String?
+
+pub fn current_context() -> @context.Context
+
+pub fn current_span_context() -> @api.SpanContext?
+
+pub fn decode_export_response(Bytes) -> @sdk.ExportResult
+
+pub fn decode_export_response_json(Bytes) -> @sdk.ExportResult
+
+pub fn detach(@context.Context) -> Unit
+
+pub fn encode_trace_request(Array[@sdk.SpanData]) -> Bytes
+
+pub fn encode_trace_request_json(Array[@sdk.SpanData]) -> Bytes
+
+pub fn exporter_selected(Array[String]?, String) -> Bool
+
+pub fn extract(@propagation.TextMapCarrier) -> @api.SpanContext?
+
+pub fn extract_baggage(@propagation.TextMapCarrier) -> Array[(String, String)]
+
+pub fn extract_baggage_context(@propagation.TextMapCarrier) -> @context.Context
+
+pub fn extract_baggage_entries(@propagation.TextMapCarrier) -> Array[@propagation.BaggageEntry]
+
+pub fn extract_context(@propagation.TextMapCarrier) -> @context.Context
+
+pub fn extract_tracestate(@propagation.TextMapCarrier) -> String?
+
+pub fn force_flush_global_tracer_provider() -> Unit
+
+pub fn format_baggage(Array[(String, String)]) -> String
+
+pub fn format_baggage_entries(Array[@propagation.BaggageEntry]) -> String
+
+pub fn format_traceparent(@api.SpanContext) -> String
+
+pub fn global_propagator() -> &@propagation.TextMapPropagator
+
+pub fn global_tracer(String, version? : String) -> @sdk.Tracer
+
+pub fn global_tracer_provider() -> @sdk.TracerProviderSdk?
+
+pub fn inject(@api.SpanContext, @propagation.TextMapCarrier) -> Unit
+
+pub fn inject_baggage(@context.Context, @propagation.TextMapCarrier) -> Unit
+
+pub fn inject_baggage_entries(Array[@propagation.BaggageEntry], @propagation.TextMapCarrier) -> Unit
+
+pub fn inject_context(@context.Context, @propagation.TextMapCarrier) -> Unit
+
+pub fn inject_with_tracestate(@api.SpanContext, String?, @propagation.TextMapCarrier) -> Unit
+
+pub fn invalid_span_context() -> @api.SpanContext
+
+pub fn is_supported_protocol(String) -> Bool
+
+pub fn parse_baggage(String) -> Array[(String, String)]
+
+pub fn parse_baggage_entries(String) -> Array[@propagation.BaggageEntry]
+
+pub fn parse_traceparent(String) -> @api.SpanContext?
+
+pub fn reset_global_propagator() -> Unit
+
+pub fn set_global_propagator(&@propagation.TextMapPropagator) -> Unit
+
+pub fn set_global_tracer_provider(@sdk.TracerProviderSdk) -> Unit
+
+pub fn setup(service_name? : String, resource? : @sdk.Resource, resource_attributes? : Map[String, @sdk.AttributeValue], endpoint? : String, headers? : Map[String, String], sampler? : @sdk.Sampler, span_limits? : @sdk.SpanLimits, transport? : (String, Map[String, String], Bytes) -> @otlp.TransportResponse, exporters? : Array[String], use_batch? : Bool, batch? : @sdk.BatchConfig) -> @sdk.TracerProviderSdk
+
+pub fn shutdown_global_tracer_provider() -> Unit
+
+pub fn span_context(Array[Int32], Array[Int32], Int32, tracestate? : String, is_remote? : Bool) -> @api.SpanContext
+
+pub fn span_context_from_hex(String, String, Int32) -> @api.SpanContext
+
+pub fn traces_exporter_enabled(String) -> Bool
+
+pub fn[X] with_context(@context.Context, () -> X raise?) -> X raise?
+
+pub fn[X] with_span_context(@api.SpanContext, () -> X raise?) -> X raise?
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+pub using @sdk {type AttributeValue}
+
+pub using @propagation {type BaggageEntry}
+
+pub using @propagation {type BaggagePropagator}
+
+pub using @sdk {type BatchConfig}
+
+pub using @sdk {type BatchSpanProcessor}
+
+pub using @propagation {type CompositePropagator}
+
+pub using @sdk {type ConsoleSpanExporter}
+
+pub using @context {type Context}
+
+pub using @sdk {type ExportResult}
+
+pub using @sdk {type IdGenerator}
+
+pub using @sdk {type InMemorySpanExporter}
+
+pub using @otlp {type OtlpHttpConfig}
+
+pub using @otlp {type OtlpHttpExporter}
+
+pub using @sdk {type Resource}
+
+pub using @sdk {type Sampler}
+
+pub using @sdk {type SamplingDecision}
+
+pub using @sdk {type SimpleSpanProcessor}
+
+pub using @api {type SpanContext}
+
+pub using @sdk {type SpanData}
+
+pub using @sdk {type SpanEvent}
+
+pub using @api {type SpanKind}
+
+pub using @sdk {type SpanLimits}
+
+pub using @sdk {type SpanLink}
+
+pub using @sdk {type SpanSdk}
+
+pub using @api {type StatusCode}
+
+pub using @propagation {type TextMapCarrier}
+
+pub using @propagation {type TraceContextPropagator}
+
+pub using @sdk {type Tracer}
+
+pub using @sdk {type TracerProviderSdk}
+
+pub using @propagation {type Tracestate}
+
+pub type Transport = (String, Map[String, String], Bytes) -> @otlp.TransportResponse
+
+pub using @otlp {type TransportResponse}
+
+pub using @sdk {trait SpanExporter}
+
+pub using @sdk {trait SpanProcessor}
+
+pub using @propagation {trait TextMapPropagator}
+
+// Traits

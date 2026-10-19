@@ -42,7 +42,7 @@ pub fn Tracer::start_span(
   }
   let (trace_id, parent_span_id, tracestate) = match valid_parent {
     Some(ctx) => (ctx.trace_id_view(), ctx.span_id_view(), ctx.tracestate())
-    None => (self.provider.id_generator.generate_trace_id(), [], "")
+    None => (self.provider.id_generator.generate_trace_id(), no_parent_span_id, "")
   }
   let span_id = self.provider.id_generator.generate_span_id()
   let decision = self.provider.sampler.should_sample(valid_parent, trace_id)

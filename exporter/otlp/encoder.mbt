@@ -246,7 +246,10 @@ fn encode_attributes(
   if attributes.length() == 0 {
     return
   }
-  for key, value in attributes {
+  // `to_array` preserves insertion order and avoids one iterator allocation
+  // per entry.
+  for entry in attributes.to_array() {
+    let (key, value) = entry
     if !try_encode_scalar_attribute(writer, field, key, value) {
       let kv = writer.take_scratch()
       kv.write_string_field(1, key)
@@ -440,12 +443,7 @@ fn resource_key_value(sb : StringBuilder, value : @sdk.AttributeValue) -> Unit {
 
 ///|
 fn resource_key(resource : Map[String, @sdk.AttributeValue]) -> String {
-  let entries : Array[(String, @sdk.AttributeValue)] = Array(
-    capacity=resource.length(),
-  )
-  for key, value in resource {
-    entries.push((key, value))
-  }
+  let entries : Array[(String, @sdk.AttributeValue)] = resource.to_array()
   entries.sort_by(fn(a, b) { a.0.compare(b.0) })
   let sb = StringBuilder()
   for entry in entries {
@@ -738,6 +736,46 @@ fn scope_size_hint(scope : ScopeGroup) -> Int32 {
 pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
   if spans.length() == 0 {
     return b""
+  }
+  // Fast path: every span shares the same resource and the same scope, so
+  // grouping would produce a single resource/scope group. This is the common
+  // case for spans of one provider and tracer, and it skips the grouping
+  // allocations.
+  let first = spans[0]
+  let shared_resource = first.resource.as_map()
+  let mut uniform = true
+  for i = 1; i < spans.length(); i = i + 1 {
+    let data = spans[i]
+    if !physical_equal(shared_resource, data.resource.as_map()) ||
+      data.scope_name != first.scope_name ||
+      data.scope_version != first.scope_version {
+      uniform = false
+      break
+    }
+  }
+  if uniform {
+    let mut spans_hint = 0
+    for data in spans {
+      spans_hint = spans_hint + estimate_span_size(data)
+    }
+    let scopes_hint = 32 +
+      first.scope_name.length() +
+      first.scope_version.length() +
+      spans_hint
+    let total_hint = 64 + resource_size_hint(shared_resource) + scopes_hint
+    let writer = take_root_writer(total_hint)
+    let resource_spans = writer.take_scratch_with_capacity(total_hint)
+    encode_resource(resource_spans, shared_resource)
+    let scope_spans = resource_spans.take_scratch_with_capacity(scopes_hint)
+    encode_scope(scope_spans, first.scope_name, first.scope_version)
+    for data in spans {
+      encode_span(scope_spans, data)
+    }
+    resource_spans.append_message(2, scope_spans)
+    writer.append_message(1, resource_spans)
+    let bytes = writer.to_bytes()
+    release_root_writer(writer)
+    return bytes
   }
   // Group the spans by resource and scope before encoding.
   let groups = group_spans(spans)

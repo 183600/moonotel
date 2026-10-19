@@ -113,6 +113,12 @@ pub struct SpanSdk {
   scope_version : String
 }
 
+// Empty parent span ID shared by root spans. Spans never mutate it and every
+// access returns a copy, so one shared instance is safe.
+
+///|
+let no_parent_span_id : Array[Int32] = []
+
 ///|
 fn create_span(
   name : String,
@@ -301,7 +307,8 @@ fn limited_attributes(
     [], capacity=map_capacity_for_entries(capacity),
   )
   let mut dropped = 0
-  for key, value in attributes {
+  for entry in attributes.to_array() {
+    let (key, value) = entry
     if within_limit(kept.length(), count_limit) {
       kept.set(key, truncate_attribute_value(value, value_length_limit))
     } else {
@@ -537,7 +544,8 @@ pub fn SpanSdk::set_attributes(
         self.attributes = Some(Map([], capacity=map_capacity_for_entries(budget)))
       }
     }
-    for key, value in attributes {
+    for entry in attributes.to_array() {
+      let (key, value) = entry
       self.set_attribute_limited(key, value)
     }
   }
@@ -753,7 +761,8 @@ pub fn SpanSdk::record_exception(
     ])
     match attributes {
       Some(extra) =>
-        for key, value in extra {
+        for entry in extra.to_array() {
+          let (key, value) = entry
           event_attributes.set(key, value)
         }
       None => ()
@@ -827,7 +836,8 @@ fn copy_attribute_map(
   let out : Map[String, AttributeValue] = Map(
     [], capacity=map_capacity_for_entries(attributes.length()),
   )
-  for key, value in attributes {
+  for entry in attributes.to_array() {
+    let (key, value) = entry
     out.set(key, copy_attribute_value(value))
   }
   out

@@ -35,16 +35,29 @@ pub fn IdGenerator::new(
 fn pseudo_random_bytes(n : Int32, state : Ref[UInt64]) -> Array[Int32] {
   let out : Array[Int32] = Array::unsafe_make_uninit(n)
   let mut filled = 0
-  let mut acc = 0
-  while filled < n {
+  let mut acc : UInt64 = 0
+  // One splitmix64 word per 8 bytes: the common 16- and 8-byte requests take
+  // the unrolled body without per-byte loop control.
+  while filled + 8 <= n {
+    let word = splitmix64(state)
+    acc = acc | word
+    out.unsafe_set(filled, (word & 0xFF).to_int())
+    out.unsafe_set(filled + 1, ((word >> 8) & 0xFF).to_int())
+    out.unsafe_set(filled + 2, ((word >> 16) & 0xFF).to_int())
+    out.unsafe_set(filled + 3, ((word >> 24) & 0xFF).to_int())
+    out.unsafe_set(filled + 4, ((word >> 32) & 0xFF).to_int())
+    out.unsafe_set(filled + 5, ((word >> 40) & 0xFF).to_int())
+    out.unsafe_set(filled + 6, ((word >> 48) & 0xFF).to_int())
+    out.unsafe_set(filled + 7, (word >> 56).to_int())
+    filled = filled + 8
+  }
+  if filled < n {
     let mut word = splitmix64(state)
-    let mut taken = 0
-    while taken < 8 && filled < n {
+    while filled < n {
       let b = (word & 0xFF).to_int()
       out.unsafe_set(filled, b)
-      acc = acc | b
+      acc = acc | b.to_uint64()
       word = word >> 8
-      taken = taken + 1
       filled = filled + 1
     }
   }

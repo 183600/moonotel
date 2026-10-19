@@ -362,6 +362,24 @@ fn hex_to_bytes(hex : String, out : Array[Int32]) -> Bool {
   let n = out.length()
   let mut bad = 0
   let mut i = 0
+  // Four bytes per iteration: fewer loop-control steps for the common fixed
+  // sizes (16 and 8 bytes).
+  while i + 4 <= n {
+    let h0 = hex_unit_value(hex.unsafe_get(i * 2))
+    let l0 = hex_unit_value(hex.unsafe_get(i * 2 + 1))
+    let h1 = hex_unit_value(hex.unsafe_get(i * 2 + 2))
+    let l1 = hex_unit_value(hex.unsafe_get(i * 2 + 3))
+    let h2 = hex_unit_value(hex.unsafe_get(i * 2 + 4))
+    let l2 = hex_unit_value(hex.unsafe_get(i * 2 + 5))
+    let h3 = hex_unit_value(hex.unsafe_get(i * 2 + 6))
+    let l3 = hex_unit_value(hex.unsafe_get(i * 2 + 7))
+    bad = bad | h0 | l0 | h1 | l1 | h2 | l2 | h3 | l3
+    out.unsafe_set(i, h0 * 16 + l0)
+    out.unsafe_set(i + 1, h1 * 16 + l1)
+    out.unsafe_set(i + 2, h2 * 16 + l2)
+    out.unsafe_set(i + 3, h3 * 16 + l3)
+    i = i + 4
+  }
   while i < n {
     let hi = hex_unit_value(hex.unsafe_get(i * 2))
     let lo = hex_unit_value(hex.unsafe_get(i * 2 + 1))
@@ -381,6 +399,29 @@ fn hex_to_nonzero_bytes(hex : String, start : Int32, out : Array[Int32]) -> Bool
   let mut bad = 0
   let mut acc = 0
   let mut i = 0
+  // Four bytes per iteration: fewer loop-control steps for the common fixed
+  // sizes (16 and 8 bytes).
+  while i + 4 <= n {
+    let h0 = hex_unit_value(hex.unsafe_get(start + i * 2))
+    let l0 = hex_unit_value(hex.unsafe_get(start + i * 2 + 1))
+    let h1 = hex_unit_value(hex.unsafe_get(start + i * 2 + 2))
+    let l1 = hex_unit_value(hex.unsafe_get(start + i * 2 + 3))
+    let h2 = hex_unit_value(hex.unsafe_get(start + i * 2 + 4))
+    let l2 = hex_unit_value(hex.unsafe_get(start + i * 2 + 5))
+    let h3 = hex_unit_value(hex.unsafe_get(start + i * 2 + 6))
+    let l3 = hex_unit_value(hex.unsafe_get(start + i * 2 + 7))
+    bad = bad | h0 | l0 | h1 | l1 | h2 | l2 | h3 | l3
+    let b0 = h0 * 16 + l0
+    let b1 = h1 * 16 + l1
+    let b2 = h2 * 16 + l2
+    let b3 = h3 * 16 + l3
+    acc = acc | b0 | b1 | b2 | b3
+    out.unsafe_set(i, b0)
+    out.unsafe_set(i + 1, b1)
+    out.unsafe_set(i + 2, b2)
+    out.unsafe_set(i + 3, b3)
+    i = i + 4
+  }
   while i < n {
     let hi = hex_unit_value(hex.unsafe_get(start + i * 2))
     let lo = hex_unit_value(hex.unsafe_get(start + i * 2 + 1))

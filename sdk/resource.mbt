@@ -149,7 +149,8 @@ fn copy_attributes_with_capacity(
   capacity : Int,
 ) -> Map[String, AttributeValue] {
   let out : Map[String, AttributeValue] = Map([], capacity~)
-  for key, value in values {
+  for entry in values.to_array() {
+    let (key, value) = entry
     out.set(key, value)
   }
   out
@@ -244,7 +245,8 @@ pub fn Resource::merge(self : Resource, other : Resource) -> Resource {
     self.attributes,
     map_capacity_for_entries(self.attributes.length() + other.attributes.length()),
   )
-  for key, value in other.attributes {
+  for entry in other.attributes.to_array() {
+    let (key, value) = entry
     attributes.set(key, value)
   }
   { attributes, }
@@ -340,7 +342,8 @@ pub fn ResourceAttributes::set(
       let copied : Map[String, AttributeValue] = Map(
         [], capacity=map_capacity_for_entries(self.shared.length() + 1),
       )
-      for entry_key, entry_value in self.shared {
+      for entry in self.shared.to_array() {
+        let (entry_key, entry_value) = entry
         copied.set(entry_key, entry_value)
       }
       self.own = Some(copied)

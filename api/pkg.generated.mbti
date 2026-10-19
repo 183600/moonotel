@@ -1,0 +1,81 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "yourname/otel/api"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub const TRACE_FLAGS_SAMPLED : Int32 = 1
+
+pub fn byte_to_hex_char(Int32) -> String
+
+pub fn bytes_from_hex(String) -> Array[Int32]?
+
+pub fn bytes_to_hex(Array[Int32]) -> String
+
+pub fn invalid_span_context() -> SpanContext
+
+pub fn is_zero(Array[Int32]) -> Bool
+
+pub fn span_context(Array[Int32], Array[Int32], Int32, tracestate? : String, is_remote? : Bool) -> SpanContext
+
+pub fn span_context_from_hex(String, String, Int32) -> SpanContext
+
+// Errors
+
+// Types and methods
+type Span
+
+pub struct SpanContext {
+  trace_id : Array[Int32]
+  span_id : Array[Int32]
+  trace_flags : Int32
+  tracestate : String
+  is_valid : Bool
+  is_remote : Bool
+}
+pub fn SpanContext::is_remote(Self) -> Bool
+pub fn SpanContext::is_sampled(Self) -> Bool
+pub fn SpanContext::is_valid(Self) -> Bool
+pub fn SpanContext::span_id(Self) -> Array[Int32]
+pub fn SpanContext::span_id_hex(Self) -> String
+pub fn SpanContext::span_id_view(Self) -> Array[Int32]
+pub fn SpanContext::trace_flags(Self) -> Int32
+pub fn SpanContext::trace_id(Self) -> Array[Int32]
+pub fn SpanContext::trace_id_hex(Self) -> String
+pub fn SpanContext::trace_id_view(Self) -> Array[Int32]
+pub fn SpanContext::tracestate(Self) -> String
+pub fn SpanContext::with_remote(Self, Bool) -> Self
+pub fn SpanContext::with_tracestate(Self, String) -> Self
+
+pub(all) enum SpanKind {
+  Internal
+  Server
+  Client
+  Producer
+  Consumer
+} derive(Eq, @debug.Debug)
+pub fn SpanKind::equal(Self, Self) -> Bool
+pub fn SpanKind::not_equal(Self, Self) -> Bool
+pub fn SpanKind::otlp_value(Self) -> Int32
+pub fn SpanKind::to_repr(Self) -> @debug.Repr
+pub fn SpanKind::to_string(Self) -> String
+
+pub(all) enum StatusCode {
+  Unset
+  Ok
+  Error
+} derive(Eq, @debug.Debug)
+pub fn StatusCode::equal(Self, Self) -> Bool
+pub fn StatusCode::not_equal(Self, Self) -> Bool
+pub fn StatusCode::otlp_value(Self) -> Int32
+pub fn StatusCode::to_repr(Self) -> @debug.Repr
+pub fn StatusCode::to_string(Self) -> String
+
+type Tracer
+pub fn Tracer::start_span(Self, String) -> Span
+
+// Type aliases
+
+// Traits

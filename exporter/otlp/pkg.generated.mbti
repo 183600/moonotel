@@ -1,0 +1,66 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "yourname/otel/exporter/otlp"
+
+import {
+  "yourname/otel/sdk",
+}
+
+// Values
+pub const OTLP_HTTP_JSON_PROTOCOL : String = "http/json"
+
+pub const OTLP_HTTP_PROTOBUF_PROTOCOL : String = "http/protobuf"
+
+pub fn content_type_for_protocol(String) -> String
+
+pub fn decode_export_response(Bytes) -> @sdk.ExportResult
+
+pub fn decode_export_response_json(Bytes) -> @sdk.ExportResult
+
+pub fn encode_trace_request(Array[@sdk.SpanData]) -> Bytes
+
+pub fn encode_trace_request_json(Array[@sdk.SpanData]) -> Bytes
+
+pub fn is_supported_protocol(String) -> Bool
+
+// Errors
+
+// Types and methods
+pub(all) struct OtlpHttpConfig {
+  endpoint : String
+  traces_endpoint : String?
+  headers : Map[String, String]
+  timeout_millis : Int32
+  compression : String
+  protocol : String
+  max_retries : Int32
+}
+pub fn OtlpHttpConfig::from_env() -> Self
+pub fn OtlpHttpConfig::new(endpoint? : String, traces_endpoint? : String, headers? : Map[String, String], timeout_millis? : Int32, compression? : String, protocol? : String, max_retries? : Int32) -> Self
+pub fn OtlpHttpConfig::traces_url(Self) -> String
+
+pub struct OtlpHttpExporter {
+  config : OtlpHttpConfig
+  transport : (String, Map[String, String], Bytes) -> TransportResponse
+  url : String
+  headers : Map[String, String]
+  retry_wait : (Int32) -> Unit
+}
+pub fn OtlpHttpExporter::config(Self) -> OtlpHttpConfig
+pub fn OtlpHttpExporter::export_span(Self, @sdk.SpanData) -> @sdk.ExportResult
+pub fn OtlpHttpExporter::export_spans(Self, Array[@sdk.SpanData]) -> @sdk.ExportResult
+pub fn OtlpHttpExporter::export_spans_http(Self, Array[@sdk.SpanData]) -> @sdk.ExportResult
+pub fn OtlpHttpExporter::new(OtlpHttpConfig, (String, Map[String, String], Bytes) -> TransportResponse, retry_wait? : (Int32) -> Unit) -> Self
+pub fn OtlpHttpExporter::shutdown(Self) -> Unit
+pub impl @sdk.SpanExporter for OtlpHttpExporter
+
+pub(all) struct TransportResponse {
+  status_code : Int32
+  body : Bytes
+}
+
+// Type aliases
+pub type RetryWait = (Int32) -> Unit
+
+pub type Transport = (String, Map[String, String], Bytes) -> TransportResponse
+
+// Traits

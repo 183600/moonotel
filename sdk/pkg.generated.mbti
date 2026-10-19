@@ -1,0 +1,422 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "yourname/otel/sdk"
+
+import {
+  "moonbitlang/core/debug",
+  "yourname/otel/api",
+  "yourname/otel/context",
+}
+
+// Values
+pub const CLIENT_ADDRESS : String = "client.address"
+
+pub const CLIENT_PORT : String = "client.port"
+
+pub const DEPLOYMENT_ENVIRONMENT : String = "deployment.environment"
+
+pub const ERROR_TYPE : String = "error.type"
+
+pub const EXCEPTION_MESSAGE : String = "exception.message"
+
+pub const EXCEPTION_STACKTRACE : String = "exception.stacktrace"
+
+pub const EXCEPTION_TYPE : String = "exception.type"
+
+pub const HTTP_REQUEST_BODY_SIZE : String = "http.request.body.size"
+
+pub const HTTP_REQUEST_HEADER_PREFIX : String = "http.request.header."
+
+pub const HTTP_REQUEST_METHOD : String = "http.request.method"
+
+pub const HTTP_RESPONSE_BODY_SIZE : String = "http.response.body.size"
+
+pub const HTTP_RESPONSE_HEADER_PREFIX : String = "http.response.header."
+
+pub const HTTP_RESPONSE_STATUS_CODE : String = "http.response.status_code"
+
+pub const HTTP_ROUTE : String = "http.route"
+
+pub const NETWORK_PROTOCOL_NAME : String = "network.protocol.name"
+
+pub const NETWORK_PROTOCOL_VERSION : String = "network.protocol.version"
+
+pub const SDK_VERSION : String = "0.1.0"
+
+pub const SERVER_ADDRESS : String = "server.address"
+
+pub const SERVER_PORT : String = "server.port"
+
+pub const SERVICE_NAME : String = "service.name"
+
+pub const SERVICE_VERSION : String = "service.version"
+
+pub const TELEMETRY_SDK_LANGUAGE : String = "telemetry.sdk.language"
+
+pub const TELEMETRY_SDK_NAME : String = "telemetry.sdk.name"
+
+pub const TELEMETRY_SDK_VERSION : String = "telemetry.sdk.version"
+
+pub const URL_FULL : String = "url.full"
+
+pub const URL_PATH : String = "url.path"
+
+pub const URL_QUERY : String = "url.query"
+
+pub const URL_SCHEME : String = "url.scheme"
+
+pub const USER_AGENT_ORIGINAL : String = "user_agent.original"
+
+pub fn exporter_selected(Array[String]?, String) -> Bool
+
+pub fn force_flush_global_tracer_provider() -> Unit
+
+pub fn global_tracer(String, version? : String) -> Tracer
+
+pub fn global_tracer_provider() -> TracerProviderSdk?
+
+pub fn sampling_decision_drop() -> SamplingDecision
+
+pub fn sampling_decision_record_and_sample() -> SamplingDecision
+
+pub fn sampling_decision_record_only() -> SamplingDecision
+
+pub fn set_global_tracer_provider(TracerProviderSdk) -> Unit
+
+pub fn shutdown_global_tracer_provider() -> Unit
+
+pub fn traces_exporter_disabled() -> Bool
+
+pub fn traces_exporter_enabled(String) -> Bool
+
+// Errors
+
+// Types and methods
+pub(all) enum AttributeValue {
+  StringValue(String)
+  BoolValue(Bool)
+  IntValue(Int64)
+  DoubleValue(Double)
+  StringArrayValue(Array[String])
+  BoolArrayValue(Array[Bool])
+  IntArrayValue(Array[Int64])
+  DoubleArrayValue(Array[Double])
+} derive(Eq, @debug.Debug)
+pub fn AttributeValue::equal(Self, Self) -> Bool
+pub fn AttributeValue::not_equal(Self, Self) -> Bool
+pub fn AttributeValue::to_repr(Self) -> @debug.Repr
+
+pub struct BatchConfig {
+  max_queue_size : Int32
+  max_export_batch_size : Int32
+  flush_interval_millis : Int32
+}
+pub fn BatchConfig::default() -> Self
+pub fn BatchConfig::from_env() -> Self
+pub fn BatchConfig::new(max_queue_size? : Int32, max_export_batch_size? : Int32, flush_interval_millis? : Int32) -> Self
+
+pub struct BatchSpanProcessor {
+  exporter : &SpanExporter
+  max_queue_size : Int32
+  max_export_batch_size : Int32
+  flush_interval_millis : Int32
+  queue : Array[SpanData?]
+  mut head : Int32
+  mut count : Int32
+  mut last_flush_time_millis : UInt64
+  mut shutdown_called : Bool
+  mut dropped_spans : UInt64
+  mut export_failures : UInt64
+}
+pub fn BatchSpanProcessor::dropped_spans(Self) -> UInt64
+pub fn BatchSpanProcessor::export_failures(Self) -> UInt64
+pub fn BatchSpanProcessor::flush_batch(Self) -> Unit
+pub fn BatchSpanProcessor::flush_interval_millis(Self) -> Int32
+pub fn BatchSpanProcessor::force_flush(Self) -> Unit
+pub fn BatchSpanProcessor::from_env(&SpanExporter) -> Self
+pub fn BatchSpanProcessor::is_shutdown(Self) -> Bool
+pub fn BatchSpanProcessor::new(&SpanExporter, max_queue_size? : Int32, max_export_batch_size? : Int32, flush_interval_millis? : Int32) -> Self
+pub fn BatchSpanProcessor::on_end(Self, SpanData) -> Unit
+pub fn BatchSpanProcessor::on_start(Self, SpanSdk) -> Unit
+pub fn BatchSpanProcessor::queue_size(Self) -> Int32
+pub fn BatchSpanProcessor::shutdown(Self) -> Unit
+pub fn BatchSpanProcessor::tick(Self) -> Unit
+pub fn BatchSpanProcessor::with_config(&SpanExporter, BatchConfig) -> Self
+pub impl SpanProcessor for BatchSpanProcessor
+
+pub struct ConsoleSpanExporter {
+  mut shutdown_called : Bool
+}
+pub fn ConsoleSpanExporter::export_span(Self, SpanData) -> ExportResult
+pub fn ConsoleSpanExporter::export_spans(Self, Array[SpanData]) -> ExportResult
+pub fn ConsoleSpanExporter::is_shutdown(Self) -> Bool
+pub fn ConsoleSpanExporter::new() -> Self
+pub fn ConsoleSpanExporter::shutdown(Self) -> Unit
+pub impl SpanExporter for ConsoleSpanExporter
+
+pub(all) enum ExportResult {
+  ExportSuccess
+  ExportFailure(String)
+} derive(Eq, @debug.Debug)
+pub fn ExportResult::equal(Self, Self) -> Bool
+pub fn ExportResult::is_success(Self) -> Bool
+pub fn ExportResult::not_equal(Self, Self) -> Bool
+pub fn ExportResult::to_repr(Self) -> @debug.Repr
+
+pub struct IdGenerator {
+  trace_id_source : () -> Array[Int32]
+  span_id_source : () -> Array[Int32]
+}
+pub fn IdGenerator::deterministic(UInt64) -> Self
+pub fn IdGenerator::generate_span_id(Self) -> Array[Int32]
+pub fn IdGenerator::generate_trace_id(Self) -> Array[Int32]
+pub fn IdGenerator::new(() -> Array[Int32], () -> Array[Int32]) -> Self
+pub fn IdGenerator::random() -> Self
+
+pub struct InMemorySpanExporter {
+  batches : Array[Array[SpanData]]
+  mut span_total : Int32
+  mut shutdown_called : Bool
+}
+pub fn InMemorySpanExporter::clear(Self) -> Unit
+pub fn InMemorySpanExporter::export_span(Self, SpanData) -> ExportResult
+pub fn InMemorySpanExporter::export_spans(Self, Array[SpanData]) -> ExportResult
+pub fn InMemorySpanExporter::exported_batches(Self) -> Array[Array[SpanData]]
+pub fn InMemorySpanExporter::exported_spans(Self) -> Array[SpanData]
+pub fn InMemorySpanExporter::is_shutdown(Self) -> Bool
+pub fn InMemorySpanExporter::new() -> Self
+pub fn InMemorySpanExporter::shutdown(Self) -> Unit
+pub fn InMemorySpanExporter::span_count(Self) -> Int32
+pub fn InMemorySpanExporter::take_spans(Self) -> Array[SpanData]
+pub impl SpanExporter for InMemorySpanExporter
+
+pub struct Resource {
+  attributes : Map[String, AttributeValue]
+}
+pub fn Resource::attributes(Self) -> Map[String, AttributeValue]
+pub fn Resource::empty() -> Self
+pub fn Resource::from_env(service_name? : String) -> Self
+pub fn Resource::get(Self, String) -> AttributeValue?
+pub fn Resource::is_empty(Self) -> Bool
+pub fn Resource::length(Self) -> Int32
+pub fn Resource::merge(Self, Self) -> Self
+pub fn Resource::new(attributes? : Map[String, AttributeValue]) -> Self
+pub fn Resource::service_name(Self) -> String
+pub fn Resource::with_attribute(Self, String, AttributeValue) -> Self
+
+pub struct ResourceAttributes {
+  shared : Map[String, AttributeValue]
+  mut own : Map[String, AttributeValue]?
+}
+pub fn ResourceAttributes::as_map(Self) -> Map[String, AttributeValue]
+pub fn ResourceAttributes::clear(Self) -> Unit
+pub fn ResourceAttributes::contains(Self, String) -> Bool
+pub fn ResourceAttributes::copy(Self) -> Self
+pub fn ResourceAttributes::get(Self, String) -> AttributeValue?
+pub fn ResourceAttributes::get_or_default(Self, String, AttributeValue) -> AttributeValue
+pub fn ResourceAttributes::is_empty(Self) -> Bool
+pub fn ResourceAttributes::iter(Self) -> Iter[(String, AttributeValue)]
+pub fn ResourceAttributes::iter2(Self) -> Iter2[String, AttributeValue]
+pub fn ResourceAttributes::keys(Self) -> Iter[String]
+pub fn ResourceAttributes::length(Self) -> Int32
+pub fn ResourceAttributes::new(Map[String, AttributeValue]) -> Self
+pub fn ResourceAttributes::remove(Self, String) -> Unit
+pub fn ResourceAttributes::set(Self, String, AttributeValue) -> Unit
+pub fn ResourceAttributes::to_array(Self) -> Array[(String, AttributeValue)]
+pub fn ResourceAttributes::values(Self) -> Iter[AttributeValue]
+
+pub struct Sampler {
+  sample : (@api.SpanContext?, Array[Int32]) -> SamplingDecision
+}
+pub fn Sampler::always_off() -> Self
+pub fn Sampler::always_on() -> Self
+pub fn Sampler::from_env() -> Self
+pub fn Sampler::parent_based(Self, remote_parent_sampled? : Self, remote_parent_not_sampled? : Self, local_parent_sampled? : Self, local_parent_not_sampled? : Self) -> Self
+pub fn Sampler::record_only() -> Self
+pub fn Sampler::should_sample(Self, @api.SpanContext?, Array[Int32]) -> SamplingDecision
+pub fn Sampler::trace_id_ratio_based(Double) -> Self
+
+pub(all) struct SamplingDecision {
+  is_recorded : Bool
+  is_sampled : Bool
+} derive(Eq, @debug.Debug)
+pub fn SamplingDecision::equal(Self, Self) -> Bool
+pub fn SamplingDecision::not_equal(Self, Self) -> Bool
+pub fn SamplingDecision::to_repr(Self) -> @debug.Repr
+
+pub struct SimpleSpanProcessor {
+  exporter : &SpanExporter
+  mut shutdown_called : Bool
+  mut export_failures : UInt64
+}
+pub fn SimpleSpanProcessor::export_failures(Self) -> UInt64
+pub fn SimpleSpanProcessor::force_flush(Self) -> Unit
+pub fn SimpleSpanProcessor::is_shutdown(Self) -> Bool
+pub fn SimpleSpanProcessor::new(&SpanExporter) -> Self
+pub fn SimpleSpanProcessor::on_end(Self, SpanData) -> Unit
+pub fn SimpleSpanProcessor::on_start(Self, SpanSdk) -> Unit
+pub fn SimpleSpanProcessor::shutdown(Self) -> Unit
+pub impl SpanProcessor for SimpleSpanProcessor
+
+pub(all) struct SpanData {
+  name : String
+  span_context : @api.SpanContext
+  parent_span_id : Array[Int32]
+  kind : @api.SpanKind
+  start_time_unix_nano : Int64
+  end_time_unix_nano : Int64
+  attributes : Map[String, AttributeValue]
+  events : Array[SpanEvent]
+  links : Array[SpanLink]
+  dropped_attributes_count : Int32
+  dropped_events_count : Int32
+  dropped_links_count : Int32
+  status : @api.StatusCode
+  status_description : String
+  resource : ResourceAttributes
+  scope_name : String
+  scope_version : String
+}
+
+pub(all) struct SpanEvent {
+  name : String
+  time_unix_nano : Int64
+  attributes : Map[String, AttributeValue]
+  dropped_attributes_count : Int32
+}
+
+pub struct SpanLimits {
+  attribute_count_limit : Int32
+  event_count_limit : Int32
+  link_count_limit : Int32
+  event_attribute_count_limit : Int32
+  link_attribute_count_limit : Int32
+  attribute_value_length_limit : Int32
+}
+pub fn SpanLimits::attribute_count_limit(Self) -> Int32
+pub fn SpanLimits::attribute_value_length_limit(Self) -> Int32
+pub fn SpanLimits::event_attribute_count_limit(Self) -> Int32
+pub fn SpanLimits::event_count_limit(Self) -> Int32
+pub fn SpanLimits::from_env() -> Self
+pub fn SpanLimits::link_attribute_count_limit(Self) -> Int32
+pub fn SpanLimits::link_count_limit(Self) -> Int32
+pub fn SpanLimits::new(attribute_count_limit? : Int32, event_count_limit? : Int32, link_count_limit? : Int32, event_attribute_count_limit? : Int32, link_attribute_count_limit? : Int32, attribute_value_length_limit? : Int32) -> Self
+pub fn SpanLimits::unlimited() -> Self
+
+pub(all) struct SpanLink {
+  span_context : @api.SpanContext
+  attributes : Map[String, AttributeValue]
+  dropped_attributes_count : Int32
+}
+pub fn SpanLink::new(@api.SpanContext, attributes? : Map[String, AttributeValue]) -> Self
+
+pub struct SpanSdk {
+  mut name : String
+  context : @api.SpanContext
+  parent_span_id : Array[Int32]
+  kind : @api.SpanKind
+  start_time_unix_nano : Int64
+  mut end_time_unix_nano : Int64
+  mut ended : Bool
+  recording : Bool
+  mut attributes : Map[String, AttributeValue]?
+  mut events : Array[SpanEvent]?
+  mut links : Array[SpanLink]?
+  mut status : @api.StatusCode
+  mut status_description : String
+  limits : SpanLimits
+  mut dropped_attributes : Int32
+  mut dropped_events : Int32
+  mut dropped_links : Int32
+  processors : Array[&SpanProcessor]
+  resource : Map[String, AttributeValue]
+  scope_name : String
+  scope_version : String
+}
+pub fn SpanSdk::add_event(Self, String, attributes? : Map[String, AttributeValue], time_unix_nano? : Int64) -> Unit
+pub fn SpanSdk::add_link(Self, SpanLink) -> Unit
+pub fn SpanSdk::attributes(Self) -> Map[String, AttributeValue]
+pub fn SpanSdk::context(Self) -> @api.SpanContext
+pub fn SpanSdk::dropped_attributes_count(Self) -> Int32
+pub fn SpanSdk::dropped_events_count(Self) -> Int32
+pub fn SpanSdk::dropped_links_count(Self) -> Int32
+pub fn SpanSdk::end(Self, end_time_unix_nano? : Int64) -> Unit
+pub fn SpanSdk::end_time_unix_nano(Self) -> Int64
+pub fn SpanSdk::events(Self) -> Array[SpanEvent]
+pub fn SpanSdk::is_ended(Self) -> Bool
+pub fn SpanSdk::is_recording(Self) -> Bool
+pub fn SpanSdk::kind(Self) -> @api.SpanKind
+pub fn SpanSdk::limits(Self) -> SpanLimits
+pub fn SpanSdk::links(Self) -> Array[SpanLink]
+pub fn SpanSdk::name(Self) -> String
+pub fn SpanSdk::parent_span_id(Self) -> Array[Int32]
+pub fn SpanSdk::record_exception(Self, Error, exception_type? : String, attributes? : Map[String, AttributeValue], time_unix_nano? : Int64) -> Unit
+pub fn SpanSdk::set_attribute(Self, String, AttributeValue) -> Unit
+pub fn SpanSdk::set_attributes(Self, Map[String, AttributeValue]) -> Unit
+pub fn SpanSdk::set_bool_array_attribute(Self, String, Array[Bool]) -> Unit
+pub fn SpanSdk::set_bool_attribute(Self, String, Bool) -> Unit
+pub fn SpanSdk::set_double_array_attribute(Self, String, Array[Double]) -> Unit
+pub fn SpanSdk::set_double_attribute(Self, String, Double) -> Unit
+pub fn SpanSdk::set_int_array_attribute(Self, String, Array[Int64]) -> Unit
+pub fn SpanSdk::set_int_attribute(Self, String, Int64) -> Unit
+pub fn SpanSdk::set_status(Self, @api.StatusCode, description? : String) -> Unit
+pub fn SpanSdk::set_string_array_attribute(Self, String, Array[String]) -> Unit
+pub fn SpanSdk::set_string_attribute(Self, String, String) -> Unit
+pub fn SpanSdk::start_time_unix_nano(Self) -> Int64
+pub fn SpanSdk::status(Self) -> @api.StatusCode
+pub fn SpanSdk::status_description(Self) -> String
+pub fn SpanSdk::update_name(Self, String) -> Unit
+
+pub struct Tracer {
+  provider : TracerProviderSdk
+  scope_name : String
+  scope_version : String
+}
+pub fn Tracer::scope_name(Self) -> String
+pub fn Tracer::scope_version(Self) -> String
+pub fn Tracer::start_root_span(Self, String, kind? : @api.SpanKind, attributes? : Map[String, AttributeValue], links? : Array[SpanLink], start_time_unix_nano? : Int64) -> SpanSdk
+pub fn Tracer::start_span(Self, String, kind? : @api.SpanKind, parent? : @api.SpanContext, attributes? : Map[String, AttributeValue], links? : Array[SpanLink], start_time_unix_nano? : Int64) -> SpanSdk
+pub fn Tracer::start_span_with_context(Self, String, context? : @context.Context, kind? : @api.SpanKind, attributes? : Map[String, AttributeValue], links? : Array[SpanLink], start_time_unix_nano? : Int64) -> SpanSdk
+pub fn[X] Tracer::with_span(Self, String, (SpanSdk) -> X raise?, context? : @context.Context, kind? : @api.SpanKind, parent? : @api.SpanContext, attributes? : Map[String, AttributeValue], links? : Array[SpanLink], start_time_unix_nano? : Int64) -> X raise?
+pub async fn[X] Tracer::with_span_async(Self, String, async (SpanSdk) -> X, context? : @context.Context, kind? : @api.SpanKind, parent? : @api.SpanContext, attributes? : Map[String, AttributeValue], links? : Array[SpanLink], start_time_unix_nano? : Int64) -> X
+
+pub struct TracerProviderSdk {
+  resource : Resource
+  sampler : Sampler
+  id_generator : IdGenerator
+  span_limits : SpanLimits
+  processors : Array[&SpanProcessor]
+  mut shutdown_called : Bool
+}
+pub fn TracerProviderSdk::force_flush(Self) -> Unit
+pub fn TracerProviderSdk::get_tracer(Self, String, version? : String) -> Tracer
+pub fn TracerProviderSdk::is_shutdown(Self) -> Bool
+pub fn TracerProviderSdk::new(service_name? : String) -> Self
+pub fn TracerProviderSdk::processor_count(Self) -> Int32
+pub fn TracerProviderSdk::resource(Self) -> Map[String, AttributeValue]
+pub fn TracerProviderSdk::resource_object(Self) -> Resource
+pub fn TracerProviderSdk::sampler(Self) -> Sampler
+pub fn TracerProviderSdk::shutdown(Self) -> Unit
+pub fn TracerProviderSdk::span_limits(Self) -> SpanLimits
+pub fn TracerProviderSdk::with_id_generator(Self, IdGenerator) -> Self
+pub fn TracerProviderSdk::with_resource(Self, Resource) -> Self
+pub fn TracerProviderSdk::with_resource_attribute(Self, String, AttributeValue) -> Self
+pub fn TracerProviderSdk::with_resource_attributes(Self, Map[String, AttributeValue]) -> Self
+pub fn TracerProviderSdk::with_sampler(Self, Sampler) -> Self
+pub fn TracerProviderSdk::with_span_limits(Self, SpanLimits) -> Self
+pub fn TracerProviderSdk::with_span_processor(Self, &SpanProcessor) -> Self
+
+// Type aliases
+
+// Traits
+pub(open) trait SpanExporter {
+  fn export_spans(Self, Array[SpanData]) -> ExportResult
+  fn export_span(Self, SpanData) -> ExportResult = _
+  fn shutdown(Self) -> Unit
+}
+
+pub(open) trait SpanProcessor {
+  fn on_start(Self, SpanSdk) -> Unit
+  fn on_end(Self, SpanData) -> Unit
+  fn force_flush(Self) -> Unit
+  fn shutdown(Self) -> Unit
+}

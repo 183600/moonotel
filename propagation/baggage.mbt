@@ -155,16 +155,19 @@ fn is_baggage_value_char(code : Int32) -> Bool {
   code >= 0 && code < 128 && baggage_value_char_table.unsafe_get(code)
 }
 
+// Sentinel encoded length returned for invalid baggage values. A real encoded
+// length is never negative (the empty value has length 0).
+const INVALID_BAGGAGE_LENGTH : Int32 = -1
+
 // Decode the body of a baggage value that contains at least one `%`.
 // Returns the decoded string together with the byte length of its
-// percent-encoded form. In the non-ASCII case (where lossy UTF-8 decoding
-// makes the byte accounting hard to track) the length is recomputed from the
-// decoded string to stay exactly equivalent to `percent_encoded_length`.
+// percent-encoded form, or `("", INVALID_BAGGAGE_LENGTH)` when the value is
+// malformed. In the non-ASCII case (where lossy UTF-8 decoding makes the byte
+// accounting hard to track) the length is recomputed from the decoded string
+// to stay exactly equivalent to `percent_encoded_length`.
 
 ///|
-fn percent_decode_escaped_with_length(
-  value : StringView,
-) -> (String, Int32)? {
+fn percent_decode_escaped_with_length(value : StringView) -> (String, Int32) {
   let len = value.length()
   let mut decoded_len = 0
   let mut encoded_len = 0
@@ -174,12 +177,12 @@ fn percent_decode_escaped_with_length(
     let c = value.unsafe_get(i).unsafe_to_char()
     if c == '%' {
       if i + 2 >= len {
-        return None
+        return ("", INVALID_BAGGAGE_LENGTH)
       }
       let hi = hex_digit_value(value.unsafe_get(i + 1).unsafe_to_char())
       let lo = hex_digit_value(value.unsafe_get(i + 2).unsafe_to_char())
       if hi < 0 || lo < 0 {
-        return None
+        return ("", INVALID_BAGGAGE_LENGTH)
       }
       let byte = hi * 16 + lo
       if byte >= 0x80 {
@@ -195,7 +198,7 @@ fn percent_decode_escaped_with_length(
     } else {
       let code = c.to_int()
       if !is_baggage_value_char(code) {
-        return None
+        return ("", INVALID_BAGGAGE_LENGTH)
       }
       encoded_len = encoded_len + 1
       decoded_len = decoded_len + 1
@@ -220,7 +223,7 @@ fn percent_decode_escaped_with_length(
         j = j + 1
       }
     }
-    Some((out.unsafe_reinterpret_as_bytes().to_unchecked_string(), encoded_len))
+    (out.unsafe_reinterpret_as_bytes().to_unchecked_string(), encoded_len)
   } else {
     let out = FixedArray::make(decoded_len, b'\x00')
     let mut j = 0
@@ -242,7 +245,7 @@ fn percent_decode_escaped_with_length(
     let decoded = @utf8.decode_lossy(
       out.unsafe_reinterpret_as_bytes().exact_view(),
     )
-    Some((decoded, percent_encoded_length(decoded)))
+    (decoded, percent_encoded_length(decoded))
   }
 }
 
@@ -250,20 +253,21 @@ fn percent_decode_escaped_with_length(
 
 ///|
 fn percent_decode_escaped(value : StringView) -> String? {
-  match percent_decode_escaped_with_length(value) {
-    Some((decoded, _)) => Some(decoded)
-    None => None
+  let (decoded, encoded_len) = percent_decode_escaped_with_length(value)
+  if encoded_len < 0 {
+    None
+  } else {
+    Some(decoded)
   }
 }
 
 // Percent-decode a baggage value held as a view, also reporting the byte
-// length of its percent-encoded form. Returns None when a `%` sequence is
-// truncated or not followed by two hex digits.
+// length of its percent-encoded form. Returns `("", INVALID_BAGGAGE_LENGTH)`
+// when a `%` sequence is truncated or not followed by two hex digits, or when
+// a character may not appear literally in a value.
 
 ///|
-fn percent_decode_view_with_length(
-  value : StringView,
-) -> (String, Int32)? {
+fn percent_decode_view_with_length(value : StringView) -> (String, Int32) {
   let len = value.length()
   // A value without `%` decodes to itself; its characters still need
   // validating. Every kept character is allowed literally, so the encoded
@@ -272,17 +276,14 @@ fn percent_decode_view_with_length(
   while i < len {
     let code = value.unsafe_get(i).to_int()
     if code == 0x25 {
-      break
+      return percent_decode_escaped_with_length(value)
     }
     if !is_baggage_value_char(code) {
-      return None
+      return ("", INVALID_BAGGAGE_LENGTH)
     }
     i = i + 1
   }
-  if i == len {
-    return Some((value.to_owned(), len))
-  }
-  percent_decode_escaped_with_length(value)
+  (value.to_owned(), len)
 }
 
 // Percent-decode a baggage value. Returns None when a `%` sequence is
@@ -510,24 +511,21 @@ fn parse_baggage_properties(
         value_end = value_end - 1
       }
       if is_valid_baggage_key(key_view) {
-        match
-          percent_decode_view_with_length(
-            view.view(start_offset=value_start, end_offset=value_end),
-          ) {
-          Some((decoded, _)) => {
-            let key = key_view.to_owned()
-            let mut duplicate = false
-            for existing in properties {
-              if existing.0 == key {
-                duplicate = true
-                break
-              }
-            }
-            if !duplicate {
-              properties.push((key, decoded))
+        let (decoded, encoded_len) = percent_decode_view_with_length(
+          view.view(start_offset=value_start, end_offset=value_end),
+        )
+        if encoded_len >= 0 {
+          let key = key_view.to_owned()
+          let mut duplicate = false
+          for existing in properties {
+            if existing.0 == key {
+              duplicate = true
+              break
             }
           }
-          None => ()
+          if !duplicate {
+            properties.push((key, decoded))
+          }
         }
       }
     }
@@ -612,26 +610,22 @@ pub fn parse_baggage_entries(value : String) -> Array[BaggageEntry] {
               is_ows_code(view.unsafe_get(value_end - 1)) {
           value_end = value_end - 1
         }
-        match
-          percent_decode_view_with_length(
-            view.view(start_offset=value_start, end_offset=value_end),
-          ) {
-          Some((decoded, encoded_len)) => {
-            let properties = parse_baggage_properties(view, semi, item_end)
-            let key = key_view.to_owned()
-            let separator = if entries.length() > 0 { 1 } else { 0 }
-            let mut size = key.length() + 1 + encoded_len + separator
-            for property in properties {
-              size = size +
-                baggage_property_size(property.0, property.1)
-            }
-            if bytes + size > BAGGAGE_MAX_BYTES {
-              break
-            }
-            entries.push({ key, value: decoded, properties, })
-            bytes = bytes + size
+        let (decoded, encoded_len) = percent_decode_view_with_length(
+          view.view(start_offset=value_start, end_offset=value_end),
+        )
+        if encoded_len >= 0 {
+          let properties = parse_baggage_properties(view, semi, item_end)
+          let key = key_view.to_owned()
+          let separator = if entries.length() > 0 { 1 } else { 0 }
+          let mut size = key.length() + 1 + encoded_len + separator
+          for property in properties {
+            size = size + baggage_property_size(property.0, property.1)
           }
-          None => ()
+          if bytes + size > BAGGAGE_MAX_BYTES {
+            break
+          }
+          entries.push({ key, value: decoded, properties, })
+          bytes = bytes + size
         }
       }
     }
@@ -714,22 +708,19 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
               is_ows_code(view.unsafe_get(value_end - 1)) {
           value_end = value_end - 1
         }
-        match
-          percent_decode_view_with_length(
-            view.view(start_offset=value_start, end_offset=value_end),
-          ) {
-          Some((decoded, encoded_len)) => {
-            // Properties are dropped, so they do not contribute to the size.
-            let key = key_view.to_owned()
-            let separator = if pairs.length() > 0 { 1 } else { 0 }
-            let size = key.length() + 1 + encoded_len + separator
-            if bytes + size > BAGGAGE_MAX_BYTES {
-              break
-            }
-            pairs.push((key, decoded))
-            bytes = bytes + size
+        let (decoded, encoded_len) = percent_decode_view_with_length(
+          view.view(start_offset=value_start, end_offset=value_end),
+        )
+        if encoded_len >= 0 {
+          // Properties are dropped, so they do not contribute to the size.
+          let key = key_view.to_owned()
+          let separator = if pairs.length() > 0 { 1 } else { 0 }
+          let size = key.length() + 1 + encoded_len + separator
+          if bytes + size > BAGGAGE_MAX_BYTES {
+            break
           }
-          None => ()
+          pairs.push((key, decoded))
+          bytes = bytes + size
         }
       }
     }
@@ -984,7 +975,8 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
         }
         match node.baggage_map {
           Some(map) =>
-            for key, value in map {
+            for entry in map.to_array() {
+              let (key, value) = entry
               let mut insert = true
               match seen {
                 Some(keys) => {

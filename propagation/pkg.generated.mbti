@@ -1,0 +1,148 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "yourname/otel/propagation"
+
+import {
+  "moonbitlang/core/debug",
+  "yourname/otel/api",
+  "yourname/otel/context",
+}
+
+// Values
+pub const BAGGAGE_MAX_BYTES : Int32 = 8192
+
+pub const BAGGAGE_MAX_MEMBERS : Int32 = 64
+
+pub const TRACESTATE_MAX_MEMBERS : Int32 = 32
+
+pub fn baggage_header_name() -> String
+
+pub fn context_baggage_header(@context.Context) -> String?
+
+pub fn extract(TextMapCarrier) -> @api.SpanContext?
+
+pub fn extract_baggage(TextMapCarrier) -> Array[(String, String)]
+
+pub fn extract_baggage_context(TextMapCarrier) -> @context.Context
+
+pub fn extract_baggage_entries(TextMapCarrier) -> Array[BaggageEntry]
+
+pub fn extract_context(TextMapCarrier) -> @context.Context
+
+pub fn extract_tracestate(TextMapCarrier) -> String?
+
+pub fn format_baggage(Array[(String, String)]) -> String
+
+pub fn format_baggage_entries(Array[BaggageEntry]) -> String
+
+pub fn format_traceparent(@api.SpanContext) -> String
+
+pub fn global_propagator() -> &TextMapPropagator
+
+pub fn inject(@api.SpanContext, TextMapCarrier) -> Unit
+
+pub fn inject_baggage(@context.Context, TextMapCarrier) -> Unit
+
+pub fn inject_baggage_entries(Array[BaggageEntry], TextMapCarrier) -> Unit
+
+pub fn inject_context(@context.Context, TextMapCarrier) -> Unit
+
+pub fn inject_with_tracestate(@api.SpanContext, String?, TextMapCarrier) -> Unit
+
+pub fn parse_baggage(String) -> Array[(String, String)]
+
+pub fn parse_baggage_entries(String) -> Array[BaggageEntry]
+
+pub fn parse_traceparent(String) -> @api.SpanContext?
+
+pub fn parse_tracestate(String) -> String?
+
+pub fn percent_decode(String) -> String?
+
+pub fn percent_encode(String) -> String
+
+pub fn percent_encoded_length(String) -> Int32
+
+pub fn reset_global_propagator() -> Unit
+
+pub fn set_global_propagator(&TextMapPropagator) -> Unit
+
+pub fn traceparent_header_name() -> String
+
+pub fn tracestate_header_name() -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct BaggageEntry {
+  key : String
+  value : String
+  properties : Array[(String, String)]
+} derive(Eq, @debug.Debug)
+pub fn BaggageEntry::equal(Self, Self) -> Bool
+pub fn BaggageEntry::new(String, String, properties? : Array[(String, String)]) -> Self
+pub fn BaggageEntry::not_equal(Self, Self) -> Bool
+pub fn BaggageEntry::to_repr(Self) -> @debug.Repr
+
+pub struct BaggagePropagator {
+}
+pub fn BaggagePropagator::extract(Self, TextMapCarrier) -> @context.Context
+pub fn BaggagePropagator::inject(Self, @context.Context, TextMapCarrier) -> Unit
+pub fn BaggagePropagator::new() -> Self
+pub impl TextMapPropagator for BaggagePropagator
+
+pub struct CompositePropagator {
+  propagators : Array[&TextMapPropagator]
+}
+pub fn CompositePropagator::extract(Self, TextMapCarrier) -> @context.Context
+pub fn CompositePropagator::from_env() -> Self
+pub fn CompositePropagator::inject(Self, @context.Context, TextMapCarrier) -> Unit
+pub fn CompositePropagator::length(Self) -> Int32
+pub fn CompositePropagator::new(Array[&TextMapPropagator]) -> Self
+pub impl TextMapPropagator for CompositePropagator
+
+pub struct TextMapCarrier {
+  entries : Map[String, String]
+  getter : ((String) -> String?)?
+  setter : ((String, String) -> Unit)?
+}
+pub fn TextMapCarrier::from_entries(Array[(String, String)]) -> Self
+pub fn TextMapCarrier::from_getter((String) -> String?) -> Self
+pub fn TextMapCarrier::from_getter_setter((String) -> String?, (String, String) -> Unit) -> Self
+pub fn TextMapCarrier::from_map(Map[String, String]) -> Self
+pub fn TextMapCarrier::from_setter((String, String) -> Unit) -> Self
+pub fn TextMapCarrier::get(Self, String) -> String?
+pub fn TextMapCarrier::length(Self) -> Int32
+pub fn TextMapCarrier::new() -> Self
+pub fn TextMapCarrier::remove(Self, String) -> Unit
+pub fn TextMapCarrier::set(Self, String, String) -> Unit
+pub fn TextMapCarrier::to_map(Self) -> Map[String, String]
+
+pub struct TraceContextPropagator {
+}
+pub fn TraceContextPropagator::extract(Self, TextMapCarrier) -> @context.Context
+pub fn TraceContextPropagator::inject(Self, @context.Context, TextMapCarrier) -> Unit
+pub fn TraceContextPropagator::new() -> Self
+pub impl TextMapPropagator for TraceContextPropagator
+
+pub struct Tracestate {
+  members : Array[(String, String)]
+}
+pub fn Tracestate::add(Self, String, String) -> Self
+pub fn Tracestate::empty() -> Self
+pub fn Tracestate::entries(Self) -> Array[(String, String)]
+pub fn Tracestate::get(Self, String) -> String?
+pub fn Tracestate::is_empty(Self) -> Bool
+pub fn Tracestate::length(Self) -> Int32
+pub fn Tracestate::parse(String) -> Self?
+pub fn Tracestate::parse_or_empty(String) -> Self
+pub fn Tracestate::remove(Self, String) -> Self
+pub fn Tracestate::to_header(Self) -> String
+pub fn Tracestate::update(Self, String, String) -> Self
+
+// Type aliases
+
+// Traits
+pub(open) trait TextMapPropagator {
+  fn inject(Self, @context.Context, TextMapCarrier) -> Unit
+  fn extract(Self, TextMapCarrier) -> @context.Context
+}
