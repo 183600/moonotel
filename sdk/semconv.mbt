@@ -17,6 +17,12 @@ pub const HTTP_RESPONSE_BODY_SIZE : String = "http.response.body.size"
 pub const HTTP_ROUTE : String = "http.route"
 
 ///|
+pub const HTTP_REQUEST_HEADER_PREFIX : String = "http.request.header."
+
+///|
+pub const HTTP_RESPONSE_HEADER_PREFIX : String = "http.response.header."
+
+///|
 pub const URL_FULL : String = "url.full"
 
 ///|

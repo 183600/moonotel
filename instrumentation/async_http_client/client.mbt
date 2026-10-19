@@ -417,13 +417,16 @@ pub async fn request(
       if port > 0 {
         span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
       }
+      let sent_headers = traced_headers(
+        headers,
+        span.context(),
+        request_context,
+      )
+      @http_header_capture.HeaderCapture::from_env(
+        @http_header_capture.ENV_CLIENT_REQUEST_HEADERS,
+      ).record_request(sent_headers, span)
       let outcome = Ok(
-        @http.request(
-          url,
-          request_method,
-          traced_headers(headers, span.context(), request_context),
-          request_body,
-        ),
+        @http.request(url, request_method, sent_headers, request_body),
       ) catch {
         error => Err(error)
       }
@@ -437,6 +440,9 @@ pub async fn request(
           raise error
         }
       }
+      @http_header_capture.HeaderCapture::from_env(
+        @http_header_capture.ENV_CLIENT_RESPONSE_HEADERS,
+      ).record_response(response.headers, span)
       span.set_attribute(
         @sdk.HTTP_RESPONSE_STATUS_CODE,
         @sdk.IntValue(response.code.to_int64()),

@@ -7,12 +7,14 @@ import {
   "yourname/otel/context",
   "yourname/otel/propagation",
   "yourname/otel/sdk",
+  "yourname/otel/instrumentation/http_header_capture",
 }
 
 import {
   "moonbitlang/async",
   "moonbitlang/async/socket",
   "moonbitlang/core/debug",
+  "moonbitlang/core/env",
 } for "test"
 
 pkgtype(kind: "library")

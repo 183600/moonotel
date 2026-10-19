@@ -6,11 +6,13 @@ import {
   "yourname/otel/context",
   "yourname/otel/propagation",
   "yourname/otel/sdk",
+  "yourname/otel/instrumentation/http_header_capture",
 }
 
 import {
   "moonbitlang/async",
   "moonbitlang/async/socket",
+  "moonbitlang/core/env",
   "yourname/otel/api",
   "yourname/otel/instrumentation/async_http_server" @server,
 } for "test"

@@ -1,0 +1,9 @@
+import {
+  "moonbitlang/async/http",
+  "moonbitlang/core/env",
+  "yourname/otel/sdk",
+}
+
+pkgtype(kind: "library")
+
+supported_targets = "native"

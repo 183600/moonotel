@@ -477,6 +477,13 @@ pub async fn ServerCall::respond(
     extra_headers.get(@http.CaseInsensitiveString("connection")) is None {
     extra_headers.set(@http.CaseInsensitiveString("connection"), "close")
   }
+  match self.span {
+    Some(span) =>
+      @http_header_capture.HeaderCapture::from_env(
+        @http_header_capture.ENV_SERVER_RESPONSE_HEADERS,
+      ).record_response(extra_headers, span)
+    None => ()
+  }
   self.connection.send_response(
     status_code,
     reason.unwrap_or(status_reason(status_code)),
@@ -652,6 +659,9 @@ async fn serve_call(
           )
         None => ()
       }
+      @http_header_capture.HeaderCapture::from_env(
+        @http_header_capture.ENV_SERVER_REQUEST_HEADERS,
+      ).record_request(request.headers, server_span)
     }
     None => ()
   }
