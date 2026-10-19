@@ -183,6 +183,18 @@ pub fn extract_parent(
   extract_context(headers).span_context()
 }
 
+// Strip the square brackets of a bracketed IPv6 literal so that
+// `server.address` holds the bare address, matching `client_host_string`.
+
+///|
+fn strip_ipv6_brackets(address : String) -> String {
+  if address.has_prefix("[") && address.has_suffix("]") {
+    address[1:address.length() - 1].to_owned()
+  } else {
+    address
+  }
+}
+
 ///|
 fn record_host_attributes(
   span : @sdk.SpanSdk,
@@ -199,7 +211,10 @@ fn record_host_attributes(
           }
         None => (host, -1)
       }
-      span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(address))
+      span.set_attribute(
+        @sdk.SERVER_ADDRESS,
+        @sdk.StringValue(strip_ipv6_brackets(address)),
+      )
       if port > 0 {
         span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
       }

@@ -398,25 +398,59 @@ pub fn SpanSdk::parent_span_id(self : SpanSdk) -> Array[Int32] {
   self.parent_span_id.copy()
 }
 
-// The recorded attributes (empty for non-recording spans).
+// The recorded attributes (empty for non-recording spans). The returned map
+// is a snapshot: modifying it does not change the span and cannot bypass the
+// span limits.
 
 ///|
 pub fn SpanSdk::attributes(self : SpanSdk) -> Map[String, AttributeValue] {
-  self.mutable_attributes()
+  match self.attributes {
+    Some(attributes) => copy_attribute_map(attributes)
+    None => Map([], capacity=1)
+  }
 }
 
-// The recorded events (empty for non-recording spans).
+// The recorded events (empty for non-recording spans). The returned array and
+// its events are snapshots: modifying them does not change the span.
 
 ///|
 pub fn SpanSdk::events(self : SpanSdk) -> Array[SpanEvent] {
-  self.mutable_events()
+  match self.events {
+    Some(events) => {
+      let out : Array[SpanEvent] = Array(capacity=events.length())
+      for event in events {
+        out.push({
+          name: event.name,
+          time_unix_nano: event.time_unix_nano,
+          attributes: copy_attribute_map(event.attributes),
+          dropped_attributes_count: event.dropped_attributes_count,
+        })
+      }
+      out
+    }
+    None => []
+  }
 }
 
-// The links of this span.
+// The links of this span. The returned array and its links are snapshots:
+// modifying them does not change the span.
 
 ///|
 pub fn SpanSdk::links(self : SpanSdk) -> Array[SpanLink] {
-  self.mutable_links()
+  match self.links {
+    Some(links) => {
+      let out : Array[SpanLink] = Array(capacity=links.length())
+      for link in links {
+        out.push({
+          span_context: link.span_context,
+          attributes: copy_attribute_map(link.attributes),
+          dropped_attributes_count: link.dropped_attributes_count,
+        })
+      }
+      out
+    }
+    None => []
+  }
 }
 
 // The collection limits this span enforces.

@@ -204,3 +204,42 @@ test "config_from_env_defaults" {
   assert_eq(config.compression, "none")
   assert_eq(config.timeout_millis, 10000)
 }
+
+///|
+test "negative_max_retries_is_clamped_to_zero" {
+  let config = @otlp.OtlpHttpConfig::new(
+    endpoint="http://collector:4318",
+    max_retries=-4,
+  )
+  assert_eq(config.max_retries, 0)
+}
+
+///|
+test "negative_max_retries_still_exports_once" {
+  let mock = mock_transport(500)
+  let exporter = @otlp.OtlpHttpExporter::new(
+    @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318", max_retries=-4),
+    mock.as_transport(),
+  )
+  let result = exporter.export_spans([test_span()])
+  assert_false(result.is_success())
+  assert_eq(mock.urls.length(), 1)
+}
+
+///|
+test "negative_max_retries_on_direct_config_still_exports_once" {
+  let config : @otlp.OtlpHttpConfig = {
+    endpoint: "http://collector:4318",
+    traces_endpoint: None,
+    headers: Map([]),
+    timeout_millis: 10000,
+    compression: "none",
+    protocol: @otlp.OTLP_HTTP_PROTOBUF_PROTOCOL,
+    max_retries: -4,
+  }
+  let mock = mock_transport(500)
+  let exporter = @otlp.OtlpHttpExporter::new(config, mock.as_transport())
+  let result = exporter.export_spans([test_span()])
+  assert_false(result.is_success())
+  assert_eq(mock.urls.length(), 1)
+}

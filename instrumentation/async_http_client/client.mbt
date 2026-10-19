@@ -260,6 +260,18 @@ pub fn split_url(url : String) -> (String, Int32) {
   (host, port)
 }
 
+// Strip the square brackets of a bracketed IPv6 literal so that
+// `server.address` holds the bare address rather than the URI syntax.
+
+///|
+fn strip_ipv6_brackets(address : String) -> String {
+  if address.has_prefix("[") && address.has_suffix("]") {
+    address[1:address.length() - 1].to_owned()
+  } else {
+    address
+  }
+}
+
 // Remove the `userinfo` (credentials) component from an absolute URL, as
 // required by the HTTP semantic conventions for the `url.full` attribute.
 // URLs without an authority or without userinfo are returned unchanged;
@@ -398,7 +410,10 @@ pub async fn request(
       if scheme != "" {
         span.set_attribute(@sdk.URL_SCHEME, @sdk.StringValue(scheme))
       }
-      span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(host))
+      span.set_attribute(
+        @sdk.SERVER_ADDRESS,
+        @sdk.StringValue(strip_ipv6_brackets(host)),
+      )
       if port > 0 {
         span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
       }

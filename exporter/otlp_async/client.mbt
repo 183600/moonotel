@@ -271,10 +271,15 @@ async fn post_trace_request_with_headers(
 ) -> @sdk.ExportResult {
   let json = config.protocol == @otlp.OTLP_HTTP_JSON_PROTOCOL
   let url = config.traces_url()
+  let max_retries = if config.max_retries < 0 {
+    0
+  } else {
+    config.max_retries
+  }
   let mut attempt = 0
   let mut last_failure = ""
   let mut retry_after : Int32? = None
-  while attempt <= config.max_retries {
+  while attempt <= max_retries {
     if attempt > 0 {
       let delay = match retry_after {
         Some(value) => value

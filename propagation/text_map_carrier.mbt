@@ -165,9 +165,16 @@ pub fn TextMapCarrier::length(self : TextMapCarrier) -> Int32 {
   self.entries.length()
 }
 
-// Export the headers as a plain map
+// Export the headers as a plain map. The returned map is a shallow copy, so
+// modifying it does not change the carrier; for a write-through carrier it
+// only holds the entries stored locally (external headers read through the
+// getter are not included).
 
 ///|
 pub fn TextMapCarrier::to_map(self : TextMapCarrier) -> Map[String, String] {
-  self.entries
+  let out : Map[String, String] = Map([])
+  for key, value in self.entries {
+    out.set(key, value)
+  }
+  out
 }

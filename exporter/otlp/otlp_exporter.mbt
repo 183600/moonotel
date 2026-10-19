@@ -88,6 +88,7 @@ pub fn OtlpHttpConfig::new(
   protocol? : String,
   max_retries? : Int32,
 ) -> OtlpHttpConfig {
+  let retries = max_retries.unwrap_or(DEFAULT_MAX_RETRIES)
   {
     endpoint: endpoint.unwrap_or("http://localhost:4318"),
     traces_endpoint,
@@ -95,7 +96,11 @@ pub fn OtlpHttpConfig::new(
     timeout_millis: timeout_millis.unwrap_or(10000),
     compression: compression.unwrap_or("none"),
     protocol: protocol.unwrap_or(OTLP_HTTP_PROTOBUF_PROTOCOL),
-    max_retries: max_retries.unwrap_or(DEFAULT_MAX_RETRIES),
+    max_retries: if retries < 0 {
+      0
+    } else {
+      retries
+    },
   }
 }
 
@@ -434,9 +439,14 @@ pub fn OtlpHttpExporter::export_spans_http(
   }
   let url = self.url
   let headers = self.headers
+  let max_retries = if self.config.max_retries < 0 {
+    0
+  } else {
+    self.config.max_retries
+  }
   let mut attempt = 0
   let mut last_failure = ""
-  while attempt <= self.config.max_retries {
+  while attempt <= max_retries {
     if attempt > 0 {
       (self.retry_wait)(attempt)
     }
