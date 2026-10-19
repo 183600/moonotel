@@ -202,6 +202,13 @@ fn json_parse_rejected_spans(text : String, start : Int32) -> (Int64, Int32)? {
   if pos >= len {
     return None
   }
+  if text.unsafe_get(pos).to_int() == 0x6E {
+    // A JSON `null` is accepted for any field and means the default value.
+    match json_skip_value(text, pos, 0) {
+      Some(after) => return Some((0L, after))
+      None => return None
+    }
+  }
   if text.unsafe_get(pos).to_int() == 0x22 {
     let (raw, after) = match json_parse_string_at(text, pos) {
       Some(pair) => pair
@@ -394,10 +401,22 @@ fn json_parse_partial_success(
   start : Int32,
 ) -> (Int64, String, Int32)? {
   let len = text.length()
-  if start >= len || text.unsafe_get(start).to_int() != 0x7B {
+  let at = json_skip_ws(text, start)
+  if at >= len {
     return None
   }
-  let mut cursor = json_skip_ws(text, start + 1)
+  if text.unsafe_get(at).to_int() == 0x6E {
+    // A JSON `null` is accepted for any field and means the default value,
+    // i.e. an empty partial-success message.
+    match json_skip_value(text, at, 0) {
+      Some(after) => return Some((0L, "", after))
+      None => return None
+    }
+  }
+  if text.unsafe_get(at).to_int() != 0x7B {
+    return None
+  }
+  let mut cursor = json_skip_ws(text, at + 1)
   if cursor < len && text.unsafe_get(cursor).to_int() == 0x7D {
     return Some((0L, "", cursor + 1))
   }
@@ -421,12 +440,20 @@ fn json_parse_partial_success(
       rejected = value
       cursor = after
     } else if key == "errorMessage" {
-      let (value, after) = match json_parse_string_at(text, cursor) {
-        Some(pair) => pair
-        None => return None
+      if cursor < len && text.unsafe_get(cursor).to_int() == 0x6E {
+        // A JSON `null` is accepted for any field and means the default value.
+        cursor = match json_skip_value(text, cursor, 0) {
+          Some(end) => end
+          None => return None
+        }
+      } else {
+        let (value, after) = match json_parse_string_at(text, cursor) {
+          Some(pair) => pair
+          None => return None
+        }
+        message = value
+        cursor = after
       }
-      message = value
-      cursor = after
     } else {
       cursor = match json_skip_value(text, cursor, 0) {
         Some(end) => end

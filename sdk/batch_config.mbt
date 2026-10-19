@@ -23,6 +23,28 @@ fn env_int(name : String, default : Int32) -> Int32 {
   }
 }
 
+// Read a non-negative integer from an environment variable, falling back to
+// `default` when the variable is absent, not a valid integer, or negative.
+// Durations accept zero; only negative values are invalid.
+
+///|
+fn env_duration(name : String, default : Int32) -> Int32 {
+  match @env.get_env_var(name) {
+    Some(value) =>
+      try {
+        let parsed = @string.parse_int(value.trim())
+        if parsed < 0 {
+          default
+        } else {
+          parsed
+        }
+      } catch {
+        _ => default
+      }
+    None => default
+  }
+}
+
 ///|
 pub struct BatchConfig {
   max_queue_size : Int32
@@ -84,7 +106,7 @@ pub fn BatchConfig::default() -> BatchConfig {
 pub fn BatchConfig::from_env() -> BatchConfig {
   let queue_size = env_int("OTEL_BSP_MAX_QUEUE_SIZE", 2048)
   let batch_size = env_int("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", 512)
-  let schedule_delay = env_int("OTEL_BSP_SCHEDULE_DELAY", 5000)
+  let schedule_delay = env_duration("OTEL_BSP_SCHEDULE_DELAY", 5000)
   let effective_batch = if batch_size > queue_size {
     queue_size
   } else {

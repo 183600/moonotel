@@ -221,18 +221,23 @@ fn non_blank_env_value(name : String) -> String? {
 }
 
 // Parse the timeout environment variable `name`. `None` when the variable is
-// unset, blank or not a positive integer, so that the caller can continue with
-// the next fallback.
+// unset, blank, negative or not an integer, so that the caller can continue
+// with the next fallback. A zero timeout means "no timeout" per the
+// OpenTelemetry configuration specification.
 
 ///|
 fn parse_timeout_env(name : String) -> Int32? {
   match @env.get_env_var(name) {
     Some(value) => {
-      let parsed = @string.parse_int(value.trim()) catch { _ => 0 }
-      if parsed > 0 {
-        Some(parsed)
-      } else {
-        None
+      let trimmed = value.trim()
+      let parsed = try {
+        Some(@string.parse_int(trimmed))
+      } catch {
+        _ => None
+      }
+      match parsed {
+        Some(number) => if number >= 0 { Some(number) } else { None }
+        None => None
       }
     }
     None => None

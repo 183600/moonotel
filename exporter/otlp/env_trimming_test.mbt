@@ -98,3 +98,21 @@ test "non_ascii_percent_escape_is_kept_verbatim" {
   unset_otlp_env()
   assert_eq(config.headers.get("x"), Some("%éA"))
 }
+
+///|
+test "zero_timeout_means_no_timeout" {
+  unset_otlp_env()
+  @env.set_env_var("OTEL_EXPORTER_OTLP_TIMEOUT", "0")
+  let config = @otlp.OtlpHttpConfig::from_env()
+  unset_otlp_env()
+  assert_eq(config.timeout_millis, 0)
+}
+
+///|
+test "negative_timeout_falls_back_to_default" {
+  unset_otlp_env()
+  @env.set_env_var("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", "-250")
+  let config = @otlp.OtlpHttpConfig::from_env()
+  unset_otlp_env()
+  assert_eq(config.timeout_millis, 10000)
+}

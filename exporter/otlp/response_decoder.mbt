@@ -54,13 +54,23 @@ pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
   let data = body.exact_view()
   let length = data.length()
   let mut pos = 0
+  // Repeated occurrences of a message field are merged, so a later
+  // `partial_success` may overwrite (including with zero values) fields set by
+  // an earlier occurrence. Evaluate only after the whole body is parsed.
+  let mut rejected : UInt64 = 0
+  let mut error_message = ""
   while pos < length {
     let (tag, after_tag) = match read_response_varint(data, pos) {
       Some(pair) => pair
       None => return malformed_response()
     }
     pos = after_tag
-    let field = (tag >> 3).to_int()
+    let field_number = tag >> 3
+    // Protobuf field numbers are 1-based and must fit in 29 bits.
+    if field_number == 0UL || field_number > 536870911UL {
+      return malformed_response()
+    }
+    let field = field_number.to_int()
     let wire = (tag & 7).to_int()
     if wire == 2 {
       let (size, after_size) = match read_response_varint(data, pos) {
@@ -75,8 +85,6 @@ pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
         // partial_success { int64 rejected_spans = 1; string error_message = 2; }
         let partial = data.exact_view(start=after_size, end~)
         let mut inner = 0
-        let mut rejected : UInt64 = 0
-        let mut error_message = ""
         while inner < partial.length() {
           let (inner_tag, inner_after) = match
             read_response_varint(partial, inner) {
@@ -84,7 +92,12 @@ pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
             None => return malformed_response()
           }
           inner = inner_after
-          let inner_field = (inner_tag >> 3).to_int()
+          let inner_field_number = inner_tag >> 3
+          // Protobuf field numbers are 1-based and must fit in 29 bits.
+          if inner_field_number == 0UL || inner_field_number > 536870911UL {
+            return malformed_response()
+          }
+          let inner_field = inner_field_number.to_int()
           let inner_wire = (inner_tag & 7).to_int()
           if inner_wire == 0 {
             let (value, value_after) = match

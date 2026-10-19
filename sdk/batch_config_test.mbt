@@ -141,3 +141,12 @@ test "batch_processor_with_config_uses_every_field" {
   assert_eq(processor.queue_size(), 0)
   assert_true(probe_names_equal(exporter.names, ["s2"]))
 }
+
+///|
+test "batch_config_from_env_accepts_zero_schedule_delay" {
+  clear_bsp_env()
+  @env.set_env_var("OTEL_BSP_SCHEDULE_DELAY", "0")
+  let config = @sdk.BatchConfig::from_env()
+  clear_bsp_env()
+  assert_eq(config.flush_interval_millis, 0)
+}
