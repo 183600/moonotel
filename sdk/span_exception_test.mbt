@@ -71,6 +71,41 @@ test "record_exception honours the exception_type override" {
 }
 
 ///|
+test "record_exception records additional attributes" {
+  let (span, exporter) = exception_test_setup(@sdk.Sampler::always_on())
+  let extra : Map[String, @sdk.AttributeValue] = Map([
+    ("http.status_code", @sdk.IntValue(500)),
+  ])
+  span.record_exception(TestError("boom"), attributes=extra)
+  span.end()
+  let data = exporter.spans[0]
+  assert_eq(
+    data.events[0].attributes.get("http.status_code"),
+    Some(@sdk.IntValue(500)),
+  )
+  match data.events[0].attributes.get(@sdk.EXCEPTION_TYPE) {
+    Some(@sdk.StringValue(type_name)) =>
+      assert_true(type_name.contains("TestError"))
+    _ => fail("exception.type attribute is missing")
+  }
+}
+
+///|
+test "record_exception additional attributes take precedence" {
+  let (span, exporter) = exception_test_setup(@sdk.Sampler::always_on())
+  let extra : Map[String, @sdk.AttributeValue] = Map([
+    (@sdk.EXCEPTION_MESSAGE, @sdk.StringValue("overridden")),
+  ])
+  span.record_exception(TestError("boom"), attributes=extra)
+  span.end()
+  let data = exporter.spans[0]
+  assert_eq(
+    data.events[0].attributes.get(@sdk.EXCEPTION_MESSAGE),
+    Some(@sdk.StringValue("overridden")),
+  )
+}
+
+///|
 test "record_exception is ignored on non-recording spans" {
   let (span, exporter) = exception_test_setup(@sdk.Sampler::always_off())
   assert_false(span.is_recording())

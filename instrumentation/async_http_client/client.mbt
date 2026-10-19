@@ -167,6 +167,33 @@ fn find_authority_end(text : StringView) -> Int32 {
   len
 }
 
+// Split the path and query components of a URL. The fragment is dropped and
+// the query is returned without its leading `?`. An URL without a path yields
+// an empty path; callers apply the semantic conventions default.
+
+///|
+fn split_url_path_query(url : String) -> (String, String) {
+  let rest = match url.find("://") {
+    Some(index) => {
+      let after_scheme = url[index + 3:]
+      after_scheme[find_authority_end(after_scheme):]
+    }
+    None => url[:]
+  }
+  let without_fragment = match rest.find("#") {
+    Some(index) => rest[:index]
+    None => rest
+  }
+  match without_fragment.find("?") {
+    Some(index) =>
+      (
+        without_fragment[:index].to_owned(),
+        without_fragment[index + 1:].to_owned(),
+      )
+    None => (without_fragment.to_owned(), "")
+  }
+}
+
 // Split an absolute URL into (scheme, host, port). The scheme is "" when the
 // URL has no valid scheme; the port falls back to the scheme default when it
 // is not explicit; an explicit but unparsable port yields -1.
@@ -409,6 +436,14 @@ pub async fn request(
       let (scheme, host, port) = split_url_parts(url)
       if scheme != "" {
         span.set_attribute(@sdk.URL_SCHEME, @sdk.StringValue(scheme))
+      }
+      let (url_path, url_query) = split_url_path_query(url)
+      span.set_attribute(
+        @sdk.URL_PATH,
+        @sdk.StringValue(if url_path == "" { "/" } else { url_path }),
+      )
+      if url_query != "" {
+        span.set_attribute(@sdk.URL_QUERY, @sdk.StringValue(url_query))
       }
       span.set_attribute(
         @sdk.SERVER_ADDRESS,

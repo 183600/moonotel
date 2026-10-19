@@ -151,6 +151,35 @@ async test "get creates a client span and injects traceparent" {
 }
 
 ///|
+async test "client span records the url path and query" {
+  let (tracer, exporter) = test_tracer("client-url-parts")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      server.run_forever() <| ((_request, _body, conn) => {
+        conn.send_response(200, "OK")
+      })
+    }
+    let (response, _body) = @async_http_client.get(
+      "http://127.0.0.1:\{port}/search?q=moonbit&lang=zh",
+      tracer~,
+      context=@context.Context::root(),
+    )
+    assert_eq(response.code, 200)
+    let data = exporter.spans.val[0]
+    assert_eq(
+      data.attributes.get(@sdk.URL_PATH),
+      Some(@sdk.StringValue("/search")),
+    )
+    assert_eq(
+      data.attributes.get(@sdk.URL_QUERY),
+      Some(@sdk.StringValue("q=moonbit&lang=zh")),
+    )
+  }
+}
+
+///|
 async test "client span continues the current trace context" {
   let (tracer, exporter) = test_tracer("client-test-parent")
   @async.with_task_group() <| group => {

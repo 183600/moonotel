@@ -729,14 +729,16 @@ pub fn SpanSdk::add_link(self : SpanSdk, link : SpanLink) -> Unit {
 }
 
 // Record an exception as an `exception` event, following the OpenTelemetry
-// semantic conventions (`exception.type` / `exception.message`).
-// No-op for non-recording or ended spans.
+// semantic conventions (`exception.type` / `exception.message`). Additional
+// event attributes may be supplied; they take precedence over the attributes
+// derived from the error. No-op for non-recording or ended spans.
 
 ///|
 pub fn SpanSdk::record_exception(
   self : SpanSdk,
   error : Error,
   exception_type? : String,
+  attributes? : Map[String, AttributeValue],
   time_unix_nano? : Int64,
 ) -> Unit {
   if self.recording && !self.ended {
@@ -745,11 +747,18 @@ pub fn SpanSdk::record_exception(
       Some(value) => value
       None => error.to_string()
     }
-    let attributes : Map[String, AttributeValue] = Map([
+    let event_attributes : Map[String, AttributeValue] = Map([
       (EXCEPTION_TYPE, StringValue(type_name)),
       (EXCEPTION_MESSAGE, StringValue(message)),
     ])
-    self.add_event("exception", attributes~, time_unix_nano?)
+    match attributes {
+      Some(extra) =>
+        for key, value in extra {
+          event_attributes.set(key, value)
+        }
+      None => ()
+    }
+    self.add_event("exception", attributes=event_attributes, time_unix_nano?)
   }
 }
 
