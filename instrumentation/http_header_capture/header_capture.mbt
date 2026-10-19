@@ -20,8 +20,8 @@ pub const ENV_CLIENT_REQUEST_HEADERS : String = "OTEL_INSTRUMENTATION_HTTP_CAPTU
 ///|
 pub const ENV_CLIENT_RESPONSE_HEADERS : String = "OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_RESPONSE"
 
-// A parsed header-capture configuration. Empty configurations are cheap: no
-// headers are inspected and no attributes are recorded.
+// A parsed header-capture configuration. Empty configurations inspect no
+// headers and record no attributes.
 
 ///|
 pub struct HeaderCapture {

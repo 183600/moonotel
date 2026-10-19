@@ -362,8 +362,7 @@ fn hex_to_bytes(hex : String, out : Array[Int32]) -> Bool {
   let n = out.length()
   let mut bad = 0
   let mut i = 0
-  // Four bytes per iteration: fewer loop-control steps for the common fixed
-  // sizes (16 and 8 bytes).
+  // Process four bytes per iteration.
   while i + 4 <= n {
     let h0 = hex_unit_value(hex.unsafe_get(i * 2))
     let l0 = hex_unit_value(hex.unsafe_get(i * 2 + 1))
@@ -399,8 +398,7 @@ fn hex_to_nonzero_bytes(hex : String, start : Int32, out : Array[Int32]) -> Bool
   let mut bad = 0
   let mut acc = 0
   let mut i = 0
-  // Four bytes per iteration: fewer loop-control steps for the common fixed
-  // sizes (16 and 8 bytes).
+  // Process four bytes per iteration.
   while i + 4 <= n {
     let h0 = hex_unit_value(hex.unsafe_get(start + i * 2))
     let l0 = hex_unit_value(hex.unsafe_get(start + i * 2 + 1))

@@ -101,7 +101,7 @@ pub impl SpanExporter for InMemorySpanExporter with fn export_span(self, data) {
   if self.shutdown_called {
     ExportFailure("in-memory exporter is shut down")
   } else {
-    // `[data]` is freshly allocated, so no defensive copy is needed.
+    // Store the batch as its own array.
     self.batches.push([data])
     self.span_total = self.span_total + 1
     ExportSuccess

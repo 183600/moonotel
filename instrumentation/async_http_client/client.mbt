@@ -363,8 +363,7 @@ fn traced_headers(
   let out = plain_headers(headers, extra=3)
   // Inject through the process-wide propagator so that the headers written are
   // the ones selected by `OTEL_PROPAGATORS` (by default `traceparent`,
-  // `tracestate` and `baggage`). The carrier reads and writes `out` directly,
-  // so no intermediate map or second copy is needed for the injected headers.
+  // `tracestate` and `baggage`). The carrier reads and writes `out` directly.
   let carrier = @propagation.TextMapCarrier::from_getter_setter(
     fn(key) { out.get(@http.CaseInsensitiveString(key)) },
     fn(key, value) { out.set(@http.CaseInsensitiveString(key), value) },

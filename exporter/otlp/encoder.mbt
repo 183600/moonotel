@@ -246,8 +246,7 @@ fn encode_attributes(
   if attributes.length() == 0 {
     return
   }
-  // `to_array` preserves insertion order and avoids one iterator allocation
-  // per entry.
+  // Iterate the attributes in insertion order.
   for entry in attributes.to_array() {
     let (key, value) = entry
     if !try_encode_scalar_attribute(writer, field, key, value) {
@@ -492,8 +491,7 @@ fn find_scope_group(
         None => None
       }
     None => {
-      // Avoid building the lookup index while the group has at most one
-      // scope: a linear scan over one entry is cheaper than a map.
+      // Use a linear scan for a group with at most one scope.
       if group.scopes.length() < 2 {
         let mut found : ScopeGroup? = None
         for scope in group.scopes {
@@ -523,9 +521,7 @@ fn find_scope_group(
 }
 
 // Count-based estimate of the encoded attribute size. Values are not
-// inspected: the per-span estimate is on the hot path, and actual buffer
-// capacities are stabilized by the writer pools anyway, so underestimating
-// long string payloads only costs a rare buffer growth.
+// inspected.
 
 ///|
 fn estimate_attributes_size(
@@ -585,7 +581,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   // `resource_index` yet.
   let mut unindexed = false
   // Keys of resources already seen, keyed by physical identity. Allocated on
-  // the first switch away from a resource, which is rare.
+  // the first switch away from a resource.
   let mut known_resource_keys : Array[
     (Map[String, @sdk.AttributeValue], String),
   ]? = None
@@ -737,10 +733,8 @@ pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
   if spans.length() == 0 {
     return b""
   }
-  // Fast path: every span shares the same resource and the same scope, so
-  // grouping would produce a single resource/scope group. This is the common
-  // case for spans of one provider and tracer, and it skips the grouping
-  // allocations.
+  // When every span shares the same resource and scope, they form a single
+  // resource/scope group.
   let first = spans[0]
   let shared_resource = first.resource.as_map()
   let mut uniform = true
