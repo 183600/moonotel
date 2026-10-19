@@ -365,9 +365,7 @@ fn encode_span_fields(span : ProtoWriter, data : @sdk.SpanData) -> Unit {
   )
 }
 
-// Encode a span (field 2) straight into `writer`, patching the length prefix
-// once the body is written. This skips the intermediate scratch buffer used
-// by `append_message`.
+// Encode a span (field 2) into `writer`.
 
 ///|
 fn encode_span_direct(writer : ProtoWriter, data : @sdk.SpanData) -> Unit {

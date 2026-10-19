@@ -245,8 +245,7 @@ pub fn TracerProviderSdk::processor_count(self : TracerProviderSdk) -> Int32 {
   self.processors.length()
 }
 
-// Whether `shutdown` has been called. The flag is shared by every copy of
-// the provider, so tracers created before the shutdown observe it too.
+// Whether `shutdown` has been called.
 
 ///|
 pub fn TracerProviderSdk::is_shutdown(self : TracerProviderSdk) -> Bool {

@@ -95,8 +95,6 @@ fn JsonBuf::write_bytes(self : JsonBuf, bytes : Bytes) -> Unit {
   if n >= 16 {
     buf.blit_from_bytes(pos, bytes, 0, n)
   } else {
-    // Most JSON literals are short; copying them with a few wide loads and
-    // stores avoids the call overhead of a bulk copy.
     let mut i = 0
     while i + 8 <= n {
       buf.unsafe_write_uint64_le(pos + i, bytes.unsafe_read_uint64_le(i))
@@ -729,8 +727,8 @@ pub fn encode_trace_request_json(spans : Array[@sdk.SpanData]) -> Bytes {
   if spans.length() == 0 {
     return b""
   }
-  // When every span shares the same resource and scope, emit the single
-  // resource/scope group directly instead of building the grouping structure.
+  // When every span shares the same resource and scope, they form a single
+  // resource/scope group.
   let first = spans[0]
   let shared_resource = first.resource.as_map()
   let mut uniform = true
