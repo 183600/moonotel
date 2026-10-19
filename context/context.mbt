@@ -164,8 +164,7 @@ pub fn Context::with_baggage(
   let baggage : Map[String, String] = Map(
     [], capacity=map_capacity_for_entries(values.length()),
   )
-  for entry in values.to_array() {
-    let (key, value) = entry
+  for key, value in values {
     baggage.set(key, value)
   }
   {
@@ -321,28 +320,34 @@ pub fn Context::baggage_entry(self : Context, key : String) -> BaggageEntry? {
 ///|
 pub fn Context::baggage_entries(self : Context) -> Array[BaggageEntry] {
   let entries : Array[BaggageEntry] = []
-  let values : Map[String, Bool] = Map([])
-  let mut deleted : Map[String, Bool]? = None
+  // Keys whose innermost occurrence is a `without_value` marker. Kept as an
+  // array because the chain is short and this avoids allocating lookup maps
+  // on every call.
+  let deleted : Array[String] = []
   let mut cursor : Context? = Some(self)
   while true {
     match cursor {
       Some(context) => {
         match context.key {
           Some(key) => {
-            let mut visible = values.get(key) is None
+            let mut visible = true
+            for existing in entries {
+              if existing.key == key {
+                visible = false
+                break
+              }
+            }
             if visible {
-              match deleted {
-                Some(removed) =>
-                  if removed.get(key) is Some(_) {
-                    visible = false
-                  }
-                None => ()
+              for removed in deleted {
+                if removed == key {
+                  visible = false
+                  break
+                }
               }
             }
             if visible {
               match context.value {
-                Some(value) => {
-                  values.set(key, true)
+                Some(value) =>
                   entries.push({
                     key,
                     value,
@@ -351,16 +356,7 @@ pub fn Context::baggage_entries(self : Context) -> Array[BaggageEntry] {
                       None => []
                     },
                   })
-                }
-                None =>
-                  match deleted {
-                    Some(removed) => removed.set(key, true)
-                    None => {
-                      let removed : Map[String, Bool] = Map([])
-                      removed.set(key, true)
-                      deleted = Some(removed)
-                    }
-                  }
+                None => deleted.push(key)
               }
             }
           }
@@ -368,20 +364,23 @@ pub fn Context::baggage_entries(self : Context) -> Array[BaggageEntry] {
         }
         match context.baggage_map {
           Some(map) =>
-            for entry in map.to_array() {
-              let (key, value) = entry
-              let mut visible = values.get(key) is None
-              if visible {
-                match deleted {
-                  Some(removed) =>
-                    if removed.get(key) is Some(_) {
-                      visible = false
-                    }
-                  None => ()
+            for key, value in map {
+              let mut visible = true
+              for existing in entries {
+                if existing.key == key {
+                  visible = false
+                  break
                 }
               }
               if visible {
-                values.set(key, true)
+                for removed in deleted {
+                  if removed == key {
+                    visible = false
+                    break
+                  }
+                }
+              }
+              if visible {
                 entries.push({ key, value, properties: [] })
               }
             }
@@ -400,44 +399,41 @@ pub fn Context::baggage_entries(self : Context) -> Array[BaggageEntry] {
 
 ///|
 pub fn Context::has_baggage(self : Context) -> Bool {
-  let mut seen : Map[String, Bool]? = None
+  let deleted : Array[String] = []
   let mut cursor : Context? = Some(self)
   while true {
     match cursor {
       Some(context) => {
         match context.key {
-          Some(key) =>
-            match seen {
-              Some(keys) =>
-                if keys.get(key) is None {
-                  keys.set(key, true)
-                  match context.value {
-                    Some(_) => return true
-                    None => ()
-                  }
-                }
-              None =>
-                match context.value {
-                  Some(_) => return true
-                  None => {
-                    let keys : Map[String, Bool] = Map([])
-                    keys.set(key, true)
-                    seen = Some(keys)
-                  }
-                }
+          Some(key) => {
+            let mut removed = false
+            for candidate in deleted {
+              if candidate == key {
+                removed = true
+                break
+              }
             }
+            if !removed {
+              match context.value {
+                Some(_) => return true
+                None => deleted.push(key)
+              }
+            }
+          }
           None => ()
         }
         match context.baggage_map {
           Some(map) =>
-            for entry in map.to_array() {
-              let (key, _) = entry
-              match seen {
-                Some(keys) =>
-                  if keys.get(key) is None {
-                    return true
-                  }
-                None => return true
+            for key, _ in map {
+              let mut removed = false
+              for candidate in deleted {
+                if candidate == key {
+                  removed = true
+                  break
+                }
+              }
+              if !removed {
+                return true
               }
             }
           None => ()
@@ -456,56 +452,44 @@ pub fn Context::has_baggage(self : Context) -> Bool {
 ///|
 pub fn Context::baggage(self : Context) -> Map[String, String] {
   let values = Map([])
-  let mut deleted : Map[String, Bool]? = None
+  let deleted : Array[String] = []
   let mut cursor : Context? = Some(self)
   while true {
     match cursor {
       Some(context) => {
         match context.key {
-          Some(key) => {
-            let mut visible = values.get(key) is None
-            if visible {
-              match deleted {
-                Some(removed) =>
-                  if removed.get(key) is Some(_) {
-                    visible = false
-                  }
-                None => ()
+          Some(key) =>
+            if values.get(key) is None {
+              let mut removed = false
+              for candidate in deleted {
+                if candidate == key {
+                  removed = true
+                  break
+                }
+              }
+              if !removed {
+                match context.value {
+                  Some(value) => values.set(key, value)
+                  None => deleted.push(key)
+                }
               }
             }
-            if visible {
-              match context.value {
-                Some(value) => values.set(key, value)
-                None =>
-                  match deleted {
-                    Some(removed) => removed.set(key, true)
-                    None => {
-                      let removed : Map[String, Bool] = Map([])
-                      removed.set(key, true)
-                      deleted = Some(removed)
-                    }
-                  }
-              }
-            }
-          }
           None => ()
         }
         match context.baggage_map {
           Some(map) =>
-            for entry in map.to_array() {
-              let (key, value) = entry
-              let mut visible = values.get(key) is None
-              if visible {
-                match deleted {
-                  Some(removed) =>
-                    if removed.get(key) is Some(_) {
-                      visible = false
-                    }
-                  None => ()
+            for key, value in map {
+              if values.get(key) is None {
+                let mut removed = false
+                for candidate in deleted {
+                  if candidate == key {
+                    removed = true
+                    break
+                  }
                 }
-              }
-              if visible {
-                values.set(key, value)
+                if !removed {
+                  values.set(key, value)
+                }
               }
             }
           None => ()

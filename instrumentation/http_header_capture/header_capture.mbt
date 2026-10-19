@@ -49,14 +49,40 @@ pub fn HeaderCapture::parse(spec : String) -> HeaderCapture {
   { capture_all, names }
 }
 
+// Last parsed configuration per environment variable. Instrumentations ask
+// for the same four variables on every request; keeping the parse result
+// avoids re-splitting the list while still noticing environment changes (the
+// raw value is compared on each call).
+
+///|
+let header_capture_cache : Map[String, (String?, HeaderCapture)] = Map([])
+
 // Read and parse a header-capture configuration from an environment variable.
 // A missing or blank variable disables capture.
 
 ///|
 pub fn HeaderCapture::from_env(variable : String) -> HeaderCapture {
-  match @env.get_env_var(variable) {
-    Some(value) => HeaderCapture::parse(value)
-    None => HeaderCapture::parse("")
+  let raw = @env.get_env_var(variable)
+  match header_capture_cache.get(variable) {
+    Some((cached_raw, capture)) =>
+      if cached_raw == raw {
+        capture
+      } else {
+        let capture = match raw {
+          Some(value) => HeaderCapture::parse(value)
+          None => HeaderCapture::parse("")
+        }
+        header_capture_cache.set(variable, (raw, capture))
+        capture
+      }
+    None => {
+      let capture = match raw {
+        Some(value) => HeaderCapture::parse(value)
+        None => HeaderCapture::parse("")
+      }
+      header_capture_cache.set(variable, (raw, capture))
+      capture
+    }
   }
 }
 
@@ -72,7 +98,13 @@ pub fn HeaderCapture::is_enabled(self : HeaderCapture) -> Bool {
 
 ///|
 pub fn HeaderCapture::captures(self : HeaderCapture, name : String) -> Bool {
-  self.capture_all || self.names.contains(name.to_lower())
+  if self.capture_all {
+    true
+  } else if self.names.length() == 0 {
+    false
+  } else {
+    self.names.contains(name.to_lower())
+  }
 }
 
 ///|
@@ -91,8 +123,7 @@ fn record_headers(
       )
     }
   } else if capture.names.length() > 0 {
-    for entry in capture.names.to_array() {
-      let (name, _) = entry
+    for name, _ in capture.names {
       match headers.get(@http.CaseInsensitiveString(name)) {
         Some(value) =>
           span.set_attribute(

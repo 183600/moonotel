@@ -345,8 +345,7 @@ fn plain_headers(
     Some(values) => {
       let total = values.length() + extra
       let out = Map([], capacity=map_capacity_for_entries(total))
-      for entry in values.to_array() {
-        let (key, value) = entry
+      for key, value in values {
         out.set(@http.CaseInsensitiveString(key), value)
       }
       out

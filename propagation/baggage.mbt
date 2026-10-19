@@ -781,54 +781,89 @@ pub fn format_baggage_entries(entries : Array[BaggageEntry]) -> String {
   if entries.length() == 0 {
     return ""
   }
-  // First pass: normalize the members that fit within the limits (at most
-  // `BAGGAGE_MAX_MEMBERS` members and `BAGGAGE_MAX_BYTES` bytes). Invalid keys
-  // are skipped, invalid or duplicated properties are dropped; once a member
-  // would exceed the byte budget it and every following member are dropped.
-  let members : Array[BaggageEntry] = []
-  let mut bytes = 0
   let mut size = 0
-  for entry in entries {
-    if members.length() >= BAGGAGE_MAX_MEMBERS {
-      break
+  // Fast path: every member is valid, has no properties and fits within the
+  // limits, so the input array can be rendered without building a normalized
+  // copy first.
+  let mut simple = entries.length() <= BAGGAGE_MAX_MEMBERS
+  if simple {
+    let mut bytes = 0
+    let mut i = 0
+    while i < entries.length() {
+      let entry = entries.unsafe_get(i)
+      if !is_valid_baggage_key(entry.key) || entry.properties.length() > 0 {
+        simple = false
+        break
+      }
+      let separator = if i > 0 { 1 } else { 0 }
+      let member_size = entry.key.length() +
+        1 +
+        separator +
+        percent_encoded_length(entry.value)
+      if bytes + member_size > BAGGAGE_MAX_BYTES {
+        simple = false
+        break
+      }
+      bytes = bytes + member_size
+      i = i + 1
     }
-    if !is_valid_baggage_key(entry.key) {
-      continue
+    if simple {
+      size = bytes
     }
-    let properties : Array[(String, String)] = []
-    for property in entry.properties {
-      if is_valid_baggage_key(property.0) {
-        let mut duplicate = false
-        for existing in properties {
-          if existing.0 == property.0 {
-            duplicate = true
-            break
+  }
+  let members : Array[BaggageEntry] = if simple {
+    entries
+  } else {
+    // Normalize the members that fit within the limits (at most
+    // `BAGGAGE_MAX_MEMBERS` members and `BAGGAGE_MAX_BYTES` bytes). Invalid
+    // keys are skipped, invalid or duplicated properties are dropped; once a
+    // member would exceed the byte budget it and every following member are
+    // dropped.
+    let members : Array[BaggageEntry] = Array(capacity=entries.length())
+    let mut bytes = 0
+    for entry in entries {
+      if members.length() >= BAGGAGE_MAX_MEMBERS {
+        break
+      }
+      if !is_valid_baggage_key(entry.key) {
+        continue
+      }
+      let properties : Array[(String, String)] = []
+      for property in entry.properties {
+        if is_valid_baggage_key(property.0) {
+          let mut duplicate = false
+          for existing in properties {
+            if existing.0 == property.0 {
+              duplicate = true
+              break
+            }
+          }
+          if !duplicate {
+            properties.push(property)
           }
         }
-        if !duplicate {
-          properties.push(property)
-        }
       }
+      let separator = if members.length() > 0 { 1 } else { 0 }
+      let mut member_size = entry.key.length() +
+        1 +
+        separator +
+        percent_encoded_length(entry.value)
+      for property in properties {
+        member_size = member_size + baggage_property_size(property.0, property.1)
+      }
+      if bytes + member_size > BAGGAGE_MAX_BYTES {
+        break
+      }
+      members.push({ key: entry.key, value: entry.value, properties, })
+      bytes = bytes + member_size
+      size = size + member_size
     }
-    let separator = if members.length() > 0 { 1 } else { 0 }
-    let mut member_size = entry.key.length() +
-      1 +
-      separator +
-      percent_encoded_length(entry.value)
-    for property in properties {
-      member_size = member_size + baggage_property_size(property.0, property.1)
-    }
-    if bytes + member_size > BAGGAGE_MAX_BYTES {
-      break
-    }
-    members.push({ key: entry.key, value: entry.value, properties, })
-    bytes = bytes + member_size
-    size = size + member_size
+    members
   }
   if members.length() == 0 {
     return ""
   }
-  // Second pass: render the selected members into a UTF-16LE buffer.
+  // Render the selected members into a UTF-16LE buffer.
   let out : FixedArray[Byte] = FixedArray::make(size * 2, b'\x00')
   let mut pos = 0
   let mut written = 0
@@ -866,36 +901,69 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
   if entries.length() == 0 {
     return ""
   }
-  // First pass: select the members that fit within the limits. Invalid keys
-  // are skipped; once a member would exceed the byte budget it and every
-  // following member are dropped.
-  let selected : Array[(String, String)] = []
-  let mut bytes = 0
   let mut size = 0
-  for entry in entries {
-    if selected.length() >= BAGGAGE_MAX_MEMBERS {
-      break
+  // Fast path: every pair is valid and fits within the limits, so the input
+  // can be rendered without building a selected copy.
+  let mut simple = entries.length() <= BAGGAGE_MAX_MEMBERS
+  if simple {
+    let mut bytes = 0
+    let mut i = 0
+    while i < entries.length() {
+      let entry = entries.unsafe_get(i)
+      if !is_valid_baggage_key(entry.0) {
+        simple = false
+        break
+      }
+      let separator = if i > 0 { 1 } else { 0 }
+      let member_size = entry.0.length() +
+        1 +
+        separator +
+        percent_encoded_length(entry.1)
+      if bytes + member_size > BAGGAGE_MAX_BYTES {
+        simple = false
+        break
+      }
+      bytes = bytes + member_size
+      i = i + 1
     }
-    let key = entry.0
-    if !is_valid_baggage_key(key) {
-      continue
+    if simple {
+      size = bytes
     }
-    let separator = if selected.length() > 0 { 1 } else { 0 }
-    let member_size = key.length() +
-      1 +
-      separator +
-      percent_encoded_length(entry.1)
-    if bytes + member_size > BAGGAGE_MAX_BYTES {
-      break
+  }
+  let selected : Array[(String, String)] = if simple {
+    entries
+  } else {
+    // Select the members that fit within the limits. Invalid keys are
+    // skipped; once a member would exceed the byte budget it and every
+    // following member are dropped.
+    let selected : Array[(String, String)] = Array(capacity=entries.length())
+    let mut bytes = 0
+    for entry in entries {
+      if selected.length() >= BAGGAGE_MAX_MEMBERS {
+        break
+      }
+      let key = entry.0
+      if !is_valid_baggage_key(key) {
+        continue
+      }
+      let separator = if selected.length() > 0 { 1 } else { 0 }
+      let member_size = key.length() +
+        1 +
+        separator +
+        percent_encoded_length(entry.1)
+      if bytes + member_size > BAGGAGE_MAX_BYTES {
+        break
+      }
+      selected.push(entry)
+      bytes = bytes + member_size
+      size = size + member_size
     }
-    selected.push(entry)
-    bytes = bytes + member_size
-    size = size + member_size
+    selected
   }
   if selected.length() == 0 {
     return ""
   }
-  // Second pass: render the selected members into a UTF-16LE buffer.
+  // Render the selected members into a UTF-16LE buffer.
   let out : FixedArray[Byte] = FixedArray::make(size * 2, b'\x00')
   let mut pos = 0
   let mut written = 0

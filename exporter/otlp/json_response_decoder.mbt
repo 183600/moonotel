@@ -41,6 +41,121 @@ fn json_hex_nibble(code : Int32) -> Int32 {
   }
 }
 
+// Compare a plain JSON string body (without escapes) to `expected` without
+// allocating a copy.
+
+///|
+fn json_string_range_equals(
+  text : String,
+  start : Int32,
+  end : Int32,
+  expected : String,
+) -> Bool {
+  if end - start != expected.length() {
+    return false
+  }
+  let mut i = start
+  let mut j = 0
+  while i < end {
+    if text.unsafe_get(i) != expected.unsafe_get(j) {
+      return false
+    }
+    i = i + 1
+    j = j + 1
+  }
+  true
+}
+
+// Classify the JSON string at `start` against two fields, each accepted under
+// two names. Returns `(0, after)` for the first field, `(1, after)` for the
+// second and `(-1, after)` for any other value. Plain strings are compared in
+// place; strings containing escapes fall back to the decoder so that escaped
+// and unescaped field names remain equivalent.
+
+///|
+fn json_field_id_at(
+  text : String,
+  start : Int32,
+  first_json : String,
+  first_proto : String,
+  second_json : String,
+  second_proto : String,
+) -> (Int32, Int32)? {
+  let len = text.length()
+  if start >= len || text.unsafe_get(start).to_int() != 0x22 {
+    return None
+  }
+  let content_start = start + 1
+  let mut pos = content_start
+  while pos < len {
+    let code = text.unsafe_get(pos).to_int()
+    if code == 0x22 {
+      let id = if json_string_range_equals(text, content_start, pos, first_json) ||
+        json_string_range_equals(text, content_start, pos, first_proto) {
+        0
+      } else if json_string_range_equals(
+        text,
+        content_start,
+        pos,
+        second_json,
+      ) || json_string_range_equals(text, content_start, pos, second_proto) {
+        1
+      } else {
+        -1
+      }
+      return Some((id, pos + 1))
+    }
+    if code == 0x5C || code < 0x20 {
+      break
+    }
+    pos = pos + 1
+  }
+  if pos >= len {
+    return None
+  }
+  let (decoded, after) = match json_parse_string_at(text, start) {
+    Some(pair) => pair
+    None => return None
+  }
+  let id = if decoded == first_json || decoded == first_proto {
+    0
+  } else if decoded == second_json || decoded == second_proto {
+    1
+  } else {
+    -1
+  }
+  Some((id, after))
+}
+
+// Validate and skip the JSON string starting at `start`, returning the index
+// just past the closing quote. Plain strings are skipped without allocating.
+
+///|
+fn json_skip_string_at(text : String, start : Int32) -> Int32? {
+  let len = text.length()
+  if start >= len || text.unsafe_get(start).to_int() != 0x22 {
+    return None
+  }
+  let mut pos = start + 1
+  while pos < len {
+    let code = text.unsafe_get(pos).to_int()
+    if code == 0x22 {
+      return Some(pos + 1)
+    }
+    if code == 0x5C || code < 0x20 {
+      break
+    }
+    pos = pos + 1
+  }
+  if pos >= len {
+    return None
+  }
+  match json_parse_string_at(text, start) {
+    Some((_, after)) => Some(after)
+    None => None
+  }
+}
+
 // Parse the JSON string starting at the opening quote. Returns the decoded
 // text and the index just past the closing quote.
 
@@ -278,8 +393,8 @@ fn json_skip_object(text : String, pos : Int32, depth : Int32) -> Int32? {
     return Some(cursor + 1)
   }
   while true {
-    let after_key = match json_parse_string_at(text, cursor) {
-      Some(pair) => pair.1
+    let after_key = match json_skip_string_at(text, cursor) {
+      Some(after) => after
       None => return None
     }
     cursor = json_skip_ws(text, after_key)
@@ -359,8 +474,8 @@ fn json_skip_value(text : String, start : Int32, depth : Int32) -> Int32? {
   }
   let code = text.unsafe_get(pos).to_int()
   if code == 0x22 {
-    match json_parse_string_at(text, pos) {
-      Some(pair) => Some(pair.1)
+    match json_skip_string_at(text, pos) {
+      Some(after) => Some(after)
       None => None
     }
   } else if code == 0x7B {
@@ -452,7 +567,14 @@ fn json_parse_partial_success(
   let mut rejected : Int64 = 0L
   let mut message = ""
   while true {
-    let (key, after_key) = match json_parse_string_at(text, cursor) {
+    let (key, after_key) = match json_field_id_at(
+      text,
+      cursor,
+      "rejectedSpans",
+      "rejected_spans",
+      "errorMessage",
+      "error_message",
+    ) {
       Some(pair) => pair
       None => return None
     }
@@ -461,14 +583,14 @@ fn json_parse_partial_success(
       return None
     }
     cursor = json_skip_ws(text, cursor + 1)
-    if key == "rejectedSpans" || key == "rejected_spans" {
+    if key == 0 {
       let (value, after) = match json_parse_rejected_spans(text, cursor) {
         Some(pair) => pair
         None => return None
       }
       rejected = value
       cursor = after
-    } else if key == "errorMessage" || key == "error_message" {
+    } else if key == 1 {
       if cursor < len && text.unsafe_get(cursor).to_int() == 0x6E {
         // A JSON `null` is accepted for any field and means the default value.
         cursor = match json_skip_value(text, cursor, 0) {
@@ -534,7 +656,14 @@ pub fn decode_export_response_json(body : Bytes) -> @sdk.ExportResult {
   let mut rejected : Int64 = 0L
   let mut message = ""
   while true {
-    let (key, after_key) = match json_parse_string_at(text, pos) {
+    let (key, after_key) = match json_field_id_at(
+      text,
+      pos,
+      "partialSuccess",
+      "partial_success",
+      "",
+      "",
+    ) {
       Some(pair) => pair
       None => return malformed_json_response()
     }
@@ -543,7 +672,7 @@ pub fn decode_export_response_json(body : Bytes) -> @sdk.ExportResult {
       return malformed_json_response()
     }
     pos = json_skip_ws(text, pos + 1)
-    if key == "partialSuccess" || key == "partial_success" {
+    if key == 0 {
       let (count, text_message, after) = match
         json_parse_partial_success(text, pos) {
         Some(triple) => triple

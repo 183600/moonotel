@@ -467,8 +467,7 @@ pub async fn ServerCall::respond(
   }
   match headers {
     Some(values) =>
-      for entry in values.to_array() {
-        let (key, value) = entry
+      for key, value in values {
         extra_headers.set(@http.CaseInsensitiveString(key), value)
       }
     None => ()
