@@ -97,6 +97,18 @@ pub impl SpanExporter for InMemorySpanExporter with fn export_spans(self, spans)
 }
 
 ///|
+pub impl SpanExporter for InMemorySpanExporter with fn export_span(self, data) {
+  if self.shutdown_called {
+    ExportFailure("in-memory exporter is shut down")
+  } else {
+    // `[data]` is freshly allocated, so no defensive copy is needed.
+    self.batches.push([data])
+    self.span_total = self.span_total + 1
+    ExportSuccess
+  }
+}
+
+///|
 pub impl SpanExporter for InMemorySpanExporter with fn shutdown(self) {
   self.shutdown_called = true
 }

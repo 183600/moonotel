@@ -654,8 +654,11 @@ pub fn encode_trace_request_json(spans : Array[@sdk.SpanData]) -> Bytes {
   let groups = group_spans(spans)
   let mut size_hint = 64
   for group in groups {
+    // Resource attributes are emitted by every group as well; JSON quotes and
+    // escapes them, so their binary estimate is doubled like the span payload.
+    size_hint = size_hint + resource_size_hint(group.resource) * 2
     for scope in group.scopes {
-      size_hint = size_hint + scope.size_hint * 2
+      size_hint = size_hint + scope_size_hint(scope) * 2
     }
   }
   let sb = JsonBuf::new(size_hint)
