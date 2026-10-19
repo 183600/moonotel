@@ -355,3 +355,25 @@ test "encode_span_omits_zero_dropped_counts" {
   let event_fields = parse_fields(fields_of(span_fields, 11)[0].payload)
   assert_true(first_of(event_fields, 4) is None)
 }
+
+///|
+test "encode_trace_request_message_larger_than_two_megabytes" {
+  let sb = StringBuilder()
+  let chunk = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  for i = 0; i < 40000; i = i + 1 {
+    sb.write_string(chunk)
+  }
+  let big = sb.to_string()
+  let attributes : Map[String, @sdk.AttributeValue] = Map([], capacity=2)
+  attributes.set("http.request.method", @sdk.StringValue("GET"))
+  attributes.set("big", @sdk.StringValue(big))
+  let span : @sdk.SpanData = { ..sample_span(), attributes, }
+  let bytes = @otlp.encode_trace_request([span])
+  let top = parse_fields(bytes.exact_view())
+  let resource_spans = parse_fields(first_of(top, 1).unwrap().payload)
+  let scope_spans = parse_fields(first_of(resource_spans, 2).unwrap().payload)
+  let spans = fields_of(scope_spans, 2)
+  assert_eq(spans.length(), 1)
+  let span_fields = parse_fields(spans[0].payload)
+  assert_eq(attribute_value(span_fields, "big"), Some(big))
+}

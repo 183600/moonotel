@@ -37,7 +37,8 @@ fn request_headers(
     [],
     capacity=map_capacity_for_entries(config.headers.length() + 2),
   )
-  for key, value in config.headers {
+  for entry in config.headers.to_array() {
+    let (key, value) = entry
     headers.set(@http.CaseInsensitiveString(key), value)
   }
   headers.set(

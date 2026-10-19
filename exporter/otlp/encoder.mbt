@@ -6,46 +6,46 @@
 
 ///|
 fn encode_string_array(writer : ProtoWriter, items : Array[String]) -> Unit {
-  let array = writer.take_scratch()
+  let len_pos = writer.begin_message(5)
   for item in items {
-    let element = array.take_scratch()
-    element.write_string_field(1, item)
-    array.append_message(1, element)
+    let element_pos = writer.begin_message(1)
+    writer.write_string_field(1, item)
+    writer.end_message(element_pos)
   }
-  writer.append_message(5, array)
+  writer.end_message(len_pos)
 }
 
 ///|
 fn encode_bool_array(writer : ProtoWriter, items : Array[Bool]) -> Unit {
-  let array = writer.take_scratch()
+  let len_pos = writer.begin_message(5)
   for item in items {
-    let element = array.take_scratch()
-    element.write_bool_field(2, item)
-    array.append_message(1, element)
+    let element_pos = writer.begin_message(1)
+    writer.write_bool_field(2, item)
+    writer.end_message(element_pos)
   }
-  writer.append_message(5, array)
+  writer.end_message(len_pos)
 }
 
 ///|
 fn encode_int_array(writer : ProtoWriter, items : Array[Int64]) -> Unit {
-  let array = writer.take_scratch()
+  let len_pos = writer.begin_message(5)
   for item in items {
-    let element = array.take_scratch()
-    element.write_varint_field(3, item.reinterpret_as_uint64())
-    array.append_message(1, element)
+    let element_pos = writer.begin_message(1)
+    writer.write_varint_field(3, item.reinterpret_as_uint64())
+    writer.end_message(element_pos)
   }
-  writer.append_message(5, array)
+  writer.end_message(len_pos)
 }
 
 ///|
 fn encode_double_array(writer : ProtoWriter, items : Array[Double]) -> Unit {
-  let array = writer.take_scratch()
+  let len_pos = writer.begin_message(5)
   for item in items {
-    let element = array.take_scratch()
-    element.write_double_field(4, item)
-    array.append_message(1, element)
+    let element_pos = writer.begin_message(1)
+    writer.write_double_field(4, item)
+    writer.end_message(element_pos)
   }
-  writer.append_message(5, array)
+  writer.end_message(len_pos)
 }
 
 ///|
@@ -250,12 +250,12 @@ fn encode_attributes(
   for entry in attributes.to_array() {
     let (key, value) = entry
     if !try_encode_scalar_attribute(writer, field, key, value) {
-      let kv = writer.take_scratch()
-      kv.write_string_field(1, key)
-      let any_value = kv.take_scratch()
+      let len_pos = writer.begin_message(field)
+      writer.write_string_field(1, key)
+      let any_value = writer.take_scratch()
       encode_any_value(any_value, value)
-      kv.append_message(2, any_value)
-      writer.append_message(field, kv)
+      writer.append_message(2, any_value)
+      writer.end_message(len_pos)
     }
   }
 }
@@ -282,60 +282,53 @@ fn encode_scope(writer : ProtoWriter, name : String, version : String) -> Unit {
 
 ///|
 fn encode_event(writer : ProtoWriter, event : @sdk.SpanEvent) -> Unit {
-  let event_writer = writer.take_scratch()
-  event_writer.write_fixed64_field(
-    1,
-    event.time_unix_nano.reinterpret_as_uint64(),
-  )
-  event_writer.write_string_field(2, event.name)
-  encode_attributes(event_writer, 3, event.attributes)
+  let len_pos = writer.begin_message(11)
+  writer.write_fixed64_field(1, event.time_unix_nano.reinterpret_as_uint64())
+  writer.write_string_field(2, event.name)
+  encode_attributes(writer, 3, event.attributes)
   if event.dropped_attributes_count > 0 {
-    event_writer.write_varint_field(
-      4,
-      event.dropped_attributes_count.to_uint64(),
-    )
+    writer.write_varint_field(4, event.dropped_attributes_count.to_uint64())
   }
-  writer.append_message(11, event_writer)
+  writer.end_message(len_pos)
 }
 
 ///|
 fn encode_link(writer : ProtoWriter, link : @sdk.SpanLink) -> Unit {
-  let link_writer = writer.take_scratch()
-  link_writer.write_bytes_from_int_array(1, link.span_context.trace_id_view())
-  link_writer.write_bytes_from_int_array(2, link.span_context.span_id_view())
+  let len_pos = writer.begin_message(13)
+  writer.write_bytes_from_int_array(1, link.span_context.trace_id_view())
+  writer.write_bytes_from_int_array(2, link.span_context.span_id_view())
   let tracestate = link.span_context.tracestate()
   if tracestate != "" {
-    link_writer.write_string_field(3, tracestate)
+    writer.write_string_field(3, tracestate)
   }
-  encode_attributes(link_writer, 4, link.attributes)
+  encode_attributes(writer, 4, link.attributes)
   if link.dropped_attributes_count > 0 {
-    link_writer.write_varint_field(5, link.dropped_attributes_count.to_uint64())
+    writer.write_varint_field(5, link.dropped_attributes_count.to_uint64())
   }
-  link_writer.write_fixed32_field(
+  writer.write_fixed32_field(
     6,
     link.span_context.trace_flags().reinterpret_as_uint(),
   )
-  writer.append_message(13, link_writer)
+  writer.end_message(len_pos)
 }
 
 ///|
 fn encode_status(writer : ProtoWriter, data : @sdk.SpanData) -> Unit {
   if data.status != @api.StatusCode::Unset || data.status_description != "" {
-    let status = writer.take_scratch()
+    let len_pos = writer.begin_message(15)
     if data.status_description != "" {
-      status.write_string_field(2, data.status_description)
+      writer.write_string_field(2, data.status_description)
     }
     let code = data.status.otlp_value()
     if code != 0 {
-      status.write_varint_field(3, code.to_uint64())
+      writer.write_varint_field(3, code.to_uint64())
     }
-    writer.append_message(15, status)
+    writer.end_message(len_pos)
   }
 }
 
 ///|
-fn encode_span(writer : ProtoWriter, data : @sdk.SpanData) -> Unit {
-  let span = writer.take_scratch()
+fn encode_span_fields(span : ProtoWriter, data : @sdk.SpanData) -> Unit {
   span.write_bytes_from_int_array(1, data.span_context.trace_id_view())
   span.write_bytes_from_int_array(2, data.span_context.span_id_view())
   let tracestate = data.span_context.tracestate()
@@ -370,7 +363,17 @@ fn encode_span(writer : ProtoWriter, data : @sdk.SpanData) -> Unit {
     16,
     data.span_context.trace_flags().reinterpret_as_uint(),
   )
-  writer.append_message(2, span)
+}
+
+// Encode a span (field 2) straight into `writer`, patching the length prefix
+// once the body is written. This skips the intermediate scratch buffer used
+// by `append_message`.
+
+///|
+fn encode_span_direct(writer : ProtoWriter, data : @sdk.SpanData) -> Unit {
+  let len_pos = writer.begin_message(2)
+  encode_span_fields(writer, data)
+  writer.end_message(len_pos)
 }
 
 // Append the decimal digits of a non-negative integer.
@@ -758,15 +761,15 @@ pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
       spans_hint
     let total_hint = 64 + resource_size_hint(shared_resource) + scopes_hint
     let writer = take_root_writer(total_hint)
-    let resource_spans = writer.take_scratch_with_capacity(total_hint)
-    encode_resource(resource_spans, shared_resource)
-    let scope_spans = resource_spans.take_scratch_with_capacity(scopes_hint)
-    encode_scope(scope_spans, first.scope_name, first.scope_version)
+    let resource_spans_pos = writer.begin_message(1)
+    encode_resource(writer, shared_resource)
+    let scope_spans_pos = writer.begin_message(2)
+    encode_scope(writer, first.scope_name, first.scope_version)
     for data in spans {
-      encode_span(scope_spans, data)
+      encode_span_direct(writer, data)
     }
-    resource_spans.append_message(2, scope_spans)
-    writer.append_message(1, resource_spans)
+    writer.end_message(scope_spans_pos)
+    writer.end_message(resource_spans_pos)
     let bytes = writer.to_bytes()
     release_root_writer(writer)
     return bytes
@@ -796,7 +799,7 @@ pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
       )
       encode_scope(scope_spans, scope.scope_name, scope.scope_version)
       for span in scope.spans {
-        encode_span(scope_spans, span)
+        encode_span_direct(scope_spans, span)
       }
       resource_spans.append_message(2, scope_spans)
     }

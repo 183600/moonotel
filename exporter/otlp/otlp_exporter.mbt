@@ -399,7 +399,8 @@ fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
   let headers = Map(
     [], capacity=map_capacity_for_entries(config.headers.length() + 1),
   )
-  for key, value in config.headers {
+  for entry in config.headers.to_array() {
+    let (key, value) = entry
     headers.set(key, value)
   }
   headers.set("content-type", content_type_for_protocol(config.protocol))

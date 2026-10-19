@@ -83,14 +83,16 @@ fn record_headers(
   span : @sdk.SpanSdk,
 ) -> Unit {
   if capture.capture_all {
-    for name, value in headers {
+    for entry in headers.to_array() {
+      let (name, value) = entry
       span.set_attribute(
         prefix + name.to_string().to_lower(),
         @sdk.StringArrayValue([value]),
       )
     }
   } else if capture.names.length() > 0 {
-    for name, _ in capture.names {
+    for entry in capture.names.to_array() {
+      let (name, _) = entry
       match headers.get(@http.CaseInsensitiveString(name)) {
         Some(value) =>
           span.set_attribute(

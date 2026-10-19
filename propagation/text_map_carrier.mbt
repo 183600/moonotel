@@ -106,7 +106,8 @@ pub fn TextMapCarrier::get(self : TextMapCarrier, key : String) -> String? {
   match self.entries.get(key) {
     Some(value) => Some(value)
     None => {
-      for candidate, value in self.entries.iter2() {
+      for entry in self.entries.to_array() {
+        let (candidate, value) = entry
         if ascii_case_insensitive_equal(candidate, key) {
           return Some(value)
         }
@@ -141,7 +142,8 @@ pub fn TextMapCarrier::remove(self : TextMapCarrier, key : String) -> Unit {
   self.entries.remove(key)
   // Collect the keys that match `key` case-insensitively, then remove them.
   let mut matches : Array[String]? = None
-  for candidate, _value in self.entries.iter2() {
+  for entry in self.entries.to_array() {
+    let (candidate, _value) = entry
     if ascii_case_insensitive_equal(candidate, key) {
       match matches {
         Some(list) => list.push(candidate)
@@ -173,7 +175,8 @@ pub fn TextMapCarrier::length(self : TextMapCarrier) -> Int32 {
 ///|
 pub fn TextMapCarrier::to_map(self : TextMapCarrier) -> Map[String, String] {
   let out : Map[String, String] = Map([])
-  for key, value in self.entries {
+  for entry in self.entries.to_array() {
+    let (key, value) = entry
     out.set(key, value)
   }
   out

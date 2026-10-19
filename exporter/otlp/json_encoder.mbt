@@ -90,8 +90,32 @@ fn JsonBuf::ensure(self : JsonBuf, extra : Int32) -> Unit {
 fn JsonBuf::write_bytes(self : JsonBuf, bytes : Bytes) -> Unit {
   let n = bytes.length()
   self.ensure(n)
-  self.buf.blit_from_bytes(self.len, bytes, 0, n)
-  self.len = self.len + n
+  let buf = self.buf
+  let pos = self.len
+  if n >= 16 {
+    buf.blit_from_bytes(pos, bytes, 0, n)
+  } else {
+    // Most JSON literals are short; copying them with a few wide loads and
+    // stores avoids the call overhead of a bulk copy.
+    let mut i = 0
+    while i + 8 <= n {
+      buf.unsafe_write_uint64_le(pos + i, bytes.unsafe_read_uint64_le(i))
+      i = i + 8
+    }
+    if i + 4 <= n {
+      buf.unsafe_write_uint32_le(pos + i, bytes.unsafe_read_uint32_le(i))
+      i = i + 4
+    }
+    if i + 2 <= n {
+      buf.unsafe_write_uint16_le(pos + i, bytes.unsafe_read_uint16_le(i))
+      i = i + 2
+    }
+    if i < n {
+      buf.unsafe_set(pos + i, bytes.unsafe_get(i))
+      i = i + 1
+    }
+  }
+  self.len = pos + n
 }
 
 ///|
@@ -197,6 +221,36 @@ fn json_write_hex_quoted(sb : JsonBuf, bytes : Array[Int32]) -> Unit {
   let buf = sb.buf
   let mut pos = sb.len
   let mut i = 0
+  while i + 4 <= len {
+    let b0 = bytes.unsafe_get(i)
+    let b1 = bytes.unsafe_get(i + 1)
+    let b2 = bytes.unsafe_get(i + 2)
+    let b3 = bytes.unsafe_get(i + 3)
+    if (b0 | b1 | b2 | b3) >= 0 &&
+      b0 < 256 &&
+      b1 < 256 &&
+      b2 < 256 &&
+      b3 < 256 {
+      buf.unsafe_write_uint64_le(
+        pos,
+        json_hex_pairs.unsafe_get(b0).to_uint64() |
+        (json_hex_pairs.unsafe_get(b1).to_uint64() << 16) |
+        (json_hex_pairs.unsafe_get(b2).to_uint64() << 32) |
+        (json_hex_pairs.unsafe_get(b3).to_uint64() << 48),
+      )
+    } else {
+      buf.unsafe_write_uint32_le(
+        pos,
+        json_hex_pair_of(b0) | (json_hex_pair_of(b1) << 16),
+      )
+      buf.unsafe_write_uint32_le(
+        pos + 4,
+        json_hex_pair_of(b2) | (json_hex_pair_of(b3) << 16),
+      )
+    }
+    pos = pos + 8
+    i = i + 4
+  }
   while i + 2 <= len {
     buf.unsafe_write_uint32_le(
       pos,
@@ -674,6 +728,49 @@ fn json_write_span(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
 pub fn encode_trace_request_json(spans : Array[@sdk.SpanData]) -> Bytes {
   if spans.length() == 0 {
     return b""
+  }
+  // When every span shares the same resource and scope, emit the single
+  // resource/scope group directly instead of building the grouping structure.
+  let first = spans[0]
+  let shared_resource = first.resource.as_map()
+  let mut uniform = true
+  for i = 1; i < spans.length(); i = i + 1 {
+    let data = spans[i]
+    if !physical_equal(shared_resource, data.resource.as_map()) ||
+      data.scope_name != first.scope_name ||
+      data.scope_version != first.scope_version {
+      uniform = false
+      break
+    }
+  }
+  if uniform {
+    let mut spans_hint = 0
+    for data in spans {
+      spans_hint = spans_hint + estimate_span_size(data)
+    }
+    let size_hint = 64 +
+      resource_size_hint(shared_resource) * 2 +
+      (32 +
+        first.scope_name.length() +
+        first.scope_version.length() +
+        spans_hint) *
+      2
+    let sb = JsonBuf::new(size_hint)
+    sb.write_bytes(b"{\"resourceSpans\":[{\"resource\":")
+    json_write_resource(sb, shared_resource)
+    sb.write_bytes(b",\"scopeSpans\":[{\"scope\":")
+    json_write_scope(sb, first.scope_name, first.scope_version)
+    sb.write_bytes(b",\"spans\":[")
+    let mut first_span = true
+    for data in spans {
+      if !first_span {
+        sb.write_char(',')
+      }
+      first_span = false
+      json_write_span(sb, data)
+    }
+    sb.write_bytes(b"]}]}]}")
+    return sb.to_bytes()
   }
   let groups = group_spans(spans)
   let mut size_hint = 64

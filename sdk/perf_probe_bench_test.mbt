@@ -287,6 +287,38 @@ test "bench context baggage header" (b : @bench.T) {
 }
 
 ///|
+test "bench encode batch json" (b : @bench.T) {
+  let exporter = @sdk.InMemorySpanExporter::new()
+  let provider = @sdk.TracerProviderSdk::new(service_name="bench")
+    .with_sampler(@sdk.Sampler::always_on())
+    .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+  let tracer = provider.get_tracer("bench", version="1.0.0")
+  for i = 0; i < 100; i = i + 1 {
+    let span = tracer.start_span("operation")
+    span.set_attribute("index", @sdk.IntValue(i.to_int64()))
+    span.set_attribute("name", @sdk.StringValue("value-\{i}"))
+    span.end()
+  }
+  let spans = exporter.exported_spans()
+  b.bench(fn() { let _ = @otlp.encode_trace_request_json(spans) })
+}
+
+///|
+test "bench encode batch json no attrs" (b : @bench.T) {
+  let exporter = @sdk.InMemorySpanExporter::new()
+  let provider = @sdk.TracerProviderSdk::new(service_name="bench")
+    .with_sampler(@sdk.Sampler::always_on())
+    .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+  let tracer = provider.get_tracer("bench", version="1.0.0")
+  for i = 0; i < 100; i = i + 1 {
+    let span = tracer.start_span("operation")
+    span.end()
+  }
+  let spans = exporter.exported_spans()
+  b.bench(fn() { let _ = @otlp.encode_trace_request_json(spans) })
+}
+
+///|
 test "bench decode export response" (b : @bench.T) {
   let body : Bytes = b"\x0A\x08\x08\x01\x12\x04oops"
   b.bench(fn() { let _ = @otlp.decode_export_response(body) })

@@ -171,6 +171,54 @@ fn ProtoWriter::write_tag(
   self.write_varint(tag.to_uint64())
 }
 
+// Begin a length-delimited message field whose body is written directly into
+// this writer: writes the tag and three reserved length bytes, then returns
+// the position of the length field. `field` must be below 16 so that the tag
+// is a single byte. The caller writes the body and then calls `end_message`
+// with the returned position.
+
+///|
+fn ProtoWriter::begin_message(self : ProtoWriter, field : Int32) -> Int32 {
+  if self.len + 4 > self.buf.length() {
+    self.reserve(4)
+  }
+  let start = self.len
+  self.buf.unsafe_set(start, ((field << 3) | 2).to_byte())
+  self.len = start + 4
+  start + 1
+}
+
+// Close a message opened by `begin_message`: pads the length varint to its
+// exact width by moving the body, or shrinks the reserved space when the body
+// needs fewer bytes.
+
+///|
+fn ProtoWriter::end_message(self : ProtoWriter, len_pos : Int32) -> Unit {
+  let body_start = len_pos + 3
+  let body_len = self.len - body_start
+  let needed = varint_size(body_len.to_uint64())
+  if needed < 3 {
+    self.buf.unsafe_blit(len_pos + needed, self.buf, body_start, body_len)
+  } else if needed > 3 {
+    // The reserved room was too small for the length varint: make room by
+    // moving the body to the right.
+    let extra = needed - 3
+    if self.len + extra > self.buf.length() {
+      self.reserve(extra)
+    }
+    self.buf.unsafe_blit(body_start + extra, self.buf, body_start, body_len)
+  }
+  let mut value = body_len.to_uint64()
+  let mut pos = len_pos
+  while value >= 0x80 {
+    self.buf.unsafe_set(pos, ((value & 0x7F) | 0x80).to_int().to_byte())
+    value = value >> 7
+    pos = pos + 1
+  }
+  self.buf.unsafe_set(pos, value.to_int().to_byte())
+  self.len = len_pos + needed + body_len
+}
+
 // Write the tag and length prefix of a length-delimited field.
 
 ///|
