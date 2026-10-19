@@ -23,6 +23,7 @@ pub struct OtlpHttpAsyncSpanExporter {
   queue : @aqueue.Queue[Array[@sdk.SpanData]]
   mut shutdown_called : Bool
   mut dropped : UInt64
+  mut failures : UInt64
 }
 
 // Create an exporter and start its background sender in `group`. The queue
@@ -44,6 +45,7 @@ pub fn[G] OtlpHttpAsyncSpanExporter::new(
     queue: @aqueue.Queue(kind=@aqueue.DiscardOldest(size)),
     shutdown_called: false,
     dropped: 0,
+    failures: 0,
   }
   group.spawn_bg(no_wait=true) <| () => { exporter.run() }
   // The background sender is cancelled when the group exits, before the group
@@ -71,6 +73,17 @@ pub fn OtlpHttpAsyncSpanExporter::dropped_batches(
   self : OtlpHttpAsyncSpanExporter,
 ) -> UInt64 {
   self.dropped
+}
+
+// Number of OTLP requests that failed to export, including requests that
+// hit the configured timeout. The result of an asynchronous export cannot be
+// reported through `export_spans`, so failures are surfaced here instead.
+
+///|
+pub fn OtlpHttpAsyncSpanExporter::export_failures(
+  self : OtlpHttpAsyncSpanExporter,
+) -> UInt64 {
+  self.failures
 }
 
 // Whether `shutdown` has been called.
@@ -165,7 +178,9 @@ async fn OtlpHttpAsyncSpanExporter::export_available(
 // Send one OTLP request. The request is protected from cancellation so that a
 // batch already taken from the queue is not lost when the task group exits
 // while a request is in flight; `timeout_millis` bounds how long shutdown can
-// be delayed by an unresponsive collector.
+// be delayed by an unresponsive collector. A failed request (including a
+// timeout) is counted and not retried here: the exporter below already retried
+// it according to the configuration.
 
 ///|
 async fn OtlpHttpAsyncSpanExporter::send(
@@ -188,7 +203,10 @@ async fn OtlpHttpAsyncSpanExporter::send(
     } else {
       Some(self.exporter.export_batch(batch))
     }
-    let _ = outcome
+    match outcome {
+      Some(@sdk.ExportSuccess) => ()
+      _ => self.failures = self.failures + 1
+    }
   })
 }
 
@@ -247,5 +265,6 @@ pub impl @sdk.SpanExporter for OtlpHttpAsyncSpanExporter with fn shutdown(self) 
 ///|
 pub extend OtlpHttpAsyncSpanExporter with @sdk.SpanExporter::{
   export_spans,
+  export_span,
   shutdown,
 }

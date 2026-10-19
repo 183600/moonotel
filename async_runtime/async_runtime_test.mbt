@@ -49,6 +49,7 @@ async test "otlp async exporter delivers spans while the group runs" {
       @async.sleep(200)
       assert_true(received.val >= 1)
       assert_false(exporter.is_shutdown())
+      assert_eq(exporter.export_failures(), 0)
     }
   }
 }
@@ -113,6 +114,33 @@ async test "queue overflow discards only the batches that were evicted" {
     assert_true(exporter.export_spans(batch).is_success())
     assert_true(exporter.export_spans(batch).is_success())
     assert_eq(exporter.dropped_batches(), 2)
+  }
+}
+
+///|
+async test "otlp async exporter counts failed requests" {
+  @async.with_task_group() <| group => {
+    let config = @otlp.OtlpHttpConfig::new(
+      endpoint="http://127.0.0.1:1",
+      timeout_millis=2000,
+      max_retries=0,
+    )
+    let exporter = @async_runtime.OtlpHttpAsyncSpanExporter::new(config, group)
+    let provider = @sdk.TracerProviderSdk::new(service_name="async-failures").with_span_processor(
+      @sdk.SimpleSpanProcessor::new(exporter),
+    )
+    let tracer = provider.get_tracer("async-failures")
+    assert_eq(exporter.export_failures(), 0)
+    tracer.start_root_span("lost").end()
+    // The failed connection attempt may take a moment to surface; poll until
+    // it is counted instead of relying on a fixed sleep.
+    let mut waited = 0
+    while waited < 3000 && exporter.export_failures() == 0 {
+      @async.sleep(25)
+      waited = waited + 25
+    }
+    assert_true(exporter.export_failures() >= 1)
+    assert_eq(exporter.dropped_batches(), 0)
   }
 }
 
