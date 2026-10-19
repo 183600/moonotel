@@ -260,11 +260,7 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
   let generic_endpoint = non_blank_env_value("OTEL_EXPORTER_OTLP_ENDPOINT")
   let endpoint = match generic_endpoint {
     Some(value) => value
-    None =>
-      match traces_endpoint {
-        Some(value) => value
-        None => "http://localhost:4318"
-      }
+    None => "http://localhost:4318"
   }
   let headers = match @env.get_env_var("OTEL_EXPORTER_OTLP_HEADERS") {
     Some(value) => parse_headers(value)

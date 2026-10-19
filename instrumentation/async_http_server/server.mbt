@@ -473,9 +473,16 @@ pub async fn ServerCall::respond(
     None => ()
   }
   let close_requested = self.connection_close_requested()
-  if close_requested &&
-    extra_headers.get(@http.CaseInsensitiveString("connection")) is None {
+  if close_requested {
     extra_headers.set(@http.CaseInsensitiveString("connection"), "close")
+  }
+  let mut close_after_response = close_requested
+  match extra_headers.get(@http.CaseInsensitiveString("connection")) {
+    Some(value) =>
+      if has_close_token(value) {
+        close_after_response = true
+      }
+    None => ()
   }
   match self.span {
     Some(span) =>
@@ -505,7 +512,7 @@ pub async fn ServerCall::respond(
   }
   self.connection.end_response()
   self.responded = true
-  if close_requested {
+  if close_after_response {
     self.connection.close()
     self.connection_closed = true
   }

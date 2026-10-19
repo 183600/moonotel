@@ -464,6 +464,9 @@ pub fn inject_with_tracestate(
   tracestate : String?,
   carrier : TextMapCarrier,
 ) -> Unit {
+  if !sc.is_valid() {
+    return
+  }
   inject(sc, carrier)
   match tracestate {
     Some(state) =>

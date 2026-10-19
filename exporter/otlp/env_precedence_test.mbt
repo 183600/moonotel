@@ -56,6 +56,19 @@ test "generic_endpoint_is_used_when_traces_endpoint_is_absent" {
 }
 
 ///|
+test "traces_endpoint_without_generic_keeps_default_base_endpoint" {
+  unset_otlp_env()
+  @env.set_env_var(
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://specific:4318/custom/traces",
+  )
+  let config = @otlp.OtlpHttpConfig::from_env()
+  unset_otlp_env()
+  assert_eq(config.endpoint, "http://localhost:4318")
+  assert_eq(config.traces_endpoint, Some("http://specific:4318/custom/traces"))
+  assert_eq(config.traces_url(), "http://specific:4318/custom/traces")
+}
+
+///|
 test "traces_headers_override_generic_headers" {
   unset_otlp_env()
   @env.set_env_var("OTEL_EXPORTER_OTLP_HEADERS", "x-generic=1,x-shared=generic")

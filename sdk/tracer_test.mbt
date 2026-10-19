@@ -28,6 +28,65 @@ pub impl @sdk.SpanExporter for RecordingExporter with fn shutdown(self) {
 }
 
 ///|
+struct StartAttributeProcessor {
+  mut seen : Bool
+  mut saw_initial : Bool
+}
+
+///|
+pub impl @sdk.SpanProcessor for StartAttributeProcessor with fn on_start(
+  self,
+  span,
+) {
+  self.seen = true
+  match span.attributes().get("initial") {
+    Some(@sdk.StringValue("yes")) => self.saw_initial = true
+    _ => ()
+  }
+}
+
+///|
+pub impl @sdk.SpanProcessor for StartAttributeProcessor with fn on_end(
+  self,
+  data,
+) {
+  let _ = self
+  let _ = data
+}
+
+///|
+pub impl @sdk.SpanProcessor for StartAttributeProcessor with fn force_flush(
+  self,
+) {
+  let _ = self
+}
+
+///|
+pub impl @sdk.SpanProcessor for StartAttributeProcessor with fn shutdown(
+  self,
+) {
+  let _ = self
+}
+
+///|
+test "on_start_sees_initial_attributes" {
+  let processor : StartAttributeProcessor = {
+    seen: false,
+    saw_initial: false,
+  }
+  let provider = @sdk.TracerProviderSdk::new(
+    service_name="svc",
+  ).with_span_processor(processor)
+  let attributes : Map[String, @sdk.AttributeValue] = Map([
+    ("initial", @sdk.StringValue("yes")),
+  ])
+  let span = provider.get_tracer("t").start_span("op", attributes~)
+  assert_true(processor.seen)
+  assert_true(processor.saw_initial)
+  span.end()
+}
+
+///|
 test "span_shape_and_context" {
   let exporter = recording_exporter()
   let provider = @sdk.TracerProviderSdk::new(service_name="test-service")
@@ -397,6 +456,30 @@ test "with_span_uses_explicit_parent" {
     @api.bytes_to_hex(exporter.spans[0].parent_span_id),
     "1112131415161718",
   )
+}
+
+///|
+test "with_span_inherits_baggage_from_explicit_context" {
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
+  let tracer = provider.get_tracer("t")
+  let parent = @api.span_context(
+    @api.bytes_from_hex("0102030405060708090a0b0c0d0e0f10").unwrap(),
+    @api.bytes_from_hex("1112131415161718").unwrap(),
+    @api.TRACE_FLAGS_SAMPLED,
+  )
+  let baggage : Map[String, String] = Map([("tenant", "acme")])
+  let base = @context.Context::root().with_baggage(baggage)
+  tracer.with_span(
+    "child",
+    span => {
+      assert_eq(span.context().trace_id_hex(), parent.trace_id_hex())
+      assert_eq(@api.bytes_to_hex(span.parent_span_id()), "1112131415161718")
+      assert_eq(@context.current_context().value("tenant"), Some("acme"))
+    },
+    context=base,
+    parent~,
+  )
+  assert_eq(@context.current_context().value("tenant"), None)
 }
 
 ///|

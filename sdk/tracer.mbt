@@ -75,14 +75,14 @@ pub fn Tracer::start_span(
     self.scope_name,
     self.scope_version,
   )
+  match attributes {
+    Some(attrs) => span.set_attributes(attrs)
+    None => ()
+  }
   if span.recording {
     for processor in self.provider.processors {
       processor.on_start(span)
     }
-  }
-  match attributes {
-    Some(attrs) => span.set_attributes(attrs)
-    None => ()
   }
   span
 }
@@ -118,7 +118,8 @@ pub fn Tracer::start_span_with_context(
 // Run `f` with a new span that becomes the current span for the duration of
 // the call, so spans started inside `f` link to it automatically. When
 // `parent` is omitted the span is a child of the current context's span (or a
-// root span); an explicit `context` is used only when `parent` is absent.
+// root span); an explicit `context` supplies the ambient base context
+// (including baggage) while an explicit `parent` overrides the span parent.
 // The span is ended and the previous context restored when `f` returns or
 // raises.
 
@@ -154,9 +155,11 @@ pub fn[X] Tracer::with_span(
         start_time_unix_nano?,
       )
   }
-  let previous = @context.attach(
-    @context.current_context().with_span(span.context()),
-  )
+  let base = match context {
+    Some(value) => value
+    None => @context.current_context()
+  }
+  let previous = @context.attach(base.with_span(span.context()))
   defer @context.detach(previous)
   defer span.end()
   f(span)
@@ -200,9 +203,11 @@ pub async fn[X] Tracer::with_span_async(
         start_time_unix_nano?,
       )
   }
-  let previous = @context.attach(
-    @context.current_context().with_span(span.context()),
-  )
+  let base = match context {
+    Some(value) => value
+    None => @context.current_context()
+  }
+  let previous = @context.attach(base.with_span(span.context()))
   defer @context.detach(previous)
   defer span.end()
   f(span)

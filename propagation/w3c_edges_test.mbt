@@ -30,6 +30,15 @@ test "inject_without_tracestate_writes_no_tracestate_header" {
 }
 
 ///|
+test "inject_with_tracestate_skips_invalid_span_context" {
+  let carrier = @propagation.TextMapCarrier::new()
+  @propagation.inject_with_tracestate(
+    @api.invalid_span_context(), Some("a=1"), carrier,
+  )
+  assert_eq(carrier.length(), 0)
+}
+
+///|
 test "parse_tracestate_rejects_duplicate_third_member" {
   assert_true(@propagation.parse_tracestate("a=1,b=2,c=3,b=4") is None)
 }
