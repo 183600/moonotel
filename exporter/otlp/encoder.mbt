@@ -494,56 +494,52 @@ fn find_scope_group(
         None => None
       }
     None => {
-      let index : Map[(String, String), Int32] = Map([])
-      let mut found : ScopeGroup? = None
-      for at, scope in group.scopes {
-        index.set((scope.scope_name, scope.scope_version), at)
-        if found is None &&
-          scope.scope_name == scope_name &&
-          scope.scope_version == scope_version {
-          found = Some(scope)
+      // Avoid building the lookup index while the group has at most one
+      // scope: a linear scan over one entry is cheaper than a map.
+      if group.scopes.length() < 2 {
+        let mut found : ScopeGroup? = None
+        for scope in group.scopes {
+          if scope.scope_name == scope_name &&
+            scope.scope_version == scope_version {
+            found = Some(scope)
+            break
+          }
         }
+        found
+      } else {
+        let index : Map[(String, String), Int32] = Map([])
+        let mut found : ScopeGroup? = None
+        for at, scope in group.scopes {
+          index.set((scope.scope_name, scope.scope_version), at)
+          if found is None &&
+            scope.scope_name == scope_name &&
+            scope.scope_version == scope_version {
+            found = Some(scope)
+          }
+        }
+        group.scope_index = Some(index)
+        found
       }
-      group.scope_index = Some(index)
-      found
     }
   }
 }
 
-// Extra bytes contributed by an attribute beyond its count-based allowance:
-// the length of string payloads, which dominate the encoded size of long
-// values (URLs, SQL, error messages).
-
-///|
-fn estimate_attribute_value_size(value : @sdk.AttributeValue) -> Int32 {
-  match value {
-    @sdk.StringValue(text) => text.length()
-    @sdk.StringArrayValue(items) => {
-      let mut size = 0
-      for item in items {
-        size = size + item.length()
-      }
-      size
-    }
-    _ => 0
-  }
-}
+// Count-based estimate of the encoded attribute size. Values are not
+// inspected: the per-span estimate is on the hot path, and actual buffer
+// capacities are stabilized by the writer pools anyway, so underestimating
+// long string payloads only costs a rare buffer growth.
 
 ///|
 fn estimate_attributes_size(
   attributes : Map[String, @sdk.AttributeValue],
 ) -> Int32 {
-  let mut size = attributes.length() * 40
-  for key, value in attributes {
-    size = size + key.length() + estimate_attribute_value_size(value)
-  }
-  size
+  attributes.length() * 48
 }
 
 // Rough encoded size of one span, used to size the scratch buffers. Attribute
-// values are approximated by their count plus the length of their string
-// payloads; numeric and boolean arrays may still be over- or under-estimated
-// slightly, which only affects the initial buffer capacity.
+// values are approximated by their count; numeric and boolean arrays may still
+// be over- or under-estimated slightly, which only affects the initial buffer
+// capacity.
 
 ///|
 fn estimate_span_size(data : @sdk.SpanData) -> Int32 {
@@ -590,8 +586,11 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
   // Whether the key of `groups[last_index]` has not been registered in
   // `resource_index` yet.
   let mut unindexed = false
-  // Keys of resources already seen, keyed by physical identity.
-  let known_resource_keys : Array[(Map[String, @sdk.AttributeValue], String)] = []
+  // Keys of resources already seen, keyed by physical identity. Allocated on
+  // the first switch away from a resource, which is rare.
+  let mut known_resource_keys : Array[
+    (Map[String, @sdk.AttributeValue], String),
+  ]? = None
   // Scope group of the last matched span.
   let mut cached_group_index = -1
   let mut cached_scope : ScopeGroup? = None
@@ -614,14 +613,29 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
             }
             // The key of a newly created group is computed on the first
             // switch away from it.
-            let key = cached_resource_key(
-              groups[last_index].resource,
-              known_resource_keys,
-            )
+            let keys = match known_resource_keys {
+              Some(keys) => keys
+              None => {
+                let keys : Array[
+                  (Map[String, @sdk.AttributeValue], String),
+                ] = []
+                known_resource_keys = Some(keys)
+                keys
+              }
+            }
+            let key = cached_resource_key(groups[last_index].resource, keys)
             index_map.set(key, last_index)
             unindexed = false
           }
-          let key = cached_resource_key(data_resource, known_resource_keys)
+          let keys = match known_resource_keys {
+            Some(keys) => keys
+            None => {
+              let keys : Array[(Map[String, @sdk.AttributeValue], String)] = []
+              known_resource_keys = Some(keys)
+              keys
+            }
+          }
+          let key = cached_resource_key(data_resource, keys)
           let known : Int32? = match resource_index {
             Some(map) => map.get(key)
             None => None
