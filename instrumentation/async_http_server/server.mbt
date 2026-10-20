@@ -133,9 +133,24 @@ fn status_reason(status_code : Int32) -> String {
 
 ///|
 fn parse_port(text : StringView) -> Int32 {
-  @string.parse_int(text) catch {
-    _ => -1
+  let len = text.length()
+  if len == 0 {
+    return -1
   }
+  let mut port = 0
+  let mut i = 0
+  while i < len {
+    let code = text.unsafe_get(i).to_int()
+    if code < 0x30 || code > 0x39 {
+      return -1
+    }
+    port = port * 10 + (code - 0x30)
+    if port > 65535 {
+      return -1
+    }
+    i = i + 1
+  }
+  port
 }
 
 ///|

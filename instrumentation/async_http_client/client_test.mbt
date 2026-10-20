@@ -401,3 +401,27 @@ async test "client span records error.type when the request fails" {
     assert_eq(data.events[0].name, "exception")
   }
 }
+
+///|
+test "split_url rejects non-decimal and out-of-range ports" {
+  assert_eq(
+    @async_http_client.split_url("http://example.com:0x1F90/x"),
+    ("example.com", -1),
+  )
+  assert_eq(
+    @async_http_client.split_url("http://example.com:1_0/x"),
+    ("example.com", -1),
+  )
+  assert_eq(
+    @async_http_client.split_url("http://example.com:+80/x"),
+    ("example.com", -1),
+  )
+  assert_eq(
+    @async_http_client.split_url("http://example.com:65536/x"),
+    ("example.com", -1),
+  )
+  assert_eq(
+    @async_http_client.split_url("http://example.com:00080/x"),
+    ("example.com", 80),
+  )
+}
