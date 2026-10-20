@@ -260,14 +260,16 @@ pub fn Sampler::should_sample(
 ///|
 fn sampler_ratio_from_env() -> Double {
   match @env.get_env_var("OTEL_TRACES_SAMPLER_ARG") {
-    Some(value) => {
-      let ratio = @string.parse_double(value.trim()) catch { _ => 1.0 }
-      if ratio.is_nan() || ratio < 0.0 || ratio > 1.0 {
-        1.0
-      } else {
-        ratio
+    Some(value) =>
+      match parse_decimal_double(value.trim()) {
+        Some(ratio) =>
+          if ratio.is_nan() || ratio < 0.0 || ratio > 1.0 {
+            1.0
+          } else {
+            ratio
+          }
+        None => 1.0
       }
-    }
     None => 1.0
   }
 }
