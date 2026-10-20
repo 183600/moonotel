@@ -97,6 +97,22 @@ test "json_decode_skips_unknown_fields" {
 }
 
 ///|
+test "json_decode_rejects_malformed_numbers_in_unknown_fields" {
+  for body in [
+    "{\"unknown\":1e}",
+    "{\"unknown\":1e+}",
+    "{\"unknown\":-}",
+    "{\"unknown\":1.}",
+    "{\"unknown\":1.2.3}",
+    "{\"unknown\":--1}",
+    "{\"unknown\":1+2}",
+    "{\"unknown\":01}",
+  ] {
+    assert_false(decode_json_body(body).is_success())
+  }
+}
+
+///|
 test "json_decode_partial_success_skips_unknown_members" {
   let message = json_failure_message(
     decode_json_body(

@@ -591,6 +591,68 @@ fn json_skip_array(text : String, pos : Int32, depth : Int32) -> Int32? {
   }
 }
 
+// Skip a JSON number, validating it against the RFC 8259 grammar:
+// `-? (0 / [1-9][0-9]*) (. [0-9]+)? ([eE] [+-]? [0-9]+)?`.
+
+///|
+fn json_skip_number(text : String, start : Int32) -> Int32? {
+  let len = text.length()
+  let mut pos = start
+  if pos < len && text.unsafe_get(pos).to_int() == 0x2D {
+    pos = pos + 1
+  }
+  if pos >= len {
+    return None
+  }
+  let first = text.unsafe_get(pos).to_int()
+  if first == 0x30 {
+    pos = pos + 1
+  } else if first >= 0x31 && first <= 0x39 {
+    pos = pos + 1
+    while pos < len &&
+      text.unsafe_get(pos).to_int() >= 0x30 &&
+      text.unsafe_get(pos).to_int() <= 0x39 {
+      pos = pos + 1
+    }
+  } else {
+    return None
+  }
+  if pos < len && text.unsafe_get(pos).to_int() == 0x2E {
+    pos = pos + 1
+    let fraction_start = pos
+    while pos < len &&
+      text.unsafe_get(pos).to_int() >= 0x30 &&
+      text.unsafe_get(pos).to_int() <= 0x39 {
+      pos = pos + 1
+    }
+    if pos == fraction_start {
+      return None
+    }
+  }
+  if pos < len {
+    let exponent = text.unsafe_get(pos).to_int()
+    if exponent == 0x65 || exponent == 0x45 {
+      pos = pos + 1
+      if pos < len {
+        let sign = text.unsafe_get(pos).to_int()
+        if sign == 0x2B || sign == 0x2D {
+          pos = pos + 1
+        }
+      }
+      let exponent_start = pos
+      while pos < len &&
+        text.unsafe_get(pos).to_int() >= 0x30 &&
+        text.unsafe_get(pos).to_int() <= 0x39 {
+        pos = pos + 1
+      }
+      if pos == exponent_start {
+        return None
+      }
+    }
+  }
+  Some(pos)
+}
+
 // Skip any JSON value. `start` may point at leading whitespace. The depth
 // bound keeps deeply nested input from exhausting the stack.
 
@@ -646,23 +708,7 @@ fn json_skip_value(text : String, start : Int32, depth : Int32) -> Int32? {
       None
     }
   } else if code == 0x2D || (code >= 0x30 && code <= 0x39) {
-    // A JSON number; the digits and exponent characters are consumed without
-    // validation because the value is skipped.
-    let mut cursor = pos
-    while cursor < len {
-      let c = text.unsafe_get(cursor).to_int()
-      if (c >= 0x30 && c <= 0x39) ||
-        c == 0x2D ||
-        c == 0x2B ||
-        c == 0x2E ||
-        c == 0x65 ||
-        c == 0x45 {
-        cursor = cursor + 1
-      } else {
-        break
-      }
-    }
-    Some(cursor)
+    json_skip_number(text, pos)
   } else {
     None
   }
