@@ -41,8 +41,7 @@ fn json_hex_nibble(code : Int32) -> Int32 {
   }
 }
 
-// Compare a plain JSON string body (without escapes) to `expected` without
-// allocating a copy.
+// Compare a plain JSON string body (without escapes) to `expected`.
 
 ///|
 fn json_string_range_equals(
@@ -128,7 +127,7 @@ fn json_field_id_at(
 }
 
 // Validate and skip the JSON string starting at `start`, returning the index
-// just past the closing quote. Plain strings are skipped without allocating.
+// just past the closing quote.
 
 ///|
 fn json_skip_string_at(text : String, start : Int32) -> Int32? {

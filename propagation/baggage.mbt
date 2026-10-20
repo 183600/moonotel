@@ -651,10 +651,10 @@ fn parse_baggage_entries_general(value : String) -> Array[BaggageEntry] {
   entries
 }
 
-// Fast path for a baggage header made only of well-formed plain-ASCII
-// members without properties: no optional whitespace, no percent escapes and
-// no malformed members. Returns None when anything needs the lenient general
-// parser (properties, decoding, whitespace, skipped members, limits).
+// Parse a baggage header made only of well-formed plain-ASCII members without
+// properties: no optional whitespace, no percent escapes and no malformed
+// members. Returns None when anything needs the lenient general parser
+// (properties, decoding, whitespace, skipped members, limits).
 
 ///|
 fn parse_baggage_plain(value : String) -> Array[(String, String)]? {
@@ -867,9 +867,8 @@ pub fn format_baggage_entries(entries : Array[BaggageEntry]) -> String {
     return ""
   }
   let mut size = 0
-  // Fast path: every member is valid, has no properties and fits within the
-  // limits, so the input array can be rendered without building a normalized
-  // copy first.
+  // Every member is valid, has no properties and fits within the limits, so
+  // the input array can be rendered directly.
   let mut simple = entries.length() <= BAGGAGE_MAX_MEMBERS
   if simple {
     let mut bytes = 0
@@ -987,8 +986,8 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
     return ""
   }
   let mut size = 0
-  // Fast path: every pair is valid and fits within the limits, so the input
-  // can be rendered without building a selected copy.
+  // Every pair is valid and fits within the limits, so the input can be
+  // rendered directly.
   let mut simple = entries.length() <= BAGGAGE_MAX_MEMBERS
   if simple {
     let mut bytes = 0

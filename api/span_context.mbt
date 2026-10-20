@@ -132,7 +132,7 @@ pub fn SpanContext::is_sampled(self : SpanContext) -> Bool {
 pub fn is_zero(bytes : Array[Int32]) -> Bool {
   let len = bytes.length()
   let mut i = 0
-  // Test two elements per iteration; any non-zero bit makes the OR non-zero.
+  // Test two elements per iteration.
   while i + 1 < len {
     if (bytes.unsafe_get(i) | bytes.unsafe_get(i + 1)) != 0 {
       return false

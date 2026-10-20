@@ -243,12 +243,10 @@ pub impl SpanProcessor for BatchSpanProcessor with fn on_start(self, _span) {
   let _ = self
 }
 
-// Timestamp in milliseconds used for the timed-flush check. The span's end
-// timestamp comes from the same millisecond clock and avoids another host
-// clock call per exported span. A timestamp older than the last flush, or
-// farther than one flush interval from it, falls back to the clock so that
-// manually built or explicitly backdated snapshots cannot stall or skip a
-// scheduled flush.
+// Timestamp in milliseconds used for the timed-flush check. A timestamp older
+// than the last flush, or farther than one flush interval from it, falls back
+// to the clock so that manually built or explicitly backdated snapshots
+// cannot stall or skip a scheduled flush.
 
 ///|
 fn timed_flush_now(

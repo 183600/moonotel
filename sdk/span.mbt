@@ -870,8 +870,8 @@ fn copy_attribute_map(
   if attributes.length() == 0 {
     return Map([], capacity=1)
   }
-  // Copy the map structure in one pass, then clone only the mutable
-  // array-valued payloads; string and numeric values are immutable.
+  // Copy the map structure, then clone the mutable array-valued payloads;
+  // string and numeric values are immutable.
   let out = attributes.copy()
   for key, value in attributes {
     match value {

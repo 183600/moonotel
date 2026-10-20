@@ -320,9 +320,7 @@ pub fn Context::baggage_entry(self : Context, key : String) -> BaggageEntry? {
 ///|
 pub fn Context::baggage_entries(self : Context) -> Array[BaggageEntry] {
   let entries : Array[BaggageEntry] = []
-  // Keys whose innermost occurrence is a `without_value` marker. Kept as an
-  // array because the chain is short and this avoids allocating lookup maps
-  // on every call.
+  // Keys whose innermost occurrence is a `without_value` marker.
   let deleted : Array[String] = []
   let mut cursor : Context? = Some(self)
   while true {

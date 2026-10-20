@@ -36,8 +36,7 @@ fn pseudo_random_bytes(n : Int32, state : Ref[UInt64]) -> Array[Int32] {
   let out : Array[Int32] = Array::unsafe_make_uninit(n)
   let mut filled = 0
   let mut acc : UInt64 = 0
-  // One splitmix64 word per 8 bytes: the common 16- and 8-byte requests take
-  // the unrolled body without per-byte loop control.
+  // One splitmix64 word per 8 bytes.
   while filled + 8 <= n {
     let word = splitmix64(state)
     acc = acc | word

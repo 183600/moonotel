@@ -348,8 +348,6 @@ fn json_write_decimal_digits(sb : JsonBuf, value : UInt64) -> Unit {
     sb.len = sb.len + 1
     return
   }
-  // Small values (enum numbers, flags, counters) fit in one or two table
-  // writes and skip the 20-byte scratch window.
   if value < 100 {
     sb.ensure(2)
     sb.buf.unsafe_write_uint16_le(
@@ -386,8 +384,7 @@ fn json_write_decimal_digits(sb : JsonBuf, value : UInt64) -> Unit {
   let start = sb.len
   let mut pos = start + 20
   let mut v = value
-  // Consume four digits per division by 10000; a 64-bit value needs at most
-  // five iterations.
+  // Consume four digits per division by 10000.
   while v >= 10000 {
     let remainder = (v % 10000).to_int()
     pos = pos - 4

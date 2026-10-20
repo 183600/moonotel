@@ -49,10 +49,8 @@ pub fn HeaderCapture::parse(spec : String) -> HeaderCapture {
   { capture_all, names }
 }
 
-// Last parsed configuration per environment variable. Instrumentations ask
-// for the same four variables on every request; keeping the parse result
-// avoids re-splitting the list while still noticing environment changes (the
-// raw value is compared on each call).
+// Last parsed configuration per environment variable. The raw value is
+// compared on each call so environment changes are noticed.
 
 ///|
 let header_capture_cache : Map[String, (String?, HeaderCapture)] = Map([])
