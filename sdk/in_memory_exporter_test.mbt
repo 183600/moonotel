@@ -147,3 +147,68 @@ test "in_memory_exporter_returned_spans_are_deep_copies" {
   assert_eq(again.resource.get("injected"), None)
   assert_eq(@api.bytes_to_hex(again.parent_span_id), "1112131415161718")
 }
+
+///|
+test "in_memory_exporter_isolates_stored_spans_from_input_mutations" {
+  let trace_hex = "0102030405060708090a0b0c0d0e0f10"
+  let parent_hex = "1112131415161718"
+  let parent = @api.span_context(
+    @api.bytes_from_hex(trace_hex).unwrap(),
+    @api.bytes_from_hex(parent_hex).unwrap(),
+    @api.TRACE_FLAGS_SAMPLED,
+  )
+  let source = @sdk.InMemorySpanExporter::new()
+  let provider = @sdk.TracerProviderSdk::new(service_name="mem-store-copy")
+    .with_span_processor(@sdk.SimpleSpanProcessor::new(source))
+    .with_sampler(@sdk.Sampler::always_on())
+  let span = provider.get_tracer("mem-scope").start_span("stored", parent~)
+  span.set_string_array_attribute("k", ["a"])
+  span.add_link(
+    @sdk.SpanLink::new(
+      parent,
+      attributes=Map([("l", @sdk.StringArrayValue(["l"]))]),
+    ),
+  )
+  span.end()
+  let data = source.exported_spans()[0]
+  let stored_span_id_hex = data.span_context.span_id_hex()
+  let exporter = @sdk.InMemorySpanExporter::new()
+  assert_eq(exporter.export_spans([data]), @sdk.ExportSuccess)
+  let single = @sdk.InMemorySpanExporter::new()
+  assert_eq(single.export_span(data), @sdk.ExportSuccess)
+  data.span_context.trace_id_view()[0] = 99
+  data.span_context.span_id_view()[0] = 99
+  data.links[0].span_context.trace_id_view()[0] = 99
+  data.links[0].span_context.span_id_view()[0] = 99
+  data.parent_span_id[0] = 99
+  data.attributes.set("after", @sdk.StringValue("x"))
+  match data.attributes.get("k") {
+    Some(@sdk.StringArrayValue(items)) => items.push("changed")
+    _ => abort("expected a string array attribute")
+  }
+  match data.links[0].attributes.get("l") {
+    Some(@sdk.StringArrayValue(items)) => items.push("changed")
+    _ => abort("expected a string array attribute")
+  }
+  for target in [exporter, single] {
+    let stored = target.exported_spans()[0]
+    assert_eq(stored.span_context.trace_id_hex(), trace_hex)
+    assert_eq(stored.span_context.span_id_hex(), stored_span_id_hex)
+    assert_eq(stored.parent_span_id[0], 0x11)
+    assert_eq(@api.bytes_to_hex(stored.parent_span_id), parent_hex)
+    assert_eq(stored.links[0].span_context.trace_id_hex(), trace_hex)
+    assert_eq(stored.links[0].span_context.span_id_hex(), parent_hex)
+    assert_eq(stored.attributes.get("k"), Some(@sdk.StringArrayValue(["a"])))
+    assert_eq(stored.attributes.get("after"), None)
+    assert_eq(
+      stored.links[0].attributes.get("l"),
+      Some(@sdk.StringArrayValue(["l"])),
+    )
+  }
+  let returned = exporter.exported_spans()[0]
+  returned.span_context.trace_id_view()[0] = 77
+  returned.links[0].span_context.trace_id_view()[0] = 78
+  let again = exporter.exported_spans()[0]
+  assert_eq(again.span_context.trace_id_hex(), trace_hex)
+  assert_eq(again.links[0].span_context.trace_id_hex(), trace_hex)
+}

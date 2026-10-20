@@ -26,6 +26,7 @@ pub fn InMemorySpanExporter::new() -> InMemorySpanExporter {
 fn copy_span_data(data : SpanData) -> SpanData {
   {
     ..data,
+    span_context: @api.SpanContext::copy(data.span_context),
     parent_span_id: data.parent_span_id.copy(),
     attributes: copy_attribute_map(data.attributes),
     events: copy_events(data.events),
@@ -109,7 +110,13 @@ pub impl SpanExporter for InMemorySpanExporter with fn export_spans(self, spans)
   } else if spans.length() == 0 {
     ExportSuccess
   } else {
-    self.batches.push(spans.copy())
+    // Copy the input spans and their mutable payloads so later mutations of
+    // the caller's data cannot change what was exported.
+    let copied : Array[SpanData] = Array(capacity=spans.length())
+    for span in spans {
+      copied.push(copy_span_data(span))
+    }
+    self.batches.push(copied)
     self.span_total = self.span_total + spans.length()
     ExportSuccess
   }
@@ -120,8 +127,8 @@ pub impl SpanExporter for InMemorySpanExporter with fn export_span(self, data) {
   if self.shutdown_called {
     ExportFailure("in-memory exporter is shut down")
   } else {
-    // Store the batch as its own array.
-    self.batches.push([data])
+    // Store the data as its own batch and isolate it from the caller.
+    self.batches.push([copy_span_data(data)])
     self.span_total = self.span_total + 1
     ExportSuccess
   }

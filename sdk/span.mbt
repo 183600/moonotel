@@ -466,7 +466,7 @@ fn copy_links(links : Array[SpanLink]) -> Array[SpanLink] {
   let out : Array[SpanLink] = Array(capacity=links.length())
   for link in links {
     out.push({
-      span_context: link.span_context,
+      span_context: @api.SpanContext::copy(link.span_context),
       attributes: copy_attribute_map(link.attributes),
       dropped_attributes_count: link.dropped_attributes_count,
     })

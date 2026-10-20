@@ -375,6 +375,14 @@ pub fn SpanContext::span_id(self : SpanContext) -> Array[Int32] {
   self.span_id.copy()
 }
 
+// Deep-copy this context so that mutating either copy's ID arrays cannot
+// affect the other.
+
+///|
+pub fn SpanContext::copy(self : SpanContext) -> SpanContext {
+  { ..self, trace_id: self.trace_id.copy(), span_id: self.span_id.copy() }
+}
+
 // The trace ID bytes backing this context. The returned array is shared with
 // the context and must not be mutated. The shared `invalid_span_context()`
 // instance hands out a dedicated zero-filled array so that its own arrays

@@ -33,6 +33,7 @@ pub struct SpanContext {
   is_valid : Bool
   is_remote : Bool
 }
+pub fn SpanContext::copy(Self) -> Self
 pub fn SpanContext::is_remote(Self) -> Bool
 pub fn SpanContext::is_sampled(Self) -> Bool
 pub fn SpanContext::is_valid(Self) -> Bool

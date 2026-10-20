@@ -107,6 +107,24 @@ test "export_passes_custom_headers" {
 }
 
 ///|
+test "configured_content_type_is_replaced_case_insensitively" {
+  let mock = mock_transport(200)
+  let headers : Map[String, String] = Map([], capacity=1)
+  headers.set("Content-Type", "text/plain")
+  let config = @otlp.OtlpHttpConfig::new(
+    endpoint="http://collector:4318",
+    headers~,
+  )
+  let exporter = @otlp.OtlpHttpExporter::new(config, mock.as_transport())
+  let _ = exporter.export_spans([test_span()])
+  assert_eq(
+    mock.headers[0].get("content-type"),
+    Some("application/x-protobuf"),
+  )
+  assert_eq(mock.headers[0].get("Content-Type"), None)
+}
+
+///|
 test "export_empty_span_list_skips_transport" {
   let mock = mock_transport(200)
   let exporter = @otlp.OtlpHttpExporter::new(

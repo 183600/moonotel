@@ -442,7 +442,11 @@ fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
     [], capacity=map_capacity_for_entries(config.headers.length() + 1),
   )
   for key, value in config.headers {
-    headers.set(key, value)
+    // HTTP header names are case-insensitive, so drop any user-configured
+    // `Content-Type` spelling before adding the protocol's own value.
+    if key.to_lower() != "content-type" {
+      headers.set(key, value)
+    }
   }
   headers.set("content-type", content_type_for_protocol(config.protocol))
   headers
