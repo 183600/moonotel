@@ -271,7 +271,14 @@ pub fn Context::span_context(self : Context) -> @api.SpanContext? {
   None
 }
 
-// The member of `list` stored under `key`, if any.
+// Copy a baggage entry and its mutable properties array.
+
+///|
+fn copy_baggage_entry(entry : BaggageEntry) -> BaggageEntry {
+  { ..entry, properties: entry.properties.copy() }
+}
+
+// The member of `list` stored under `key`, if any, as a copy.
 
 ///|
 fn baggage_list_entry(
@@ -280,7 +287,7 @@ fn baggage_list_entry(
 ) -> BaggageEntry? {
   for entry in list {
     if entry.key == key {
-      return Some(entry)
+      return Some(copy_baggage_entry(entry))
     }
   }
   None
@@ -345,7 +352,7 @@ pub fn Context::baggage_entry(self : Context, key : String) -> BaggageEntry? {
                     key,
                     value,
                     properties: match context.properties {
-                      Some(properties) => properties
+                      Some(properties) => properties.copy()
                       None => []
                     },
                   })
@@ -420,7 +427,7 @@ pub fn Context::baggage_entries(self : Context) -> Array[BaggageEntry] {
                     key,
                     value,
                     properties: match context.properties {
-                      Some(properties) => properties
+                      Some(properties) => properties.copy()
                       None => []
                     },
                   })
@@ -473,7 +480,7 @@ pub fn Context::baggage_entries(self : Context) -> Array[BaggageEntry] {
                 }
               }
               if visible {
-                entries.push(entry)
+                entries.push(copy_baggage_entry(entry))
               }
             }
           None => ()
