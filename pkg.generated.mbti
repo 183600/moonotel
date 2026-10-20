@@ -104,7 +104,15 @@ pub fn parse_baggage_entries(String) -> Array[@propagation.BaggageEntry]
 
 pub fn parse_traceparent(String) -> @api.SpanContext?
 
+pub fn parse_tracestate(String) -> String?
+
 pub fn reset_global_propagator() -> Unit
+
+pub fn sampling_decision_drop() -> @sdk.SamplingDecision
+
+pub fn sampling_decision_record_and_sample() -> @sdk.SamplingDecision
+
+pub fn sampling_decision_record_only() -> @sdk.SamplingDecision
 
 pub fn set_global_propagator(&@propagation.TextMapPropagator) -> Unit
 
@@ -118,7 +126,11 @@ pub fn span_context(Array[Int32], Array[Int32], Int32, tracestate? : String, is_
 
 pub fn span_context_from_hex(String, String, Int32) -> @api.SpanContext
 
+pub fn traceparent_header_name() -> String
+
 pub fn traces_exporter_enabled(String) -> Bool
+
+pub fn tracestate_header_name() -> String
 
 pub fn[X] with_context(@context.Context, () -> X raise?) -> X raise?
 
