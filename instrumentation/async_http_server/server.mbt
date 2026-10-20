@@ -390,7 +390,7 @@ pub fn ServerCall::start_span(
 
 ///|
 fn is_http_ows(c : Char) -> Bool {
-  c == ' ' || c == '\t' || c == '\n' || c == '\r'
+  c == ' ' || c == '\t'
 }
 
 // Whether the five code units at `start` spell `close` ignoring ASCII case.
