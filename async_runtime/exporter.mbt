@@ -161,7 +161,9 @@ async fn OtlpHttpAsyncSpanExporter::export_available(
   self : OtlpHttpAsyncSpanExporter,
   first : Array[@sdk.SpanData],
 ) -> Unit {
-  let mut pending = first
+  // Coalescing appends queued spans to `batch`; own the array so the caller's
+  // batch is never modified.
+  let mut pending = first.copy()
   let mut split = false
   while pending.length() > 0 {
     // The queue loop below only enforces the limit on spans appended from the
