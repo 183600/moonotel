@@ -116,3 +116,14 @@ test "negative_timeout_falls_back_to_default" {
   unset_otlp_env()
   assert_eq(config.timeout_millis, 10000)
 }
+
+///|
+test "non_decimal_timeout_falls_back_to_default" {
+  for value in ["0x10", "0o10", "0b1010", "1_000", "+2500"] {
+    unset_otlp_env()
+    @env.set_env_var("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", value)
+    let config = @otlp.OtlpHttpConfig::from_env()
+    unset_otlp_env()
+    assert_eq(config.timeout_millis, 10000)
+  }
+}

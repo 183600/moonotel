@@ -266,20 +266,32 @@ fn non_blank_env_value(name : String) -> String? {
 // OpenTelemetry configuration specification.
 
 ///|
+fn parse_timeout_decimal(value : StringView) -> Int32? {
+  let len = value.length()
+  if len == 0 {
+    return None
+  }
+  let mut number = 0
+  let mut i = 0
+  while i < len {
+    let code = value.unsafe_get(i).to_int()
+    if code < 0x30 || code > 0x39 {
+      return None
+    }
+    let digit = code - 0x30
+    if number > (2147483647 - digit) / 10 {
+      return None
+    }
+    number = number * 10 + digit
+    i = i + 1
+  }
+  Some(number)
+}
+
+///|
 fn parse_timeout_env(name : String) -> Int32? {
   match @env.get_env_var(name) {
-    Some(value) => {
-      let trimmed = value.trim()
-      let parsed = try {
-        Some(@string.parse_int(trimmed))
-      } catch {
-        _ => None
-      }
-      match parsed {
-        Some(number) => if number >= 0 { Some(number) } else { None }
-        None => None
-      }
-    }
+    Some(value) => parse_timeout_decimal(value.trim())
     None => None
   }
 }
