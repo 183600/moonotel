@@ -84,7 +84,12 @@ test "retry_after_millis handles seconds and dates" {
   assert_eq(retry_after_millis("60"), Some(60000))
   // Larger values are capped so a server cannot stall the exporter.
   assert_eq(retry_after_millis("120"), Some(60000))
+  assert_eq(retry_after_millis("9999999999"), Some(60000))
+  assert_eq(retry_after_millis("000000000000000000000060"), Some(60000))
   assert_eq(retry_after_millis("-1"), None)
+  assert_eq(retry_after_millis("+1"), None)
+  assert_eq(retry_after_millis("0x10"), None)
+  assert_eq(retry_after_millis("1_0"), None)
   assert_eq(retry_after_millis(""), None)
   assert_eq(retry_after_millis("not-a-delay"), None)
   // Dates in the past mean "retry immediately".

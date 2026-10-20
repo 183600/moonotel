@@ -237,21 +237,37 @@ fn parse_http_date_seconds(value : StringView) -> Int64? {
 // `None`.
 
 ///|
+fn parse_retry_after_seconds(value : StringView) -> Int32? {
+  let len = value.length()
+  if len == 0 {
+    return None
+  }
+  let mut seconds = 0
+  let mut i = 0
+  while i < len {
+    let code = value.unsafe_get(i).to_int()
+    if code < 0x30 || code > 0x39 {
+      return None
+    }
+    if seconds <= 60 {
+      seconds = seconds * 10 + (code - 0x30)
+      if seconds > 60 {
+        seconds = 60
+      }
+    }
+    i = i + 1
+  }
+  Some(seconds)
+}
+
+///|
 fn retry_after_millis(value : String) -> Int32? {
   let trimmed = value.trim()
   if trimmed == "" {
     return None
   }
-  let parsed = Some(@string.parse_int(trimmed)) catch { _ => None }
-  match parsed {
-    Some(seconds) =>
-      if seconds < 0 {
-        None
-      } else if seconds > 60 {
-        Some(60000)
-      } else {
-        Some(seconds * 1000)
-      }
+  match parse_retry_after_seconds(trimmed) {
+    Some(seconds) => Some(seconds * 1000)
     None =>
       // Not a delta-seconds value: many servers send an IMF-fixdate instead.
       match parse_http_date_seconds(trimmed[:]) {
