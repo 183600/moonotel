@@ -307,6 +307,145 @@ fn json_parse_decimal_int64(value : String) -> Int64? {
   }
 }
 
+///|
+fn json_normalize_numeric_int64(token : String) -> String? {
+  let len = token.length()
+  if len == 0 {
+    return None
+  }
+  let mut pos = 0
+  let mut negative = false
+  let first = token.unsafe_get(0).to_int()
+  if first == 0x2D {
+    negative = true
+    pos = 1
+  } else if first == 0x2B {
+    pos = 1
+  }
+  if pos >= len {
+    return None
+  }
+  let digits = StringBuilder()
+  let mut integer_digits = 0
+  while pos < len {
+    let code = token.unsafe_get(pos).to_int()
+    if code < 0x30 || code > 0x39 {
+      break
+    }
+    digits.write_char(code.unsafe_to_char())
+    integer_digits = integer_digits + 1
+    pos = pos + 1
+  }
+  if integer_digits == 0 {
+    return None
+  }
+  let mut fraction_digits = 0
+  if pos < len && token.unsafe_get(pos).to_int() == 0x2E {
+    pos = pos + 1
+    let fraction_start = pos
+    while pos < len {
+      let code = token.unsafe_get(pos).to_int()
+      if code < 0x30 || code > 0x39 {
+        break
+      }
+      digits.write_char(code.unsafe_to_char())
+      fraction_digits = fraction_digits + 1
+      pos = pos + 1
+    }
+    if pos == fraction_start {
+      return None
+    }
+  }
+  let mut exponent : Int64 = 0L
+  if pos < len {
+    let marker = token.unsafe_get(pos).to_int()
+    if marker == 0x65 || marker == 0x45 {
+      pos = pos + 1
+      let mut exponent_negative = false
+      if pos < len {
+        let sign = token.unsafe_get(pos).to_int()
+        if sign == 0x2D {
+          exponent_negative = true
+          pos = pos + 1
+        } else if sign == 0x2B {
+          pos = pos + 1
+        }
+      }
+      if pos >= len {
+        return None
+      }
+      let exponent_start = pos
+      let mut value : Int64 = 0L
+      while pos < len {
+        let code = token.unsafe_get(pos).to_int()
+        if code < 0x30 || code > 0x39 {
+          break
+        }
+        if value < 1000000L {
+          value = value * 10L + (code - 0x30).to_int64()
+        }
+        pos = pos + 1
+      }
+      if pos == exponent_start {
+        return None
+      }
+      exponent = if exponent_negative { -value } else { value }
+    }
+  }
+  if pos != len {
+    return None
+  }
+  let digit_string = digits.to_string()
+  let digit_length = digit_string.length()
+  let mut start = 0
+  while start < digit_length && digit_string.unsafe_get(start).to_int() == 0x30 {
+    start = start + 1
+  }
+  if start == digit_length {
+    return Some("0")
+  }
+  let mut end = digit_length
+  let mut exponent_10 = exponent - fraction_digits.to_int64()
+  if exponent_10 < 0L {
+    let needed = -exponent_10
+    if needed > (end - start).to_int64() {
+      return None
+    }
+    let keep = end - needed.to_int()
+    let mut i = keep
+    while i < end {
+      if digit_string.unsafe_get(i).to_int() != 0x30 {
+        return None
+      }
+      i = i + 1
+    }
+    end = keep
+    if end == start {
+      return None
+    }
+    exponent_10 = 0L
+  }
+  let total_length = (end - start).to_int64() + exponent_10
+  if total_length > 19L {
+    return None
+  }
+  let normalized = StringBuilder()
+  if negative {
+    normalized.write_char('-')
+  }
+  let mut i = start
+  while i < end {
+    normalized.write_char(digit_string.unsafe_get(i).unsafe_to_char())
+    i = i + 1
+  }
+  let mut zeros = exponent_10
+  while zeros > 0L {
+    normalized.write_char('0')
+    zeros = zeros - 1L
+  }
+  Some(normalized.to_string())
+}
+
 // Parse an int64 field that arrives as a bare JSON number. Integers are
 // accepted directly; exponent/decimal forms (`2e2`, `2.0`) are accepted when
 // they denote a whole number, matching the goog.protobuf JSON parser.
@@ -315,17 +454,11 @@ fn json_parse_decimal_int64(value : String) -> Int64? {
 fn json_parse_numeric_int64(token : String) -> Int64? {
   match json_parse_decimal_int64(token) {
     Some(value) => Some(value)
-    None => {
-      let value = @string.parse_double(token) catch { _ => return None }
-      if value.is_nan() || value.is_inf() {
-        return None
+    None =>
+      match json_normalize_numeric_int64(token) {
+        Some(normalized) => json_parse_decimal_int64(normalized)
+        None => None
       }
-      let truncated = value.to_int64()
-      if truncated.to_double() != value {
-        return None
-      }
-      Some(truncated)
-    }
   }
 }
 
@@ -592,6 +725,7 @@ fn json_parse_partial_success(
     } else if key == 1 {
       if cursor < len && text.unsafe_get(cursor).to_int() == 0x6E {
         // A JSON `null` is accepted for any field and means the default value.
+        message = ""
         cursor = match json_skip_value(text, cursor, 0) {
           Some(end) => end
           None => return None
