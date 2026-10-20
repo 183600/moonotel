@@ -55,6 +55,7 @@ pub fn Tracer::start_span(
     Some(ctx) => if ctx.is_valid() { Some(ctx) } else { None }
     None => None
   }
+  let span_kind = kind.unwrap_or(@api.SpanKind::Internal)
   let start_time = match start_time_unix_nano {
     Some(value) => value
     None => unix_nano_now()
@@ -68,7 +69,7 @@ pub fn Tracer::start_span(
       name,
       context,
       parent_span_id,
-      kind.unwrap_or(@api.SpanKind::Internal),
+      span_kind,
       start_time,
       false,
       None,
@@ -84,7 +85,22 @@ pub fn Tracer::start_span(
     None => (self.provider.id_generator.generate_trace_id(), no_parent_span_id, "")
   }
   let span_id = self.provider.id_generator.generate_span_id()
-  let decision = self.provider.sampler.should_sample(valid_parent, trace_id)
+  let sampler_attributes : Map[String, AttributeValue] = match attributes {
+    Some(values) => values
+    None => Map([])
+  }
+  let sampler_links : Array[SpanLink] = match links {
+    Some(values) => values
+    None => []
+  }
+  let decision = self.provider.sampler.should_sample_parameters({
+    parent: valid_parent,
+    trace_id,
+    name,
+    kind: span_kind,
+    attributes: sampler_attributes,
+    links: sampler_links,
+  })
   let flags = if decision.is_sampled { @api.TRACE_FLAGS_SAMPLED } else { 0 }
   let span_context = @api.span_context(trace_id, span_id, flags, tracestate~)
   // Non-recording spans (DROP) keep no links, matching the SDK spec;
@@ -101,7 +117,7 @@ pub fn Tracer::start_span(
     name,
     span_context,
     parent_span_id,
-    kind.unwrap_or(@api.SpanKind::Internal),
+    span_kind,
     start_time,
     decision.is_recorded,
     span_links,

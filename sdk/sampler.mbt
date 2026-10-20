@@ -68,13 +68,40 @@ fn ratio_threshold(ratio : Double) -> UInt64 {
   (ratio * 9223372036854775808.0).to_uint64()
 }
 
-// A Sampler is a function from (parent SpanContext?, trace ID) to a decision,
-// together with a human-readable description of its configuration.
+// Everything a sampler may inspect when deciding whether to record and
+// export a span. Following the OpenTelemetry specification, the sampling
+// decision can depend on the parent, the trace ID, the span name and kind,
+// and the attributes and links passed at span creation.
+
+///|
+pub(all) struct SamplingParameters {
+  parent : @api.SpanContext?
+  trace_id : Array[Int32]
+  name : String
+  kind : @api.SpanKind
+  attributes : Map[String, AttributeValue]
+  links : Array[SpanLink]
+}
+
+// A Sampler turns sampling parameters into a decision and carries a
+// human-readable description of its configuration.
 
 ///|
 pub struct Sampler {
   description : String
-  sample : (@api.SpanContext?, Array[Int32]) -> SamplingDecision
+  sample : (SamplingParameters) -> SamplingDecision
+}
+
+// Build a sampler from a description and a sampling function. The function is
+// called with the parent, trace ID, name, kind, attributes and links of every
+// new span, so samplers can implement attribute- or route-based policies.
+
+///|
+pub fn Sampler::new(
+  description : String,
+  sample : (SamplingParameters) -> SamplingDecision,
+) -> Sampler {
+  { description, sample, }
 }
 
 // The description of this sampler, following the format required by the
@@ -90,30 +117,25 @@ pub fn Sampler::description(self : Sampler) -> String {
 
 ///|
 pub fn Sampler::always_on() -> Sampler {
-  {
-    description: "AlwaysOnSampler",
-    sample: fn(_parent, _trace_id) { sampling_decision_record_and_sample() },
-  }
+  Sampler::new("AlwaysOnSampler", fn(_parameters) {
+    sampling_decision_record_and_sample()
+  })
 }
 
 // Never sample any span.
 
 ///|
 pub fn Sampler::always_off() -> Sampler {
-  {
-    description: "AlwaysOffSampler",
-    sample: fn(_parent, _trace_id) { sampling_decision_drop() },
-  }
+  Sampler::new("AlwaysOffSampler", fn(_parameters) { sampling_decision_drop() })
 }
 
 // Record every span locally but never sample (never export).
 
 ///|
 pub fn Sampler::record_only() -> Sampler {
-  {
-    description: "RecordOnlySampler",
-    sample: fn(_parent, _trace_id) { sampling_decision_record_only() },
-  }
+  Sampler::new("RecordOnlySampler", fn(_parameters) {
+    sampling_decision_record_only()
+  })
 }
 
 // Sample a deterministic fraction of traces based on the trace ID.
@@ -135,16 +157,13 @@ pub fn Sampler::trace_id_ratio_based(ratio : Double) -> Sampler {
     ratio
   }
   let threshold = ratio_threshold(clamped)
-  {
-    description: "TraceIdRatioBased{" + clamped.to_string() + "}",
-    sample: fn(_parent, trace_id) {
-      if trace_id_fraction(trace_id) >> 1 < threshold {
-        sampling_decision_record_and_sample()
-      } else {
-        sampling_decision_drop()
-      }
-    },
-  }
+  Sampler::new("TraceIdRatioBased{" + clamped.to_string() + "}", fn(parameters) {
+    if trace_id_fraction(parameters.trace_id) >> 1 < threshold {
+      sampling_decision_record_and_sample()
+    } else {
+      sampling_decision_drop()
+    }
+  })
 }
 
 // Delegate to `root` only when there is no valid parent; otherwise delegate
@@ -177,35 +196,47 @@ pub fn Sampler::parent_based(
     Some(value) => value
     None => Sampler::always_off()
   }
-  {
-    description: "ParentBased{" + root.description() + "}",
-    sample: fn(parent, trace_id) {
-      match parent {
-        Some(ctx) =>
-          if ctx.is_valid() {
-            let sampled = (ctx.trace_flags() & 1) != 0
-            let delegate = if ctx.is_remote() {
-              if sampled {
-                remote_sampled
-              } else {
-                remote_not_sampled
-              }
-            } else if sampled {
-              local_sampled
+  Sampler::new("ParentBased{" + root.description() + "}", fn(parameters) {
+    match parameters.parent {
+      Some(ctx) =>
+        if ctx.is_valid() {
+          let sampled = (ctx.trace_flags() & 1) != 0
+          let delegate = if ctx.is_remote() {
+            if sampled {
+              remote_sampled
             } else {
-              local_not_sampled
+              remote_not_sampled
             }
-            delegate.should_sample(Some(ctx), trace_id)
+          } else if sampled {
+            local_sampled
           } else {
-            root.should_sample(None, trace_id)
+            local_not_sampled
           }
-        None => root.should_sample(None, trace_id)
-      }
-    },
-  }
+          delegate.should_sample_parameters(
+            { ..parameters, parent: Some(ctx), },
+          )
+        } else {
+          root.should_sample_parameters({ ..parameters, parent: None, })
+        }
+      None => root.should_sample_parameters(parameters)
+    }
+  })
 }
 
-// Run the sampler for the given parent context and trace ID.
+// Run the sampler with the full set of sampling parameters.
+
+///|
+pub fn Sampler::should_sample_parameters(
+  self : Sampler,
+  parameters : SamplingParameters,
+) -> SamplingDecision {
+  (self.sample)(parameters)
+}
+
+// Run the sampler for the given parent context and trace ID. Span-specific
+// parameters are empty: the name is "", the kind is `Internal`, and no
+// attributes or links are supplied. Use `should_sample_parameters` to expose
+// them to a custom sampler.
 
 ///|
 pub fn Sampler::should_sample(
@@ -213,7 +244,14 @@ pub fn Sampler::should_sample(
   parent : @api.SpanContext?,
   trace_id : Array[Int32],
 ) -> SamplingDecision {
-  (self.sample)(parent, trace_id)
+  self.should_sample_parameters({
+    parent,
+    trace_id,
+    name: "",
+    kind: @api.SpanKind::Internal,
+    attributes: Map([]),
+    links: [],
+  })
 }
 
 // The ratio configured through `OTEL_TRACES_SAMPLER_ARG`, or 1.0 when the

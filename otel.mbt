@@ -21,6 +21,7 @@ pub using @sdk {
   type SpanEvent,
   type SpanLink,
   type SamplingDecision,
+  type SamplingParameters,
   type ExportResult,
   type Sampler,
   type SpanLimits,

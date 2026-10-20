@@ -227,15 +227,17 @@ pub fn ResourceAttributes::values(Self) -> Iter[AttributeValue]
 
 pub struct Sampler {
   description : String
-  sample : (@api.SpanContext?, Array[Int32]) -> SamplingDecision
+  sample : (SamplingParameters) -> SamplingDecision
 }
 pub fn Sampler::always_off() -> Self
 pub fn Sampler::always_on() -> Self
 pub fn Sampler::description(Self) -> String
 pub fn Sampler::from_env() -> Self
+pub fn Sampler::new(String, (SamplingParameters) -> SamplingDecision) -> Self
 pub fn Sampler::parent_based(Self, remote_parent_sampled? : Self, remote_parent_not_sampled? : Self, local_parent_sampled? : Self, local_parent_not_sampled? : Self) -> Self
 pub fn Sampler::record_only() -> Self
 pub fn Sampler::should_sample(Self, @api.SpanContext?, Array[Int32]) -> SamplingDecision
+pub fn Sampler::should_sample_parameters(Self, SamplingParameters) -> SamplingDecision
 pub fn Sampler::trace_id_ratio_based(Double) -> Self
 
 pub(all) struct SamplingDecision {
@@ -245,6 +247,15 @@ pub(all) struct SamplingDecision {
 pub fn SamplingDecision::equal(Self, Self) -> Bool
 pub fn SamplingDecision::not_equal(Self, Self) -> Bool
 pub fn SamplingDecision::to_repr(Self) -> @debug.Repr
+
+pub(all) struct SamplingParameters {
+  parent : @api.SpanContext?
+  trace_id : Array[Int32]
+  name : String
+  kind : @api.SpanKind
+  attributes : Map[String, AttributeValue]
+  links : Array[SpanLink]
+}
 
 pub struct SimpleSpanProcessor {
   exporter : &SpanExporter
