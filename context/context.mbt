@@ -13,8 +13,8 @@ pub struct Context {
   properties : Array[(String, String)]?
   // Baggage map carried by a single chain node, used by `with_baggage`.
   baggage_map : Map[String, String]?
-  // Baggage members carried by a single chain node, used by
-  // `with_baggage_entries`. Stored innermost-first and deduplicated.
+  // Baggage members carried by this context node, used by
+  // `with_baggage_entries`.
   baggage_list : Array[BaggageEntry]?
   parent : Context?
 }
@@ -221,9 +221,8 @@ pub fn Context::with_baggage_entries(
   if entries.length() == 0 {
     return self
   }
-  // Every member is kept in a single chain node: walking from the last entry
-  // to the first keeps the innermost occurrence of each key, and the result is
-  // already ordered from innermost to outermost.
+  // Walking from the last entry to the first keeps the innermost occurrence of
+  // each key; the result is ordered from innermost to outermost.
   let list : Array[BaggageEntry] = Array(capacity=entries.length())
   let mut i = entries.length() - 1
   while i >= 0 {
