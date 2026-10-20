@@ -305,7 +305,7 @@ fn limited_attributes(
 ) -> (Map[String, AttributeValue], Int32) {
   let total = attributes.length()
   if (count_limit < 0 || total <= count_limit) && value_length_limit < 0 {
-    return (attributes.copy(), 0)
+    return (copy_attribute_map(attributes), 0)
   }
   let capacity = if count_limit < 0 || count_limit > total {
     total
@@ -318,7 +318,12 @@ fn limited_attributes(
   let mut dropped = 0
   for key, value in attributes {
     if within_limit(kept.length(), count_limit) {
-      kept.set(key, truncate_attribute_value(value, value_length_limit))
+      kept.set(
+        key,
+        copy_attribute_value(
+          truncate_attribute_value(value, value_length_limit),
+        ),
+      )
     } else {
       dropped = dropped + 1
     }
@@ -339,16 +344,23 @@ fn SpanSdk::set_attribute_limited(
   if within_limit(attributes.length(), self.limits.attribute_count_limit) {
     attributes.set(
       key,
-      truncate_attribute_value(value, self.limits.attribute_value_length_limit),
+      copy_attribute_value(
+        truncate_attribute_value(
+          value,
+          self.limits.attribute_value_length_limit,
+        ),
+      ),
     )
   } else {
     match attributes.get(key) {
       Some(_) =>
         attributes.set(
           key,
-          truncate_attribute_value(
-            value,
-            self.limits.attribute_value_length_limit,
+          copy_attribute_value(
+            truncate_attribute_value(
+              value,
+              self.limits.attribute_value_length_limit,
+            ),
           ),
         )
       None => self.dropped_attributes = self.dropped_attributes + 1

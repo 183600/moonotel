@@ -201,7 +201,10 @@ fn Resource::attributes_shared(self : Resource) -> Map[String, AttributeValue] {
 
 ///|
 pub fn Resource::get(self : Resource, key : String) -> AttributeValue? {
-  self.attributes.get(key)
+  match self.attributes.get(key) {
+    Some(value) => Some(copy_attribute_value(value))
+    None => None
+  }
 }
 
 // Number of attributes in this resource.
@@ -245,7 +248,7 @@ pub fn Resource::merge(self : Resource, other : Resource) -> Resource {
     map_capacity_for_entries(self.attributes.length() + other.attributes.length()),
   )
   for key, value in other.attributes {
-    attributes.set(key, value)
+    attributes.set(key, copy_attribute_value(value))
   }
   { attributes, }
 }
@@ -320,8 +323,16 @@ pub fn ResourceAttributes::get(
   key : String,
 ) -> AttributeValue? {
   match self.own {
-    Some(map) => map.get(key)
-    None => self.shared.get(key)
+    Some(map) =>
+      match map.get(key) {
+        Some(value) => Some(copy_attribute_value(value))
+        None => None
+      }
+    None =>
+      match self.shared.get(key) {
+        Some(value) => Some(copy_attribute_value(value))
+        None => None
+      }
   }
 }
 
@@ -398,7 +409,10 @@ pub fn ResourceAttributes::get_or_default(
   key : String,
   default : AttributeValue,
 ) -> AttributeValue {
-  self.as_map().get_or_default(key, default)
+  match self.as_map().get(key) {
+    Some(value) => copy_attribute_value(value)
+    None => default
+  }
 }
 
 // Remove `key` from this snapshot, copying the shared map first when needed.
@@ -457,7 +471,12 @@ pub fn ResourceAttributes::values(
 pub fn ResourceAttributes::to_array(
   self : ResourceAttributes,
 ) -> Array[(String, AttributeValue)] {
-  self.as_map().to_array()
+  let entries = self.as_map().to_array()
+  for i, entry in entries {
+    let (key, value) = entry
+    entries[i] = (key, copy_attribute_value(value))
+  }
+  entries
 }
 
 ///|

@@ -48,6 +48,30 @@ test "resource_merge_prefers_the_other_resource" {
 }
 
 ///|
+test "resource_merge_copies_array_attribute_payloads" {
+  let other_values : Array[String] = ["a"]
+  let base = @sdk.Resource::empty().with_attribute(
+    "base",
+    @sdk.StringArrayValue(["x"]),
+  )
+  let other = @sdk.Resource::new(
+    attributes=Map([("k", @sdk.StringArrayValue(other_values))]),
+  )
+  let merged = base.merge(other)
+  other_values.push("b")
+  match other.get("k") {
+    Some(@sdk.StringArrayValue(items)) => items.push("c")
+    _ => abort("expected a string array attribute")
+  }
+  assert_eq(merged.get("k"), Some(@sdk.StringArrayValue(["a"])))
+  match base.get("base") {
+    Some(@sdk.StringArrayValue(items)) => items.push("y")
+    _ => abort("expected a string array attribute")
+  }
+  assert_eq(merged.get("base"), Some(@sdk.StringArrayValue(["x"])))
+}
+
+///|
 test "resource_service_name_defaults_to_unknown_service" {
   assert_eq(@sdk.Resource::empty().service_name(), "unknown_service")
   assert_eq(
@@ -182,4 +206,37 @@ test "provider_resource_flows_into_exported_spans" {
     spans[0].resource.get("service.version"),
     Some(@sdk.StringValue("9.9.9")),
   )
+}
+
+///|
+test "resource_get_does_not_expose_array_attribute_payloads" {
+  let resource = @sdk.Resource::new(
+    attributes=Map([("k", @sdk.StringArrayValue(["a"]))]),
+  )
+  match resource.get("k") {
+    Some(@sdk.StringArrayValue(items)) => items.push("b")
+    _ => abort("expected a string array attribute")
+  }
+  assert_eq(resource.get("k"), Some(@sdk.StringArrayValue(["a"])))
+}
+
+///|
+test "resource_attributes_accessors_do_not_expose_array_payloads" {
+  let snapshot = @sdk.ResourceAttributes::new(
+    Map([("k", @sdk.StringArrayValue(["a"]))]),
+  )
+  match snapshot.get("k") {
+    Some(@sdk.StringArrayValue(items)) => items.push("b")
+    _ => abort("expected a string array attribute")
+  }
+  match snapshot.get_or_default("k", @sdk.StringValue("")) {
+    @sdk.StringArrayValue(items) => items.push("c")
+    _ => abort("expected a string array attribute")
+  }
+  let entries = snapshot.to_array()
+  match entries[0].1 {
+    @sdk.StringArrayValue(items) => items.push("d")
+    _ => abort("expected a string array attribute")
+  }
+  assert_eq(snapshot.get("k"), Some(@sdk.StringArrayValue(["a"])))
 }
