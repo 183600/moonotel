@@ -240,3 +240,30 @@ test "resource_attributes_accessors_do_not_expose_array_payloads" {
   }
   assert_eq(snapshot.get("k"), Some(@sdk.StringArrayValue(["a"])))
 }
+
+///|
+test "resource_attributes_iterators_do_not_expose_array_payloads" {
+  let snapshot = @sdk.ResourceAttributes::new(
+    Map([("k", @sdk.StringArrayValue(["a"]))]),
+  )
+  for entry in snapshot.iter() {
+    let (_, value) = entry
+    match value {
+      @sdk.StringArrayValue(items) => items.push("iter")
+      _ => abort("expected a string array attribute")
+    }
+  }
+  for _, value in snapshot.iter2() {
+    match value {
+      @sdk.StringArrayValue(items) => items.push("iter2")
+      _ => abort("expected a string array attribute")
+    }
+  }
+  for value in snapshot.values() {
+    match value {
+      @sdk.StringArrayValue(items) => items.push("values")
+      _ => abort("expected a string array attribute")
+    }
+  }
+  assert_eq(snapshot.get("k"), Some(@sdk.StringArrayValue(["a"])))
+}

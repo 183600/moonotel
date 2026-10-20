@@ -19,8 +19,23 @@ pub fn InMemorySpanExporter::new() -> InMemorySpanExporter {
   { batches: [], span_total: 0, shutdown_called: false, }
 }
 
-// The exported batches, in arrival order. Batches are copied so callers cannot
-// mutate the exporter's state.
+// Deep-copy a span snapshot so that mutating the result cannot change the
+// exporter's stored data.
+
+///|
+fn copy_span_data(data : SpanData) -> SpanData {
+  {
+    ..data,
+    parent_span_id: data.parent_span_id.copy(),
+    attributes: copy_attribute_map(data.attributes),
+    events: copy_events(data.events),
+    links: copy_links(data.links),
+    resource: data.resource.copy(),
+  }
+}
+
+// The exported batches, in arrival order. Batches and their spans are copied
+// so callers cannot mutate the exporter's state.
 
 ///|
 pub fn InMemorySpanExporter::exported_batches(
@@ -28,12 +43,16 @@ pub fn InMemorySpanExporter::exported_batches(
 ) -> Array[Array[SpanData]] {
   let out : Array[Array[SpanData]] = Array(capacity=self.batches.length())
   for batch in self.batches {
-    out.push(batch.copy())
+    let copied : Array[SpanData] = Array(capacity=batch.length())
+    for span in batch {
+      copied.push(copy_span_data(span))
+    }
+    out.push(copied)
   }
   out
 }
 
-// Every exported span, flattened in arrival order.
+// Every exported span, flattened in arrival order. Each span is a copy.
 
 ///|
 pub fn InMemorySpanExporter::exported_spans(
@@ -42,7 +61,7 @@ pub fn InMemorySpanExporter::exported_spans(
   let out : Array[SpanData] = Array(capacity=self.span_total)
   for batch in self.batches {
     for span in batch {
-      out.push(span)
+      out.push(copy_span_data(span))
     }
   }
   out

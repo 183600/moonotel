@@ -91,3 +91,59 @@ test "in_memory_exporter_returned_batches_are_copies" {
   batches[0].clear()
   assert_eq(exporter.span_count(), 1)
 }
+
+///|
+test "in_memory_exporter_returned_spans_are_deep_copies" {
+  let exporter = @sdk.InMemorySpanExporter::new()
+  let provider = @sdk.TracerProviderSdk::new(service_name="mem-deep-copy")
+    .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+    .with_sampler(@sdk.Sampler::always_on())
+  let tracer = provider.get_tracer("mem-scope")
+  let parent = @api.span_context(
+    @api.bytes_from_hex("0102030405060708090a0b0c0d0e0f10").unwrap(),
+    @api.bytes_from_hex("1112131415161718").unwrap(),
+    @api.TRACE_FLAGS_SAMPLED,
+  )
+  let span = tracer.start_span("deep", parent~)
+  span.set_string_array_attribute("k", ["a"])
+  span.add_event("ev", attributes=Map([("e", @sdk.StringArrayValue(["e"]))]))
+  span.add_link(
+    @sdk.SpanLink::new(
+      parent,
+      attributes=Map([("l", @sdk.StringArrayValue(["l"]))]),
+    ),
+  )
+  span.end()
+  let first = exporter.exported_spans()[0]
+  match first.attributes.get("k") {
+    Some(@sdk.StringArrayValue(items)) => items.push("changed")
+    _ => abort("expected a string array attribute")
+  }
+  first.attributes.set("injected", @sdk.StringValue("x"))
+  match first.events[0].attributes.get("e") {
+    Some(@sdk.StringArrayValue(items)) => items.push("changed")
+    _ => abort("expected a string array attribute")
+  }
+  match first.links[0].attributes.get("l") {
+    Some(@sdk.StringArrayValue(items)) => items.push("changed")
+    _ => abort("expected a string array attribute")
+  }
+  first.resource.set("injected", @sdk.StringValue("x"))
+  first.parent_span_id[0] = 99
+  let batch = exporter.exported_batches()[0][0]
+  batch.attributes.set("from_batch", @sdk.StringValue("x"))
+  let again = exporter.exported_spans()[0]
+  assert_eq(again.attributes.get("k"), Some(@sdk.StringArrayValue(["a"])))
+  assert_eq(again.attributes.get("injected"), None)
+  assert_eq(again.attributes.get("from_batch"), None)
+  assert_eq(
+    again.events[0].attributes.get("e"),
+    Some(@sdk.StringArrayValue(["e"])),
+  )
+  assert_eq(
+    again.links[0].attributes.get("l"),
+    Some(@sdk.StringArrayValue(["l"])),
+  )
+  assert_eq(again.resource.get("injected"), None)
+  assert_eq(@api.bytes_to_hex(again.parent_span_id), "1112131415161718")
+}

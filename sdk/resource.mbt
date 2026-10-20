@@ -381,14 +381,23 @@ pub fn ResourceAttributes::is_empty(self : ResourceAttributes) -> Bool {
 pub fn ResourceAttributes::iter(
   self : ResourceAttributes,
 ) -> Iter[(String, AttributeValue)] {
-  self.as_map().iter()
+  self.as_map().iter().map(fn(entry) {
+    let (key, value) = entry
+    (key, copy_attribute_value(value))
+  })
 }
 
 ///|
 pub fn ResourceAttributes::iter2(
   self : ResourceAttributes,
 ) -> Iter2[String, AttributeValue] {
-  self.as_map().iter2()
+  let entries = self.as_map().iter()
+  Iter2::new(fn() {
+    match entries.next() {
+      Some((key, value)) => Some((key, copy_attribute_value(value)))
+      None => None
+    }
+  })
 }
 
 // Whether this snapshot stores a value under `key`.
@@ -464,7 +473,7 @@ pub fn ResourceAttributes::keys(self : ResourceAttributes) -> Iter[String] {
 pub fn ResourceAttributes::values(
   self : ResourceAttributes,
 ) -> Iter[AttributeValue] {
-  self.as_map().values()
+  self.as_map().values().map(fn(value) { copy_attribute_value(value) })
 }
 
 ///|
