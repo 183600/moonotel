@@ -496,18 +496,25 @@ pub async fn ServerCall::respond(
     reason.unwrap_or(status_reason(status_code)),
     extra_headers~,
   )
+  let body_allowed = match (self.request.meth, status_code) {
+    (Head, _) => false
+    (Connect, 200..<300) => false
+    (_, 100..<200 | 204 | 304) => false
+    _ => true
+  }
   match body {
-    Some(text) => {
-      self.connection.write(text)
-      match self.span {
-        Some(span) =>
-          span.set_attribute(
-            @sdk.HTTP_RESPONSE_BODY_SIZE,
-            @sdk.IntValue(utf8_byte_length(text).to_int64()),
-          )
-        None => ()
+    Some(text) =>
+      if body_allowed {
+        self.connection.write(text)
+        match self.span {
+          Some(span) =>
+            span.set_attribute(
+              @sdk.HTTP_RESPONSE_BODY_SIZE,
+              @sdk.IntValue(utf8_byte_length(text).to_int64()),
+            )
+          None => ()
+        }
       }
-    }
     None => ()
   }
   self.connection.end_response()
