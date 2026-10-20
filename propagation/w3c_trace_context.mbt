@@ -559,8 +559,8 @@ fn is_digit_char(c : Char) -> Bool {
   c >= '0' && c <= '9'
 }
 
-// Whether each ASCII code unit (0-127) may appear in a `tracestate` key
-// besides `@`: `lcalpha`, digit, `_`, `-`, `*` or `/`.
+// Whether each ASCII code unit (0-127) may appear after the first character
+// of a `tracestate` key: `lcalpha`, digit, `_`, `-`, `*`, `/` or `@`.
 
 ///|
 let tracestate_key_char_table : FixedArray[Bool] = build_tracestate_key_char_table()
@@ -575,7 +575,8 @@ fn build_tracestate_key_char_table() -> FixedArray[Bool] {
       code == 0x5F ||
       code == 0x2D ||
       code == 0x2A ||
-      code == 0x2F
+      code == 0x2F ||
+      code == 0x40
     table.unsafe_set(code, allowed)
     code = code + 1
   }
@@ -608,8 +609,8 @@ fn build_tracestate_value_char_table() -> FixedArray[Bool] {
   table
 }
 
-// Validate a `tracestate` key: either a simple key (`lcalpha` followed by up to
-// 255 key characters) or a multi-tenant key (`tenant-id@system-id`).
+// Validate a `tracestate` key using the Trace Context Level 2 grammar:
+// `key = (lcalpha / DIGIT) 0*255 keychar`, where `keychar` also includes `@`.
 
 ///|
 fn is_valid_tracestate_key(key : StringView) -> Bool {
@@ -617,36 +618,18 @@ fn is_valid_tracestate_key(key : StringView) -> Bool {
   if len == 0 || len > 256 {
     return false
   }
-  // Validate the character set and locate the (at most one) `@`.
-  let mut at = -1
-  let mut i = 0
+  let first = key.unsafe_get(0).unsafe_to_char()
+  if !is_lcalpha(first) && !is_digit_char(first) {
+    return false
+  }
+  let mut i = 1
   while i < len {
-    let c = key.unsafe_get(i).unsafe_to_char()
-    if c == '@' {
-      if at >= 0 {
-        // At most one `@` per key.
-        return false
-      }
-      at = i
-    } else if !is_tracestate_key_tail(c) {
+    if !is_tracestate_key_tail(key.unsafe_get(i).unsafe_to_char()) {
       return false
     }
     i = i + 1
   }
-  if at < 0 {
-    is_lcalpha(key.unsafe_get(0).unsafe_to_char())
-  } else {
-    let tenant_len = at
-    let system_len = len - at - 1
-    if tenant_len < 1 || tenant_len > 241 || system_len < 1 || system_len > 14 {
-      return false
-    }
-    let first = key.unsafe_get(0).unsafe_to_char()
-    if !is_lcalpha(first) && !is_digit_char(first) {
-      return false
-    }
-    is_lcalpha(key.unsafe_get(at + 1).unsafe_to_char())
-  }
+  true
 }
 
 // Validate a `tracestate` value: printable ASCII without `,` or `=`, holding
