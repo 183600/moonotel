@@ -33,9 +33,6 @@ let protocol_name_http : @sdk.AttributeValue = @sdk.StringValue("http")
 let protocol_version_http_1_1 : @sdk.AttributeValue = @sdk.StringValue("1.1")
 
 ///|
-let url_scheme_http : @sdk.AttributeValue = @sdk.StringValue("http")
-
-///|
 let method_get : @sdk.AttributeValue = @sdk.StringValue("GET")
 
 ///|
@@ -143,10 +140,42 @@ fn parse_port(text : StringView) -> Int32 {
 
 ///|
 fn split_path_query(path : String) -> (String, String) {
-  match path.find("?") {
-    Some(index) => (path[:index].to_owned(), path[index + 1:].to_owned())
-    None => (path, "")
+  let lower = path.to_lower()
+  let has_absolute_uri = lower.has_prefix("http://") || lower.has_prefix("https://")
+  let mut rest : StringView = if lower.has_prefix("http://") {
+    path[7:]
+  } else if lower.has_prefix("https://") {
+    path[8:]
+  } else {
+    path[:]
   }
+  if has_absolute_uri {
+    let mut authority_end = 0
+    while authority_end < rest.length() &&
+      rest.unsafe_get(authority_end).to_int() != 0x2F &&
+      rest.unsafe_get(authority_end).to_int() != 0x3F &&
+      rest.unsafe_get(authority_end).to_int() != 0x23 {
+      authority_end = authority_end + 1
+    }
+    rest = rest[authority_end:]
+  }
+  match rest.find("?") {
+    Some(index) => {
+      let path_part = rest[:index]
+      (
+        if path_part.length() == 0 { "/" } else { path_part.to_owned() },
+        rest[index + 1:].to_owned(),
+      )
+    }
+    None =>
+      if rest.length() == 0 { ("/", "") } else { (rest.to_owned(), "") }
+  }
+}
+
+///|
+fn request_target_scheme(path : String) -> String {
+  let lower = path.to_lower()
+  if lower.has_prefix("https://") { "https" } else { "http" }
 }
 
 // Parse the incoming trace context of a request through the process-wide
@@ -635,7 +664,10 @@ async fn serve_call(
         @sdk.HTTP_REQUEST_METHOD,
         method_attribute_value(request.meth),
       )
-      server_span.set_attribute(@sdk.URL_SCHEME, url_scheme_http)
+      server_span.set_attribute(
+        @sdk.URL_SCHEME,
+        @sdk.StringValue(request_target_scheme(request.path)),
+      )
       server_span.set_attribute(@sdk.NETWORK_PROTOCOL_NAME, protocol_name_http)
       // `moonbitlang/async/http` speaks HTTP/1.1 only.
       server_span.set_attribute(
