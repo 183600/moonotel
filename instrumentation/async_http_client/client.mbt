@@ -670,3 +670,45 @@ pub async fn options(
     context?,
   )
 }
+
+// Traced `TRACE` request (no request body).
+
+///|
+pub async fn trace(
+  url : String,
+  headers? : Map[String, String],
+  tracer? : @sdk.Tracer,
+  span_name? : String,
+  context? : @context.Context,
+) -> (@http.Response, &@io.Data) {
+  request(
+    url,
+    @http.RequestMethod::Trace,
+    b"",
+    headers?,
+    tracer?,
+    span_name?,
+    context?,
+  )
+}
+
+// Traced `CONNECT` request (no request body).
+
+///|
+pub async fn connect(
+  url : String,
+  headers? : Map[String, String],
+  tracer? : @sdk.Tracer,
+  span_name? : String,
+  context? : @context.Context,
+) -> (@http.Response, &@io.Data) {
+  request(
+    url,
+    @http.RequestMethod::Connect,
+    b"",
+    headers?,
+    tracer?,
+    span_name?,
+    context?,
+  )
+}

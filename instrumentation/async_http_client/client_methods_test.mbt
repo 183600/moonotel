@@ -67,3 +67,44 @@ async test "head patch and options use the right methods" {
     )
   }
 }
+
+///|
+async test "trace and connect use the right methods" {
+  let (tracer, exporter) = methods_test_tracer("client-methods")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    let methods : Ref[Array[String]] = Ref([])
+    group.spawn_bg(no_wait=true) <| () => {
+      server.run_forever() <| ((request, _body, conn) => {
+        methods.val.push(@async_http_client.http_method_name(request.meth))
+        if request.meth == @http.RequestMethod::Connect {
+          conn.send_response(405, "Method Not Allowed")
+        } else {
+          conn.send_response(200, "OK")
+        }
+      })
+    }
+    let url = "http://127.0.0.1:\{port}/methods"
+    let (trace_response, _) = @async_http_client.trace(url, tracer~)
+    let (connect_response, _) = @async_http_client.connect(url, tracer~)
+    assert_eq(trace_response.code, 200)
+    assert_eq(connect_response.code, 405)
+    assert_eq(methods.val, ["TRACE", "CONNECT"])
+    assert_eq(exporter.spans.val.length(), 2)
+    assert_eq(exporter.spans.val[0].name, "TRACE")
+    assert_eq(exporter.spans.val[1].name, "CONNECT")
+    assert_eq(
+      exporter.spans.val[0].attributes.get(@sdk.HTTP_REQUEST_METHOD),
+      Some(@sdk.StringValue("TRACE")),
+    )
+    assert_eq(
+      exporter.spans.val[1].attributes.get(@sdk.HTTP_REQUEST_METHOD),
+      Some(@sdk.StringValue("CONNECT")),
+    )
+    assert_eq(
+      exporter.spans.val[1].status,
+      @api.StatusCode::Error,
+    )
+  }
+}
