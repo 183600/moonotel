@@ -21,6 +21,11 @@ test "tracestate_rejects_cr_and_lf_as_ows" {
   assert_eq(parse_tracestate("a=1,\nb=2"), None)
   assert_eq(parse_tracestate("\ta=1\t"), Some("a=1"))
   assert_eq(parse_tracestate("a=1,\tb=2"), Some("a=1,b=2"))
+  assert_true(Tracestate::parse("a=1\r") is None)
+  assert_true(Tracestate::parse("a=1\n") is None)
+  assert_true(Tracestate::parse("\ra=1") is None)
+  assert_true(Tracestate::parse("a=1,\rb=2") is None)
+  assert_eq(Tracestate::parse("\ta=1\t").unwrap().get("a"), Some("1"))
 }
 
 ///|

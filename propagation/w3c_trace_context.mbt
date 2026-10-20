@@ -24,12 +24,15 @@ pub fn tracestate_header_name() -> String {
   "tracestate"
 }
 
+// HTTP optional whitespace. OWS is `SP / HTAB` only (RFC 9110 §5.6.3); CR
+// and LF are not whitespace.
+
 ///|
 fn is_trim_char(c : Char) -> Bool {
-  c == ' ' || c == '\t' || c == '\n' || c == '\r'
+  c == ' ' || c == '\t'
 }
 
-// Equivalent to `value.trim()` (the default whitespace set).
+// Trim HTTP optional whitespace around a value.
 
 ///|
 fn trim_ows(value : StringView) -> StringView {
