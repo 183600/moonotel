@@ -24,6 +24,19 @@ test "json_decode_whitespace_only_is_success" {
 }
 
 ///|
+test "json_decode_rejects_oversized_response_body" {
+  // Whitespace-only bodies parse as success up to the 4 MiB limit; one byte
+  // more must be rejected before parsing, as required by the OTLP spec.
+  let at_limit : Bytes = Bytes::make(4194304, b' ')
+  assert_eq(@otlp.decode_export_response_json(at_limit), @sdk.ExportSuccess)
+  let oversized : Bytes = Bytes::make(4194305, b' ')
+  match @otlp.decode_export_response_json(oversized) {
+    @sdk.ExportFailure(message) => assert_true(message.contains("4 MiB"))
+    @sdk.ExportSuccess => abort("expected an export failure")
+  }
+}
+
+///|
 test "json_decode_empty_object_is_success" {
   assert_eq(decode_json_body("{}"), @sdk.ExportSuccess)
 }

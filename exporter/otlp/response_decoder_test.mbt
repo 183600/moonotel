@@ -52,6 +52,17 @@ test "decode_truncated_body_is_failure" {
 }
 
 ///|
+test "decode_rejects_oversized_response_body" {
+  // Per the OTLP spec the client must limit the response body size (4 MiB by
+  // recommendation) and treat an oversized body as a non-retryable failure.
+  let oversized : Bytes = Bytes::make(4194305, b'\x00')
+  match @otlp.decode_export_response(oversized) {
+    @sdk.ExportFailure(message) => assert_true(message.contains("4 MiB"))
+    @sdk.ExportSuccess => abort("expected an export failure")
+  }
+}
+
+///|
 test "decode_invalid_wire_types_is_failure" {
   // Field 1 with wire type 3 (start group) / 6 / 7 never occurs in this
   // message and must be rejected instead of silently accepted.

@@ -2,6 +2,18 @@
 // success. A `partial_success` field reports rejected spans; per the OTLP
 // spec a partial success must not be retried.
 
+// The OTLP specification requires clients to limit the size of a response
+// body before parsing it and recommends 4 MiB as the default limit. A body
+// over the limit is treated as a non-retryable failure.
+
+///|
+const OTLP_MAX_RESPONSE_BODY_BYTES : Int = 4194304
+
+///|
+fn oversized_response() -> @sdk.ExportResult {
+  @sdk.ExportFailure("OTLP response body exceeds the 4 MiB limit")
+}
+
 ///|
 fn malformed_response() -> @sdk.ExportResult {
   @sdk.ExportFailure("malformed OTLP response body")
@@ -50,6 +62,9 @@ fn read_response_varint(data : BytesView, offset : Int32) -> (UInt64, Int32)? {
 
 ///|
 pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
+  if body.length() > OTLP_MAX_RESPONSE_BODY_BYTES {
+    return oversized_response()
+  }
   let data = body.exact_view()
   let length = data.length()
   let mut pos = 0

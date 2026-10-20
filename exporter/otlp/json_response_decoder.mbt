@@ -801,6 +801,11 @@ fn json_parse_partial_success(
 
 ///|
 pub fn decode_export_response_json(body : Bytes) -> @sdk.ExportResult {
+  // The OTLP specification requires a response body size limit (4 MiB by
+  // recommendation) to be enforced before parsing.
+  if body.length() > OTLP_MAX_RESPONSE_BODY_BYTES {
+    return oversized_response()
+  }
   let text = @utf8.decode_lossy(body.exact_view())
   let len = text.length()
   let mut pos = json_skip_ws(text, 0)
