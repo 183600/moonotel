@@ -259,8 +259,9 @@ fn json_parse_string_at(text : String, start : Int32) -> (String, Int32)? {
   None
 }
 
-// Parse a decimal integer, optionally signed. An optional leading `-` or `+`
-// sign is accepted; no whitespace or other non-digit inside `value` is.
+// Parse a decimal integer. Only an optional leading `-` sign is accepted
+// (matching the JSON number grammar and the proto3 JSON decimal-string form);
+// a leading `+` or any other non-digit inside `value` is rejected.
 
 ///|
 fn json_parse_decimal_int64(value : String) -> Int64? {
@@ -273,8 +274,6 @@ fn json_parse_decimal_int64(value : String) -> Int64? {
   let first = value.unsafe_get(0).to_int()
   if first == 0x2D {
     negative = true
-    pos = 1
-  } else if first == 0x2B {
     pos = 1
   }
   if pos >= len {
@@ -318,8 +317,6 @@ fn json_normalize_numeric_int64(token : String) -> String? {
   let first = token.unsafe_get(0).to_int()
   if first == 0x2D {
     negative = true
-    pos = 1
-  } else if first == 0x2B {
     pos = 1
   }
   if pos >= len {
@@ -490,22 +487,11 @@ fn json_parse_rejected_spans(text : String, start : Int32) -> (Int64, Int32)? {
       None => None
     }
   } else {
-    let mut cursor = pos
-    while cursor < len {
-      let code = text.unsafe_get(cursor).to_int()
-      if (code >= 0x30 && code <= 0x39) ||
-        code == 0x2D ||
-        code == 0x2B ||
-        code == 0x2E ||
-        code == 0x65 ||
-        code == 0x45 {
-        cursor = cursor + 1
-      } else {
-        break
-      }
-    }
-    if cursor == pos {
-      return None
+    // A bare JSON number: validate it against the RFC 8259 grammar with the
+    // same strictness applied to numbers in skipped fields.
+    let cursor = match json_skip_number(text, pos) {
+      Some(end) => end
+      None => return None
     }
     match json_parse_numeric_int64(text[pos:cursor].to_owned()) {
       Some(value) => Some((value, cursor))

@@ -113,6 +113,20 @@ test "json_decode_rejects_malformed_numbers_in_unknown_fields" {
 }
 
 ///|
+test "json_decode_rejects_plus_sign_and_leading_zero_numbers" {
+  for body in [
+    "{\"partialSuccess\":{\"rejectedSpans\":\"+5\"}}",
+    "{\"partialSuccess\":{\"rejectedSpans\":+5}}",
+    "{\"partialSuccess\":{\"rejectedSpans\":01}}",
+    "{\"partialSuccess\":{\"rejectedSpans\":-01}}",
+    "{\"partialSuccess\":{\"rejectedSpans\":00}}",
+    "{\"partialSuccess\":{\"rejectedSpans\":+0}}",
+  ] {
+    assert_false(decode_json_body(body).is_success())
+  }
+}
+
+///|
 test "json_decode_partial_success_skips_unknown_members" {
   let message = json_failure_message(
     decode_json_body(
