@@ -1,0 +1,23 @@
+///|
+test "probe resource attributes copy on write" {
+  let shared : Map[String, AttributeValue] = Map([])
+  shared.set("a", StringValue("1"))
+  shared.set("b", IntValue(2L))
+  let snapshot = ResourceAttributes::new(shared)
+  assert_eq(snapshot.length(), 2)
+  assert_eq(snapshot.get("a"), Some(StringValue("1")))
+  snapshot.set("c", BoolValue(true))
+  assert_eq(shared.contains("c"), false)
+  assert_eq(snapshot.length(), 3)
+  let copy = snapshot.copy()
+  snapshot.set("a", StringValue("changed"))
+  snapshot.remove("b")
+  snapshot.clear()
+  assert_eq(copy.get("a"), Some(StringValue("1")))
+  assert_eq(copy.get("b"), Some(IntValue(2L)))
+  assert_eq(copy.get("c"), Some(BoolValue(true)))
+  assert_eq(copy.length(), 3)
+  let empty_copy = copy.copy()
+  copy.clear()
+  assert_eq(empty_copy.length(), 3)
+}
