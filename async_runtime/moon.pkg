@@ -1,6 +1,7 @@
 import {
   "moonbitlang/async",
   "moonbitlang/async/aqueue",
+  "moonbitlang/async/cond_var",
   "yourname/otel/context",
   "yourname/otel/exporter/otlp",
   "yourname/otel/exporter/otlp_async",
@@ -15,6 +16,7 @@ import {
 } for "test"
 
 import {
+  "moonbitlang/async/cond_var",
   "moonbitlang/async/http",
   "moonbitlang/async/socket",
   "yourname/otel/api",

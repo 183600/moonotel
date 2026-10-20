@@ -73,6 +73,8 @@ async test "oversized queued batch is re-split after a partial fill" {
       shutdown_called: false,
       dropped: 0,
       failures: 0,
+      active_sends: 0,
+      send_finished: @cond_var.Cond(),
     }
     // The first batch takes one slot, so 511 spans of the queued 1025 fit in
     // the same request and 514 are left over: the remainder exceeds the

@@ -23,6 +23,8 @@ pub struct OtlpHttpAsyncSpanExporter {
   mut shutdown_called : Bool
   mut dropped : UInt64
   mut failures : UInt64
+  mut active_sends : Int
+  send_finished : @cond_var.Cond
 }
 
 // Create an exporter and start its background sender in `group`. The queue
@@ -45,6 +47,8 @@ pub fn[G] OtlpHttpAsyncSpanExporter::new(
     shutdown_called: false,
     dropped: 0,
     failures: 0,
+    active_sends: 0,
+    send_finished: @cond_var.Cond(),
   }
   group.spawn_bg(no_wait=true) <| () => { exporter.run() }
   // The background sender is cancelled when the group exits, before the group
@@ -104,7 +108,13 @@ pub fn OtlpHttpAsyncSpanExporter::is_shutdown(
 pub async fn OtlpHttpAsyncSpanExporter::flush(
   self : OtlpHttpAsyncSpanExporter,
 ) -> Unit {
-  self.drain()
+  while true {
+    self.drain()
+    if self.active_sends == 0 {
+      return
+    }
+    self.send_finished.wait()
+  }
 }
 
 // Queue a batch for the background sender. Never blocks: when the queue is
@@ -205,6 +215,11 @@ async fn OtlpHttpAsyncSpanExporter::send(
 ) -> Unit {
   if batch.length() == 0 {
     return
+  }
+  self.active_sends = self.active_sends + 1
+  defer {
+    self.active_sends = self.active_sends - 1
+    self.send_finished.broadcast()
   }
   let timeout = self.exporter.config().timeout_millis
   let _ = @async.protect_from_cancel(() => {
