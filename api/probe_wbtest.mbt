@@ -34,7 +34,7 @@ test "probe bytes_to_hex fast paths" {
       let actual = bytes_to_hex(bytes)
       if actual != expected {
         println("MISMATCH len=" + len.to_string())
-        println(@debug.to_repr(bytes))
+        println(Repr(bytes))
         println(actual)
         println(expected)
         abort("bytes_to_hex mismatch")

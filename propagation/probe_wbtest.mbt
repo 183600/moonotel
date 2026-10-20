@@ -27,8 +27,8 @@ test "probe baggage fast path matches general parser" {
       Some(plain) => {
         if plain != general {
           println("MISMATCH pairs input=" + value)
-          println(@debug.to_repr(plain))
-          println(@debug.to_repr(general))
+          println(Repr(plain))
+          println(Repr(general))
           abort("baggage pair fast-path mismatch")
         }
         let fast_entries : Array[BaggageEntry] = []
@@ -38,16 +38,16 @@ test "probe baggage fast path matches general parser" {
         let general_entries = parse_baggage_entries_general(value)
         if fast_entries != general_entries {
           println("MISMATCH entries input=" + value)
-          println(@debug.to_repr(fast_entries))
-          println(@debug.to_repr(general_entries))
+          println(Repr(fast_entries))
+          println(Repr(general_entries))
           abort("baggage entry fast-path mismatch")
         }
         let formatted = format_baggage(plain)
         if parse_baggage(formatted) != general {
           println("MISMATCH roundtrip input=" + value)
           println(formatted)
-          println(@debug.to_repr(parse_baggage(formatted)))
-          println(@debug.to_repr(general))
+          println(Repr(parse_baggage(formatted)))
+          println(Repr(general))
           abort("baggage roundtrip mismatch")
         }
       }

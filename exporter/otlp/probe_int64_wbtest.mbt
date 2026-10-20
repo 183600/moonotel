@@ -14,6 +14,10 @@ test "probe numeric int64 boundaries" {
   ]
   for text in cases {
     let parsed = json_parse_numeric_int64(text)
-    println(text + " -> " + parsed.to_string())
+    let rendered = match parsed {
+      Some(value) => value.to_string()
+      None => "None"
+    }
+    println(text + " -> " + rendered)
   }
 }
