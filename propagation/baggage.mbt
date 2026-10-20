@@ -415,11 +415,12 @@ pub fn percent_encode(value : String) -> String {
   out.unsafe_reinterpret_as_bytes().to_unchecked_string()
 }
 
-// Whether a code unit is HTTP optional whitespace (space, tab, CR, LF).
+// Whether a code unit is HTTP optional whitespace. OWS is `SP / HTAB` only
+// (RFC 9110 §5.6.3); CR and LF are not whitespace.
 
 ///|
 fn is_ows_code(c : UInt16) -> Bool {
-  c == 0x20 || c == 0x09 || c == 0x0A || c == 0x0D
+  c == 0x20 || c == 0x09
 }
 
 // Number of bytes the percent-encoded form of `value` occupies in a `baggage`
