@@ -45,9 +45,35 @@ fn write_int32_hex(out : StringBuilder, bytes : Array[Int32]) -> Unit {
   }
 }
 
+// Render an array value as `[a, b, c]` from already-rendered element strings.
+
+///|
+fn format_array(items : Array[String]) -> String {
+  "[" + items.join(", ") + "]"
+}
+
+// Render a single attribute value compactly, so the console output stays on
+// one line regardless of the value's shape.
+
+///|
+fn format_attribute_value(value : AttributeValue) -> String {
+  match value {
+    StringValue(text) => text
+    BoolValue(flag) => flag.to_string()
+    IntValue(number) => number.to_string()
+    DoubleValue(number) => number.to_string()
+    StringArrayValue(items) => format_array(items)
+    BoolArrayValue(items) => format_array(items.map(fn(item) { item.to_string() }))
+    IntArrayValue(items) => format_array(items.map(fn(item) { item.to_string() }))
+    DoubleArrayValue(items) => format_array(items.map(fn(item) { item.to_string() }))
+  }
+}
+
 // Render one span as a single summary line:
 // `name=<name> trace_id=<hex> span_id=<hex> parent_span_id=<hex> kind=<kind>
-//  status=<status> duration_ms=<n> attributes=<n> events=<n> links=<n>`
+//  status=<status> duration_ms=<n> attributes=<n>{key=value,...} events=<n>
+//  links=<n>`. Attribute values and event names are appended after the counts
+// so the line stays useful for demos without breaking the summary prefix.
 
 ///|
 fn format_span(data : SpanData) -> String {
@@ -68,12 +94,40 @@ fn format_span(data : SpanData) -> String {
     1000000L
   out.write_string(" status=")
   out.write_string(data.status.to_string())
+  if data.status_description.length() > 0 {
+    out.write_string(" status_description=")
+    out.write_string(data.status_description)
+  }
   out.write_string(" duration_ms=")
   out.write_string(duration_millis.to_string())
   out.write_string(" attributes=")
   out.write_string(data.attributes.length().to_string())
+  if data.attributes.length() > 0 {
+    out.write_char('{')
+    let mut first = true
+    for key, value in data.attributes {
+      if !first {
+        out.write_string(", ")
+      }
+      first = false
+      out.write_string(key)
+      out.write_char('=')
+      out.write_string(format_attribute_value(value))
+    }
+    out.write_char('}')
+  }
   out.write_string(" events=")
   out.write_string(data.events.length().to_string())
+  if data.events.length() > 0 {
+    out.write_char('[')
+    for i = 0; i < data.events.length(); i = i + 1 {
+      if i > 0 {
+        out.write_string(", ")
+      }
+      out.write_string(data.events[i].name)
+    }
+    out.write_char(']')
+  }
   out.write_string(" links=")
   out.write_string(data.links.length().to_string())
   out.to_string()
