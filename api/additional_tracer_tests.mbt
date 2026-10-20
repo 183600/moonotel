@@ -3,7 +3,7 @@
 // Helper types and functions for tracer tests
 
 ///|
-struct Tracer {
+priv struct Tracer {
   name : String
   provider : TracerProvider
 }
@@ -21,7 +21,7 @@ priv struct IdGenerator {
 }
 
 ///|
-struct Span {
+priv struct Span {
   name : String
   context : SpanContext
 }
@@ -43,7 +43,7 @@ fn create_tracer(provider : TracerProvider, name : String) -> Tracer {
 }
 
 ///|
-pub fn Tracer::start_span(self : Tracer, name : String) -> Span {
+fn Tracer::start_span(self : Tracer, name : String) -> Span {
   self.provider.id_generator.span_counter = self.provider.id_generator.span_counter +
     1
   let counter = self.provider.id_generator.span_counter

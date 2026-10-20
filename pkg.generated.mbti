@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "yourname/otel/otel"
+package "yourname/otel"
 
 import {
   "yourname/otel/api",
