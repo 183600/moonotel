@@ -404,3 +404,18 @@ test "explicit_span_limits_override_the_environment" {
   assert_eq(span.attributes().length(), 4)
   assert_eq(span.dropped_attributes_count(), 2)
 }
+
+///|
+test "span_limits_from_env_rejects_non_decimal_numbers" {
+  clear_limit_env()
+  @env.set_env_var("OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT", "0x2")
+  @env.set_env_var("OTEL_SPAN_EVENT_COUNT_LIMIT", "0o10")
+  @env.set_env_var("OTEL_SPAN_LINK_COUNT_LIMIT", "1_0")
+  @env.set_env_var("OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT", "0x4")
+  let limits = @sdk.SpanLimits::from_env()
+  clear_limit_env()
+  assert_eq(limits.attribute_count_limit(), 128)
+  assert_eq(limits.event_count_limit(), 128)
+  assert_eq(limits.link_count_limit(), 128)
+  assert_eq(limits.attribute_value_length_limit(), -1)
+}

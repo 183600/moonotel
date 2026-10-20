@@ -9,15 +9,9 @@
 fn env_int(name : String, default : Int32) -> Int32 {
   match @env.get_env_var(name) {
     Some(value) =>
-      try {
-        let parsed = @string.parse_int(value.trim())
-        if parsed < 1 {
-          default
-        } else {
-          parsed
-        }
-      } catch {
-        _ => default
+      match parse_decimal_int(value.trim()) {
+        Some(parsed) => if parsed < 1 { default } else { parsed }
+        None => default
       }
     None => default
   }
@@ -31,15 +25,9 @@ fn env_int(name : String, default : Int32) -> Int32 {
 fn env_duration(name : String, default : Int32) -> Int32 {
   match @env.get_env_var(name) {
     Some(value) =>
-      try {
-        let parsed = @string.parse_int(value.trim())
-        if parsed < 0 {
-          default
-        } else {
-          parsed
-        }
-      } catch {
-        _ => default
+      match parse_decimal_int(value.trim()) {
+        Some(parsed) => if parsed < 0 { default } else { parsed }
+        None => default
       }
     None => default
   }

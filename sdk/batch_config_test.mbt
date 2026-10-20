@@ -150,3 +150,16 @@ test "batch_config_from_env_accepts_zero_schedule_delay" {
   clear_bsp_env()
   assert_eq(config.flush_interval_millis, 0)
 }
+
+///|
+test "batch_config_from_env_rejects_non_decimal_numbers" {
+  clear_bsp_env()
+  @env.set_env_var("OTEL_BSP_MAX_QUEUE_SIZE", "0x10")
+  @env.set_env_var("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", "1_0")
+  @env.set_env_var("OTEL_BSP_SCHEDULE_DELAY", "0b101")
+  let config = @sdk.BatchConfig::from_env()
+  clear_bsp_env()
+  assert_eq(config.max_queue_size, 2048)
+  assert_eq(config.max_export_batch_size, 512)
+  assert_eq(config.flush_interval_millis, 5000)
+}

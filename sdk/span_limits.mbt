@@ -112,15 +112,9 @@ fn env_limit_opt(name : String) -> Int32? {
       if trimmed == "" {
         None
       } else {
-        try {
-          let parsed = @string.parse_int(trimmed)
-          if parsed < 0 {
-            None
-          } else {
-            Some(parsed)
-          }
-        } catch {
-          _ => None
+        match parse_decimal_int(trimmed) {
+          Some(parsed) => if parsed < 0 { None } else { Some(parsed) }
+          None => None
         }
       }
     }
