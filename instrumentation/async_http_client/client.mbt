@@ -322,7 +322,14 @@ fn strip_ipv6_brackets(address : String) -> String {
 ///|
 pub fn redact_url(url : String) -> String {
   let scheme_end = match url.find("://") {
-    Some(index) => index + 3
+    Some(index) =>
+      // A `://` sequence only introduces an authority after a valid scheme;
+      // otherwise it is part of a relative path and must be preserved.
+      if split_scheme(url) == "" {
+        return url
+      } else {
+        index + 3
+      }
     None => return url
   }
   let rest = url[scheme_end:]
