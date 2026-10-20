@@ -174,16 +174,26 @@ fn split_path_query(path : String) -> (String, String) {
     }
     rest = rest[authority_end:]
   }
-  match rest.find("?") {
+  // A fragment is not part of the request target components: drop it before
+  // looking for the query separator.
+  let without_fragment = match rest.find("#") {
+    Some(index) => rest[:index]
+    None => rest
+  }
+  match without_fragment.find("?") {
     Some(index) => {
-      let path_part = rest[:index]
+      let path_part = without_fragment[:index]
       (
         if path_part.length() == 0 { "/" } else { path_part.to_owned() },
-        rest[index + 1:].to_owned(),
+        without_fragment[index + 1:].to_owned(),
       )
     }
     None =>
-      if rest.length() == 0 { ("/", "") } else { (rest.to_owned(), "") }
+      if without_fragment.length() == 0 {
+        ("/", "")
+      } else {
+        (without_fragment.to_owned(), "")
+      }
   }
 }
 
