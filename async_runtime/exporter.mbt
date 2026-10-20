@@ -94,6 +94,19 @@ pub fn OtlpHttpAsyncSpanExporter::is_shutdown(
   self.shutdown_called
 }
 
+// Drain and export every batch currently queued, waiting for the OTLP
+// requests to finish. Spans accepted after the drain started may remain in
+// the queue for the background sender. Failed requests are counted by
+// `export_failures`; they are not retried beyond the exporter's configured
+// retry policy.
+
+///|
+pub async fn OtlpHttpAsyncSpanExporter::flush(
+  self : OtlpHttpAsyncSpanExporter,
+) -> Unit {
+  self.drain()
+}
+
 // Queue a batch for the background sender. Never blocks: when the queue is
 // full the oldest batch is dropped to make room.
 

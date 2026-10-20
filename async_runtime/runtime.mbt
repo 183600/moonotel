@@ -109,6 +109,12 @@ pub fn[G, X] spawn(
 // environment variables. Spans are handed to the background task when they
 // end and sent in coalesced batches; pending spans are drained when the task
 // group exits.
+//
+// When `use_batch` is true (or an explicit `batch` configuration is supplied),
+// a `BatchSpanProcessor` is installed in front of the async exporter and a
+// background flush loop is started in `group`. The batch defaults come from
+// the standard OTEL_BSP_* variables. By default the async exporter's own queue
+// performs the batching.
 
 ///|
 pub fn[G] setup(
@@ -122,6 +128,8 @@ pub fn[G] setup(
   span_limits? : @sdk.SpanLimits,
   exporters? : Array[String],
   max_queue_size? : Int32,
+  use_batch? : Bool,
+  batch? : @sdk.BatchConfig,
 ) -> @sdk.TracerProviderSdk {
   let base = @otlp.OtlpHttpConfig::from_env()
   let config : @otlp.OtlpHttpConfig = {
@@ -162,9 +170,29 @@ pub fn[G] setup(
       group,
       max_queue_size?,
     )
-    provider = provider.with_span_processor(
-      @sdk.SimpleSpanProcessor::new(exporter),
-    )
+    let processor : &@sdk.SpanProcessor = match batch {
+      // An explicit configuration always uses the batch processor.
+      Some(config) => {
+        let value = @sdk.BatchSpanProcessor::with_config(exporter, config)
+        spawn_flush_loop(group, value)
+        let processor : &@sdk.SpanProcessor = value
+        processor
+      }
+      None =>
+        if use_batch.unwrap_or(false) {
+          // Queue/batch/interval defaults come from the OTEL_BSP_* variables.
+          let value = @sdk.BatchSpanProcessor::from_env(exporter)
+          spawn_flush_loop(group, value)
+          let processor : &@sdk.SpanProcessor = value
+          processor
+        } else {
+          let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
+            exporter,
+          )
+          processor
+        }
+    }
+    provider = provider.with_span_processor(processor)
   }
   @sdk.set_global_tracer_provider(provider)
   provider
