@@ -543,7 +543,7 @@ pub async fn ServerCall::respond(
   let body_allowed = match (self.request.meth, status_code) {
     (Head, _) => false
     (Connect, 200..<300) => false
-    (_, 100..<200 | 204 | 304) => false
+    (_, 100..<200 | 204 | 205 | 304) => false
     _ => true
   }
   match body {
