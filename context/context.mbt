@@ -81,12 +81,14 @@ pub fn Context::root() -> Context {
   root_context
 }
 
-// Derive a context carrying the given span.
+// Derive a context carrying the given span. The context owns a copy of the
+// SpanContext, so later mutations through the caller's ID views cannot change
+// it.
 
 ///|
 pub fn Context::with_span(self : Context, sc : @api.SpanContext) -> Context {
   {
-    span_ctx: Some(sc),
+    span_ctx: Some(sc.copy()),
     key: None,
     value: None,
     properties: None,
@@ -250,7 +252,8 @@ pub fn Context::with_baggage_entries(
   }
 }
 
-// The nearest span context in the chain, if any.
+// The nearest span context in the chain, if any, as a copy: mutating its ID
+// arrays cannot change the context or other values derived from it.
 
 ///|
 pub fn Context::span_context(self : Context) -> @api.SpanContext? {
@@ -259,7 +262,7 @@ pub fn Context::span_context(self : Context) -> @api.SpanContext? {
     match cursor {
       Some(context) =>
         match context.span_ctx {
-          Some(sc) => return Some(sc)
+          Some(sc) => return Some(sc.copy())
           None => cursor = context.parent
         }
       None => break
