@@ -150,7 +150,7 @@ fn copy_attributes_with_capacity(
 ) -> Map[String, AttributeValue] {
   let out : Map[String, AttributeValue] = Map([], capacity~)
   for key, value in values {
-    out.set(key, value)
+    out.set(key, copy_attribute_value(value))
   }
   out
 }
@@ -231,7 +231,7 @@ pub fn Resource::with_attribute(
     self.attributes,
     map_capacity_for_entries(self.attributes.length() + 1),
   )
-  attributes.set(key, value)
+  attributes.set(key, copy_attribute_value(value))
   { attributes, }
 }
 
@@ -341,13 +341,13 @@ pub fn ResourceAttributes::set(
         [], capacity=map_capacity_for_entries(self.shared.length() + 1),
       )
       for entry_key, entry_value in self.shared {
-        copied.set(entry_key, entry_value)
+        copied.set(entry_key, copy_attribute_value(entry_value))
       }
       self.own = Some(copied)
       copied
     }
   }
-  map.set(key, value)
+  map.set(key, copy_attribute_value(value))
 }
 
 // Number of attributes in this snapshot.
@@ -412,7 +412,9 @@ pub fn ResourceAttributes::remove(
     Some(map) => map.remove(key)
     None =>
       if self.shared.contains(key) {
-        let copied : Map[String, AttributeValue] = self.shared.copy()
+        let copied : Map[String, AttributeValue] = copy_attributes(
+          self.shared,
+        )
         copied.remove(key)
         self.own = Some(copied)
       }
@@ -434,7 +436,7 @@ pub fn ResourceAttributes::clear(self : ResourceAttributes) -> Unit {
 pub fn ResourceAttributes::copy(
   self : ResourceAttributes,
 ) -> ResourceAttributes {
-  { shared: self.as_map().copy(), own: None }
+  { shared: copy_attributes(self.as_map()), own: None }
 }
 
 // Iterators over the snapshot's keys and values, and its pairs as an array.

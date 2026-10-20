@@ -126,6 +126,38 @@ test "provider_with_resource_replaces_the_default_resource" {
 }
 
 ///|
+test "resource_new_copies_array_attribute_payloads" {
+  let values : Array[String] = ["a"]
+  let resource = @sdk.Resource::new(
+    attributes=Map([("k", @sdk.StringArrayValue(values))]),
+  )
+  values.push("b")
+  assert_eq(resource.get("k"), Some(@sdk.StringArrayValue(["a"])))
+  let exported = resource.attributes()
+  match exported.get("k") {
+    Some(@sdk.StringArrayValue(items)) => items.push("c")
+    _ => abort("expected a string array attribute")
+  }
+  assert_eq(resource.get("k"), Some(@sdk.StringArrayValue(["a"])))
+}
+
+///|
+test "resource_attributes_copy_copies_array_attribute_payloads" {
+  let values : Array[String] = ["a"]
+  let snapshot = @sdk.ResourceAttributes::new(
+    Map([("k", @sdk.StringArrayValue(values))]),
+  )
+  let copy = snapshot.copy()
+  values.push("b")
+  assert_eq(copy.get("k"), Some(@sdk.StringArrayValue(["a"])))
+  match copy.get("k") {
+    Some(@sdk.StringArrayValue(items)) => items.push("c")
+    _ => abort("expected a string array attribute")
+  }
+  assert_eq(snapshot.get("k"), Some(@sdk.StringArrayValue(["a", "b"])))
+}
+
+///|
 test "provider_resource_flows_into_exported_spans" {
   let exporter = @sdk.InMemorySpanExporter::new()
   let resource = @sdk.Resource::new(
