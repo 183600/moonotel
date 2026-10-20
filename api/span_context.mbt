@@ -77,7 +77,7 @@ pub fn SpanContext::with_tracestate(
   self : SpanContext,
   tracestate : String,
 ) -> SpanContext {
-  { ..self, tracestate, }
+  { ..self.copy(), tracestate, }
 }
 
 // Whether this context was received from a remote parent (through a
@@ -95,7 +95,7 @@ pub fn SpanContext::with_remote(
   self : SpanContext,
   is_remote : Bool,
 ) -> SpanContext {
-  { ..self, is_remote, }
+  { ..self.copy(), is_remote, }
 }
 
 // Check if SpanContext is valid

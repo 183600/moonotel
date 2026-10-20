@@ -368,11 +368,12 @@ fn SpanSdk::set_attribute_limited(
   }
 }
 
-// The SpanContext of this span.
+// The SpanContext of this span, as a copy: mutating its ID arrays cannot
+// change the span or the data it exports.
 
 ///|
 pub fn SpanSdk::context(self : SpanSdk) -> @api.SpanContext {
-  self.context
+  @api.SpanContext::copy(self.context)
 }
 
 // Whether the span records attributes and events. Following the
@@ -776,7 +777,7 @@ pub fn SpanSdk::add_link(self : SpanSdk, link : SpanLink) -> Unit {
     self
     .mutable_links()
     .push({
-      span_context: link.span_context,
+      span_context: @api.SpanContext::copy(link.span_context),
       attributes: link_attributes,
       dropped_attributes_count: dropped,
     })
@@ -978,7 +979,7 @@ fn SpanData::take_from_span(span : SpanSdk) -> SpanData {
   span.links = None
   {
     name: span.name,
-    span_context: span.context,
+    span_context: @api.SpanContext::copy(span.context),
     parent_span_id: span.parent_span_id.copy(),
     kind: span.kind,
     start_time_unix_nano: span.start_time_unix_nano,

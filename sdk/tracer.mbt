@@ -61,7 +61,7 @@ pub fn Tracer::start_span(
   }
   if self.provider.disabled || self.provider.is_shutdown() {
     let (context, parent_span_id) = match valid_parent {
-      Some(ctx) => (ctx, ctx.span_id_view())
+      Some(ctx) => (ctx.copy(), ctx.span_id())
       None => (@api.invalid_span_context(), no_parent_span_id)
     }
     return create_span(
@@ -80,7 +80,7 @@ pub fn Tracer::start_span(
     )
   }
   let (trace_id, parent_span_id, tracestate) = match valid_parent {
-    Some(ctx) => (ctx.trace_id_view(), ctx.span_id_view(), ctx.tracestate())
+    Some(ctx) => (ctx.trace_id(), ctx.span_id(), ctx.tracestate())
     None => (self.provider.id_generator.generate_trace_id(), no_parent_span_id, "")
   }
   let span_id = self.provider.id_generator.generate_span_id()
