@@ -559,7 +559,7 @@ pub fn parse_baggage_entries(value : String) -> Array[BaggageEntry] {
 
 ///|
 fn parse_baggage_entries_general(value : String) -> Array[BaggageEntry] {
-  let entries : Array[BaggageEntry] = []
+  let entries : Array[BaggageEntry] = Array(capacity=4)
   // Size of the normalized header built from `entries` so far.
   let mut bytes = 0
   let view = value[:]
@@ -661,7 +661,7 @@ fn parse_baggage_plain(value : String) -> Array[(String, String)]? {
   if value == "" {
     return Some([])
   }
-  let pairs : Array[(String, String)] = []
+  let pairs : Array[(String, String)] = Array(capacity=4)
   let view = value[:]
   let len = view.length()
   let mut bytes = 0
@@ -732,7 +732,7 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
 
 ///|
 fn parse_baggage_general(value : String) -> Array[(String, String)] {
-  let pairs : Array[(String, String)] = []
+  let pairs : Array[(String, String)] = Array(capacity=4)
   // Size of the normalized header built from `pairs` so far.
   let mut bytes = 0
   let view = value[:]
@@ -1076,11 +1076,13 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
   if baggage.length() == 0 {
     return None
   }
-  let entries : Array[BaggageEntry] = []
+  let entries : Array[BaggageEntry] = Array(capacity=baggage.length())
   for entry in baggage {
-    entries.push(
-      BaggageEntry::new(entry.key, entry.value, properties=entry.properties),
-    )
+    entries.push({
+      key: entry.key,
+      value: entry.value,
+      properties: entry.properties,
+    })
   }
   // Small lists are sorted with an insertion sort; larger lists use the
   // generic sort.
@@ -1169,7 +1171,9 @@ pub fn extract_baggage_context(carrier : TextMapCarrier) -> @context.Context {
   if entries.length() == 0 {
     return @context.Context::root()
   }
-  let context_entries : Array[@context.BaggageEntry] = []
+  let context_entries : Array[@context.BaggageEntry] = Array(
+    capacity=entries.length(),
+  )
   for entry in entries {
     context_entries.push(
       @context.BaggageEntry::new(

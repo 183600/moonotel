@@ -40,6 +40,7 @@ pub struct Context {
   value : String?
   properties : Array[(String, String)]?
   baggage_map : Map[String, String]?
+  baggage_list : Array[BaggageEntry]?
   parent : Context?
 }
 pub fn Context::baggage(Self) -> Map[String, String]

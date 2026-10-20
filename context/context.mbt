@@ -13,6 +13,9 @@ pub struct Context {
   properties : Array[(String, String)]?
   // Baggage map carried by a single chain node, used by `with_baggage`.
   baggage_map : Map[String, String]?
+  // Baggage members carried by a single chain node, used by
+  // `with_baggage_entries`. Stored innermost-first and deduplicated.
+  baggage_list : Array[BaggageEntry]?
   parent : Context?
 }
 
@@ -67,6 +70,7 @@ let root_context : Context = {
   value: None,
   properties: None,
   baggage_map: None,
+  baggage_list: None,
   parent: None,
 }
 
@@ -87,6 +91,7 @@ pub fn Context::with_span(self : Context, sc : @api.SpanContext) -> Context {
     value: None,
     properties: None,
     baggage_map: None,
+    baggage_list: None,
     parent: Some(self),
   }
 }
@@ -105,6 +110,7 @@ pub fn Context::with_value(
     value: Some(value),
     properties: None,
     baggage_map: None,
+    baggage_list: None,
     parent: Some(self),
   }
 }
@@ -130,6 +136,7 @@ pub fn Context::with_baggage_entry(
     value: Some(value),
     properties,
     baggage_map: None,
+    baggage_list: None,
     parent: Some(self),
   }
 }
@@ -146,6 +153,7 @@ pub fn Context::without_value(self : Context, key : String) -> Context {
     value: None,
     properties: None,
     baggage_map: None,
+    baggage_list: None,
     parent: Some(self),
   }
 }
@@ -173,6 +181,7 @@ pub fn Context::with_baggage(
     value: None,
     properties: None,
     baggage_map: Some(baggage),
+    baggage_list: None,
     parent: Some(self),
   }
 }
@@ -194,6 +203,7 @@ pub fn Context::with_baggage_owned(
     value: None,
     properties: None,
     baggage_map: Some(values),
+    baggage_list: None,
     parent: Some(self),
   }
 }
@@ -208,15 +218,37 @@ pub fn Context::with_baggage_entries(
   self : Context,
   entries : Array[BaggageEntry],
 ) -> Context {
-  let mut context = self
-  for entry in entries {
-    context = context.with_baggage_entry(
-      entry.key,
-      entry.value,
-      properties=entry.properties,
-    )
+  if entries.length() == 0 {
+    return self
   }
-  context
+  // Every member is kept in a single chain node: walking from the last entry
+  // to the first keeps the innermost occurrence of each key, and the result is
+  // already ordered from innermost to outermost.
+  let list : Array[BaggageEntry] = Array(capacity=entries.length())
+  let mut i = entries.length() - 1
+  while i >= 0 {
+    let entry = entries.unsafe_get(i)
+    let mut duplicate = false
+    for existing in list {
+      if existing.key == entry.key {
+        duplicate = true
+        break
+      }
+    }
+    if !duplicate {
+      list.push(entry)
+    }
+    i = i - 1
+  }
+  {
+    span_ctx: None,
+    key: None,
+    value: None,
+    properties: None,
+    baggage_map: None,
+    baggage_list: Some(list),
+    parent: Some(self),
+  }
 }
 
 // The nearest span context in the chain, if any.
@@ -232,6 +264,21 @@ pub fn Context::span_context(self : Context) -> @api.SpanContext? {
           None => cursor = context.parent
         }
       None => break
+    }
+  }
+  None
+}
+
+// The member of `list` stored under `key`, if any.
+
+///|
+fn baggage_list_entry(
+  list : Array[BaggageEntry],
+  key : String,
+) -> BaggageEntry? {
+  for entry in list {
+    if entry.key == key {
+      return Some(entry)
     }
   }
   None
@@ -253,15 +300,24 @@ pub fn Context::value(self : Context, key : String) -> String? {
             } else {
               cursor = context.parent
             }
-          None =>
+          None => {
             match context.baggage_map {
               Some(map) =>
                 match map.get(key) {
                   Some(value) => return Some(value)
+                  None => ()
+                }
+              None => ()
+            }
+            match context.baggage_list {
+              Some(list) =>
+                match baggage_list_entry(list, key) {
+                  Some(entry) => return Some(entry.value)
                   None => cursor = context.parent
                 }
               None => cursor = context.parent
             }
+          }
         }
       None => break
     }
@@ -296,16 +352,28 @@ pub fn Context::baggage_entry(self : Context, key : String) -> BaggageEntry? {
             } else {
               cursor = context.parent
             }
-          None =>
-            match context.baggage_map {
+          None => {
+            let found : BaggageEntry? = match context.baggage_map {
               Some(map) =>
                 match map.get(key) {
-                  Some(value) =>
-                    return Some({ key, value, properties: [] })
-                  None => cursor = context.parent
+                  Some(value) => Some({ key, value, properties: [] })
+                  None => None
                 }
+              None => None
+            }
+            let found = match found {
+              Some(_) => found
+              None =>
+                match context.baggage_list {
+                  Some(list) => baggage_list_entry(list, key)
+                  None => None
+                }
+            }
+            match found {
+              Some(entry) => return Some(entry)
               None => cursor = context.parent
             }
+          }
         }
       None => break
     }
@@ -384,6 +452,30 @@ pub fn Context::baggage_entries(self : Context) -> Array[BaggageEntry] {
             }
           None => ()
         }
+        match context.baggage_list {
+          Some(list) =>
+            for entry in list {
+              let mut visible = true
+              for existing in entries {
+                if existing.key == entry.key {
+                  visible = false
+                  break
+                }
+              }
+              if visible {
+                for removed in deleted {
+                  if removed == entry.key {
+                    visible = false
+                    break
+                  }
+                }
+              }
+              if visible {
+                entries.push(entry)
+              }
+            }
+          None => ()
+        }
         cursor = context.parent
       }
       None => break
@@ -426,6 +518,22 @@ pub fn Context::has_baggage(self : Context) -> Bool {
               let mut removed = false
               for candidate in deleted {
                 if candidate == key {
+                  removed = true
+                  break
+                }
+              }
+              if !removed {
+                return true
+              }
+            }
+          None => ()
+        }
+        match context.baggage_list {
+          Some(list) =>
+            for entry in list {
+              let mut removed = false
+              for candidate in deleted {
+                if candidate == entry.key {
                   removed = true
                   break
                 }
@@ -487,6 +595,24 @@ pub fn Context::baggage(self : Context) -> Map[String, String] {
                 }
                 if !removed {
                   values.set(key, value)
+                }
+              }
+            }
+          None => ()
+        }
+        match context.baggage_list {
+          Some(list) =>
+            for entry in list {
+              if values.get(entry.key) is None {
+                let mut removed = false
+                for candidate in deleted {
+                  if candidate == entry.key {
+                    removed = true
+                    break
+                  }
+                }
+                if !removed {
+                  values.set(entry.key, entry.value)
                 }
               }
             }
