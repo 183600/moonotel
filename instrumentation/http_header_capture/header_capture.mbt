@@ -115,8 +115,7 @@ fn record_headers(
   span : @sdk.SpanSdk,
 ) -> Unit {
   if capture.capture_all {
-    for entry in headers.to_array() {
-      let (name, value) = entry
+    for name, value in headers {
       span.set_attribute(
         prefix + name.to_string().to_lower(),
         @sdk.StringArrayValue([value]),

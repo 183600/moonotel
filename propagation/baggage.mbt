@@ -545,6 +545,20 @@ fn parse_baggage_properties(
 
 ///|
 pub fn parse_baggage_entries(value : String) -> Array[BaggageEntry] {
+  match parse_baggage_plain(value) {
+    Some(pairs) => {
+      let entries : Array[BaggageEntry] = Array(capacity=pairs.length())
+      for pair in pairs {
+        entries.push({ key: pair.0, value: pair.1, properties: [], })
+      }
+      entries
+    }
+    None => parse_baggage_entries_general(value)
+  }
+}
+
+///|
+fn parse_baggage_entries_general(value : String) -> Array[BaggageEntry] {
   let entries : Array[BaggageEntry] = []
   // Size of the normalized header built from `entries` so far.
   let mut bytes = 0
@@ -637,6 +651,69 @@ pub fn parse_baggage_entries(value : String) -> Array[BaggageEntry] {
   entries
 }
 
+// Fast path for a baggage header made only of well-formed plain-ASCII
+// members without properties: no optional whitespace, no percent escapes and
+// no malformed members. Returns None when anything needs the lenient general
+// parser (properties, decoding, whitespace, skipped members, limits).
+
+///|
+fn parse_baggage_plain(value : String) -> Array[(String, String)]? {
+  if value == "" {
+    return Some([])
+  }
+  let pairs : Array[(String, String)] = []
+  let view = value[:]
+  let len = view.length()
+  let mut bytes = 0
+  let mut start = 0
+  while start <= len {
+    if pairs.length() >= BAGGAGE_MAX_MEMBERS || bytes >= BAGGAGE_MAX_BYTES {
+      break
+    }
+    let mut end = start
+    let mut eq = -1
+    while end < len {
+      let c = view.unsafe_get(end)
+      if c == 0x2C {
+        break
+      }
+      if c == 0x3D && eq < 0 {
+        eq = end
+        end = end + 1
+        continue
+      }
+      if eq < 0 {
+        // Before `=` the text is the (HTTP token) key.
+        if !is_token_char(c.unsafe_to_char()) {
+          return None
+        }
+      } else if !is_baggage_value_char(c.to_int()) {
+        // Whitespace, control characters and `%` need the general parser.
+        return None
+      }
+      end = end + 1
+    }
+    if eq < 0 || eq == start {
+      return None
+    }
+    // No trimming was needed because whitespace was rejected above.
+    let key = view.view(start_offset=start, end_offset=eq).to_owned()
+    let member_value = view.view(start_offset=eq + 1, end_offset=end)
+    let separator = if pairs.length() > 0 { 1 } else { 0 }
+    let size = key.length() + 1 + member_value.length() + separator
+    if bytes + size > BAGGAGE_MAX_BYTES {
+      break
+    }
+    pairs.push((key, member_value.to_owned()))
+    bytes = bytes + size
+    if end == len {
+      break
+    }
+    start = end + 1
+  }
+  Some(pairs)
+}
+
 // Parse a `baggage` header value into an ordered list of key/value pairs.
 // Members that are malformed are skipped; properties are dropped (use
 // `parse_baggage_entries` to keep them).
@@ -647,6 +724,14 @@ pub fn parse_baggage_entries(value : String) -> Array[BaggageEntry] {
 
 ///|
 pub fn parse_baggage(value : String) -> Array[(String, String)] {
+  match parse_baggage_plain(value) {
+    Some(pairs) => pairs
+    None => parse_baggage_general(value)
+  }
+}
+
+///|
+fn parse_baggage_general(value : String) -> Array[(String, String)] {
   let pairs : Array[(String, String)] = []
   // Size of the normalized header built from `pairs` so far.
   let mut bytes = 0

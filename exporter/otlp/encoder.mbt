@@ -247,8 +247,7 @@ fn encode_attributes(
     return
   }
   // Iterate the attributes in insertion order.
-  for entry in attributes.to_array() {
-    let (key, value) = entry
+  for key, value in attributes {
     if !try_encode_scalar_attribute(writer, field, key, value) {
       let len_pos = writer.begin_message(field)
       writer.write_string_field(1, key)

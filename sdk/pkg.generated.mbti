@@ -334,6 +334,7 @@ pub struct SpanSdk {
   resource : Map[String, AttributeValue]
   scope_name : String
   scope_version : String
+  // private fields
 }
 pub fn SpanSdk::add_event(Self, String, attributes? : Map[String, AttributeValue], time_unix_nano? : Int64) -> Unit
 pub fn SpanSdk::add_link(Self, SpanLink) -> Unit

@@ -101,6 +101,10 @@ pub struct SpanSdk {
   mut attributes : Map[String, AttributeValue]?
   mut events : Array[SpanEvent]?
   mut links : Array[SpanLink]?
+  // Export snapshot, filled by `end` when the span recorded data and has
+  // processors. The collections are moved (not copied) into it, so accessors
+  // fall back to this snapshot once the mutable fields are cleared.
+  priv mut snapshot : SpanData?
   mut status : @api.StatusCode
   mut status_description : String
   limits : SpanLimits
@@ -146,6 +150,7 @@ fn create_span(
     attributes: None,
     events: None,
     links: None,
+    snapshot: None,
     status: @api.StatusCode::Unset,
     status_description: "",
     limits,
@@ -299,6 +304,9 @@ fn limited_attributes(
   value_length_limit : Int32,
 ) -> (Map[String, AttributeValue], Int32) {
   let total = attributes.length()
+  if (count_limit < 0 || total <= count_limit) && value_length_limit < 0 {
+    return (attributes.copy(), 0)
+  }
   let capacity = if count_limit < 0 || count_limit > total {
     total
   } else {
@@ -308,8 +316,7 @@ fn limited_attributes(
     [], capacity=map_capacity_for_entries(capacity),
   )
   let mut dropped = 0
-  for entry in attributes.to_array() {
-    let (key, value) = entry
+  for key, value in attributes {
     if within_limit(kept.length(), count_limit) {
       kept.set(key, truncate_attribute_value(value, value_length_limit))
     } else {
@@ -414,8 +421,45 @@ pub fn SpanSdk::parent_span_id(self : SpanSdk) -> Array[Int32] {
 pub fn SpanSdk::attributes(self : SpanSdk) -> Map[String, AttributeValue] {
   match self.attributes {
     Some(attributes) => copy_attribute_map(attributes)
-    None => Map([], capacity=1)
+    None =>
+      match self.snapshot {
+        Some(data) => copy_attribute_map(data.attributes)
+        None => Map([], capacity=1)
+      }
   }
+}
+
+// Copy an event array so that the returned events and their attribute maps
+// are independent of the source.
+
+///|
+fn copy_events(events : Array[SpanEvent]) -> Array[SpanEvent] {
+  let out : Array[SpanEvent] = Array(capacity=events.length())
+  for event in events {
+    out.push({
+      name: event.name,
+      time_unix_nano: event.time_unix_nano,
+      attributes: copy_attribute_map(event.attributes),
+      dropped_attributes_count: event.dropped_attributes_count,
+    })
+  }
+  out
+}
+
+// Copy a link array so that the returned links and their attribute maps are
+// independent of the source.
+
+///|
+fn copy_links(links : Array[SpanLink]) -> Array[SpanLink] {
+  let out : Array[SpanLink] = Array(capacity=links.length())
+  for link in links {
+    out.push({
+      span_context: link.span_context,
+      attributes: copy_attribute_map(link.attributes),
+      dropped_attributes_count: link.dropped_attributes_count,
+    })
+  }
+  out
 }
 
 // The recorded events (empty for non-recording spans). The returned array and
@@ -424,19 +468,12 @@ pub fn SpanSdk::attributes(self : SpanSdk) -> Map[String, AttributeValue] {
 ///|
 pub fn SpanSdk::events(self : SpanSdk) -> Array[SpanEvent] {
   match self.events {
-    Some(events) => {
-      let out : Array[SpanEvent] = Array(capacity=events.length())
-      for event in events {
-        out.push({
-          name: event.name,
-          time_unix_nano: event.time_unix_nano,
-          attributes: copy_attribute_map(event.attributes),
-          dropped_attributes_count: event.dropped_attributes_count,
-        })
+    Some(events) => copy_events(events)
+    None =>
+      match self.snapshot {
+        Some(data) => copy_events(data.events)
+        None => []
       }
-      out
-    }
-    None => []
   }
 }
 
@@ -446,18 +483,12 @@ pub fn SpanSdk::events(self : SpanSdk) -> Array[SpanEvent] {
 ///|
 pub fn SpanSdk::links(self : SpanSdk) -> Array[SpanLink] {
   match self.links {
-    Some(links) => {
-      let out : Array[SpanLink] = Array(capacity=links.length())
-      for link in links {
-        out.push({
-          span_context: link.span_context,
-          attributes: copy_attribute_map(link.attributes),
-          dropped_attributes_count: link.dropped_attributes_count,
-        })
+    Some(links) => copy_links(links)
+    None =>
+      match self.snapshot {
+        Some(data) => copy_links(data.links)
+        None => []
       }
-      out
-    }
-    None => []
   }
 }
 
@@ -545,8 +576,7 @@ pub fn SpanSdk::set_attributes(
         self.attributes = Some(Map([], capacity=map_capacity_for_entries(budget)))
       }
     }
-    for entry in attributes.to_array() {
-      let (key, value) = entry
+    for key, value in attributes {
       self.set_attribute_limited(key, value)
     }
   }
@@ -766,8 +796,7 @@ pub fn SpanSdk::record_exception(
     ])
     match attributes {
       Some(extra) =>
-        for entry in extra.to_array() {
-          let (key, value) = entry
+        for key, value in extra {
           event_attributes.set(key, value)
         }
       None => ()
@@ -838,55 +867,103 @@ fn map_capacity_for_entries(entries : Int) -> Int {
 fn copy_attribute_map(
   attributes : Map[String, AttributeValue],
 ) -> Map[String, AttributeValue] {
-  let out : Map[String, AttributeValue] = Map(
-    [], capacity=map_capacity_for_entries(attributes.length()),
-  )
-  for entry in attributes.to_array() {
-    let (key, value) = entry
-    out.set(key, copy_attribute_value(value))
+  if attributes.length() == 0 {
+    return Map([], capacity=1)
+  }
+  // Copy the map structure in one pass, then clone only the mutable
+  // array-valued payloads; string and numeric values are immutable.
+  let out = attributes.copy()
+  for key, value in attributes {
+    match value {
+      StringArrayValue(_) | BoolArrayValue(_) | IntArrayValue(_)
+      | DoubleArrayValue(_) => out.set(key, copy_attribute_value(value))
+      _ => ()
+    }
   }
   out
 }
 
-// Build the immutable export snapshot of a span. The top-level attribute,
-// event and link containers are copied so that the snapshot cannot be changed
-// through the span after `end` (or across multiple processors).
+// Return an attribute map that can be shared by an export snapshot. The map
+// may be shared as-is when every value is immutable (string, bool, int,
+// double); when an array-valued attribute is present the map and its array
+// payloads are copied, because the caller may still mutate the array it
+// handed to `set_attribute` while the span was recording.
 
 ///|
-fn SpanData::from_span(span : SpanSdk) -> SpanData {
+fn snapshot_attribute_map(
+  attributes : Map[String, AttributeValue],
+) -> Map[String, AttributeValue] {
+  for _, value in attributes {
+    match value {
+      StringArrayValue(_) | BoolArrayValue(_) | IntArrayValue(_)
+      | DoubleArrayValue(_) => return copy_attribute_map(attributes)
+      _ => ()
+    }
+  }
+  attributes
+}
+
+// Replace the array-valued attribute payloads of `events` with copies. The
+// array is owned by the span and is not shared, so it is modified in place.
+
+///|
+fn snapshot_events(events : Array[SpanEvent]) -> Array[SpanEvent] {
+  for i, event in events {
+    let attributes = snapshot_attribute_map(event.attributes)
+    if !physical_equal(attributes, event.attributes) {
+      events[i] = {
+        name: event.name,
+        time_unix_nano: event.time_unix_nano,
+        attributes,
+        dropped_attributes_count: event.dropped_attributes_count,
+      }
+    }
+  }
+  events
+}
+
+// Replace the array-valued attribute payloads of `links` with copies. The
+// array is owned by the span and is not shared, so it is modified in place.
+
+///|
+fn snapshot_links(links : Array[SpanLink]) -> Array[SpanLink] {
+  for i, link in links {
+    let attributes = snapshot_attribute_map(link.attributes)
+    if !physical_equal(attributes, link.attributes) {
+      links[i] = {
+        span_context: link.span_context,
+        attributes,
+        dropped_attributes_count: link.dropped_attributes_count,
+      }
+    }
+  }
+  links
+}
+
+// Build the immutable export snapshot of a span, moving its attribute, event
+// and link collections into the snapshot. The maps and arrays are not shared
+// with anything else: the span clears its own references in `end`, and
+// callers only ever receive copies. Array-valued attribute payloads are
+// cloned first so that mutating an array the caller still holds cannot change
+// the snapshot.
+
+///|
+fn SpanData::take_from_span(span : SpanSdk) -> SpanData {
   let attributes : Map[String, AttributeValue] = match span.attributes {
-    Some(attributes) => copy_attribute_map(attributes)
+    Some(attributes) => snapshot_attribute_map(attributes)
     None => Map([], capacity=1)
   }
   let events : Array[SpanEvent] = match span.events {
-    Some(events) => {
-      let out : Array[SpanEvent] = Array(capacity=events.length())
-      for event in events {
-        out.push({
-          name: event.name,
-          time_unix_nano: event.time_unix_nano,
-          attributes: copy_attribute_map(event.attributes),
-          dropped_attributes_count: event.dropped_attributes_count,
-        })
-      }
-      out
-    }
+    Some(events) => snapshot_events(events)
     None => []
   }
   let links : Array[SpanLink] = match span.links {
-    Some(links) => {
-      let out : Array[SpanLink] = Array(capacity=links.length())
-      for link in links {
-        out.push({
-          span_context: link.span_context,
-          attributes: copy_attribute_map(link.attributes),
-          dropped_attributes_count: link.dropped_attributes_count,
-        })
-      }
-      out
-    }
+    Some(links) => snapshot_links(links)
     None => []
   }
+  span.attributes = None
+  span.events = None
+  span.links = None
   {
     name: span.name,
     span_context: span.context,
@@ -923,7 +1000,10 @@ pub fn SpanSdk::end(self : SpanSdk, end_time_unix_nano? : Int64) -> Unit {
       self.end_time_unix_nano = (@env.now() * 1000000).reinterpret_as_int64()
   }
   if self.recording && self.processors.length() > 0 {
-    let data = SpanData::from_span(self)
+    let data = SpanData::take_from_span(self)
+    // Keep the snapshot reachable so accessors still report the recorded
+    // collections after the mutable fields have been cleared.
+    self.snapshot = Some(data)
     for processor in self.processors {
       processor.on_end(data)
     }

@@ -348,25 +348,77 @@ fn json_write_decimal_digits(sb : JsonBuf, value : UInt64) -> Unit {
     sb.len = sb.len + 1
     return
   }
+  // Small values (enum numbers, flags, counters) fit in one or two table
+  // writes and skip the 20-byte scratch window.
+  if value < 100 {
+    sb.ensure(2)
+    sb.buf.unsafe_write_uint16_le(
+      sb.len,
+      json_two_digits.unsafe_get(value.to_int()),
+    )
+    sb.len = sb.len + 2
+    return
+  }
+  if value < 10000 {
+    let small = value.to_int()
+    sb.ensure(4)
+    let thousands = small / 1000
+    if thousands > 0 {
+      sb.buf.unsafe_set(sb.len, (0x30 + thousands).to_byte())
+      sb.buf.unsafe_write_uint16_le(
+        sb.len + 1,
+        json_two_digits.unsafe_get(small / 10 % 100),
+      )
+      sb.buf.unsafe_set(sb.len + 3, (0x30 + small % 10).to_byte())
+      sb.len = sb.len + 4
+    } else {
+      sb.buf.unsafe_set(sb.len, (0x30 + small / 100).to_byte())
+      sb.buf.unsafe_write_uint16_le(
+        sb.len + 1,
+        json_two_digits.unsafe_get(small % 100),
+      )
+      sb.len = sb.len + 3
+    }
+    return
+  }
   sb.ensure(20)
   let buf = sb.buf
   let start = sb.len
   let mut pos = start + 20
   let mut v = value
-  while v >= 100 {
-    pos = pos - 2
+  // Consume four digits per division by 10000; a 64-bit value needs at most
+  // five iterations.
+  while v >= 10000 {
+    let remainder = (v % 10000).to_int()
+    pos = pos - 4
     buf.unsafe_write_uint16_le(
       pos,
-      json_two_digits.unsafe_get((v % 100).to_int()),
+      json_two_digits.unsafe_get(remainder / 100),
     )
-    v = v / 100
+    buf.unsafe_write_uint16_le(
+      pos + 2,
+      json_two_digits.unsafe_get(remainder % 100),
+    )
+    v = v / 10000
   }
-  if v >= 10 {
+  let tail = v.to_int()
+  if tail >= 1000 {
+    pos = pos - 4
+    buf.unsafe_write_uint16_le(pos, json_two_digits.unsafe_get(tail / 100))
+    buf.unsafe_write_uint16_le(pos + 2, json_two_digits.unsafe_get(tail % 100))
+  } else if tail >= 100 {
+    pos = pos - 3
+    buf.unsafe_set(pos, (0x30 + tail / 100).to_byte())
+    buf.unsafe_write_uint16_le(
+      pos + 1,
+      json_two_digits.unsafe_get(tail % 100),
+    )
+  } else if tail >= 10 {
     pos = pos - 2
-    buf.unsafe_write_uint16_le(pos, json_two_digits.unsafe_get(v.to_int()))
+    buf.unsafe_write_uint16_le(pos, json_two_digits.unsafe_get(tail))
   } else {
     pos = pos - 1
-    buf.unsafe_set(pos, (0x30 + v.to_int()).to_byte())
+    buf.unsafe_set(pos, (0x30 + tail).to_byte())
   }
   let digits = start + 20 - pos
   if pos != start {
@@ -534,8 +586,7 @@ fn json_write_attributes(
 ) -> Unit {
   sb.write_char('[')
   let mut first = true
-  for entry in attributes.to_array() {
-    let (key, value) = entry
+  for key, value in attributes {
     if !first {
       sb.write_char(',')
     }
