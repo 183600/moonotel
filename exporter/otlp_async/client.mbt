@@ -28,6 +28,24 @@ fn map_capacity_for_entries(entries : Int) -> Int {
   }
 }
 
+// Enum-valued configuration (protocol and compression) is matched
+// case-insensitively, as required for the OTEL_EXPORTER_OTLP_* variables.
+
+///|
+fn normalize_enum(value : String) -> String {
+  value.trim().to_owned().to_lower()
+}
+
+///|
+fn is_json_protocol(protocol : String) -> Bool {
+  normalize_enum(protocol) == @otlp.OTLP_HTTP_JSON_PROTOCOL
+}
+
+///|
+fn is_gzip_compression(compression : String) -> Bool {
+  normalize_enum(compression) == "gzip"
+}
+
 ///|
 fn request_headers(
   config : @otlp.OtlpHttpConfig,
@@ -269,7 +287,7 @@ async fn post_trace_request_with_headers(
   body : Bytes,
   headers : Map[@http.CaseInsensitiveString, String],
 ) -> @sdk.ExportResult {
-  let json = config.protocol == @otlp.OTLP_HTTP_JSON_PROTOCOL
+  let json = is_json_protocol(config.protocol)
   let url = config.traces_url()
   let max_retries = if config.max_retries < 0 {
     0
@@ -347,8 +365,8 @@ pub async fn post_trace_request(
   if !@otlp.is_supported_protocol(config.protocol) {
     return @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol)
   }
-  let gzip = config.compression == "gzip"
-  if !gzip && config.compression != "none" {
+  let gzip = is_gzip_compression(config.compression)
+  if !gzip && normalize_enum(config.compression) != "none" {
     return @sdk.ExportFailure(
       "unsupported OTLP compression: " + config.compression,
     )
@@ -386,7 +404,7 @@ pub async fn export_spans(
   if spans.length() == 0 {
     return @sdk.ExportSuccess
   }
-  let body = if config.protocol == @otlp.OTLP_HTTP_JSON_PROTOCOL {
+  let body = if is_json_protocol(config.protocol) {
     @otlp.encode_trace_request_json(spans)
   } else {
     @otlp.encode_trace_request(spans)
@@ -410,7 +428,13 @@ pub struct OtlpHttpAsyncExporter {
 pub fn OtlpHttpAsyncExporter::new(
   config : @otlp.OtlpHttpConfig,
 ) -> OtlpHttpAsyncExporter {
-  { config, headers: request_headers(config, config.compression == "gzip"), }
+  {
+    config,
+    headers: request_headers(
+      config,
+      is_gzip_compression(config.compression),
+    ),
+  }
 }
 
 // The exporter configuration.
@@ -436,13 +460,13 @@ pub async fn OtlpHttpAsyncExporter::export_batch(
   if !@otlp.is_supported_protocol(config.protocol) {
     return @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol)
   }
-  let gzip = config.compression == "gzip"
-  if !gzip && config.compression != "none" {
+  let gzip = is_gzip_compression(config.compression)
+  if !gzip && normalize_enum(config.compression) != "none" {
     return @sdk.ExportFailure(
       "unsupported OTLP compression: " + config.compression,
     )
   }
-  let body = if config.protocol == @otlp.OTLP_HTTP_JSON_PROTOCOL {
+  let body = if is_json_protocol(config.protocol) {
     @otlp.encode_trace_request_json(spans)
   } else {
     @otlp.encode_trace_request(spans)

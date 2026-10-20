@@ -58,6 +58,7 @@ const DEFAULT_MAX_RETRIES : Int32 = 3
 
 ///|
 pub fn is_supported_protocol(protocol : String) -> Bool {
+  let protocol = normalize_enum(protocol)
   protocol == OTLP_HTTP_PROTOBUF_PROTOCOL || protocol == OTLP_HTTP_JSON_PROTOCOL
 }
 
@@ -65,11 +66,24 @@ pub fn is_supported_protocol(protocol : String) -> Bool {
 
 ///|
 pub fn content_type_for_protocol(protocol : String) -> String {
-  if protocol == OTLP_HTTP_JSON_PROTOCOL {
+  if is_json_protocol(protocol) {
     "application/json"
   } else {
     "application/x-protobuf"
   }
+}
+
+// Enum-valued environment variables are matched case-insensitively. Values
+// are trimmed so that values such as `" HTTP/JSON "` are accepted as well.
+
+///|
+fn normalize_enum(value : String) -> String {
+  value.trim().to_owned().to_lower()
+}
+
+///|
+fn is_json_protocol(protocol : String) -> Bool {
+  normalize_enum(protocol) == OTLP_HTTP_JSON_PROTOCOL
 }
 
 // Create a configuration with sensible defaults
@@ -94,8 +108,10 @@ pub fn OtlpHttpConfig::new(
     traces_endpoint,
     headers: headers.unwrap_or(Map([])),
     timeout_millis: timeout_millis.unwrap_or(10000),
-    compression: compression.unwrap_or("none"),
-    protocol: protocol.unwrap_or(OTLP_HTTP_PROTOBUF_PROTOCOL),
+    compression: normalize_enum(compression.unwrap_or("none")),
+    protocol: normalize_enum(
+      protocol.unwrap_or(OTLP_HTTP_PROTOBUF_PROTOCOL),
+    ),
     max_retries: if retries < 0 {
       0
     } else {
@@ -184,6 +200,29 @@ fn decode_header_value(value : StringView) -> String {
   @utf8.decode_lossy(Bytes::from_array(bytes).exact_view())
 }
 
+// Store a header, replacing any existing header whose name differs only by
+// case. HTTP header names are case-insensitive, so `X-Token` and `x-token`
+// must not be sent as two distinct headers.
+
+///|
+fn set_header(
+  headers : Map[String, String],
+  key : String,
+  value : String,
+) -> Unit {
+  let normalized = key.to_lower()
+  let stale : Array[String] = []
+  for existing, _ in headers {
+    if existing.to_lower() == normalized {
+      stale.push(existing)
+    }
+  }
+  for existing in stale {
+    headers.remove(existing)
+  }
+  headers.set(key, value)
+}
+
 ///|
 fn parse_headers(value : String) -> Map[String, String] {
   let headers = Map([])
@@ -192,7 +231,8 @@ fn parse_headers(value : String) -> Map[String, String] {
       Some((key, header_value)) => {
         let trimmed_key = key.trim()
         if trimmed_key != "" {
-          headers.set(
+          set_header(
+            headers,
             trimmed_key.to_owned(),
             decode_header_value(header_value.trim()),
           )
@@ -270,7 +310,9 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
     Some(value) => {
       let specific = parse_headers(value)
       for key, header_value in specific {
-        headers.set(key, header_value)
+        // Signal-specific headers override generic headers even when the
+        // two spellings differ only by case.
+        set_header(headers, key, header_value)
       }
     }
     None => ()
@@ -307,8 +349,8 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
     traces_endpoint,
     headers,
     timeout_millis,
-    compression,
-    protocol,
+    compression: normalize_enum(compression),
+    protocol: normalize_enum(protocol),
     max_retries: DEFAULT_MAX_RETRIES,
   }
 }
@@ -426,12 +468,12 @@ pub fn OtlpHttpExporter::export_spans_http(
       "unsupported OTLP protocol: " + self.config.protocol,
     )
   }
-  if self.config.compression != "none" {
+  if normalize_enum(self.config.compression) != "none" {
     return @sdk.ExportFailure(
       "unsupported OTLP compression: " + self.config.compression,
     )
   }
-  let json = self.config.protocol == OTLP_HTTP_JSON_PROTOCOL
+  let json = is_json_protocol(self.config.protocol)
   let body = if json {
     encode_trace_request_json(spans)
   } else {
