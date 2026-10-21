@@ -31,7 +31,9 @@ test "setup_without_transport_and_console_exporter_installs_one_processor" {
 test "setup_without_transport_and_none_exporter_installs_nothing" {
   @env.unset_env_var("OTEL_TRACES_EXPORTER")
   @otel.shutdown_global_tracer_provider()
-  let provider = @otel.setup(service_name="default-none-facade", exporters=["none"])
+  let provider = @otel.setup(service_name="default-none-facade", exporters=[
+    "none",
+  ])
   assert_eq(provider.processor_count(), 0)
   provider.shutdown()
   @otel.shutdown_global_tracer_provider()
@@ -41,10 +43,9 @@ test "setup_without_transport_and_none_exporter_installs_nothing" {
 test "setup_without_transport_and_unknown_exporter_installs_nothing" {
   @env.unset_env_var("OTEL_TRACES_EXPORTER")
   @otel.shutdown_global_tracer_provider()
-  let provider = @otel.setup(
-    service_name="default-unknown-facade",
-    exporters=["zipkin"],
-  )
+  let provider = @otel.setup(service_name="default-unknown-facade", exporters=[
+    "zipkin",
+  ])
   assert_eq(provider.processor_count(), 0)
   provider.shutdown()
   @otel.shutdown_global_tracer_provider()

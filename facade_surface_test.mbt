@@ -46,9 +46,7 @@ test "facade_exposes_the_context_storage_hook" {
   let previous = @otel.set_context_storage(backend)
   defer @otel.set_context_storage(previous) |> ignore
   assert_eq(@otel.current_context().value("backend"), Some("root"))
-  let token = @otel.attach(
-    @otel.Context::root().with_value("backend", "inner"),
-  )
+  let token = @otel.attach(@otel.Context::root().with_value("backend", "inner"))
   assert_eq(@otel.current_context().value("backend"), Some("inner"))
   @otel.detach(token)
   assert_eq(@otel.current_context().value("backend"), Some("root"))

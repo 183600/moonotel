@@ -65,10 +65,7 @@ test "provider_merges_the_detected_resource_into_its_own" {
   // The detected attributes override the ones of the provider, the attributes
   // that only the provider carries are kept.
   assert_eq(attributes.get("service.name"), Some(@sdk.StringValue("detected")))
-  assert_eq(
-    attributes.get("service.version"),
-    Some(@sdk.StringValue("2.0.0")),
-  )
+  assert_eq(attributes.get("service.version"), Some(@sdk.StringValue("2.0.0")))
   assert_eq(
     attributes.get("telemetry.sdk.language"),
     Some(@sdk.StringValue("moonbit")),

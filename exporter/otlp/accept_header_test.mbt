@@ -12,7 +12,9 @@ fn accept_mock_transport() -> AcceptMockTransport {
 }
 
 ///|
-fn AcceptMockTransport::as_transport(self : AcceptMockTransport) -> @otlp.Transport {
+fn AcceptMockTransport::as_transport(
+  self : AcceptMockTransport,
+) -> @otlp.Transport {
   fn(_url, headers, _body) {
     self.headers.push(headers)
     { status_code: 200, body: b"", }
@@ -54,10 +56,7 @@ test "export_announces_the_protobuf_format_it_accepts" {
   assert_true(exporter.export_spans([accept_test_span()]).is_success())
   assert_eq(mock.headers.length(), 1)
   assert_eq(mock.headers[0].get("accept"), Some("application/x-protobuf"))
-  assert_eq(
-    mock.headers[0].get("content-type"),
-    Some("application/x-protobuf"),
-  )
+  assert_eq(mock.headers[0].get("content-type"), Some("application/x-protobuf"))
 }
 
 ///|
