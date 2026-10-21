@@ -436,4 +436,13 @@ test "split_url rejects non-decimal and out-of-range ports" {
     @async_http_client.split_url("http://example.com:00080/x"),
     ("example.com", 80),
   )
+  // A long decimal port must be rejected before 32-bit multiplication wraps.
+  assert_eq(
+    @async_http_client.split_url("http://example.com:4294967296/x"),
+    ("example.com", -1),
+  )
+  assert_eq(
+    @async_http_client.split_url("http://example.com:999999999999999999999/x"),
+    ("example.com", -1),
+  )
 }

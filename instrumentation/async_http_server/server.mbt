@@ -144,10 +144,11 @@ fn parse_port(text : StringView) -> Int32 {
     if code < 0x30 || code > 0x39 {
       return -1
     }
-    port = port * 10 + (code - 0x30)
-    if port > 65535 {
+    let digit = code - 0x30
+    if port > (65535 - digit) / 10 {
       return -1
     }
+    port = port * 10 + digit
     i = i + 1
   }
   port
