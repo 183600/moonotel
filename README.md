@@ -21,6 +21,41 @@ implementation deliberately compact. The repository and MoonBit module are
 both `183600/moonotel`; the entry package is the module root and is imported
 as `@moonotel`.
 
+## Install
+
+The module is not yet published to the mooncakes registry, so `moon add
+183600/moonotel` does not work at the moment. Until it is published, consume
+the module from a git checkout through a MoonBit workspace.
+
+Declare the dependency in your application's `moon.mod` (version must match
+the module's `moon.mod`):
+
+```toml
+import {
+  "183600/moonotel@0.1.0",
+}
+```
+
+Clone the repository next to your project and register both modules as
+workspace members:
+
+```bash
+git clone https://github.com/183600/moonotel.git
+moon work init                # creates moon.work, skip if it exists
+moon work use ./moonotel
+moon work use ./path/to/your-app
+```
+
+Then import the packages you need (for example the root facade plus the
+SDK):
+
+```moonbit
+import {
+  "183600/moonotel",
+  "183600/moonotel/sdk",
+}
+```
+
 ## Packages
 
 | Package | Purpose | Targets |
