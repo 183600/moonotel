@@ -46,6 +46,17 @@ test "decode_repeated_partial_success_last_wins" {
 }
 
 ///|
+test "decode_rejects_invalid_utf8_error_message" {
+  // partial_success { error_message = <0xff 0xfe> }: protobuf `string`
+  // fields must contain valid UTF-8.
+  let body : Bytes = b"\x0a\x04\x12\x02\xff\xfe"
+  match @otlp.decode_export_response(body) {
+    @sdk.ExportFailure(message) => assert_true(message.contains("malformed"))
+    @sdk.ExportSuccess => abort("expected an export failure")
+  }
+}
+
+///|
 test "decode_truncated_body_is_failure" {
   assert_false(@otlp.decode_export_response(b"\x0a").is_success())
   assert_false(@otlp.decode_export_response(b"\x0a\x05\x08").is_success())

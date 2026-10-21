@@ -133,9 +133,11 @@ pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
             }
             let end2 = after2 + size2.to_int()
             if inner_field == 2 {
-              error_message = @utf8.decode_lossy(
+              error_message = @utf8.decode(
                 partial.exact_view(start=after2, end=end2),
-              )
+              ) catch {
+                _ => return malformed_response()
+              }
             }
             inner = end2
           } else if inner_wire == 1 {
