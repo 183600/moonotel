@@ -163,3 +163,21 @@ test "extract_without_tracestate_leaves_it_empty" {
   let extracted = @propagation.extract(carrier).unwrap()
   assert_eq(extracted.tracestate(), "")
 }
+
+///|
+test "parse_tracestate_rejects_headers_without_members" {
+  // A header that holds no list-member at all carries no state; an empty
+  // `tracestate` is not a valid header value.
+  assert_eq(@propagation.parse_tracestate(","), None)
+  assert_eq(@propagation.parse_tracestate(", ,"), None)
+  assert_eq(@propagation.parse_tracestate("   "), None)
+}
+
+///|
+test "inject_skips_tracestate_without_members" {
+  let sc = tracestate_test_context().with_tracestate(",")
+  let carrier = @propagation.TextMapCarrier::new()
+  @propagation.inject(sc, carrier)
+  assert_eq(carrier.get(@propagation.tracestate_header_name()), None)
+  assert_true(carrier.get(@propagation.traceparent_header_name()) is Some(_))
+}

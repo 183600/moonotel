@@ -754,8 +754,8 @@ fn write_normalized_tracestate(view : StringView, len : Int32) -> String {
 // The result is the list of members joined by `,` with optional whitespace
 // trimmed. Empty and whitespace-only list members are allowed and dropped;
 // a duplicated key keeps its first member. Returns None when the value is
-// empty, has more than 32 members, or contains a malformed member or an
-// invalid value.
+// empty, has more than 32 members, contains a malformed member or an
+// invalid value, or holds no list-member at all.
 
 ///|
 pub fn parse_tracestate(value : String) -> String? {
@@ -885,6 +885,14 @@ pub fn parse_tracestate(value : String) -> String? {
   if unchanged {
     Some(value)
   } else {
-    Some(write_normalized_tracestate(view, len))
+    let normalized = write_normalized_tracestate(view, len)
+    if normalized == "" {
+      // The header held no list-member at all, so it carries no state. An
+      // empty `tracestate` is not a valid header value and must be dropped
+      // instead of being propagated.
+      None
+    } else {
+      Some(normalized)
+    }
   }
 }
