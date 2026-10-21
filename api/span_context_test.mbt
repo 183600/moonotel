@@ -822,14 +822,13 @@ test "property_sampled_flag_independent_of_validity" {
   let zero_span = [1, 0, 0, 0, 0, 0, 0, 0]
   let sc2 = @api.span_context(zero_trace, zero_span, 1)
   assert_false(sc2.is_valid()) // Invalid due to zero trace
-  // Note: is_sampled() only checks the flag bit, so it returns true
-  // This is the expected behavior based on the implementation
+  assert_true(sc2.is_sampled())
 
   let valid_trace = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let zero_span2 = zeros(8)
   let sc3 = @api.span_context(valid_trace, zero_span2, 1)
   assert_false(sc3.is_valid()) // Invalid due to zero span
-  // is_sampled() only checks the flag bit
+  assert_true(sc3.is_sampled())
 }
 
 ///|

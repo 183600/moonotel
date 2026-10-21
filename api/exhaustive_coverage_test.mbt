@@ -431,7 +431,7 @@ test "span_context_some_fields_valid" {
   let span_id = [1, 0, 0, 0, 0, 0, 0, 0]
   let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
-  assert_false(sc.is_sampled())
+  assert_true(sc.is_sampled())
   assert_eq(sc.trace_flags, 1)
 }
 
