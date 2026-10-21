@@ -100,6 +100,8 @@ pub fn invalid_span_context() -> @api.SpanContext
 
 pub fn is_supported_protocol(String) -> Bool
 
+pub fn no_op_tracer_provider() -> @sdk.TracerProviderSdk
+
 pub fn parse_baggage(String) -> Array[(String, String)]
 
 pub fn parse_baggage_entries(String) -> Array[@propagation.BaggageEntry]

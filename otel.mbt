@@ -44,6 +44,7 @@ pub using @sdk {
   trait SpanExporter,
   global_tracer,
   global_tracer_provider,
+  no_op_tracer_provider,
   set_global_tracer_provider,
   shutdown_global_tracer_provider,
   force_flush_global_tracer_provider,

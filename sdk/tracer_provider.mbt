@@ -309,24 +309,51 @@ pub fn set_global_tracer_provider(provider : TracerProviderSdk) -> Unit {
   global_provider.val = Some(provider)
 }
 
-// The process-wide TracerProvider, if one has been installed.
+// The process-wide provider, if one has been installed.
 
 ///|
 pub fn global_tracer_provider() -> TracerProviderSdk? {
   global_provider.val
 }
 
-// Convenience: create a tracer from the global provider. Panics when no
-// global provider has been installed.
+// The provider used when no process-wide provider has been installed. The
+// OpenTelemetry specification requires the global TracerProvider to never be
+// null, so an unset provider behaves like a no-op provider: its tracers are
+// disabled and the spans they create are non-recording.
+
+///|
+let noop_provider : Ref[TracerProviderSdk?] = Ref(None)
+
+///|
+pub fn no_op_tracer_provider() -> TracerProviderSdk {
+  match noop_provider.val {
+    Some(provider) => provider
+    None => {
+      let provider = {
+        resource: Resource::new(),
+        sampler: Sampler::always_off(),
+        id_generator: IdGenerator::random(),
+        span_limits: SpanLimits::new(),
+        processors: [],
+        disabled: true,
+        shutdown_called: Ref(false),
+      }
+      noop_provider.val = Some(provider)
+      provider
+    }
+  }
+}
+
+// Convenience: create a tracer from the global provider. When no global
+// provider has been installed a tracer from the no-op provider is returned
+// instead, so that instrumentation never fails because of a missing setup
+// call; the spans it creates are non-recording.
 
 ///|
 pub fn global_tracer(name : String, version? : String) -> Tracer {
   match global_provider.val {
     Some(provider) => provider.get_tracer(name, version?)
-    None =>
-      abort(
-        "global TracerProvider is not initialized; call set_global_tracer_provider first",
-      )
+    None => no_op_tracer_provider().get_tracer(name, version?)
   }
 }
 
