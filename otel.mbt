@@ -140,6 +140,12 @@ pub using @otlp {
 // the queue size, export batch size and flush interval read from the
 // OTEL_BSP_* environment variables. The console exporter always uses a simple
 // processor.
+//
+// The OTLP exporter needs a `transport` to send the payload. When the OTLP
+// exporter is selected but no transport is supplied, the console exporter is
+// installed instead so that finished spans are still exported (and visible)
+// instead of being dropped silently. Selecting `none`, or an exporter that is
+// not supported, still installs nothing.
 
 ///|
 pub fn setup(
@@ -172,7 +178,9 @@ pub fn setup(
     Some(value) => provider = provider.with_span_limits(value)
     None => ()
   }
-  if @sdk.exporter_selected(exporters, "console") {
+  let console_selected = @sdk.exporter_selected(exporters, "console")
+  let otlp_selected = @sdk.exporter_selected(exporters, "otlp")
+  if console_selected {
     let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
       @sdk.ConsoleSpanExporter::new(),
     )
@@ -180,7 +188,7 @@ pub fn setup(
   }
   match transport {
     Some(send) =>
-      if !@sdk.exporter_selected(exporters, "otlp") {
+      if !otlp_selected {
         // The OTLP exporter is not selected (for example `none` or
         // `console`), matching the native async `setup`.
         ()
@@ -220,7 +228,16 @@ pub fn setup(
         }
         provider = provider.with_span_processor(processor)
       }
-    None => ()
+    None =>
+      if otlp_selected && !console_selected {
+        // The OTLP exporter is selected but there is no transport to send the
+        // payload with, so fall back to the console exporter rather than
+        // dropping every span silently.
+        let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
+          @sdk.ConsoleSpanExporter::new(),
+        )
+        provider = provider.with_span_processor(processor)
+      }
   }
   @sdk.set_global_tracer_provider(provider)
   provider
