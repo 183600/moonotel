@@ -40,6 +40,12 @@ test "parse_traceparent_trims_ows" {
 }
 
 ///|
+test "parse_rejects_empty_future_version_extension" {
+  let value = "01-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01-"
+  assert_true(@propagation.parse_traceparent(value) is None)
+}
+
+///|
 test "parse_rejects_invalid_span_id_hex" {
   let value = "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-zzzzzzzzzzzzzzzz-01"
   assert_true(@propagation.parse_traceparent(value) is None)
