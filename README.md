@@ -30,9 +30,11 @@ as `@moonotel`.
 | `183600/moonotel/propagation` | W3C Trace Context propagator | all |
 | `183600/moonotel/sdk` | Tracer provider, spans, samplers, processors, semconv keys | all |
 | `183600/moonotel/exporter/otlp` | OTLP/HTTP encoder/exporter with an injectable transport | all |
-| `183600/moonotel/exporter/otlp_async` | OTLP/HTTP exporter over the real async HTTP client | native |
-| `183600/moonotel/instrumentation/async_http_client` | Traced `get`/`post`/`put`/`delete` for `moonbitlang/async/http` | native |
-| `183600/moonotel/instrumentation/async_http_server` | `run_server` wrapper that traces every request | native |
+| `183600/moonotel/exporter/otlp_async` | OTLP/HTTP exporter over the real async HTTP client | native+wasm |
+| `183600/moonotel/async_runtime` | Async batching exporter with `moonbitlang/async` | native+wasm |
+| `183600/moonotel/instrumentation/async_http_client` | Traced `get`/`post`/`put`/`delete` for `moonbitlang/async/http` | native+wasm |
+| `183600/moonotel/instrumentation/async_http_server` | `run_server` wrapper that traces every request | native+wasm |
+| `183600/moonotel/instrumentation/http_header_capture` | Request/response header capture into span attributes | native+wasm |
 | `183600/moonotel` | Re-exports, `setup`, global provider helpers | all |
 
 ## Getting started (SDK only)
@@ -54,12 +56,17 @@ and `parent_based(root)` (the OTel default). Processors:
 `SimpleSpanProcessor` (export on end) and `BatchSpanProcessor` (bounded
 queue, batched export).
 
-`BatchSpanProcessor` never blocks the thread that ends a span. When the queue
-is full it overwrites the oldest buffered span, increments `dropped_spans()`,
-and continues; export failures are counted separately in
-`export_failures()`. The queue size, batch size, and flush interval are
-configurable through `BatchConfig` / `OTEL_BSP_*`. Timed flushes are driven by
-`tick()` (or by span completion), so a quiet application should call `tick()`
+`BatchSpanProcessor` keeps span completion cheap in the common case: `on_end`
+just enqueues, and when the queue is full it overwrites the oldest buffered
+span, increments `dropped_spans()`, and continues; export failures are counted
+separately in `export_failures()`. Note that export itself runs
+synchronously: once the live queue reaches `max_export_batch_size` the batch
+is exported on the thread that ends the span, and `tick()` likewise exports on
+its caller (the async exporter in
+`183600/moonotel/async_runtime` moves this off the hot path). The queue
+size, batch size, and flush interval are configurable through `BatchConfig` /
+`OTEL_BSP_*`. Timed flushes are driven by `tick()` (or by span completion), so
+a quiet application should call `tick()`
 from its own loop or use the async runtime helper.
 
 The process-wide provider can be installed once and used from anywhere:
@@ -132,10 +139,14 @@ Supported environment variables:
 - `OTEL_EXPORTER_OTLP_HEADERS` (`key=value,key2=value2`)
 - `OTEL_EXPORTER_OTLP_COMPRESSION` (`none` or `gzip`; any other value is
   rejected with a clear error)
-- `OTEL_EXPORTER_OTLP_TIMEOUT` (milliseconds)
+- `OTEL_EXPORTER_OTLP_TIMEOUT` (milliseconds; enforced by the async exporter
+  — the synchronous exporter runs whatever `Transport` you inject, so the
+  transport itself is expected to enforce any deadline)
 - `OTEL_SERVICE_NAME`
 
-HTTP 200 – including `partial_success` – is a success and is never retried.
+HTTP 200 is never retried, but a `partial_success` payload is surfaced as an
+export failure (`ExportFailure("partial success: …")`) rather than as a
+success.
 The retryable statuses are exactly the OTLP transient set: 429/502/503/504.
 Transport failures and those statuses are retried up to `max_retries`; a
 `Retry-After` header (delta-seconds or HTTP-date, capped at 60s) takes
@@ -166,7 +177,9 @@ let parent = @propagation.extract(carrier)        // SpanContext?
 ```
 
 Parsing is strict about the specification (version `ff`, all-zero IDs,
-field lengths, version-00 extra fields) and lenient about hex case.
+field lengths, version-00 extra fields) and, per the version-00 `HEXDIGLC`
+ABNF, requires lowercase hex for `version=00` headers; future versions
+(`>= 01`) accept hex in either case.
 
 ## Context
 

@@ -1,3 +1,10 @@
+> **Status note (2026-10):** this file is the original design brief kept for
+> historical reference. The implementation has since diverged in details (for
+> example the OTLP encoder is hand-written rather than generated from proto,
+> and additional packages such as `async_runtime` and header-capture
+> instrumentation were added). Treat it as background reading; the README and
+> the code are the source of truth.
+
 下面给你一份**可以直接开干的“MoonBit OpenTelemetry Tracing + OTLP/HTTP exporter + async/http 自动埋点”项目实现方案**（按“两个人能做完、还能做得像样”来裁剪范围），目标是做出一个在生产里“能用、好用、好集成”的 **Tracing MVP**。
 
 ---

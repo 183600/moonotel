@@ -133,13 +133,6 @@ pub fn BatchSpanProcessor::export_failures(
   self.export_failures
 }
 
-// Number of buffered spans, ignoring consumed slots at the front.
-
-///|
-fn BatchSpanProcessor::live_count(self : BatchSpanProcessor) -> Int32 {
-  self.count
-}
-
 // Append a span, overwriting the oldest buffered span when the queue is full.
 
 ///|
@@ -180,7 +173,7 @@ fn BatchSpanProcessor::flush_batch_at(
   self : BatchSpanProcessor,
   now : UInt64,
 ) -> Unit {
-  let available = self.live_count()
+  let available = self.count
   if available == 0 {
     return
   }
@@ -226,7 +219,7 @@ fn BatchSpanProcessor::flush_batch_at(
 
 ///|
 pub fn BatchSpanProcessor::tick(self : BatchSpanProcessor) -> Unit {
-  if self.shutdown_called || self.live_count() == 0 {
+  if self.shutdown_called || self.count == 0 {
     return
   }
   if self.flush_interval_millis > 0 {
@@ -253,7 +246,7 @@ pub impl SpanProcessor for BatchSpanProcessor with fn on_end(self, data) {
     return
   }
   self.push_span(data)
-  if self.live_count() >= self.max_export_batch_size {
+  if self.count >= self.max_export_batch_size {
     self.flush_batch_at(@env.now())
   } else if self.flush_interval_millis > 0 {
     let now = @env.now()
@@ -267,9 +260,9 @@ pub impl SpanProcessor for BatchSpanProcessor with fn on_end(self, data) {
 
 ///|
 pub impl SpanProcessor for BatchSpanProcessor with fn force_flush(self) {
-  if self.live_count() > 0 {
+  if self.count > 0 {
     let now = @env.now()
-    while self.live_count() > 0 {
+    while self.count > 0 {
       self.flush_batch_at(now)
     }
   }
@@ -278,9 +271,9 @@ pub impl SpanProcessor for BatchSpanProcessor with fn force_flush(self) {
 ///|
 pub impl SpanProcessor for BatchSpanProcessor with fn shutdown(self) {
   if !self.shutdown_called {
-    if self.live_count() > 0 {
+    if self.count > 0 {
       let now = @env.now()
-      while self.live_count() > 0 {
+      while self.count > 0 {
         self.flush_batch_at(now)
       }
     }

@@ -14,8 +14,13 @@ pub(all) struct TransportResponse {
   body : Bytes
 }
 
-// HTTP transport: (url, headers, body) -> response.
-
+/// HTTP transport: `(url, headers, body) -> response`.
+///
+/// The transport runs synchronously inside `export_spans_http` (including its
+/// retry loop) and the exporter cannot cancel it, so an injected transport is
+/// expected to enforce its own timeout/deadline. `timeout_millis` from
+/// `OtlpHttpConfig` is honored by the async exporter
+/// (`183600/moonotel/exporter/otlp_async`), not by this synchronous path.
 ///|
 pub type Transport = (String, Map[String, String], Bytes) -> TransportResponse
 
