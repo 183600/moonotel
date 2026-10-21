@@ -794,6 +794,7 @@ pub fn SpanSdk::record_exception(
   self : SpanSdk,
   error : Error,
   exception_type? : String,
+  stacktrace? : String,
   attributes? : Map[String, AttributeValue],
   time_unix_nano? : Int64,
 ) -> Unit {
@@ -807,6 +808,11 @@ pub fn SpanSdk::record_exception(
       (EXCEPTION_TYPE, StringValue(type_name)),
       (EXCEPTION_MESSAGE, StringValue(message)),
     ])
+    match stacktrace {
+      Some(value) =>
+        event_attributes.set(EXCEPTION_STACKTRACE, StringValue(value))
+      None => ()
+    }
     match attributes {
       Some(extra) =>
         for key, value in extra {

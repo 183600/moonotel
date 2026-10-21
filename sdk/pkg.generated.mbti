@@ -378,7 +378,7 @@ pub fn SpanSdk::limits(Self) -> SpanLimits
 pub fn SpanSdk::links(Self) -> Array[SpanLink]
 pub fn SpanSdk::name(Self) -> String
 pub fn SpanSdk::parent_span_id(Self) -> Array[Int32]
-pub fn SpanSdk::record_exception(Self, Error, exception_type? : String, attributes? : Map[String, AttributeValue], time_unix_nano? : Int64) -> Unit
+pub fn SpanSdk::record_exception(Self, Error, exception_type? : String, stacktrace? : String, attributes? : Map[String, AttributeValue], time_unix_nano? : Int64) -> Unit
 pub fn SpanSdk::set_attribute(Self, String, AttributeValue) -> Unit
 pub fn SpanSdk::set_attributes(Self, Map[String, AttributeValue]) -> Unit
 pub fn SpanSdk::set_bool_array_attribute(Self, String, Array[Bool]) -> Unit

@@ -124,3 +124,49 @@ test "record_exception is ignored after the span ends" {
   let data = exporter.spans[0]
   assert_eq(data.events.length(), 0)
 }
+
+///|
+test "record_exception records an explicit stacktrace" {
+  let (span, exporter) = exception_test_setup(@sdk.Sampler::always_on())
+  span.record_exception(
+    TestError("boom"),
+    stacktrace="at handler (main.mbt:10)",
+  )
+  span.end()
+  let data = exporter.spans[0]
+  assert_eq(
+    data.events[0].attributes.get(@sdk.EXCEPTION_STACKTRACE),
+    Some(@sdk.StringValue("at handler (main.mbt:10)")),
+  )
+}
+
+///|
+test "record_exception omits a missing stacktrace" {
+  let (span, exporter) = exception_test_setup(@sdk.Sampler::always_on())
+  span.record_exception(TestError("boom"))
+  span.end()
+  let data = exporter.spans[0]
+  assert_eq(
+    data.events[0].attributes.get(@sdk.EXCEPTION_STACKTRACE),
+    None,
+  )
+}
+
+///|
+test "record_exception additional attributes override the stacktrace" {
+  let (span, exporter) = exception_test_setup(@sdk.Sampler::always_on())
+  let extra : Map[String, @sdk.AttributeValue] = Map([
+    (@sdk.EXCEPTION_STACKTRACE, @sdk.StringValue("override")),
+  ])
+  span.record_exception(
+    TestError("boom"),
+    stacktrace="original",
+    attributes=extra,
+  )
+  span.end()
+  let data = exporter.spans[0]
+  assert_eq(
+    data.events[0].attributes.get(@sdk.EXCEPTION_STACKTRACE),
+    Some(@sdk.StringValue("override")),
+  )
+}
