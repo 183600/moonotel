@@ -1,0 +1,28 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "yourname/otel/exporter/otlp_async"
+
+import {
+  "moonbitlang/async/http",
+  "yourname/otel/exporter/otlp",
+  "yourname/otel/sdk",
+}
+
+// Values
+pub async fn export_spans(@otlp.OtlpHttpConfig, Array[@sdk.SpanData]) -> @sdk.ExportResult
+
+pub async fn post_trace_request(@otlp.OtlpHttpConfig, Bytes) -> @sdk.ExportResult
+
+// Errors
+
+// Types and methods
+pub struct OtlpHttpAsyncExporter {
+  config : @otlp.OtlpHttpConfig
+  headers : Map[@http.CaseInsensitiveString, String]
+}
+pub fn OtlpHttpAsyncExporter::config(Self) -> @otlp.OtlpHttpConfig
+pub async fn OtlpHttpAsyncExporter::export_batch(Self, Array[@sdk.SpanData]) -> @sdk.ExportResult
+pub fn OtlpHttpAsyncExporter::new(@otlp.OtlpHttpConfig) -> Self
+
+// Type aliases
+
+// Traits

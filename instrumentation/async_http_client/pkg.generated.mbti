@@ -1,0 +1,46 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "yourname/otel/instrumentation/async_http_client"
+
+import {
+  "moonbitlang/async/http",
+  "moonbitlang/async/io",
+  "yourname/otel/context",
+  "yourname/otel/sdk",
+}
+
+// Values
+pub async fn connect(String, headers? : Map[String, String], tracer? : @sdk.Tracer, span_name? : String, context? : @context.Context) -> (@http.Response, &@io.Data)
+
+pub async fn delete(String, headers? : Map[String, String], tracer? : @sdk.Tracer, span_name? : String, context? : @context.Context) -> (@http.Response, &@io.Data)
+
+pub async fn get(String, headers? : Map[String, String], tracer? : @sdk.Tracer, span_name? : String, context? : @context.Context) -> (@http.Response, &@io.Data)
+
+pub async fn head(String, headers? : Map[String, String], tracer? : @sdk.Tracer, span_name? : String, context? : @context.Context) -> (@http.Response, &@io.Data)
+
+pub fn http_method_name(@http.RequestMethod) -> String
+
+pub async fn options(String, headers? : Map[String, String], tracer? : @sdk.Tracer, span_name? : String, context? : @context.Context) -> (@http.Response, &@io.Data)
+
+pub async fn patch(String, &@io.Data, headers? : Map[String, String], tracer? : @sdk.Tracer, span_name? : String, context? : @context.Context) -> (@http.Response, &@io.Data)
+
+pub async fn post(String, &@io.Data, headers? : Map[String, String], tracer? : @sdk.Tracer, span_name? : String, context? : @context.Context) -> (@http.Response, &@io.Data)
+
+pub async fn put(String, &@io.Data, headers? : Map[String, String], tracer? : @sdk.Tracer, span_name? : String, context? : @context.Context) -> (@http.Response, &@io.Data)
+
+pub fn redact_url(String) -> String
+
+pub async fn request(String, @http.RequestMethod, &@io.Data, headers? : Map[String, String], tracer? : @sdk.Tracer, span_name? : String, context? : @context.Context) -> (@http.Response, &@io.Data)
+
+pub fn split_scheme(String) -> String
+
+pub fn split_url(String) -> (String, Int32)
+
+pub async fn trace(String, headers? : Map[String, String], tracer? : @sdk.Tracer, span_name? : String, context? : @context.Context) -> (@http.Response, &@io.Data)
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

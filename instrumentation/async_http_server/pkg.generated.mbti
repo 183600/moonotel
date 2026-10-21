@@ -1,0 +1,52 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "yourname/otel/instrumentation/async_http_server"
+
+import {
+  "moonbitlang/async/http",
+  "moonbitlang/async/io",
+  "moonbitlang/async/socket",
+  "yourname/otel/api",
+  "yourname/otel/context",
+  "yourname/otel/sdk",
+}
+
+// Values
+pub fn extract_context(Map[@http.CaseInsensitiveString, String]) -> @context.Context
+
+pub fn extract_parent(Map[@http.CaseInsensitiveString, String]) -> @api.SpanContext?
+
+pub async fn run_server(@socket.Addr, async (ServerCall) -> Unit, tracer? : @sdk.Tracer, allow_failure? : Bool, max_connections? : Int32) -> Unit
+
+pub async fn run_server_on(@http.Server, async (ServerCall) -> Unit, tracer? : @sdk.Tracer, allow_failure? : Bool, max_connections? : Int32) -> Unit
+
+pub async fn run_server_with_client_address(@socket.Addr, async (ServerCall) -> Unit, tracer? : @sdk.Tracer, allow_failure? : Bool, max_connections? : Int32) -> Unit
+
+pub async fn run_server_with_client_address_on(@socket.TcpServer, async (ServerCall) -> Unit, tracer? : @sdk.Tracer, allow_failure? : Bool, max_connections? : Int32) -> Unit
+
+// Errors
+
+// Types and methods
+pub(all) struct ServerCall {
+  request : @http.Request
+  body : &@io.Reader
+  connection : @http.ServerConnection
+  span : @sdk.SpanSdk?
+  tracer : @sdk.Tracer?
+  mut path_query : (String, String)?
+  mut responded : Bool
+  mut connection_closed : Bool
+}
+pub fn ServerCall::close_connection(Self) -> Unit
+pub fn ServerCall::connection_close_requested(Self) -> Bool
+pub fn ServerCall::header(Self, String) -> String?
+pub fn ServerCall::http_method(Self) -> String
+pub fn ServerCall::path(Self) -> String
+pub fn ServerCall::query(Self) -> String
+pub async fn ServerCall::respond(Self, Int32, reason? : String, body? : String, headers? : Map[String, String]) -> Unit
+pub fn ServerCall::set_route(Self, String) -> Bool
+pub fn ServerCall::span_context(Self) -> @api.SpanContext?
+pub fn ServerCall::start_span(Self, String, kind? : @api.SpanKind, attributes? : Map[String, @sdk.AttributeValue], links? : Array[@sdk.SpanLink]) -> @sdk.SpanSdk?
+
+// Type aliases
+
+// Traits

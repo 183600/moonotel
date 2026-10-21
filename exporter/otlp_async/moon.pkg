@@ -17,4 +17,4 @@ import {
 
 pkgtype(kind: "library")
 
-supported_targets = "native"
+supported_targets = "native+wasm"

@@ -1,0 +1,48 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "yourname/otel/async_runtime"
+
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/aqueue",
+  "moonbitlang/async/cond_var",
+  "yourname/otel/context",
+  "yourname/otel/exporter/otlp",
+  "yourname/otel/exporter/otlp_async",
+  "yourname/otel/sdk",
+}
+
+// Values
+pub fn[G] setup(@async.TaskGroup[G], service_name? : String, resource? : @sdk.Resource, resource_attributes? : Map[String, @sdk.AttributeValue], endpoint? : String, headers? : Map[String, String], sampler? : @sdk.Sampler, span_limits? : @sdk.SpanLimits, exporters? : Array[String], max_queue_size? : Int32, use_batch? : Bool, batch? : @sdk.BatchConfig) -> @sdk.TracerProviderSdk
+
+pub fn[G, X] spawn(@async.TaskGroup[G], async () -> X, context? : @context.Context, no_wait? : Bool, allow_failure? : Bool) -> @async.Task[X]
+
+pub fn[G] spawn_bg(@async.TaskGroup[G], async () -> Unit, context? : @context.Context, no_wait? : Bool, allow_failure? : Bool) -> Unit
+
+pub fn[G] spawn_flush_loop(@async.TaskGroup[G], @sdk.BatchSpanProcessor, interval_millis? : Int32) -> Unit
+
+// Errors
+
+// Types and methods
+pub struct OtlpHttpAsyncSpanExporter {
+  exporter : @otlp_async.OtlpHttpAsyncExporter
+  queue : @aqueue.Queue[Array[@sdk.SpanData]]
+  mut shutdown_called : Bool
+  mut dropped : UInt64
+  mut failures : UInt64
+  mut active_sends : Int32
+  send_finished : @cond_var.Cond
+}
+pub fn OtlpHttpAsyncSpanExporter::config(Self) -> @otlp.OtlpHttpConfig
+pub fn OtlpHttpAsyncSpanExporter::dropped_batches(Self) -> UInt64
+pub fn OtlpHttpAsyncSpanExporter::export_failures(Self) -> UInt64
+pub fn OtlpHttpAsyncSpanExporter::export_span(Self, @sdk.SpanData) -> @sdk.ExportResult
+pub fn OtlpHttpAsyncSpanExporter::export_spans(Self, Array[@sdk.SpanData]) -> @sdk.ExportResult
+pub async fn OtlpHttpAsyncSpanExporter::flush(Self) -> Unit
+pub fn OtlpHttpAsyncSpanExporter::is_shutdown(Self) -> Bool
+pub fn[G] OtlpHttpAsyncSpanExporter::new(@otlp.OtlpHttpConfig, @async.TaskGroup[G], max_queue_size? : Int32) -> Self
+pub fn OtlpHttpAsyncSpanExporter::shutdown(Self) -> Unit
+pub impl @sdk.SpanExporter for OtlpHttpAsyncSpanExporter
+
+// Type aliases
+
+// Traits
