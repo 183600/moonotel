@@ -12,7 +12,7 @@ import {
 }
 
 // Values
-pub fn[G] setup(@async.TaskGroup[G], service_name? : String, resource? : @sdk.Resource, resource_attributes? : Map[String, @sdk.AttributeValue], endpoint? : String, headers? : Map[String, String], sampler? : @sdk.Sampler, span_limits? : @sdk.SpanLimits, exporters? : Array[String], max_queue_size? : Int32, use_batch? : Bool, batch? : @sdk.BatchConfig) -> @sdk.TracerProviderSdk
+pub fn[G] setup(@async.TaskGroup[G], service_name? : String, resource? : @sdk.Resource, resource_attributes? : Map[String, @sdk.AttributeValue], endpoint? : String, headers? : Map[String, String], sampler? : @sdk.Sampler, span_limits? : @sdk.SpanLimits, exporters? : Array[String], max_queue_size? : Int32, use_batch? : Bool, batch? : @sdk.BatchConfig, install_global? : Bool) -> @sdk.TracerProviderSdk
 
 pub fn[G, X] spawn(@async.TaskGroup[G], async () -> X, context? : @context.Context, no_wait? : Bool, allow_failure? : Bool) -> @async.Task[X]
 

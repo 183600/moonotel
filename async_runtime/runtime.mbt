@@ -115,6 +115,11 @@ pub fn[G, X] spawn(
 // background flush loop is started in `group`. The batch defaults come from
 // the standard OTEL_BSP_* variables. By default the async exporter's own queue
 // performs the batching.
+//
+// The provider is installed as the process-wide provider unless
+// `install_global` is false, which keeps it private (useful when several
+// providers coexist in one process, or in tests where a global shutdown from
+// unrelated code must not flush this provider's spans).
 
 ///|
 pub fn[G] setup(
@@ -130,6 +135,7 @@ pub fn[G] setup(
   max_queue_size? : Int32,
   use_batch? : Bool,
   batch? : @sdk.BatchConfig,
+  install_global? : Bool,
 ) -> @sdk.TracerProviderSdk {
   let base = @otlp.OtlpHttpConfig::from_env()
   let config : @otlp.OtlpHttpConfig = {
@@ -194,6 +200,8 @@ pub fn[G] setup(
     }
     provider = provider.with_span_processor(processor)
   }
-  @sdk.set_global_tracer_provider(provider)
+  if install_global.unwrap_or(true) {
+    @sdk.set_global_tracer_provider(provider)
+  }
   provider
 }
