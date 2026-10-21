@@ -267,6 +267,8 @@ pub type Transport = (String, Map[String, String], Bytes) -> @otlp.TransportResp
 
 pub using @otlp {type TransportResponse}
 
+pub using @sdk {trait ResourceDetector}
+
 pub using @sdk {trait SpanExporter}
 
 pub using @sdk {trait SpanProcessor}

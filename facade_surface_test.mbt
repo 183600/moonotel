@@ -53,3 +53,35 @@ test "facade_exposes_the_context_storage_hook" {
   @otel.detach(token)
   assert_eq(@otel.current_context().value("backend"), Some("root"))
 }
+
+///|
+pub struct FacadeDetector {
+  name : String
+}
+
+///|
+pub fn FacadeDetector::new(name : String) -> FacadeDetector {
+  { name, }
+}
+
+///|
+pub impl @otel.ResourceDetector for FacadeDetector with fn detect(self) {
+  @otel.Resource::new(
+    attributes=Map([
+      ("detected.by", @otel.AttributeValue::StringValue(self.name)),
+    ]),
+  )
+}
+
+///|
+pub extend FacadeDetector with @otel.ResourceDetector::{detect}
+
+///|
+test "facade_exposes_the_resource_detector_extension_point" {
+  let detector = FacadeDetector::new("facade")
+  let resource = @otel.Resource::detect([detector])
+  assert_eq(
+    resource.get("detected.by"),
+    Some(@otel.AttributeValue::StringValue("facade")),
+  )
+}

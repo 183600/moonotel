@@ -31,6 +31,7 @@ pub using @sdk {
   type SpanLimits,
   type IdGenerator,
   type Resource,
+  trait ResourceDetector,
   type SpanSdk,
   type Tracer,
   type TracerProviderSdk,

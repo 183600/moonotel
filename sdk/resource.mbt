@@ -502,3 +502,27 @@ pub fn Resource::from_env(service_name? : String) -> Resource {
   attributes.set(TELEMETRY_SDK_VERSION, StringValue(SDK_VERSION))
   { attributes, }
 }
+
+// A source of resource attributes.
+//
+// A detector contributes the attributes it knows about. The OpenTelemetry SDK
+// merges the detected resources in the order the detectors are given, so that
+// a later detector overrides the attributes of an earlier one.
+
+///|
+pub(open) trait ResourceDetector {
+  fn detect(Self) -> Resource
+}
+
+// Detect the resources of `detectors` and merge them in order: the
+// attributes of a later detector override the ones of an earlier detector.
+// An empty list of detectors yields an empty resource.
+
+///|
+pub fn Resource::detect(detectors : Array[&ResourceDetector]) -> Resource {
+  let mut resource = Resource::empty()
+  for detector in detectors {
+    resource = resource.merge(detector.detect())
+  }
+  resource
+}

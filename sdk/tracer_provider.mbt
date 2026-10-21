@@ -164,6 +164,19 @@ pub fn TracerProviderSdk::with_resource_attributes(
   { ..self, resource: self.resource.merge(Resource::new(attributes=values)), }
 }
 
+// Merge the resources detected by `detectors` into the resource of this
+// provider. The detected attributes override the ones already present, so a
+// detector can refine the resource built from the environment. The detectors
+// are merged in order, a later detector overriding an earlier one.
+
+///|
+pub fn TracerProviderSdk::with_resource_detectors(
+  self : TracerProviderSdk,
+  detectors : Array[&ResourceDetector],
+) -> TracerProviderSdk {
+  { ..self, resource: self.resource.merge(Resource::detect(detectors)), }
+}
+
 // Use a custom sampler.
 
 ///|

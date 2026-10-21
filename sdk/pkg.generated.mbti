@@ -210,6 +210,7 @@ pub struct Resource {
   attributes : Map[String, AttributeValue]
 }
 pub fn Resource::attributes(Self) -> Map[String, AttributeValue]
+pub fn Resource::detect(Array[&ResourceDetector]) -> Self
 pub fn Resource::empty() -> Self
 pub fn Resource::from_env(service_name? : String) -> Self
 pub fn Resource::get(Self, String) -> AttributeValue?
@@ -434,6 +435,7 @@ pub fn TracerProviderSdk::with_id_generator(Self, IdGenerator) -> Self
 pub fn TracerProviderSdk::with_resource(Self, Resource) -> Self
 pub fn TracerProviderSdk::with_resource_attribute(Self, String, AttributeValue) -> Self
 pub fn TracerProviderSdk::with_resource_attributes(Self, Map[String, AttributeValue]) -> Self
+pub fn TracerProviderSdk::with_resource_detectors(Self, Array[&ResourceDetector]) -> Self
 pub fn TracerProviderSdk::with_sampler(Self, Sampler) -> Self
 pub fn TracerProviderSdk::with_span_limits(Self, SpanLimits) -> Self
 pub fn TracerProviderSdk::with_span_processor(Self, &SpanProcessor) -> Self
@@ -442,6 +444,10 @@ pub fn TracerProviderSdk::with_span_processors(Self, Array[&SpanProcessor]) -> S
 // Type aliases
 
 // Traits
+pub(open) trait ResourceDetector {
+  fn detect(Self) -> Resource
+}
+
 pub(open) trait SpanExporter {
   fn export_spans(Self, Array[SpanData]) -> ExportResult
   fn export_span(Self, SpanData) -> ExportResult = _
