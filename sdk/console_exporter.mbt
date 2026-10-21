@@ -39,9 +39,12 @@ fn hex_nibble_char(value : Int32) -> Char {
 ///|
 fn write_int32_hex(out : StringBuilder, bytes : Array[Int32]) -> Unit {
   for byte in bytes {
-    let value = byte & 0xFF
-    out.write_char(hex_nibble_char(value >> 4))
-    out.write_char(hex_nibble_char(value & 0x0F))
+    if byte >= 0 && byte < 256 {
+      out.write_char(hex_nibble_char(byte >> 4))
+    } else {
+      out.write_char('0')
+    }
+    out.write_char(hex_nibble_char(byte & 0x0F))
   }
 }
 

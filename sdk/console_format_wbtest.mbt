@@ -88,3 +88,35 @@ test "console format omits empty detail blocks" {
   assert_false(rendered.contains("{"))
   assert_false(rendered.contains("["))
 }
+
+///|
+test "console format renders parent ids like bytes_to_hex" {
+  let data : SpanData = {
+    name: "parent",
+    span_context: @api.span_context(
+      @api.bytes_from_hex("33333333333333333333333333333333").unwrap(),
+      @api.bytes_from_hex("4444444444444444").unwrap(),
+      1,
+    ),
+    parent_span_id: [999, -1, 256, 0xAB],
+    kind: @api.SpanKind::Internal,
+    start_time_unix_nano: 0L,
+    end_time_unix_nano: 0L,
+    attributes: Map([]),
+    events: [],
+    links: [],
+    dropped_attributes_count: 0,
+    dropped_events_count: 0,
+    dropped_links_count: 0,
+    status: @api.StatusCode::Unset,
+    status_description: "",
+    resource: ResourceAttributes::new(Map([])),
+    scope_name: "probe",
+    scope_version: "0.0.1",
+  }
+  let rendered = format_span(data)
+  assert_true(rendered.contains(" parent_span_id=070f00ab"))
+  assert_true(
+    rendered.contains(" parent_span_id=" + @api.bytes_to_hex(data.parent_span_id)),
+  )
+}
