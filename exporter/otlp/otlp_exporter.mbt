@@ -451,16 +451,22 @@ fn map_capacity_for_entries(entries : Int) -> Int {
 ///|
 fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
   let headers = Map(
-    [], capacity=map_capacity_for_entries(config.headers.length() + 1),
+    [], capacity=map_capacity_for_entries(config.headers.length() + 2),
   )
   for key, value in config.headers {
     // HTTP header names are case-insensitive, so drop any user-configured
-    // `Content-Type` spelling before adding the protocol's own value.
-    if key.to_lower() != "content-type" {
+    // `Content-Type` or `Accept` spelling before adding the protocol's own
+    // values.
+    let lower = key.to_lower()
+    if lower != "content-type" && lower != "accept" {
       headers.set(key, value)
     }
   }
-  headers.set("content-type", content_type_for_protocol(config.protocol))
+  let content_type = content_type_for_protocol(config.protocol)
+  headers.set("content-type", content_type)
+  // The OTLP/HTTP specification asks the client to announce the response
+  // format it accepts; the collector answers with the same format.
+  headers.set("accept", content_type)
   headers
 }
 

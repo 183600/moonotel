@@ -54,15 +54,16 @@ fn request_headers(
 ) -> Map[@http.CaseInsensitiveString, String] {
   let headers = Map(
     [],
-    capacity=map_capacity_for_entries(config.headers.length() + 2),
+    capacity=map_capacity_for_entries(config.headers.length() + 3),
   )
   for key, value in config.headers {
     headers.set(@http.CaseInsensitiveString(key), value)
   }
-  headers.set(
-    @http.CaseInsensitiveString("content-type"),
-    @otlp.content_type_for_protocol(config.protocol),
-  )
+  let content_type = @otlp.content_type_for_protocol(config.protocol)
+  headers.set(@http.CaseInsensitiveString("content-type"), content_type)
+  // The OTLP/HTTP specification asks the client to announce the response
+  // format it accepts; the collector answers with the same format.
+  headers.set(@http.CaseInsensitiveString("accept"), content_type)
   if gzip {
     headers.set(@http.CaseInsensitiveString("content-encoding"), "gzip")
   }
