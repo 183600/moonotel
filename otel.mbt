@@ -54,17 +54,45 @@ pub using @sdk {
   TELEMETRY_SDK_NAME,
   TELEMETRY_SDK_LANGUAGE,
   TELEMETRY_SDK_VERSION,
+  // Semantic-convention attribute keys.
+  HTTP_REQUEST_METHOD,
+  HTTP_RESPONSE_STATUS_CODE,
+  HTTP_REQUEST_BODY_SIZE,
+  HTTP_RESPONSE_BODY_SIZE,
+  HTTP_ROUTE,
+  HTTP_REQUEST_HEADER_PREFIX,
+  HTTP_RESPONSE_HEADER_PREFIX,
+  URL_FULL,
+  URL_SCHEME,
+  URL_PATH,
+  URL_QUERY,
+  SERVER_ADDRESS,
+  SERVER_PORT,
+  CLIENT_ADDRESS,
+  CLIENT_PORT,
+  USER_AGENT_ORIGINAL,
+  NETWORK_PROTOCOL_NAME,
+  NETWORK_PROTOCOL_VERSION,
+  ERROR_TYPE,
+  SERVICE_NAME,
+  SERVICE_VERSION,
+  DEPLOYMENT_ENVIRONMENT,
+  EXCEPTION_TYPE,
+  EXCEPTION_MESSAGE,
+  EXCEPTION_STACKTRACE,
 }
 
 ///|
 pub using @context {
   type Context,
+  type ContextStorage,
   current_context,
   current_span_context,
   attach,
   detach,
   with_context,
   with_span_context,
+  set_context_storage,
 }
 
 ///|

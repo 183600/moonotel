@@ -8,7 +8,8 @@
 // `partial_success`) and retries only retryable HTTP statuses. Each attempt
 // is bounded by `config.timeout_millis`.
 //
-// The package targets native only, because the async HTTP stack does.
+// The package targets native and wasm, which are the targets the async HTTP
+// stack supports.
 
 ///|
 fn is_retryable_status(status_code : Int32) -> Bool {

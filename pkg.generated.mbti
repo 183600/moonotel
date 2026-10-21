@@ -14,11 +14,51 @@ pub const BAGGAGE_MAX_BYTES : Int32 = 8192
 
 pub const BAGGAGE_MAX_MEMBERS : Int32 = 64
 
+pub const CLIENT_ADDRESS : String = "client.address"
+
+pub const CLIENT_PORT : String = "client.port"
+
+pub const DEPLOYMENT_ENVIRONMENT : String = "deployment.environment"
+
+pub const ERROR_TYPE : String = "error.type"
+
+pub const EXCEPTION_MESSAGE : String = "exception.message"
+
+pub const EXCEPTION_STACKTRACE : String = "exception.stacktrace"
+
+pub const EXCEPTION_TYPE : String = "exception.type"
+
+pub const HTTP_REQUEST_BODY_SIZE : String = "http.request.body.size"
+
+pub const HTTP_REQUEST_HEADER_PREFIX : String = "http.request.header."
+
+pub const HTTP_REQUEST_METHOD : String = "http.request.method"
+
+pub const HTTP_RESPONSE_BODY_SIZE : String = "http.response.body.size"
+
+pub const HTTP_RESPONSE_HEADER_PREFIX : String = "http.response.header."
+
+pub const HTTP_RESPONSE_STATUS_CODE : String = "http.response.status_code"
+
+pub const HTTP_ROUTE : String = "http.route"
+
+pub const NETWORK_PROTOCOL_NAME : String = "network.protocol.name"
+
+pub const NETWORK_PROTOCOL_VERSION : String = "network.protocol.version"
+
 pub const OTLP_HTTP_JSON_PROTOCOL : String = "http/json"
 
 pub const OTLP_HTTP_PROTOBUF_PROTOCOL : String = "http/protobuf"
 
 pub const SDK_VERSION : String = "0.1.0"
+
+pub const SERVER_ADDRESS : String = "server.address"
+
+pub const SERVER_PORT : String = "server.port"
+
+pub const SERVICE_NAME : String = "service.name"
+
+pub const SERVICE_VERSION : String = "service.version"
 
 pub const TELEMETRY_SDK_LANGUAGE : String = "telemetry.sdk.language"
 
@@ -31,6 +71,16 @@ pub const TRACESTATE_MAX_MEMBERS : Int32 = 32
 pub const TRACE_FLAGS_RANDOM : Int32 = 2
 
 pub const TRACE_FLAGS_SAMPLED : Int32 = 1
+
+pub const URL_FULL : String = "url.full"
+
+pub const URL_PATH : String = "url.path"
+
+pub const URL_QUERY : String = "url.query"
+
+pub const URL_SCHEME : String = "url.scheme"
+
+pub const USER_AGENT_ORIGINAL : String = "user_agent.original"
 
 pub fn attach(@context.Context) -> @context.Context
 
@@ -118,6 +168,8 @@ pub fn sampling_decision_record_and_sample() -> @sdk.SamplingDecision
 
 pub fn sampling_decision_record_only() -> @sdk.SamplingDecision
 
+pub fn set_context_storage(@context.ContextStorage) -> @context.ContextStorage
+
 pub fn set_global_propagator(&@propagation.TextMapPropagator) -> Unit
 
 pub fn set_global_tracer_provider(@sdk.TracerProviderSdk) -> Unit
@@ -160,6 +212,8 @@ pub using @propagation {type CompositePropagator}
 pub using @sdk {type ConsoleSpanExporter}
 
 pub using @context {type Context}
+
+pub using @context {type ContextStorage}
 
 pub using @sdk {type ExportResult}
 
