@@ -208,6 +208,18 @@ pub fn TracerProviderSdk::with_span_processor(
   { ..self, processors, }
 }
 
+///|
+pub fn TracerProviderSdk::with_span_processors(
+  self : TracerProviderSdk,
+  processors : Array[&SpanProcessor],
+) -> TracerProviderSdk {
+  let merged = self.processors.copy()
+  for processor in processors {
+    merged.push(processor)
+  }
+  { ..self, processors: merged, }
+}
+
 // The resource attributes of this provider, as a fresh copy.
 
 ///|

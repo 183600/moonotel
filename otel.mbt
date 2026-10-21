@@ -36,6 +36,7 @@ pub using @sdk {
   type TracerProviderSdk,
   type SimpleSpanProcessor,
   type BatchSpanProcessor,
+  type MultiSpanProcessor,
   type BatchConfig,
   type InMemorySpanExporter,
   type ConsoleSpanExporter,

@@ -165,6 +165,8 @@ pub using @sdk {type IdGenerator}
 
 pub using @sdk {type InMemorySpanExporter}
 
+pub using @sdk {type MultiSpanProcessor}
+
 pub using @otlp {type OtlpHttpConfig}
 
 pub using @otlp {type OtlpHttpExporter}
