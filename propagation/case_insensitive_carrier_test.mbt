@@ -37,6 +37,17 @@ test "remove deletes headers case-insensitively" {
 }
 
 ///|
+test "from_entries combines differently cased duplicate keys" {
+  let carrier = @propagation.TextMapCarrier::from_entries([
+    ("Tracestate", "foo=1"),
+    ("tracestate", "bar=2"),
+  ])
+  assert_eq(carrier.length(), 1)
+  assert_eq(carrier.get("tracestate"), Some("foo=1, bar=2"))
+  assert_eq(carrier.get("TRACESTATE"), Some("foo=1, bar=2"))
+}
+
+///|
 test "extract accepts differently cased traceparent headers" {
   let sc = @propagation.parse_traceparent(
     "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",

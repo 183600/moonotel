@@ -45,7 +45,20 @@ pub fn TextMapCarrier::from_entries(
   for entry in entries {
     match map.get(entry.0) {
       Some(existing) => map.set(entry.0, existing + ", " + entry.1)
-      None => map.set(entry.0, entry.1)
+      None => {
+        let mut matched : (String, String)? = None
+        for candidate, existing in map {
+          if ascii_case_insensitive_equal(candidate, entry.0) {
+            matched = Some((candidate, existing))
+            break
+          }
+        }
+        match matched {
+          Some((candidate, existing)) =>
+            map.set(candidate, existing + ", " + entry.1)
+          None => map.set(entry.0, entry.1)
+        }
+      }
     }
   }
   { entries: map, getter: None, setter: None, }
