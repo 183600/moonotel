@@ -43,10 +43,12 @@ fn is_valid_tracestate_member(key : StringView, value : StringView) -> Bool {
   value.length() > 0
 }
 
-// Parse a `tracestate` header value. Returns None when the value is empty,
-// has more than 32 members, contains a malformed or duplicate member, or has
-// an empty value. Optional whitespace around members is ignored, and
-// `key = value` is accepted; blanks directly after `=` belong to the value.
+// Parse a `tracestate` header value. Empty and whitespace-only list members
+// are allowed and carry no member; a duplicated key keeps its first member.
+// Returns None when the value is empty, has more than 32 list-members,
+// contains a malformed member, or has an invalid value. Optional whitespace
+// around members is ignored, and `key = value` is accepted; blanks directly
+// after `=` belong to the value.
 
 ///|
 pub fn Tracestate::parse(value : String) -> Tracestate? {
@@ -57,14 +59,22 @@ pub fn Tracestate::parse(value : String) -> Tracestate? {
   let view = value[:]
   let len = view.length()
   let mut start = 0
+  let mut member_count = 0
   while true {
-    if members.length() >= TRACESTATE_MAX_MEMBERS {
+    if member_count >= TRACESTATE_MAX_MEMBERS {
       return None
     }
+    member_count = member_count + 1
     let end = find_code_unit(view, ',', start)
     let item = trim_ows(view.view(start_offset=start, end_offset=end))
     if item.length() == 0 {
-      return None
+      // Empty and whitespace-only list-members are allowed and carry no
+      // key/value pair.
+      if end == len {
+        break
+      }
+      start = end + 1
+      continue
     }
     let eq = find_code_unit(item, '=', 0)
     if eq >= item.length() {
@@ -83,12 +93,17 @@ pub fn Tracestate::parse(value : String) -> Tracestate? {
     if !is_valid_tracestate_member(key[:], member_value[:]) {
       return None
     }
+    let mut duplicate = false
     for existing in members {
       if existing.0 == key {
-        return None
+        duplicate = true
+        break
       }
     }
-    members.push((key, member_value))
+    // A duplicated key keeps its first member.
+    if !duplicate {
+      members.push((key, member_value))
+    }
     if end == len {
       break
     }

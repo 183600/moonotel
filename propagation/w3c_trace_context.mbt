@@ -657,34 +657,49 @@ fn is_valid_tracestate_value(value : StringView) -> Bool {
 }
 
 // Write the normalized form of an already validated `tracestate` value: the
-// members joined by `,` with optional whitespace trimmed.
+// members joined by `,` with optional whitespace trimmed. Empty and
+// whitespace-only members are dropped, and a duplicated key keeps its first
+// member, matching `parse_tracestate`.
 
 ///|
 fn write_normalized_tracestate(view : StringView, len : Int32) -> String {
   let sb = StringBuilder(size_hint=len * 2)
   let mut count = 0
+  let seen : Array[StringView] = []
   let mut start = 0
   while true {
     let end = find_code_unit(view, ',', start)
     let item = trim_ows(view.view(start_offset=start, end_offset=end))
-    let eq = find_code_unit(item, '=', 0)
-    let key_src = item[:eq]
-    let key = trim_ows(key_src)
-    // Blanks after `=` belong to the value unless the member also has
-    // whitespace before `=` (`key = value`).
-    let value_src = item[eq + 1:]
-    let member_value = if key_src.length() == key.length() {
-      value_src
-    } else {
-      trim_ows(value_src)
+    let mut duplicate = false
+    if item.length() > 0 {
+      let eq = find_code_unit(item, '=', 0)
+      let key_src = item[:eq]
+      let key = trim_ows(key_src)
+      // Blanks after `=` belong to the value unless the member also has
+      // whitespace before `=` (`key = value`).
+      let value_src = item[eq + 1:]
+      let member_value = if key_src.length() == key.length() {
+        value_src
+      } else {
+        trim_ows(value_src)
+      }
+      for existing in seen {
+        if existing == key {
+          duplicate = true
+          break
+        }
+      }
+      if !duplicate {
+        seen.push(key)
+        if count > 0 {
+          sb.write_char(',')
+        }
+        sb.write_stringview(key)
+        sb.write_char('=')
+        sb.write_stringview(member_value)
+        count = count + 1
+      }
     }
-    if count > 0 {
-      sb.write_char(',')
-    }
-    sb.write_stringview(key)
-    sb.write_char('=')
-    sb.write_stringview(member_value)
-    count = count + 1
     if end == len {
       break
     }
@@ -696,15 +711,17 @@ fn write_normalized_tracestate(view : StringView, len : Int32) -> String {
 // Validate and normalize a `tracestate` header value.
 //
 // The result is the list of members joined by `,` with optional whitespace
-// trimmed. Returns None when the value is empty, has more than 32 members,
-// contains a malformed or duplicate key, or has an invalid value.
+// trimmed. Empty and whitespace-only list members are allowed and dropped;
+// a duplicated key keeps its first member. Returns None when the value is
+// empty, has more than 32 members, or contains a malformed member or an
+// invalid value.
 
 ///|
 pub fn parse_tracestate(value : String) -> String? {
   if value == "" {
     return None
   }
-  // Duplicate keys are rejected; at most 32 members are accepted.
+  // At most 32 list-members are accepted; duplicates keep the first entry.
   let mut first_key : StringView = ""
   let mut have_first = false
   let mut seen : Array[StringView]? = None
@@ -740,7 +757,18 @@ pub fn parse_tracestate(value : String) -> String? {
     while item_end > item_start && is_ows_code(view.unsafe_get(item_end - 1)) {
       item_end = item_end - 1
     }
-    if item_end <= item_start || eq < 0 || eq >= item_end {
+    if item_end <= item_start {
+      // Empty and whitespace-only list members are allowed by W3C and carry
+      // no key/value pair; they are omitted from the normalized form.
+      unchanged = false
+      member_count = member_count + 1
+      if end == len {
+        break
+      }
+      start = end + 1
+      continue
+    }
+    if eq < 0 || eq >= item_end {
       return None
     }
     if item_start != start || item_end != end {
@@ -768,29 +796,44 @@ pub fn parse_tracestate(value : String) -> String? {
     if !is_valid_tracestate_key(key) || !is_valid_tracestate_value(member_value) {
       return None
     }
+    let mut duplicate = false
     match seen {
       Some(keys) => {
         let mut i = 0
         let n = keys.length()
         while i < n {
           if keys.unsafe_get(i) == key {
-            return None
+            duplicate = true
+            break
           }
           i = i + 1
         }
-        keys.push(key)
+        if !duplicate {
+          keys.push(key)
+        }
       }
       None =>
         if have_first {
           if first_key == key {
-            return None
+            duplicate = true
+          } else {
+            let keys : Array[StringView] = [first_key, key]
+            seen = Some(keys)
           }
-          let keys : Array[StringView] = [first_key, key]
-          seen = Some(keys)
         } else {
           first_key = key
           have_first = true
         }
+    }
+    if duplicate {
+      // A duplicated key keeps its first member; later members are dropped.
+      unchanged = false
+      member_count = member_count + 1
+      if end == len {
+        break
+      }
+      start = end + 1
+      continue
     }
     member_count = member_count + 1
     if end == len {

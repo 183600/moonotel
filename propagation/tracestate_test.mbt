@@ -38,10 +38,14 @@ test "parse_tracestate_accepts_multi_tenant_keys" {
 }
 
 ///|
-test "parse_tracestate_rejects_empty_values" {
+test "parse_tracestate_accepts_empty_members" {
   assert_eq(@propagation.parse_tracestate(""), None)
-  assert_eq(@propagation.parse_tracestate("a=1,"), None)
-  assert_eq(@propagation.parse_tracestate(",a=1"), None)
+  assert_eq(@propagation.parse_tracestate("a=1,"), Some("a=1"))
+  assert_eq(@propagation.parse_tracestate(",a=1"), Some("a=1"))
+  assert_eq(@propagation.parse_tracestate("a=1, ,b=2"), Some("a=1,b=2"))
+  let ts = @propagation.Tracestate::parse("a=1,").unwrap()
+  assert_eq(ts.length(), 1)
+  assert_eq(ts.get("a"), Some("1"))
 }
 
 ///|
@@ -53,8 +57,11 @@ test "parse_tracestate_rejects_malformed_members" {
 }
 
 ///|
-test "parse_tracestate_rejects_duplicate_keys" {
-  assert_eq(@propagation.parse_tracestate("a=1,a=2"), None)
+test "parse_tracestate_keeps_first_duplicate_key" {
+  assert_eq(@propagation.parse_tracestate("a=1,a=2"), Some("a=1"))
+  let ts = @propagation.Tracestate::parse("a=1,a=2").unwrap()
+  assert_eq(ts.length(), 1)
+  assert_eq(ts.get("a"), Some("1"))
 }
 
 ///|
