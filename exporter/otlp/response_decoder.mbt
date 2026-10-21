@@ -19,6 +19,15 @@ fn malformed_response() -> @sdk.ExportResult {
   @sdk.ExportFailure("malformed OTLP response body")
 }
 
+///|
+fn partial_success_message_suffix(message : String) -> String {
+  if message == "" {
+    ""
+  } else {
+    " " + message
+  }
+}
+
 // Read a protobuf varint. Returns `None` when the body ends in the middle of a
 // varint or the varint is longer than 64 bits.
 
@@ -182,8 +191,8 @@ pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
     @sdk.ExportFailure(
       "partial success: rejected " +
       rejected.to_string() +
-      " span(s) " +
-      error_message,
+      " span(s)" +
+      partial_success_message_suffix(error_message),
     )
   } else {
     @sdk.ExportSuccess

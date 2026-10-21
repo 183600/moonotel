@@ -911,8 +911,8 @@ pub fn decode_export_response_json(body : Bytes) -> @sdk.ExportResult {
     @sdk.ExportFailure(
       "partial success: rejected " +
       rejected.to_string() +
-      " span(s) " +
-      message,
+      " span(s)" +
+      partial_success_message_suffix(message),
     )
   } else {
     @sdk.ExportSuccess
