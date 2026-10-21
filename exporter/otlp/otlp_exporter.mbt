@@ -382,18 +382,33 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
 // working instead of silently POSTing to `.../v1/traces/v1/traces`.
 
 ///|
+fn path_and_suffix(endpoint : String) -> (String, String) {
+  let mut cut = endpoint.length()
+  match endpoint.find("?") {
+    Some(index) => cut = index
+    None => ()
+  }
+  match endpoint.find("#") {
+    Some(index) => if index < cut { cut = index }
+    None => ()
+  }
+  (endpoint[:cut].to_owned(), endpoint[cut:].to_owned())
+}
+
+///|
 pub fn OtlpHttpConfig::traces_url(self : OtlpHttpConfig) -> String {
   match self.traces_endpoint {
     Some(full_url) => full_url
-    None =>
-      if self.endpoint.has_suffix("/v1/traces") ||
-        self.endpoint.has_suffix("/v1/traces/") {
+    None => {
+      let (path, suffix) = path_and_suffix(self.endpoint)
+      if path.has_suffix("/v1/traces") || path.has_suffix("/v1/traces/") {
         self.endpoint
-      } else if self.endpoint.has_suffix("/") {
-        self.endpoint + "v1/traces"
+      } else if path.has_suffix("/") {
+        path[:path.length() - 1].to_owned() + "/v1/traces" + suffix
       } else {
-        self.endpoint + "/v1/traces"
+        path + "/v1/traces" + suffix
       }
+    }
   }
 }
 
