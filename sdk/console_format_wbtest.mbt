@@ -4,7 +4,7 @@
 // demos without changing the summary-line prefix.
 
 ///|
-test "probe console format includes attributes and events" {
+test "console format includes attributes and events" {
   let attributes : Map[String, AttributeValue] = Map([])
   attributes.set("http.method", StringValue("GET"))
   attributes.set("http.status_code", IntValue(200L))
@@ -58,7 +58,7 @@ test "probe console format includes attributes and events" {
 }
 
 ///|
-test "probe console format omits empty detail blocks" {
+test "console format omits empty detail blocks" {
   let data : SpanData = {
     name: "internal",
     span_context: @api.span_context(

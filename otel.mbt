@@ -1,4 +1,4 @@
-// `yourname/otel` is the main entry package. It re-exports the API, SDK,
+// `183600/moonotel` is the main entry package. It re-exports the API, SDK,
 // propagation and OTLP exporter surface and offers a one-call initializer.
 
 ///|

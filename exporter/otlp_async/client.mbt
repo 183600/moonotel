@@ -296,8 +296,22 @@ fn retry_after_millis(value : String) -> Int32? {
 // decoded with the matching encoding. Network errors and retryable statuses
 // (429, 502, 503, 504) are retried up to `config.max_retries` times. The delay
 // before a retry is taken from the response's `Retry-After` header when it
-// holds a number of seconds or an HTTP date, and a short linear backoff is
-// used otherwise.
+// holds a number of seconds or an HTTP date, and a short jittered linear
+// backoff is used otherwise.
+
+// Delay before retry `attempt` (1-based) when the server did not send a
+// `Retry-After` header. The deterministic +/-20% jitter avoids a synchronized
+// retry wave from many exporters while keeping tests reproducible.
+fn retry_backoff_millis(attempt : Int32) -> Int32 {
+  let base = 100 * attempt
+  let jitter_percent = (attempt * 37) % 41 - 20
+  let delay = base + base * jitter_percent / 100
+  if delay < 1 {
+    1
+  } else {
+    delay
+  }
+}
 
 ///|
 async fn post_trace_request_with_headers(
@@ -319,7 +333,7 @@ async fn post_trace_request_with_headers(
     if attempt > 0 {
       let delay = match retry_after {
         Some(value) => value
-        None => 100 * attempt
+        None => retry_backoff_millis(attempt)
       }
       if delay > 0 {
         @async.sleep(delay)

@@ -4,7 +4,7 @@
 
 ## 0. 项目定义（你要发布到 mooncakes 的“一个具体项目”）
 
-**项目名（建议）：** `yourname/otel`（模块名），对外主入口包：`yourname/otel`  
+**项目名（建议）：** `183600/moonotel`（模块名），对外主入口包：`183600/moonotel`  
 **首发范围（MVP）：** Tracing（不做 Metrics/Logs 的完整 SDK，但预留接口）  
 **导出协议：** **OTLP/HTTP + protobuf**（先不做 gRPC，原因：规范允许 SDK 只支持一种传输时优先 `http/protobuf`）   
 **传播协议：** **W3C Trace Context**（`traceparent` / `tracestate`）   
@@ -21,13 +21,13 @@ MoonBit 包发布结构上：一个模块 `moon.mod.json`，内部多个 package
 
 ### A. API 层（稳定、轻依赖）
 对标 OTel Trace API：`TracerProvider / Tracer / Span / SpanContext / Context`  
-- `yourname/otel/api`：只放接口与基本数据结构（**不做网络、不做 async**）
-- `yourname/otel/context`：当前上下文管理（在 MoonBit 里要特别认真做）
+- `183600/moonotel/api`：只放接口与基本数据结构（**不做网络、不做 async**）
+- `183600/moonotel/context`：当前上下文管理（在 MoonBit 里要特别认真做）
 
 OTel 规范里对 `SpanContext` 的要求：TraceId 16 bytes、SpanId 8 bytes、支持 hex/binary 取值、`IsValid` 等。
 
 ### B. SDK 层（可配置：采样、处理器、ID 生成）
-- `yourname/otel/sdk`
+- `183600/moonotel/sdk`
   - `Sampler`（AlwaysOn/AlwaysOff/ParentBased+Ratio）
   - `IdGenerator`（随机 TraceId/SpanId）
   - `SpanProcessor`（Simple + Batch）
@@ -36,7 +36,7 @@ OTel 规范里对 `SpanContext` 的要求：TraceId 16 bytes、SpanId 8 bytes、
 采样与 SpanProcessor 的关系、`IsRecording` / `Sampled` 的语义、内置 sampler 行为等，都在 SDK 规范里定义得很清楚。
 
 ### C. Exporter 层（OTLP/HTTP + protobuf）
-- `yourname/otel/exporter/otlp_http`
+- `183600/moonotel/exporter/otlp_http`
   - OTLP 配置（endpoint、headers、compression、timeout）
   - OTLP TraceService 请求：HTTP POST 到 `/v1/traces`，body 是 `ExportTraceServiceRequest` protobuf 
 
@@ -45,8 +45,8 @@ OTLP proto 文件来源用官方仓库 `open-telemetry/opentelemetry-proto`（�
 MoonBit 侧 protobuf 编码就用 `moonbitlang/protobuf`：社区实践里已经用 `@protobuf.Write::write(...)` 把消息写到 buffer 再输出。
 
 ### D. Instrumentation 层（让别人“一行启用”）
-- `yourname/otel/instrumentation/async_http_client`
-- `yourname/otel/instrumentation/async_http_server`
+- `183600/moonotel/instrumentation/async_http_client`
+- `183600/moonotel/instrumentation/async_http_server`
 
 `moonbitlang/async/http` 已经有 HTTP client/server；`@http.run_server` 会为每个连接开 task 并并发处理。  
 另外 async 库在 2025-12 的更新里明确提到 HTTP client/server API 的增强（代理、server callback 改进等），你做埋点能紧跟这些能力。
@@ -313,7 +313,7 @@ MoonBit async 文章示例里直接 `@http.get(url)`。
 做一个单入口初始化（最重要）：
 
 ```moonbit
-// yourname/otel/otel.mbt
+// 183600/moonotel/otel.mbt
 pub fn init(
   service_name : String,
   endpoint? : String,
@@ -388,7 +388,7 @@ pub fn init(
 
 如果你按这个方案做，v0.1.0 的“杀手级体验”应该是：
 
-- `@otel.init(...)` 一行启用  
+- `@moonotel.init(...)` 一行启用  
 - `@otel_http.run_server_with_otel(...)` / `@otel_http.get(...)` 直接带 trace  
 - 默认 OTLP/HTTP 发到 Collector（`/v1/traces`），在 Jaeger/Tempo 里能看到完整链路   
 

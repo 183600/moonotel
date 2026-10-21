@@ -1,9 +1,9 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "yourname/otel/instrumentation/http_header_capture"
+package "183600/moonotel/instrumentation/http_header_capture"
 
 import {
+  "183600/moonotel/sdk",
   "moonbitlang/async/http",
-  "yourname/otel/sdk",
 }
 
 // Values

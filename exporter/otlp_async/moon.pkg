@@ -4,15 +4,15 @@ import {
   "moonbitlang/async/http",
   "moonbitlang/async/io",
   "moonbitlang/core/env",
-  "yourname/otel/exporter/otlp",
-  "yourname/otel/sdk",
+  "183600/moonotel/exporter/otlp",
+  "183600/moonotel/sdk",
 }
 
 import {
   "moonbitlang/async/socket",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",
-  "yourname/otel/api",
+  "183600/moonotel/api",
 } for "test"
 
 pkgtype(kind: "library")

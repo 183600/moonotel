@@ -1,6 +1,6 @@
 import {
-  "yourname/otel/api",
-  "yourname/otel/context",
+  "183600/moonotel/api",
+  "183600/moonotel/context",
   "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",

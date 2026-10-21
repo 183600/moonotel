@@ -2,9 +2,9 @@
 
 ///|
 test "setup_with_batch_config_exports_on_flush" {
-  @otel.shutdown_global_tracer_provider()
+  @moonotel.shutdown_global_tracer_provider()
   let capture = capturing_transport()
-  let provider = @otel.setup(
+  let provider = @moonotel.setup(
     service_name="batch-config-facade",
     endpoint="http://collector:4318",
     transport=capture.send(),
@@ -14,7 +14,7 @@ test "setup_with_batch_config_exports_on_flush" {
       flush_interval_millis=0,
     ),
   )
-  let tracer = @otel.global_tracer("batch-config-scope")
+  let tracer = @moonotel.global_tracer("batch-config-scope")
   let span = tracer.start_root_span("queued")
   span.end()
   // The custom batch size keeps the span queued until an explicit flush.
@@ -22,14 +22,14 @@ test "setup_with_batch_config_exports_on_flush" {
   provider.force_flush()
   assert_eq(capture.urls.length(), 1)
   assert_eq(capture.urls[0], "http://collector:4318/v1/traces")
-  @otel.shutdown_global_tracer_provider()
+  @moonotel.shutdown_global_tracer_provider()
 }
 
 ///|
 test "explicit_batch_config_overrides_use_batch_false" {
-  @otel.shutdown_global_tracer_provider()
+  @moonotel.shutdown_global_tracer_provider()
   let capture = capturing_transport()
-  let provider = @otel.setup(
+  let provider = @moonotel.setup(
     service_name="batch-config-facade",
     endpoint="http://collector:4318",
     transport=capture.send(),
@@ -39,7 +39,7 @@ test "explicit_batch_config_overrides_use_batch_false" {
       flush_interval_millis=0,
     ),
   )
-  let tracer = @otel.global_tracer("batch-config-scope")
+  let tracer = @moonotel.global_tracer("batch-config-scope")
   let span = tracer.start_root_span("still-batched")
   span.end()
   // A simple processor would have exported immediately; the batch processor
@@ -47,5 +47,5 @@ test "explicit_batch_config_overrides_use_batch_false" {
   assert_eq(capture.urls.length(), 0)
   provider.shutdown()
   assert_eq(capture.urls.length(), 1)
-  @otel.shutdown_global_tracer_provider()
+  @moonotel.shutdown_global_tracer_provider()
 }

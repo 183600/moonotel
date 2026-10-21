@@ -1,10 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "yourname/otel/propagation"
+package "183600/moonotel/propagation"
 
 import {
+  "183600/moonotel/api",
+  "183600/moonotel/context",
   "moonbitlang/core/debug",
-  "yourname/otel/api",
-  "yourname/otel/context",
 }
 
 // Values

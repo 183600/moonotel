@@ -370,13 +370,21 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
 // Full URL of the trace export endpoint. The signal-specific
 // `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` value is used verbatim; otherwise
 // `/v1/traces` is appended to the base endpoint.
+//
+// Per the OTLP specification `OTEL_EXPORTER_OTLP_ENDPOINT` is a base URL, not
+// a signal URL. Users still sometimes pass the full `.../v1/traces` URL; in
+// that case we do not append the path a second time. This keeps both forms
+// working instead of silently POSTing to `.../v1/traces/v1/traces`.
 
 ///|
 pub fn OtlpHttpConfig::traces_url(self : OtlpHttpConfig) -> String {
   match self.traces_endpoint {
     Some(full_url) => full_url
     None =>
-      if self.endpoint.has_suffix("/") {
+      if self.endpoint.has_suffix("/v1/traces") ||
+        self.endpoint.has_suffix("/v1/traces/") {
+        self.endpoint
+      } else if self.endpoint.has_suffix("/") {
         self.endpoint + "v1/traces"
       } else {
         self.endpoint + "/v1/traces"

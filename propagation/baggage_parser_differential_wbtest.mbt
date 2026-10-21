@@ -14,7 +14,7 @@ fn probe_generate(
 }
 
 ///|
-test "probe baggage fast path matches general parser" {
+test "baggage fast path matches general parser" {
   let alphabet = [
     "a", "b", "A", "0", "9", "%", "2", "f", "g", ",", "=", ";", " ", "\t",
     "\\", "\"", "\u{7f}", "\u{80}",

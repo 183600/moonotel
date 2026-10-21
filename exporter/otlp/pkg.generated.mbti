@@ -1,8 +1,8 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "yourname/otel/exporter/otlp"
+package "183600/moonotel/exporter/otlp"
 
 import {
-  "yourname/otel/sdk",
+  "183600/moonotel/sdk",
 }
 
 // Values

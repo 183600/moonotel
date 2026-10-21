@@ -1,7 +1,7 @@
 import {
   "moonbitlang/async/http",
   "moonbitlang/core/env",
-  "yourname/otel/sdk",
+  "183600/moonotel/sdk",
 }
 
 pkgtype(kind: "library")

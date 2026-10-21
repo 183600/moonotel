@@ -1,4 +1,4 @@
-# yourname/otel
+# 183600/moonotel
 
 An OpenTelemetry **Tracing MVP for MoonBit**:
 
@@ -12,26 +12,28 @@ An OpenTelemetry **Tracing MVP for MoonBit**:
 - **`moonbitlang/async/http` instrumentation** – one-call server wrapper and
   traced client helpers that create spans and propagate context
   automatically.
-- **`yourname/otel` entry package** – re-exports the stable surface and
+- **`183600/moonotel` entry package** – re-exports the stable surface and
   offers a one-call `setup`.
 
 The library follows the OpenTelemetry specification where it matters
-(sampling semantics, W3C propagation, OTLP wire format) while staying small
-enough to read in one sitting.
+(sampling semantics, W3C propagation, OTLP wire format) and keeps the
+implementation deliberately compact. The repository and MoonBit module are
+both `183600/moonotel`; the entry package is the module root and is imported
+as `@moonotel`.
 
 ## Packages
 
 | Package | Purpose | Targets |
 | --- | --- | --- |
-| `yourname/otel/api` | Trace API data types (`SpanContext`, `SpanKind`, `StatusCode`) | all |
-| `yourname/otel/context` | Immutable `Context` and current-context storage | all |
-| `yourname/otel/propagation` | W3C Trace Context propagator | all |
-| `yourname/otel/sdk` | Tracer provider, spans, samplers, processors, semconv keys | all |
-| `yourname/otel/exporter/otlp` | OTLP/HTTP encoder/exporter with an injectable transport | all |
-| `yourname/otel/exporter/otlp_async` | OTLP/HTTP exporter over the real async HTTP client | native |
-| `yourname/otel/instrumentation/async_http_client` | Traced `get`/`post`/`put`/`delete` for `moonbitlang/async/http` | native |
-| `yourname/otel/instrumentation/async_http_server` | `run_server` wrapper that traces every request | native |
-| `yourname/otel` | Re-exports, `setup`, global provider helpers | all |
+| `183600/moonotel/api` | Trace API data types (`SpanContext`, `SpanKind`, `StatusCode`) | all |
+| `183600/moonotel/context` | Immutable `Context` and current-context storage | all |
+| `183600/moonotel/propagation` | W3C Trace Context propagator | all |
+| `183600/moonotel/sdk` | Tracer provider, spans, samplers, processors, semconv keys | all |
+| `183600/moonotel/exporter/otlp` | OTLP/HTTP encoder/exporter with an injectable transport | all |
+| `183600/moonotel/exporter/otlp_async` | OTLP/HTTP exporter over the real async HTTP client | native |
+| `183600/moonotel/instrumentation/async_http_client` | Traced `get`/`post`/`put`/`delete` for `moonbitlang/async/http` | native |
+| `183600/moonotel/instrumentation/async_http_server` | `run_server` wrapper that traces every request | native |
+| `183600/moonotel` | Re-exports, `setup`, global provider helpers | all |
 
 ## Getting started (SDK only)
 
@@ -52,11 +54,19 @@ and `parent_based(root)` (the OTel default). Processors:
 `SimpleSpanProcessor` (export on end) and `BatchSpanProcessor` (bounded
 queue, batched export).
 
+`BatchSpanProcessor` never blocks the thread that ends a span. When the queue
+is full it overwrites the oldest buffered span, increments `dropped_spans()`,
+and continues; export failures are counted separately in
+`export_failures()`. The queue size, batch size, and flush interval are
+configurable through `BatchConfig` / `OTEL_BSP_*`. Timed flushes are driven by
+`tick()` (or by span completion), so a quiet application should call `tick()`
+from its own loop or use the async runtime helper.
+
 The process-wide provider can be installed once and used from anywhere:
 
 ```moonbit
-@otel.setup(service_name="checkout")           // installs a global provider
-let tracer = @sdk.global_tracer("checkout")    // or @otel.global_tracer(...)
+@moonotel.setup(service_name="checkout")           // installs a global provider
+let tracer = @sdk.global_tracer("checkout")    // or @moonotel.global_tracer(...)
 ```
 
 ## HTTP instrumentation (`moonbitlang/async/http`)
@@ -114,15 +124,38 @@ let result = @otlp_async.export_spans(config, finished_spans)
 
 Supported environment variables:
 
-- `OTEL_EXPORTER_OTLP_ENDPOINT` (default `http://localhost:4318`)
-- `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` (used verbatim)
+- `OTEL_EXPORTER_OTLP_ENDPOINT` (default `http://localhost:4318`) is a **base
+  URL**; `/v1/traces` is appended. If the value already ends in `/v1/traces`
+  (or `/v1/traces/`), it is used as-is instead of being doubled.
+- `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` is used **verbatim** and takes
+  precedence over the generic endpoint; do not append `/v1/traces` yourself.
 - `OTEL_EXPORTER_OTLP_HEADERS` (`key=value,key2=value2`)
-- `OTEL_EXPORTER_OTLP_COMPRESSION` (`none`; other values are rejected)
+- `OTEL_EXPORTER_OTLP_COMPRESSION` (`none` or `gzip`; any other value is
+  rejected with a clear error)
 - `OTEL_EXPORTER_OTLP_TIMEOUT` (milliseconds)
 - `OTEL_SERVICE_NAME`
 
-HTTP 200 – including `partial_success` – is a success and is never retried;
-429/502/503/504 are retried up to `max_retries` with linear backoff.
+HTTP 200 – including `partial_success` – is a success and is never retried.
+The retryable statuses are exactly the OTLP transient set: 429/502/503/504.
+Transport failures and those statuses are retried up to `max_retries`; a
+`Retry-After` header (delta-seconds or HTTP-date, capped at 60s) takes
+precedence over the jittered linear backoff. Other 4xx/5xx responses,
+including 500, are terminal and returned as an export failure.
+
+## Testing and CI
+
+```sh
+moon update
+moon check
+moon test
+moon check --target native
+moon test --target native
+```
+
+The async instrumentation/exporter packages are native-only; default-target
+`moon check`/`moon test` skip their bodies. The push/PR workflow
+`.github/workflows/ci.yml` runs both the default and native checks so a green
+CI means the native code was actually compiled and tested.
 
 ## W3C Trace Context
 
@@ -144,11 +177,10 @@ current context automatically.
 
 ## Development
 
-```sh
-moon check
-moon test                 # default target
-moon test --target native # async instrumentation and exporter tests
-```
+The repository also contains a `PLAN.md` with the original design notes. The
+test suite lives next to each package; add a regression test when changing
+behavior, and run both default and native checks before committing.
 
-Async packages and their tests are native-only; `moon check`/`moon test` on
-other targets skip them.
+## License
+
+Apache-2.0

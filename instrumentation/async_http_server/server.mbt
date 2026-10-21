@@ -12,7 +12,7 @@
 // concurrently.
 
 ///|
-const INSTRUMENTATION_SCOPE : String = "yourname/otel/instrumentation/async_http_server"
+const INSTRUMENTATION_SCOPE : String = "183600/moonotel/instrumentation/async_http_server"
 
 ///|
 fn map_capacity_for_entries(entries : Int) -> Int {

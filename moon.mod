@@ -1,12 +1,14 @@
-name = "yourname/otel"
+name = "183600/moonotel"
 
 version = "0.1.0"
 
 readme = "README.md"
 
-repository = "https://github.com/yourname/otel"
+repository = "https://github.com/183600/moonotel"
 
 license = "Apache-2.0"
+
+description = "OpenTelemetry tracing SDK and OTLP/HTTP exporter for MoonBit"
 
 keywords = [
   "opentelemetry",

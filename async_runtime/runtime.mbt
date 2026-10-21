@@ -1,4 +1,4 @@
-// Native async runtime helpers for `yourname/otel`: a background flush loop
+// Native async runtime helpers for `183600/moonotel`: a background flush loop
 // for batch span processors, context-aware task spawning and a one-call
 // `setup` that exports spans over OTLP/HTTP from a background task.
 //

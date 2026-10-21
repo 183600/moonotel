@@ -2,11 +2,11 @@ import {
   "moonbitlang/async/http",
   "moonbitlang/async/io",
   "moonbitlang/async/socket",
-  "yourname/otel/api",
-  "yourname/otel/context",
-  "yourname/otel/propagation",
-  "yourname/otel/sdk",
-  "yourname/otel/instrumentation/http_header_capture",
+  "183600/moonotel/api",
+  "183600/moonotel/context",
+  "183600/moonotel/propagation",
+  "183600/moonotel/sdk",
+  "183600/moonotel/instrumentation/http_header_capture",
 }
 
 import {

@@ -33,7 +33,7 @@ fn probe_seen(seen : Array[String], key : String) -> Bool {
 }
 
 ///|
-test "probe context baggage semantics" {
+test "context baggage semantics" {
   let keys : Array[String] = ["a", "b", "c", "d"]
   let values : Array[String] = ["", "1", "2", " x"]
   let mut seed = 123456789

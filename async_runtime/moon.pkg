@@ -2,24 +2,24 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/aqueue",
   "moonbitlang/async/cond_var",
-  "yourname/otel/context",
-  "yourname/otel/exporter/otlp",
-  "yourname/otel/exporter/otlp_async",
-  "yourname/otel/sdk",
+  "183600/moonotel/context",
+  "183600/moonotel/exporter/otlp",
+  "183600/moonotel/exporter/otlp_async",
+  "183600/moonotel/sdk",
 }
 
 import {
   "moonbitlang/async/http",
   "moonbitlang/async/socket",
   "moonbitlang/core/env",
-  "yourname/otel/api",
+  "183600/moonotel/api",
 } for "test"
 
 import {
   "moonbitlang/async/cond_var",
   "moonbitlang/async/http",
   "moonbitlang/async/socket",
-  "yourname/otel/api",
+  "183600/moonotel/api",
 } for "wbtest"
 
 pkgtype(kind: "library")

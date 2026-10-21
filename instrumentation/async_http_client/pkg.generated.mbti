@@ -1,11 +1,11 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "yourname/otel/instrumentation/async_http_client"
+package "183600/moonotel/instrumentation/async_http_client"
 
 import {
+  "183600/moonotel/context",
+  "183600/moonotel/sdk",
   "moonbitlang/async/http",
   "moonbitlang/async/io",
-  "yourname/otel/context",
-  "yourname/otel/sdk",
 }
 
 // Values

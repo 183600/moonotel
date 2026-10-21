@@ -7,11 +7,11 @@
 // body has been fully read.
 //
 // When no TracerProvider has been installed (see
-// `@sdk.set_global_tracer_provider` / `yourname/otel` setup) or no tracer is
+// `@sdk.set_global_tracer_provider` / `183600/moonotel` setup) or no tracer is
 // passed explicitly, requests are performed untraced.
 
 ///|
-const INSTRUMENTATION_SCOPE : String = "yourname/otel/instrumentation/async_http_client"
+const INSTRUMENTATION_SCOPE : String = "183600/moonotel/instrumentation/async_http_client"
 
 // Constant semantic-convention attribute values.
 

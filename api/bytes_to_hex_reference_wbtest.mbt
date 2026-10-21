@@ -17,7 +17,7 @@ fn probe_hex_ref(bytes : Array[Int32]) -> String {
 }
 
 ///|
-test "probe bytes_to_hex fast paths" {
+test "bytes_to_hex fast paths" {
   let lengths = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 17, 31, 32]
   let values = [-65537, -1000, -256, -255, -17, -16, -1, 0, 1, 15, 16, 127, 255,
     256, 257, 511, 512, 1000, 65535, 65536]

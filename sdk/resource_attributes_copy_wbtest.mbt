@@ -1,5 +1,5 @@
 ///|
-test "probe resource attributes copy on write" {
+test "resource attributes copy on write" {
   let shared : Map[String, AttributeValue] = Map([])
   shared.set("a", StringValue("1"))
   shared.set("b", IntValue(2L))

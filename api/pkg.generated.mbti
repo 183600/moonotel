@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "yourname/otel/api"
+package "183600/moonotel/api"
 
 import {
   "moonbitlang/core/debug",

@@ -1,9 +1,9 @@
 import {
-  "yourname/otel/api",
-  "yourname/otel/context",
-  "yourname/otel/propagation",
-  "yourname/otel/sdk",
-  "yourname/otel/exporter/otlp",
+  "183600/moonotel/api",
+  "183600/moonotel/context",
+  "183600/moonotel/propagation",
+  "183600/moonotel/sdk",
+  "183600/moonotel/exporter/otlp",
 }
 
 import {

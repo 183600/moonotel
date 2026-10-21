@@ -1,10 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "yourname/otel/exporter/otlp_async"
+package "183600/moonotel/exporter/otlp_async"
 
 import {
+  "183600/moonotel/exporter/otlp",
+  "183600/moonotel/sdk",
   "moonbitlang/async/http",
-  "yourname/otel/exporter/otlp",
-  "yourname/otel/sdk",
 }
 
 // Values

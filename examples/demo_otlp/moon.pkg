@@ -2,10 +2,10 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/http",
   "moonbitlang/async/socket",
-  "yourname/otel/async_runtime",
-  "yourname/otel/instrumentation/async_http_client" @client,
-  "yourname/otel/instrumentation/async_http_server" @server,
-  "yourname/otel/sdk",
+  "183600/moonotel/async_runtime",
+  "183600/moonotel/instrumentation/async_http_client" @client,
+  "183600/moonotel/instrumentation/async_http_server" @server,
+  "183600/moonotel/sdk",
 }
 
 supported_targets = "+native"

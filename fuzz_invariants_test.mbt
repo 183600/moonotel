@@ -241,7 +241,7 @@ test "fuzz_traceparent_round_trips" {
       continue
     }
     let flags = rng.below(4)
-    let sc = @otel.span_context(trace_id, span_id, flags)
+    let sc = @moonotel.span_context(trace_id, span_id, flags)
     let header = @propagation.format_traceparent(sc)
     let parsed = @propagation.parse_traceparent(header).unwrap()
     assert_eq(parsed.trace_id_hex(), sc.trace_id_hex())

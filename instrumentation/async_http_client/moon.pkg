@@ -1,19 +1,19 @@
 import {
   "moonbitlang/async/http",
   "moonbitlang/async/io",
-  "yourname/otel/api",
-  "yourname/otel/context",
-  "yourname/otel/propagation",
-  "yourname/otel/sdk",
-  "yourname/otel/instrumentation/http_header_capture",
+  "183600/moonotel/api",
+  "183600/moonotel/context",
+  "183600/moonotel/propagation",
+  "183600/moonotel/sdk",
+  "183600/moonotel/instrumentation/http_header_capture",
 }
 
 import {
   "moonbitlang/async",
   "moonbitlang/async/socket",
   "moonbitlang/core/env",
-  "yourname/otel/api",
-  "yourname/otel/instrumentation/async_http_server" @server,
+  "183600/moonotel/api",
+  "183600/moonotel/instrumentation/async_http_server" @server,
 } for "test"
 
 pkgtype(kind: "library")
