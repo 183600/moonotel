@@ -101,7 +101,14 @@ pub fn Tracer::start_span(
     attributes: sampler_attributes,
     links: sampler_links,
   })
-  let flags = if decision.is_sampled { @api.TRACE_FLAGS_SAMPLED } else { 0 }
+  // The sampled flag may only be set together with a recording decision
+  // (RECORD_AND_SAMPLE); a DROP decision must never set it, even when a
+  // misbehaving sampler asks for sampling.
+  let flags = if decision.is_sampled && decision.is_recorded {
+    @api.TRACE_FLAGS_SAMPLED
+  } else {
+    0
+  }
   let span_context = @api.span_context(trace_id, span_id, flags, tracestate~)
   // Non-recording spans (DROP) keep no links, matching the SDK spec;
   // `create_span` ignores links for non-recording spans. Links whose
