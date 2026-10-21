@@ -6,6 +6,8 @@ import {
 }
 
 // Values
+pub const TRACE_FLAGS_RANDOM : Int32 = 2
+
 pub const TRACE_FLAGS_SAMPLED : Int32 = 1
 
 pub fn byte_to_hex_char(Int32) -> String

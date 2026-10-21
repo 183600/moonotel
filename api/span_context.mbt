@@ -354,6 +354,12 @@ pub fn byte_to_hex_char(val : Int32) -> String {
 ///|
 pub const TRACE_FLAGS_SAMPLED : Int32 = 1
 
+// Trace flag bit indicating that the trace ID was generated randomly
+// (W3C Trace Context Level 2 random-trace-id flag).
+
+///|
+pub const TRACE_FLAGS_RANDOM : Int32 = 2
+
 // Get the raw trace flags
 
 ///|

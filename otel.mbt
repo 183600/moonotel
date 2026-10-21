@@ -12,6 +12,7 @@ pub using @api {
   bytes_to_hex,
   bytes_from_hex,
   TRACE_FLAGS_SAMPLED,
+  TRACE_FLAGS_RANDOM,
 }
 
 ///|

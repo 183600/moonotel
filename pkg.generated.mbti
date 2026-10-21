@@ -28,6 +28,8 @@ pub const TELEMETRY_SDK_VERSION : String = "telemetry.sdk.version"
 
 pub const TRACESTATE_MAX_MEMBERS : Int32 = 32
 
+pub const TRACE_FLAGS_RANDOM : Int32 = 2
+
 pub const TRACE_FLAGS_SAMPLED : Int32 = 1
 
 pub fn attach(@context.Context) -> @context.Context

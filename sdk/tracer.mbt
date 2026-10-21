@@ -103,12 +103,18 @@ pub fn Tracer::start_span(
   })
   // The sampled flag may only be set together with a recording decision
   // (RECORD_AND_SAMPLE); a DROP decision must never set it, even when a
-  // misbehaving sampler asks for sampling.
-  let flags = if decision.is_sampled && decision.is_recorded {
-    @api.TRACE_FLAGS_SAMPLED
-  } else {
-    0
+  // misbehaving sampler asks for sampling. The W3C random-trace-id flag is a
+  // property of the trace ID, so it is preserved when continuing a parent.
+  let parent_random_flag = match valid_parent {
+    Some(ctx) => ctx.trace_flags() & @api.TRACE_FLAGS_RANDOM
+    None => 0
   }
+  let flags = parent_random_flag |
+    (if decision.is_sampled && decision.is_recorded {
+      @api.TRACE_FLAGS_SAMPLED
+    } else {
+      0
+    })
   let span_context = @api.span_context(trace_id, span_id, flags, tracestate~)
   // Non-recording spans (DROP) keep no links, matching the SDK spec;
   // `create_span` ignores links for non-recording spans. Links whose
