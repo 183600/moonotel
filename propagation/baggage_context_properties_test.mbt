@@ -12,7 +12,8 @@ test "extract_baggage_context_preserves_properties" {
   match context.baggage_entry("userId") {
     Some(entry) => {
       assert_eq(entry.value, "alice")
-      assert_eq(entry.properties, [("priority", "high")])
+      // The key-only `;flag` property is valid (W3C `property =/ key OWS`).
+      assert_eq(entry.properties, [("priority", "high"), ("flag", "")])
     }
     None => fail("expected userId baggage")
   }

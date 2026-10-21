@@ -458,8 +458,10 @@ pub fn percent_encoded_length(value : String) -> Int32 {
 
 // Parse the `;`-separated properties of a member spanning `[semi, item_end)`
 // (`semi` points at the first `;`, or is -1 when the member has none).
-// Malformed properties and duplicates of an already accepted property key are
-// skipped; the property values are percent-decoded like member values.
+// A property is a `key=value` pair or a key-only flag (W3C
+// `property =/ key OWS`). Malformed properties and duplicates of an already
+// accepted property key are skipped; the property values are percent-decoded
+// like member values.
 
 ///|
 fn parse_baggage_properties(
@@ -527,6 +529,22 @@ fn parse_baggage_properties(
           if !duplicate {
             properties.push((key, decoded))
           }
+        }
+      }
+    } else {
+      // A key-only property is a valid flag (W3C `property =/ key OWS`).
+      let key_view = view.view(start_offset=item_start, end_offset=property_end)
+      if is_valid_baggage_key(key_view) {
+        let key = key_view.to_owned()
+        let mut duplicate = false
+        for existing in properties {
+          if existing.0 == key {
+            duplicate = true
+            break
+          }
+        }
+        if !duplicate {
+          properties.push((key, ""))
         }
       }
     }
@@ -819,11 +837,16 @@ fn parse_baggage_general(value : String) -> Array[(String, String)] {
 }
 
 // Number of bytes the `;key=value` form of one property occupies in a
-// normalized `baggage` header.
+// normalized `baggage` header. A key-only property (an empty value) is
+// written as `;key` (W3C `property =/ key OWS`).
 
 ///|
 fn baggage_property_size(key : String, value : String) -> Int32 {
-  1 + key.length() + 1 + percent_encoded_length(value)
+  if value.length() == 0 {
+    1 + key.length()
+  } else {
+    1 + key.length() + 1 + percent_encoded_length(value)
+  }
 }
 
 // Write a validated baggage key (ASCII token characters, one byte per code
@@ -965,9 +988,12 @@ pub fn format_baggage_entries(entries : Array[BaggageEntry]) -> String {
       out.unsafe_set(pos * 2, b';')
       pos = pos + 1
       pos = write_baggage_key_to(out, pos, property.0)
-      out.unsafe_set(pos * 2, b'=')
-      pos = pos + 1
-      pos = write_percent_encode_to(out, pos, property.1)
+      // A key-only property is emitted without `=` (W3C `property =/ key OWS`).
+      if property.1.length() > 0 {
+        out.unsafe_set(pos * 2, b'=')
+        pos = pos + 1
+        pos = write_percent_encode_to(out, pos, property.1)
+      }
     }
     written = written + 1
   }

@@ -32,7 +32,23 @@ test "parse_baggage_entries_skips_malformed_properties" {
     "a=1;flag;bad key=2;p=va\"lue;ok=3",
   )
   assert_eq(entries.length(), 1)
-  assert_eq(entries[0].properties, [("ok", "3")])
+  // `;flag` is a valid key-only property (W3C `property =/ key OWS`); the
+  // properties with an invalid key or value are still skipped.
+  assert_eq(entries[0].properties, [("flag", ""), ("ok", "3")])
+}
+
+///|
+test "format_baggage_entries_emits_key_only_properties" {
+  let entries : Array[@propagation.BaggageEntry] = [
+    @propagation.BaggageEntry::new("k", "v", properties=[
+      ("flag", ""),
+      ("p", "1"),
+    ]),
+  ]
+  assert_eq(@propagation.format_baggage_entries(entries), "k=v;flag;p=1")
+  let reparsed = @propagation.parse_baggage_entries("k=v;flag;p=1")
+  assert_eq(reparsed.length(), 1)
+  assert_eq(reparsed[0].properties, [("flag", ""), ("p", "1")])
 }
 
 ///|
