@@ -45,10 +45,10 @@ fn is_valid_tracestate_member(key : StringView, value : StringView) -> Bool {
 
 // Parse a `tracestate` header value. Empty and whitespace-only list members
 // are allowed and carry no member; a duplicated key keeps its first member.
-// Returns None when the value is empty, has more than 32 list-members,
-// contains a malformed member, or has an invalid value. Optional whitespace
-// around members is ignored, and `key = value` is accepted; blanks directly
-// after `=` belong to the value.
+// Returns None when the value is empty or holds no list-member, has more than
+// 32 list-members, contains a malformed member, or has an invalid value.
+// Optional whitespace around members is ignored, and `key = value` is
+// accepted; blanks directly after `=` belong to the value.
 
 ///|
 pub fn Tracestate::parse(value : String) -> Tracestate? {
@@ -108,6 +108,12 @@ pub fn Tracestate::parse(value : String) -> Tracestate? {
       break
     }
     start = end + 1
+  }
+  if members.length() == 0 {
+    // A header that holds no list-member at all carries no state. An empty
+    // `tracestate` is not a valid header value; callers can use
+    // `Tracestate::empty()` when an empty list is intended.
+    return None
   }
   Some({ members, })
 }

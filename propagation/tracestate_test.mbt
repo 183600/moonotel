@@ -171,6 +171,9 @@ test "parse_tracestate_rejects_headers_without_members" {
   assert_eq(@propagation.parse_tracestate(","), None)
   assert_eq(@propagation.parse_tracestate(", ,"), None)
   assert_eq(@propagation.parse_tracestate("   "), None)
+  assert_true(@propagation.Tracestate::parse(",") is None)
+  assert_true(@propagation.Tracestate::parse(", ,") is None)
+  assert_true(@propagation.Tracestate::parse("   ") is None)
 }
 
 ///|
