@@ -379,11 +379,19 @@ pub fn format_traceparent(sc : @api.SpanContext) -> String {
 }
 
 // Parse a `traceparent` header value into a SpanContext.
+// Leading and trailing optional whitespace (RFC 9110 OWS) is allowed.
 // Returns None when the value is malformed, uses `ff` as version, contains
 // all-zero IDs, or otherwise violates the specification.
 
 ///|
 pub fn parse_traceparent(value : String) -> @api.SpanContext? {
+  // OWS around the header value is not part of the ABNF and is trimmed.
+  let trimmed = trim_ows(value[:])
+  let value = if trimmed.length() == value.length() {
+    value
+  } else {
+    trimmed.to_owned()
+  }
   let len = value.length()
   // The shortest well-formed value is `00-` + 32 + `-` + 16 + `-` + 2 = 55
   // characters, so anything shorter cannot parse.

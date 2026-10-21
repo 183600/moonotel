@@ -16,6 +16,30 @@ test "parse_rejects_non_hex_version" {
 }
 
 ///|
+test "parse_traceparent_trims_ows" {
+  let inner = "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01"
+  for padded in [
+    " " + inner,
+    "\t" + inner,
+    inner + " ",
+    inner + "\t",
+    "\t " + inner + " \t",
+  ] {
+    let parsed = @propagation.parse_traceparent(padded)
+    assert_true(parsed is Some(_))
+    let sc = parsed.unwrap()
+    assert_eq(sc.trace_id_hex(), "4bf92f359d1e75b7618a2d1f3c4e5a6b")
+    assert_eq(sc.span_id_hex(), "00f067aa0ba902b7")
+    assert_true(sc.is_sampled())
+  }
+  // OWS only trims at the edges; internal whitespace stays invalid.
+  assert_true(
+    @propagation.parse_traceparent("00 -4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01")
+    is None,
+  )
+}
+
+///|
 test "parse_rejects_invalid_span_id_hex" {
   let value = "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-zzzzzzzzzzzzzzzz-01"
   assert_true(@propagation.parse_traceparent(value) is None)
