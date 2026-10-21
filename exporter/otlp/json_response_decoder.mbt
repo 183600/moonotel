@@ -65,6 +65,22 @@ fn json_string_range_equals(
   true
 }
 
+// Whether the plain JSON string body in `[start, end)` matches one of the two
+// field names. An empty name means the caller has no name for that position,
+// so it never matches (an empty JSON member name is an unknown field).
+
+///|
+fn json_name_matches(
+  text : String,
+  start : Int32,
+  end : Int32,
+  json_name : String,
+  proto_name : String,
+) -> Bool {
+  (json_name != "" && json_string_range_equals(text, start, end, json_name)) ||
+  (proto_name != "" && json_string_range_equals(text, start, end, proto_name))
+}
+
 // Classify the JSON string at `start` against two fields, each accepted under
 // two names. Returns `(0, after)` for the first field, `(1, after)` for the
 // second and `(-1, after)` for any other value. Plain strings are compared in
@@ -89,15 +105,21 @@ fn json_field_id_at(
   while pos < len {
     let code = text.unsafe_get(pos).to_int()
     if code == 0x22 {
-      let id = if json_string_range_equals(text, content_start, pos, first_json) ||
-        json_string_range_equals(text, content_start, pos, first_proto) {
+      let id = if json_name_matches(
+        text,
+        content_start,
+        pos,
+        first_json,
+        first_proto,
+      ) {
         0
-      } else if json_string_range_equals(
+      } else if json_name_matches(
         text,
         content_start,
         pos,
         second_json,
-      ) || json_string_range_equals(text, content_start, pos, second_proto) {
+        second_proto,
+      ) {
         1
       } else {
         -1
@@ -116,9 +138,11 @@ fn json_field_id_at(
     Some(pair) => pair
     None => return None
   }
-  let id = if decoded == first_json || decoded == first_proto {
+  let id = if (first_json != "" && decoded == first_json) ||
+    (first_proto != "" && decoded == first_proto) {
     0
-  } else if decoded == second_json || decoded == second_proto {
+  } else if (second_json != "" && decoded == second_json) ||
+    (second_proto != "" && decoded == second_proto) {
     1
   } else {
     -1

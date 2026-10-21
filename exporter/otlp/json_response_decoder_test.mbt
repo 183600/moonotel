@@ -140,6 +140,25 @@ test "json_decode_rejects_plus_sign_and_leading_zero_numbers" {
 }
 
 ///|
+test "json_decode_empty_member_name_is_unknown" {
+  // An empty member name is an unknown field. It must not be mistaken for
+  // `errorMessage` inside `partialSuccess` (where the decoder has no second
+  // known field name), and any JSON value must be skipped.
+  assert_eq(decode_json_body("{\"\":\"ignored\"}"), @sdk.ExportSuccess)
+  assert_eq(
+    decode_json_body("{\"partialSuccess\":{\"\":{\"nested\":true}}}"),
+    @sdk.ExportSuccess,
+  )
+  let message = json_failure_message(
+    decode_json_body(
+      "{\"partialSuccess\":{\"rejectedSpans\":\"2\",\"\":\"ignored\"}}",
+    ),
+  )
+  assert_true(message.contains("rejected 2 span(s)"))
+  assert_false(message.contains("ignored"))
+}
+
+///|
 test "json_decode_partial_success_skips_unknown_members" {
   let message = json_failure_message(
     decode_json_body(
