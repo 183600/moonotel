@@ -45,8 +45,24 @@ test "parse_masks_unknown_flag_bits" {
   let value = "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-ff"
   let parsed = @propagation.parse_traceparent(value)
   assert_true(parsed is Some(_))
-  assert_eq(parsed.unwrap().trace_flags(), 1)
+  // Only the sampled (`01`) and random (`02`) bits are kept; every other
+  // bit is reserved and must be set to zero.
+  assert_eq(parsed.unwrap().trace_flags(), 3)
   assert_true(parsed.unwrap().is_sampled())
+}
+
+///|
+test "parse_keeps_random_flag_and_format_preserves_it" {
+  // The random-trace-id flag (`02`) must survive parse and format so that
+  // an outgoing header keeps it (W3C Trace Context Level 2).
+  let value = "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-02"
+  let parsed = @propagation.parse_traceparent(value).unwrap()
+  assert_eq(parsed.trace_flags(), 2)
+  assert_false(parsed.is_sampled())
+  assert_eq(
+    @propagation.format_traceparent(parsed),
+    "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-02",
+  )
 }
 
 ///|

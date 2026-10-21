@@ -354,6 +354,13 @@ fn write_hex(
   }
 }
 
+// Known `trace-flags` bits: sampled (`0x01`) and random-trace-id (`0x02`).
+// Every other bit is reserved and must be set to zero (W3C Trace Context
+// "Other Flags"), while the random bit must be preserved on continuation.
+
+///|
+const TRACE_FLAGS_KNOWN : Int32 = 0x03
+
 // Format a valid SpanContext as a `traceparent` header value (version 00).
 // An invalid SpanContext yields an empty string.
 
@@ -362,7 +369,7 @@ pub fn format_traceparent(sc : @api.SpanContext) -> String {
   if !sc.is_valid() {
     return ""
   }
-  let flags = sc.trace_flags() & 0xFF
+  let flags = sc.trace_flags() & TRACE_FLAGS_KNOWN
   // `00-` + 32 trace chars + `-` + 16 span chars + `-` + 2 flag chars, each
   // character occupying two UTF-16LE bytes.
   let out = FixedArray::make(55 * 2, b'\x00')
@@ -446,7 +453,7 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
     @api.span_context(
       trace_id,
       span_id,
-      flags & @api.TRACE_FLAGS_SAMPLED,
+      flags & TRACE_FLAGS_KNOWN,
       is_remote=true,
     ),
   )
