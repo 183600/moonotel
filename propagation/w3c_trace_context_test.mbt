@@ -146,6 +146,34 @@ test "carrier_from_entries" {
 }
 
 ///|
+test "carrier_from_entries_combines_duplicate_keys" {
+  // RFC 7230 section 3.2.2: repeated header fields are combined with ", ".
+  let carrier = @propagation.TextMapCarrier::from_entries([
+    ("tracestate", "foo=1"),
+    ("tracestate", "bar=2"),
+  ])
+  assert_eq(carrier.length(), 1)
+  assert_eq(carrier.get("tracestate"), Some("foo=1, bar=2"))
+  assert_eq(
+    @propagation.extract_tracestate(carrier),
+    Some("foo=1, bar=2"),
+  )
+  assert_eq(
+    @propagation.parse_tracestate(carrier.get("tracestate").unwrap()),
+    Some("foo=1,bar=2"),
+  )
+  // A duplicated traceparent no longer parses after combining, so extraction
+  // restarts with a new trace.
+  let dup = @propagation.TextMapCarrier::from_entries([
+    ("traceparent", "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01"),
+    ("traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"),
+  ])
+  assert_true(
+    @propagation.parse_traceparent(dup.get("traceparent").unwrap()) is None,
+  )
+}
+
+///|
 test "inject_and_extract_round_trip" {
   let sc = make_context()
   let carrier = @propagation.TextMapCarrier::new()

@@ -33,13 +33,22 @@ pub fn TextMapCarrier::from_map(
   { entries, getter: None, setter: None, }
 }
 
-// Create a carrier from an array of key/value pairs
+// Create a carrier from an array of key/value pairs. A repeated key is
+// combined into one comma-separated value, as required for HTTP headers by
+// RFC 7230 section 3.2.2.
 
 ///|
 pub fn TextMapCarrier::from_entries(
   entries : Array[(String, String)],
 ) -> TextMapCarrier {
-  { entries: Map(entries), getter: None, setter: None, }
+  let map : Map[String, String] = Map([])
+  for entry in entries {
+    match map.get(entry.0) {
+      Some(existing) => map.set(entry.0, existing + ", " + entry.1)
+      None => map.set(entry.0, entry.1)
+    }
+  }
+  { entries: map, getter: None, setter: None, }
 }
 
 // Create a read-only carrier that looks up keys through `get` when they are
