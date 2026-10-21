@@ -261,3 +261,27 @@ test "negative_max_retries_on_direct_config_still_exports_once" {
   assert_false(result.is_success())
   assert_eq(mock.urls.length(), 1)
 }
+
+///|
+test "configured_headers_are_deduplicated_case_insensitively" {
+  let mock = mock_transport(200)
+  let headers : Map[String, String] = Map([])
+  headers.set("X-Dup", "1")
+  headers.set("x-dup", "2")
+  let config = @otlp.OtlpHttpConfig::new(
+    endpoint="http://collector:4318",
+    headers~,
+  )
+  let exporter = @otlp.OtlpHttpExporter::new(config, mock.as_transport())
+  let _ = exporter.export_spans([test_span()])
+  let mut count = 0
+  let mut value = ""
+  for key, header_value in mock.headers[0] {
+    if key.to_lower() == "x-dup" {
+      count = count + 1
+      value = header_value
+    }
+  }
+  assert_eq(count, 1)
+  assert_eq(value, "2")
+}

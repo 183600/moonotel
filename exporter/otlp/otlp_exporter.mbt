@@ -469,10 +469,10 @@ fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
   for key, value in config.headers {
     // HTTP header names are case-insensitive, so drop any user-configured
     // `Content-Type` or `Accept` spelling before adding the protocol's own
-    // values.
+    // values, and collapse differently-cased duplicates of other headers.
     let lower = key.to_lower()
     if lower != "content-type" && lower != "accept" {
-      headers.set(key, value)
+      set_header(headers, key, value)
     }
   }
   let content_type = content_type_for_protocol(config.protocol)
