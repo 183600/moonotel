@@ -66,11 +66,34 @@ test "parse_keeps_random_flag_and_format_preserves_it" {
 }
 
 ///|
-test "parse_accepts_uppercase_hex" {
+test "parse_version_00_rejects_uppercase_hex" {
+  // The version 00 ABNF spells trace-id, parent-id and trace-flags
+  // `HEXDIGLC`; uppercase hex characters invalidate the header.
   let value = "00-4BF92F359D1E75B7618A2D1F3C4E5A6B-00F067AA0BA902B7-01"
+  assert_true(@propagation.parse_traceparent(value) is None)
+  assert_true(
+    @propagation.parse_traceparent(
+      "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-00F067AA0BA902B7-01",
+    )
+    is None,
+  )
+  assert_true(
+    @propagation.parse_traceparent(
+      "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-0A",
+    )
+    is None,
+  )
+}
+
+///|
+test "parse_higher_version_accepts_uppercase_hex" {
+  // For a higher version the fields only have to be hex, in either case.
+  let value = "01-4BF92F359D1E75B7618A2D1F3C4E5A6B-00F067AA0BA902B7-01"
   let parsed = @propagation.parse_traceparent(value)
   assert_true(parsed is Some(_))
   assert_eq(parsed.unwrap().trace_id_hex(), "4bf92f359d1e75b7618a2d1f3c4e5a6b")
+  assert_eq(parsed.unwrap().span_id_hex(), "00f067aa0ba902b7")
+  assert_true(parsed.unwrap().is_sampled())
 }
 
 ///|

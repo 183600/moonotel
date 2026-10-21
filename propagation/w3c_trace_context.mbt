@@ -162,6 +162,23 @@ fn hex_unit_value(unit : UInt16) -> Int32 {
   }
 }
 
+// Whether every code unit in `[start, start + count)` is a lowercase hex
+// digit (`0-9` or `a-f`), as required by the version 00 ABNF (`HEXDIGLC`).
+
+///|
+fn has_lowercase_hex(value : String, start : Int32, count : Int32) -> Bool {
+  let end = start + count
+  let mut i = start
+  while i < end {
+    let code = value.unsafe_get(i).to_int()
+    if code < 0x30 || (code > 0x39 && (code < 0x61 || code > 0x66)) {
+      return false
+    }
+    i = i + 1
+  }
+  true
+}
+
 // Decode `byte_count` hex byte pairs starting at `start`, validating as it
 // goes and tracking whether any byte is non-zero. Returns None when any
 // character is not a hex digit or when every decoded byte is zero.
@@ -436,6 +453,15 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
   }
   if version_hi == '0' && version_lo == '0' && len > 55 {
     // Version 00 does not allow additional fields.
+    return None
+  }
+  if version_hi == '0' && version_lo == '0' &&
+    !(has_lowercase_hex(value, 3, 32) &&
+      has_lowercase_hex(value, 36, 16) &&
+      has_lowercase_hex(value, 53, 2)) {
+    // The version 00 ABNF spells every field `HEXDIGLC`; a header holding an
+    // uppercase hex character is invalid and must be ignored. Higher
+    // versions accept hex in either case.
     return None
   }
   let trace_id = match decode_hex_nonzero(value, 3, 16) {
