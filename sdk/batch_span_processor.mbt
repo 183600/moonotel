@@ -243,26 +243,6 @@ pub impl SpanProcessor for BatchSpanProcessor with fn on_start(self, _span) {
   let _ = self
 }
 
-// Timestamp in milliseconds used for the timed-flush check. A timestamp older
-// than the last flush, or farther than one flush interval from it, falls back
-// to the clock so that manually built or explicitly backdated snapshots
-// cannot stall or skip a scheduled flush.
-
-///|
-fn timed_flush_now(
-  data : SpanData,
-  since : UInt64,
-  interval : Int32,
-) -> UInt64 {
-  if interval > 0 && data.end_time_unix_nano >= 0L {
-    let millis = (data.end_time_unix_nano / 1000000L).reinterpret_as_uint64()
-    if millis >= since && millis - since <= interval.to_uint64() {
-      return millis
-    }
-  }
-  @env.now()
-}
-
 ///|
 pub impl SpanProcessor for BatchSpanProcessor with fn on_end(self, data) {
   if self.shutdown_called {
@@ -275,11 +255,7 @@ pub impl SpanProcessor for BatchSpanProcessor with fn on_end(self, data) {
   if self.live_count() >= self.max_export_batch_size {
     self.flush_batch_at(@env.now())
   } else if self.flush_interval_millis > 0 {
-    let now = timed_flush_now(
-      data,
-      self.last_flush_time_millis,
-      self.flush_interval_millis,
-    )
+    let now = @env.now()
     if now >= self.last_flush_time_millis &&
       now - self.last_flush_time_millis >=
       self.flush_interval_millis.to_uint64() {
