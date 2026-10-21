@@ -79,6 +79,43 @@ async test "server host attributes follow the absolute-form authority" {
 }
 
 ///|
+async test "server host attributes ignore userinfo in the absolute-form authority" {
+  let (tracer, exporter) = absolute_authority_tracer(
+    "server-test-absolute-authority-userinfo",
+  )
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_on(
+        server,
+        call => call.respond(200, body="ok"),
+        tracer~,
+      )
+    }
+    let connection = @socket.Tcp::connect(
+      @socket.Addr::parse("127.0.0.1:\{port}"),
+    )
+    connection.write(
+      "GET http://user:secret@backend.internal:8080/items HTTP/1.1\r\nHost: external.example.com\r\nConnection: close\r\n\r\n",
+    )
+    let _ = @async.with_timeout(5000, () => connection.read_all().text())
+    connection.close()
+    @async.sleep(50)
+    assert_eq(exporter.spans.val.length(), 1)
+    let data = exporter.spans.val[0]
+    assert_eq(
+      data.attributes.get(@sdk.SERVER_ADDRESS),
+      Some(@sdk.StringValue("backend.internal")),
+    )
+    assert_eq(
+      data.attributes.get(@sdk.SERVER_PORT),
+      Some(@sdk.IntValue(8080)),
+    )
+  }
+}
+
+///|
 async test "server host attributes keep the Host header for origin form" {
   let (tracer, exporter) = absolute_authority_tracer(
     "server-test-origin-authority",

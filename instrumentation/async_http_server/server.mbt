@@ -249,9 +249,10 @@ fn strip_ipv6_brackets(address : String) -> String {
   }
 }
 
-// The authority component of an absolute-form request target
-// (`http://host[:port]/path`), or `None` when the target is not in
-// absolute-form or carries an empty authority.
+// The host[:port] component of an absolute-form request target
+// (`http://[userinfo@]host[:port]/path`), or `None` when the target is not in
+// absolute-form or carries no host. Any userinfo prefix is discarded because
+// it is not part of `server.address`.
 
 ///|
 fn absolute_target_authority(path : String) -> String? {
@@ -271,10 +272,15 @@ fn absolute_target_authority(path : String) -> String? {
     }
     end = end + 1
   }
-  if end == 0 {
+  let authority = rest[:end]
+  let host = match authority.rev_find("@") {
+    Some(index) => authority[index + 1:]
+    None => authority
+  }
+  if host.length() == 0 {
     None
   } else {
-    Some(rest[:end].to_owned())
+    Some(host.to_owned())
   }
 }
 

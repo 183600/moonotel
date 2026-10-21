@@ -28,6 +28,23 @@ test "absolute_target_authority_extracts_authority" {
 }
 
 ///|
+test "absolute_target_authority_strips_userinfo" {
+  assert_eq(
+    absolute_target_authority("http://user:secret@backend.internal:8080/x"),
+    Some("backend.internal:8080"),
+  )
+  assert_eq(
+    absolute_target_authority("https://user@[2001:db8::1]:443/x"),
+    Some("[2001:db8::1]:443"),
+  )
+  assert_eq(
+    absolute_target_authority("http://user:p%40ss@example.com/x"),
+    Some("example.com"),
+  )
+  assert_eq(absolute_target_authority("http://user@/x"), None)
+}
+
+///|
 test "absolute_target_authority_absent_for_origin_form" {
   assert_eq(absolute_target_authority("/items"), None)
   assert_eq(absolute_target_authority("/items?q=1"), None)
