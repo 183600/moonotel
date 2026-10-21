@@ -830,7 +830,12 @@ pub fn decode_export_response_json(body : Bytes) -> @sdk.ExportResult {
   if body.length() > OTLP_MAX_RESPONSE_BODY_BYTES {
     return oversized_response()
   }
-  let text = @utf8.decode_lossy(body.exact_view())
+  // OTLP/JSON response bodies must be valid UTF-8. Lossy decoding would turn
+  // malformed bytes inside strings into U+FFFD and could accept an otherwise
+  // invalid response as success.
+  let text = @utf8.decode(body.exact_view()) catch {
+    _ => return malformed_json_response()
+  }
   let len = text.length()
   let mut pos = json_skip_ws(text, 0)
   if pos >= len {

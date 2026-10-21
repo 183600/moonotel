@@ -192,6 +192,19 @@ test "json_decode_malformed_bodies_fail" {
 }
 
 ///|
+test "json_decode_rejects_invalid_utf8" {
+  // Lossy decoding would replace the malformed bytes with U+FFFD and accept
+  // these otherwise well-formed JSON bodies as unknown fields.
+  for body in [
+    b"{\"unknown\":\"\xff\"}",
+    b"{\"unknown\":\"\xc3\"}",
+    b"{\"unknown\":\"\xed\xa0\x80\"}",
+  ] {
+    assert_false(@otlp.decode_export_response_json(body).is_success())
+  }
+}
+
+///|
 test "json_decode_rejects_deep_nesting" {
   let sb = StringBuilder()
   sb.write_string("{\"unknown\":")
