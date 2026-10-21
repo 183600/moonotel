@@ -249,12 +249,49 @@ fn strip_ipv6_brackets(address : String) -> String {
   }
 }
 
+// The authority component of an absolute-form request target
+// (`http://host[:port]/path`), or `None` when the target is not in
+// absolute-form or carries an empty authority.
+
+///|
+fn absolute_target_authority(path : String) -> String? {
+  let lower = path.to_lower()
+  let rest : StringView = if lower.has_prefix("http://") {
+    path[7:]
+  } else if lower.has_prefix("https://") {
+    path[8:]
+  } else {
+    return None
+  }
+  let mut end = 0
+  while end < rest.length() {
+    let code = rest.unsafe_get(end).to_int()
+    if code == 0x2F || code == 0x3F || code == 0x23 {
+      break
+    }
+    end = end + 1
+  }
+  if end == 0 {
+    None
+  } else {
+    Some(rest[:end].to_owned())
+  }
+}
+
 ///|
 fn record_host_attributes(
   span : @sdk.SpanSdk,
   headers : Map[@http.CaseInsensitiveString, String],
+  path : String,
 ) -> Unit {
-  match headers.get(@http.CaseInsensitiveString("host")) {
+  // With an absolute-form request target the authority of the target wins
+  // over the Host header (HTTP semantic conventions, footnotes [2] and [3];
+  // RFC 9112 also requires servers to ignore Host in that case).
+  let host : String? = match absolute_target_authority(path) {
+    Some(authority) => Some(authority)
+    None => headers.get(@http.CaseInsensitiveString("host"))
+  }
+  match host {
     Some(host) => {
       let (address, port) = match host.rev_find(":") {
         Some(colon) =>
@@ -705,7 +742,7 @@ async fn serve_call(
       if query != "" {
         server_span.set_attribute(@sdk.URL_QUERY, @sdk.StringValue(query))
       }
-      record_host_attributes(server_span, request.headers)
+      record_host_attributes(server_span, request.headers, request.path)
       match client_address {
         Some(address) =>
           server_span.set_attribute(
