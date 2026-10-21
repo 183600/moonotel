@@ -83,6 +83,18 @@ test "split_url ignores query and fragment when no path is present" {
 }
 
 ///|
+test "split_url ignores invalid scheme separators" {
+  assert_eq(
+    @async_http_client.split_url("/foo://user:pass@host"),
+    ("", 80),
+  )
+  assert_eq(
+    @async_http_client.split_url("example.com?next=http://user:pass@host"),
+    ("example.com", 80),
+  )
+}
+
+///|
 test "split_scheme lower-cases and validates schemes" {
   assert_eq(@async_http_client.split_scheme("https://example.com/x"), "https")
   assert_eq(@async_http_client.split_scheme("HTTP://example.com"), "http")

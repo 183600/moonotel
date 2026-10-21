@@ -165,6 +165,45 @@ fn is_alpha(c : Char) -> Bool {
   (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
 }
 
+// Parse a valid absolute URL scheme. Returns the lower-cased scheme and the
+// index just past its `://` separator, or `None` when the text before `://`
+// is not a valid scheme. A `://` after an invalid scheme is part of a relative
+// URL, not an authority delimiter.
+
+///|
+fn parse_url_scheme(url : String) -> (String, Int32?) {
+  match url.find("://") {
+    Some(index) =>
+      if index == 0 {
+        ("", None)
+      } else {
+        let candidate = url[:index]
+        if !is_alpha(candidate.unsafe_get(0).unsafe_to_char()) {
+          ("", None)
+        } else {
+          let sb = StringBuilder(size_hint=index * 2)
+          let mut valid = true
+          let mut i = 0
+          while i < index {
+            let c = candidate.unsafe_get(i).unsafe_to_char()
+            if !is_scheme_char(c) {
+              valid = false
+              break
+            }
+            sb.write_char(ascii_to_lower(c))
+            i = i + 1
+          }
+          if valid {
+            (sb.to_string(), Some(index + 3))
+          } else {
+            ("", None)
+          }
+        }
+      }
+    None => ("", None)
+  }
+}
+
 // The authority of an absolute URL ends at the first `/` (path), `?` (query)
 // or `#` (fragment), or at the end of the string.
 
@@ -188,9 +227,9 @@ fn find_authority_end(text : StringView) -> Int32 {
 
 ///|
 fn split_url_path_query(url : String) -> (String, String) {
-  let rest = match url.find("://") {
+  let rest = match parse_url_scheme(url).1 {
     Some(index) => {
-      let after_scheme = url[index + 3:]
+      let after_scheme = url[index:]
       after_scheme[find_authority_end(after_scheme):]
     }
     None => url[:]
@@ -215,39 +254,9 @@ fn split_url_path_query(url : String) -> (String, String) {
 
 ///|
 fn split_url_parts(url : String) -> (String, String, Int32) {
-  let scheme_index = url.find("://")
-  let scheme = match scheme_index {
-    Some(index) =>
-      if index == 0 {
-        ""
-      } else {
-        let candidate = url[:index]
-        if !is_alpha(candidate.unsafe_get(0).unsafe_to_char()) {
-          ""
-        } else {
-          let sb = StringBuilder(size_hint=index * 2)
-          let mut valid = true
-          let mut i = 0
-          while i < index {
-            let c = candidate.unsafe_get(i).unsafe_to_char()
-            if !is_scheme_char(c) {
-              valid = false
-              break
-            }
-            sb.write_char(ascii_to_lower(c))
-            i = i + 1
-          }
-          if valid {
-            sb.to_string()
-          } else {
-            ""
-          }
-        }
-      }
-    None => ""
-  }
-  let after_scheme = match scheme_index {
-    Some(index) => url[index + 3:]
+  let (scheme, scheme_end) = parse_url_scheme(url)
+  let after_scheme = match scheme_end {
+    Some(index) => url[index:]
     None => url
   }
   let default_port = if scheme == "https" { 443 } else { 80 }
