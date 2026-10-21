@@ -231,7 +231,8 @@ pub fn BatchSpanProcessor::tick(self : BatchSpanProcessor) -> Unit {
   }
   if self.flush_interval_millis > 0 {
     let now = @env.now()
-    if now - self.last_flush_time_millis >=
+    if now >= self.last_flush_time_millis &&
+      now - self.last_flush_time_millis >=
       self.flush_interval_millis.to_uint64() {
       self.flush_batch_at(now)
     }
