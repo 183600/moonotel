@@ -39,13 +39,14 @@ test "parse_tracestate_accepts_multi_tenant_keys" {
 
 ///|
 test "parse_tracestate_accepts_empty_members" {
-  assert_eq(@propagation.parse_tracestate(""), None)
+  assert_eq(@propagation.parse_tracestate(""), Some(""))
   assert_eq(@propagation.parse_tracestate("a=1,"), Some("a=1"))
   assert_eq(@propagation.parse_tracestate(",a=1"), Some("a=1"))
   assert_eq(@propagation.parse_tracestate("a=1, ,b=2"), Some("a=1,b=2"))
   let ts = @propagation.Tracestate::parse("a=1,").unwrap()
   assert_eq(ts.length(), 1)
   assert_eq(ts.get("a"), Some("1"))
+  assert_true(@propagation.Tracestate::parse("").unwrap().is_empty())
 }
 
 ///|
@@ -211,15 +212,13 @@ test "parse_or_empty_treats_memberless_headers_as_empty" {
 }
 
 ///|
-test "parse_tracestate_rejects_headers_without_members" {
-  // A header that holds no list-member at all carries no state, so the
-  // low-level parser reports it as absent rather than as an empty list.
-  assert_eq(@propagation.parse_tracestate(","), None)
-  assert_eq(@propagation.parse_tracestate(", ,"), None)
-  assert_eq(@propagation.parse_tracestate("   "), None)
-  assert_true(@propagation.Tracestate::parse(",") is None)
-  assert_true(@propagation.Tracestate::parse(", ,") is None)
-  assert_true(@propagation.Tracestate::parse("   ") is None)
+test "parse_tracestate_accepts_headers_without_members" {
+  // W3C Trace Context Level 2 requires accepting empty and whitespace-only
+  // headers; they normalize to the empty state instead of being rejected.
+  for state in ["", " ", "\t", ", ", " , ", ",", ", ,"] {
+    assert_eq(@propagation.parse_tracestate(state), Some(""))
+    assert_true(@propagation.Tracestate::parse(state).unwrap().is_empty())
+  }
 }
 
 ///|

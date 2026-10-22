@@ -537,7 +537,10 @@ pub fn inject(sc : @api.SpanContext, carrier : TextMapCarrier) -> Unit {
     let state = sc.tracestate()
     if state != "" {
       match normalized_tracestate_for_inject(state) {
-        Some(normalized) => carrier.set(tracestate_header_name(), normalized)
+        Some(normalized) =>
+          if normalized != "" {
+            carrier.set(tracestate_header_name(), normalized)
+          }
         None => ()
       }
     }
@@ -593,7 +596,9 @@ pub fn inject_with_tracestate(
       if !state.is_empty() {
         match parse_tracestate(state) {
           Some(normalized) =>
-            carrier.set(tracestate_header_name(), normalized)
+            if normalized != "" {
+              carrier.set(tracestate_header_name(), normalized)
+            }
           None => ()
         }
       }
@@ -769,15 +774,13 @@ fn write_normalized_tracestate(view : StringView, len : Int32) -> String {
 //
 // The result is the list of members joined by `,` with optional whitespace
 // trimmed. Empty and whitespace-only list members are allowed and dropped;
-// a duplicated key keeps its first member. Returns None when the value is
-// empty, has more than 32 members, contains a malformed member or an
-// invalid value, or holds no list-member at all.
+// a duplicated key keeps its first member. An empty or member-less value is
+// accepted as the empty state (`Some("")`), as required by W3C Trace Context
+// Level 2. Returns None when the value has more than 32 members, contains a
+// malformed member or an invalid value.
 
 ///|
 pub fn parse_tracestate(value : String) -> String? {
-  if value == "" {
-    return None
-  }
   // At most 32 list-members are accepted; duplicates keep the first entry.
   let mut first_key : StringView = ""
   let mut have_first = false
@@ -900,13 +903,9 @@ pub fn parse_tracestate(value : String) -> String? {
     Some(value)
   } else {
     let normalized = write_normalized_tracestate(view, len)
-    if normalized == "" {
-      // The header held no list-member at all, so it carries no state. Empty
-      // and whitespace-only `tracestate` headers must be accepted (W3C Trace
-      // Context Level 2), but they are not propagated.
-      None
-    } else {
-      Some(normalized)
-    }
+    // An empty or member-less header carries no state. It is still a valid,
+    // accepted header (W3C Trace Context Level 2); callers that write headers
+    // skip the empty normalized form.
+    Some(normalized)
   }
 }

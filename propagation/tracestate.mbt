@@ -45,16 +45,14 @@ fn is_valid_tracestate_member(key : StringView, value : StringView) -> Bool {
 
 // Parse a `tracestate` header value. Empty and whitespace-only list members
 // are allowed and carry no member; a duplicated key keeps its first member.
-// Returns None when the value is empty or holds no list-member, has more than
-// 32 list-members, contains a malformed member, or has an invalid value.
+// An empty or member-less value is accepted as the empty list, as required by
+// W3C Trace Context Level 2. Returns None when the value has more than 32
+// list-members, contains a malformed member, or has an invalid value.
 // Optional whitespace around members is ignored, and `key = value` is
 // accepted; blanks directly after `=` belong to the value.
 
 ///|
 pub fn Tracestate::parse(value : String) -> Tracestate? {
-  if value == "" {
-    return None
-  }
   let members : Array[(String, String)] = []
   let view = value[:]
   let len = view.length()
@@ -108,13 +106,6 @@ pub fn Tracestate::parse(value : String) -> Tracestate? {
       break
     }
     start = end + 1
-  }
-  if members.length() == 0 {
-    // A header that holds no list-member at all carries no state. It must be
-    // accepted on extraction (W3C Trace Context Level 2) but is reported as
-    // absent here; callers can use `Tracestate::empty()` when an empty list is
-    // intended.
-    return None
   }
   Some({ members, })
 }
