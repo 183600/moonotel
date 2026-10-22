@@ -113,10 +113,11 @@ let tracer = @sdk.global_tracer("checkout")    // or @moonotel.global_tracer(...
 
 ## HTTP instrumentation (`moonbitlang/async/http`)
 
-The instrumentation packages are native-only because the async HTTP stack is.
-They degrade gracefully: when no tracer is available the wrappers simply
-forward the request. URL attributes strip userinfo and redact the values of
-the well-known sensitive query parameters listed by the HTTP semantic
+The instrumentation packages target native and wasm, matching the async HTTP
+stack (the default wasm-gc target skips their bodies). They degrade
+gracefully: when no tracer is available the wrappers simply forward the
+request. URL attributes strip userinfo and redact the values of the
+well-known sensitive query parameters listed by the HTTP semantic
 conventions (`X-Amz-Signature`, `X-Amz-Credential`, `X-Amz-Security-Token`,
 `AWSAccessKeyId`, `Signature`, `sig`, and `X-Goog-Signature`).
 
@@ -177,10 +178,16 @@ Supported environment variables:
 - `OTEL_EXPORTER_OTLP_HEADERS` (`key=value,key2=value2`)
 - `OTEL_EXPORTER_OTLP_COMPRESSION` (`none` or `gzip`; any other value is
   rejected with a clear error)
+- `OTEL_EXPORTER_OTLP_PROTOCOL` (`http/protobuf`, the default, or `http/json`)
 - `OTEL_EXPORTER_OTLP_TIMEOUT` (milliseconds; enforced by the async exporter
   — the synchronous exporter runs whatever `Transport` you inject, so the
   transport itself is expected to enforce any deadline)
 - `OTEL_SERVICE_NAME`
+
+The signal-specific `OTEL_EXPORTER_OTLP_TRACES_HEADERS`,
+`OTEL_EXPORTER_OTLP_TRACES_COMPRESSION`, `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`
+and `OTEL_EXPORTER_OTLP_TRACES_TIMEOUT` variables take precedence over their
+generic counterparts.
 
 HTTP 200 is never retried, but a `partial_success` payload is surfaced as an
 export failure (`ExportFailure("partial success: …")`) rather than as a
@@ -197,6 +204,38 @@ Exporters are single-use sinks. `OtlpHttpExporter` rejects every batch after
 its queue on shutdown. Shutting a provider down drains batch processors before
 shutting their exporters down, so already-ending spans are not lost.
 
+## Configuration
+
+Besides the OTLP variables above, the SDK reads the standard OpenTelemetry
+environment configuration:
+
+- `OTEL_SDK_DISABLED=true` makes tracers no-op (nothing is recorded or
+  exported).
+- `OTEL_TRACES_EXPORTER` is a comma-separated list of `otlp`, `console` and
+  `none`; it defaults to `otlp`, and `none` disables every exporter. The
+  facade `setup` and the async `setup` use this list unless an explicit
+  `exporters` argument is given.
+- `OTEL_TRACES_SAMPLER` selects `always_on`, `always_off`, `traceidratio`,
+  `parentbased_always_on` (the default), `parentbased_always_off` or
+  `parentbased_traceidratio`; `OTEL_TRACES_SAMPLER_ARG` is the ratio for the
+  ratio-based variants.
+- `OTEL_BSP_MAX_QUEUE_SIZE`, `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` and
+  `OTEL_BSP_SCHEDULE_DELAY` (milliseconds) configure `BatchSpanProcessor`.
+- `OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT`, `OTEL_SPAN_EVENT_COUNT_LIMIT`,
+  `OTEL_SPAN_LINK_COUNT_LIMIT`, `OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT`,
+  `OTEL_LINK_ATTRIBUTE_COUNT_LIMIT` and
+  `OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT` configure span collection limits,
+  with the generic `OTEL_ATTRIBUTE_*` variables as fallbacks.
+- `OTEL_RESOURCE_ATTRIBUTES` (`key=value,key2=value2`, percent-encoded) and
+  `OTEL_SERVICE_NAME` configure the resource.
+- `OTEL_PROPAGATORS` selects the global propagators (default
+  `tracecontext,baggage`; `none` disables propagation).
+- `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST`,
+  `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_RESPONSE`,
+  `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_REQUEST` and
+  `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_RESPONSE` opt into
+  header capture as span attributes.
+
 ## Testing and CI
 
 ```sh
@@ -207,10 +246,12 @@ moon check --target native
 moon test --target native
 ```
 
-The async instrumentation/exporter packages are native-only; default-target
-`moon check`/`moon test` skip their bodies. The push/PR workflow
-`.github/workflows/ci.yml` runs both the default and native checks so a green
-CI means the native code was actually compiled and tested.
+The async instrumentation/exporter packages target native and wasm. The
+default wasm-gc target skips their bodies, while `moon check --target native`
+and `moon test --target native` compile and run them (`moon check --target
+wasm` also compiles them). The push/PR workflow `.github/workflows/ci.yml`
+runs both the default and native checks so a green CI means the native code
+was actually compiled and tested.
 
 ## W3C Trace Context
 
