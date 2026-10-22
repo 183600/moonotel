@@ -103,3 +103,22 @@ test "shutdown_is_visible_across_provider_copies" {
   provider.shutdown()
   assert_true(copy.is_shutdown())
 }
+
+///|
+test "copy_shutdown_flushes_processors_added_to_the_copy" {
+  let exporter = @sdk.InMemorySpanExporter::new()
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
+    .with_sampler(@sdk.Sampler::always_on())
+  let copy = provider.with_span_processor(
+    @sdk.BatchSpanProcessor::new(exporter, max_export_batch_size=100),
+  )
+  let tracer = copy.get_tracer("lifecycle")
+  tracer.start_root_span("queued").end()
+  assert_eq(exporter.span_count(), 0)
+  provider.shutdown()
+  assert_true(copy.is_shutdown())
+  assert_false(exporter.is_shutdown())
+  copy.shutdown()
+  assert_eq(exporter.span_count(), 1)
+  assert_true(exporter.is_shutdown())
+}
