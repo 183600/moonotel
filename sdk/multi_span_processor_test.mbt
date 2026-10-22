@@ -120,6 +120,27 @@ test "shutdown_of_a_copy_releases_processors_added_after_the_source_shutdown" {
 }
 
 ///|
+test "multi_span_processor_shutdown_is_visible_across_copies" {
+  let log : Ref[Array[String]] = Ref([])
+  let first = composite_probe("first", log)
+  let second = composite_probe("second", log)
+  let multi = @sdk.MultiSpanProcessor::new(processors=[first])
+  let copy = multi.with_processor(second)
+  assert_false(copy.is_shutdown())
+  multi.shutdown()
+  assert_true(copy.is_shutdown())
+  // Events reaching the copy after the original was shut down are ignored.
+  let provider = @sdk.TracerProviderSdk::new(service_name="multi-copy")
+    .with_span_processor(copy)
+    .with_sampler(@sdk.Sampler::always_on())
+  provider.get_tracer("multi-copy").start_root_span("late").end()
+  assert_eq(log.val.length(), 0)
+  copy.shutdown()
+  assert_eq(first.shutdowns.val, 1)
+  assert_eq(second.shutdowns.val, 1)
+}
+
+///|
 test "provider_registers_several_processors_at_once" {
   let log : Ref[Array[String]] = Ref([])
   let first = composite_probe("first", log)

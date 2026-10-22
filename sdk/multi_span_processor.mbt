@@ -5,7 +5,8 @@ pub struct MultiSpanProcessor {
   // A processor added to a copy starts out unshut-down even when the copy
   // itself already is, so `shutdown` can release it exactly once.
   shutdowns : Array[Ref[Bool]]
-  mut shutdown_called : Bool
+  // Shared with copies, so shutting down any copy also stops the others.
+  shutdown_called : Ref[Bool]
 }
 
 ///|
@@ -23,7 +24,7 @@ pub fn MultiSpanProcessor::new(
   {
     processors,
     shutdowns,
-    shutdown_called: false,
+    shutdown_called: Ref(false),
   }
 }
 
@@ -46,12 +47,12 @@ pub fn MultiSpanProcessor::processor_count(self : MultiSpanProcessor) -> Int32 {
 
 ///|
 pub fn MultiSpanProcessor::is_shutdown(self : MultiSpanProcessor) -> Bool {
-  self.shutdown_called
+  self.shutdown_called.val
 }
 
 ///|
 pub impl SpanProcessor for MultiSpanProcessor with fn on_start(self, span) {
-  if !self.shutdown_called {
+  if !self.shutdown_called.val {
     for processor in self.processors {
       processor.on_start(span)
     }
@@ -60,7 +61,7 @@ pub impl SpanProcessor for MultiSpanProcessor with fn on_start(self, span) {
 
 ///|
 pub impl SpanProcessor for MultiSpanProcessor with fn on_end(self, data) {
-  if !self.shutdown_called {
+  if !self.shutdown_called.val {
     for processor in self.processors {
       processor.on_end(data)
     }
@@ -69,7 +70,7 @@ pub impl SpanProcessor for MultiSpanProcessor with fn on_end(self, data) {
 
 ///|
 pub impl SpanProcessor for MultiSpanProcessor with fn force_flush(self) {
-  if !self.shutdown_called {
+  if !self.shutdown_called.val {
     for processor in self.processors {
       processor.force_flush()
     }
@@ -78,7 +79,7 @@ pub impl SpanProcessor for MultiSpanProcessor with fn force_flush(self) {
 
 ///|
 pub impl SpanProcessor for MultiSpanProcessor with fn shutdown(self) {
-  self.shutdown_called = true
+  self.shutdown_called.val = true
   let mut i = 0
   while i < self.processors.length() {
     if !self.shutdowns[i].val {
