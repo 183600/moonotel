@@ -405,20 +405,37 @@ fn record_host_attributes(
   }
   match host {
     Some(host) => {
+      // The authority may omit the port (`Host: example.com`) or carry an
+      // empty port (`Host: example.com:`). In both cases the scheme's default
+      // port is the port actually used, and the semantic conventions require
+      // `server.port` whenever `server.address` is recorded.
+      let default_port = if request_target_scheme(path) == "https" {
+        443
+      } else {
+        80
+      }
       let (address, port) = match host.rev_find(":") {
         Some(colon) =>
           if host[colon + 1:].find("]") is None {
-            (host[:colon].to_owned(), parse_port(host[colon + 1:]))
+            let port_text = host[colon + 1:]
+            (
+              host[:colon].to_owned(),
+              if port_text.length() == 0 {
+                default_port
+              } else {
+                parse_port(port_text)
+              },
+            )
           } else {
-            (host, -1)
+            (host, default_port)
           }
-        None => (host, -1)
+        None => (host, default_port)
       }
       let address = strip_ipv6_brackets(address)
       if address != "" {
         span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(address))
-        // `-1` marks an absent or invalid port; an explicit port 0 is valid
-        // and must still be recorded.
+        // `-1` marks an invalid explicit port; an absent or empty port uses
+        // the scheme default, and an explicit port 0 is valid.
         if port >= 0 {
           span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
         }
