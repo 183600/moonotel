@@ -594,6 +594,10 @@ pub fn OtlpHttpExporter::new(
   transport : Transport,
   retry_wait? : RetryWait,
 ) -> OtlpHttpExporter {
+  // Snapshot the header map so that mutating the caller's config (or a map it
+  // shares with the config) after construction cannot change the exporter's
+  // configuration or the headers of a later export.
+  let config = { ..config, headers: config.headers.copy() }
   {
     config,
     transport,

@@ -601,6 +601,10 @@ pub struct OtlpHttpAsyncExporter {
 pub fn OtlpHttpAsyncExporter::new(
   config : @otlp.OtlpHttpConfig,
 ) -> OtlpHttpAsyncExporter {
+  // Snapshot the header map so that mutating the caller's config after
+  // construction cannot change the exporter's configuration or its cached
+  // request headers.
+  let config = { ..config, headers: config.headers.copy() }
   {
     config,
     headers: request_headers(
