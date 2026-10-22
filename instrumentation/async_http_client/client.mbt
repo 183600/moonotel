@@ -228,12 +228,20 @@ fn find_authority_end(text : StringView) -> Int32 {
 
 ///|
 fn split_url_path_query(url : String) -> (String, String) {
-  let rest = match parse_url_scheme(url).1 {
-    Some(index) => {
-      let after_scheme = url[index:]
-      after_scheme[find_authority_end(after_scheme):]
+  // A network-path reference (`//authority/path`) carries an authority even
+  // though it has no scheme, so it must be stripped just like an absolute
+  // URL's authority. Otherwise `url.path` would include (and leak) userinfo.
+  let rest = if url.has_prefix("//") {
+    let after_authority = url[2:]
+    after_authority[find_authority_end(after_authority):]
+  } else {
+    match parse_url_scheme(url).1 {
+      Some(index) => {
+        let after_scheme = url[index:]
+        after_scheme[find_authority_end(after_scheme):]
+      }
+      None => url[:]
     }
-    None => url[:]
   }
   let without_fragment = match rest.find("#") {
     Some(index) => rest[:index]
