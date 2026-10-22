@@ -124,8 +124,9 @@ pub fn Context::with_value(
 }
 
 // Derive a context carrying a baggage value together with its W3C baggage
-// properties. The properties array is stored as given; callers must not mutate
-// it afterwards. An empty properties array is treated as no properties.
+// properties. A copy of the properties array is stored, so mutating the
+// caller's array cannot change the immutable context. An empty properties
+// array is treated as no properties.
 
 ///|
 pub fn Context::with_baggage_entry(
@@ -135,7 +136,12 @@ pub fn Context::with_baggage_entry(
   properties? : Array[(String, String)],
 ) -> Context {
   let properties = match properties {
-    Some(values) => if values.length() == 0 { None } else { Some(values) }
+    Some(values) =>
+      if values.length() == 0 {
+        None
+      } else {
+        Some(values.copy())
+      }
     None => None
   }
   {
@@ -240,9 +246,9 @@ pub fn Context::with_baggage_owned(
 }
 
 // Derive a context carrying every member of `entries`. Members are applied in
-// order, so a later member overrides an earlier one with the same key. The
-// property arrays are stored as given; callers must not mutate them
-// afterwards.
+// order, so a later member overrides an earlier one with the same key. Each
+// member and its properties are copied, so mutating the caller's arrays cannot
+// change the immutable context.
 
 ///|
 pub fn Context::with_baggage_entries(
@@ -266,7 +272,7 @@ pub fn Context::with_baggage_entries(
       }
     }
     if !duplicate {
-      list.push(entry)
+      list.push({ ..entry, properties: entry.properties.copy() })
     }
     i = i - 1
   }
@@ -327,7 +333,10 @@ pub fn Context::with_baggage_from(
       span_ctx: None,
       key: node.key,
       value: node.value,
-      properties: node.properties,
+      properties: match node.properties {
+        Some(properties) => Some(properties.copy())
+        None => None
+      },
       baggage_map: node.baggage_map,
       baggage_list: node.baggage_list,
       clear_baggage: node.clear_baggage,
