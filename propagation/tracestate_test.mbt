@@ -82,6 +82,22 @@ test "parse_tracestate_rejects_too_many_members" {
 }
 
 ///|
+test "parse_tracestate_does_not_count_empty_members_toward_limit" {
+  let mut state = "k0=v"
+  for i = 1; i < 32; i = i + 1 {
+    state = state + ",k" + i.to_string() + "=v"
+  }
+  assert_eq(@propagation.parse_tracestate(state + ","), Some(state))
+  assert_eq(@propagation.parse_tracestate("," + state), Some(state))
+  assert_eq(@propagation.parse_tracestate(state + ", ,"), Some(state))
+  let ts = @propagation.Tracestate::parse(state + ",").unwrap()
+  assert_eq(ts.length(), 32)
+  let too_many = state + ",k32=v"
+  assert_eq(@propagation.parse_tracestate(too_many), None)
+  assert_true(@propagation.Tracestate::parse(too_many) is None)
+}
+
+///|
 test "tracestate_mutations_reject_trailing_blank_values" {
   let ts = @propagation.Tracestate::parse("a=1").unwrap()
   assert_eq(ts.add("b", "v ").to_header(), "a=1")

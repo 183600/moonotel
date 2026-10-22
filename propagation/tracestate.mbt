@@ -61,10 +61,6 @@ pub fn Tracestate::parse(value : String) -> Tracestate? {
   let mut start = 0
   let mut member_count = 0
   while true {
-    if member_count >= TRACESTATE_MAX_MEMBERS {
-      return None
-    }
-    member_count = member_count + 1
     let end = find_code_unit(view, ',', start)
     let item = trim_ows(view.view(start_offset=start, end_offset=end))
     if item.length() == 0 {
@@ -76,6 +72,10 @@ pub fn Tracestate::parse(value : String) -> Tracestate? {
       start = end + 1
       continue
     }
+    if member_count >= TRACESTATE_MAX_MEMBERS {
+      return None
+    }
+    member_count = member_count + 1
     let eq = find_code_unit(item, '=', 0)
     if eq >= item.length() {
       return None

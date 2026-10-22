@@ -775,9 +775,6 @@ pub fn parse_tracestate(value : String) -> String? {
   // Set when any item needed optional whitespace trimmed.
   let mut unchanged = true
   while true {
-    if member_count >= 32 {
-      return None
-    }
     // Find the member end (the next `,`) together with the first `=`.
     let mut end = start
     let mut eq = -1
@@ -804,13 +801,16 @@ pub fn parse_tracestate(value : String) -> String? {
       // Empty and whitespace-only list members are allowed by W3C and carry
       // no key/value pair; they are omitted from the normalized form.
       unchanged = false
-      member_count = member_count + 1
       if end == len {
         break
       }
       start = end + 1
       continue
     }
+    if member_count >= 32 {
+      return None
+    }
+    member_count = member_count + 1
     if eq < 0 || eq >= item_end {
       return None
     }
@@ -871,14 +871,12 @@ pub fn parse_tracestate(value : String) -> String? {
     if duplicate {
       // A duplicated key keeps its first member; later members are dropped.
       unchanged = false
-      member_count = member_count + 1
       if end == len {
         break
       }
       start = end + 1
       continue
     }
-    member_count = member_count + 1
     if end == len {
       break
     }
