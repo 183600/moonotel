@@ -86,3 +86,32 @@ test "from_env treats an empty compression value as none" {
   @env.unset_env_var("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION")
   assert_eq(config.compression, "none")
 }
+
+///|
+async test "async_exporter_export_batch_gzips_and_sends_the_body" {
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    let received : Ref[Bytes] = Ref(b"")
+    let encoding : Ref[String] = Ref("")
+    group.spawn_bg(no_wait=true) <| () => {
+      server.run_forever() <| ((request, body, conn) => {
+        received.val = body.read_all().binary()
+        encoding.val = request.headers
+          .get(@http.CaseInsensitiveString("content-encoding"))
+          .unwrap_or("")
+        conn.send_response(200, "OK")
+      })
+    }
+    let config = @otlp.OtlpHttpConfig::new(
+      endpoint="http://127.0.0.1:\{port}",
+      compression="gzip",
+    )
+    let exporter = @otlp_async.OtlpHttpAsyncExporter::new(config)
+    let spans = [test_span_data()]
+    let result = exporter.export_batch(spans)
+    assert_true(result.is_success())
+    assert_eq(encoding.val, "gzip")
+    assert_eq(gunzip(received.val), @otlp.encode_trace_request(spans))
+  }
+}
