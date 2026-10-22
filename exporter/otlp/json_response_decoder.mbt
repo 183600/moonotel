@@ -726,11 +726,18 @@ fn json_skip_value(text : String, start : Int32, depth : Int32) -> Int32? {
 
 // Parse a `partialSuccess` (`partial_success`) message. Returns the rejected
 // span count, the error message and the index just past the closing brace.
+//
+// A repeated message field is merged: fields present in this occurrence
+// overwrite `rejected`/`message`, while absent fields keep the values from
+// earlier occurrences. A JSON `null` still denotes an empty message, which
+// resets both fields to their defaults.
 
 ///|
 fn json_parse_partial_success(
   text : String,
   start : Int32,
+  initial_rejected : Int64,
+  initial_message : String,
 ) -> (Int64, String, Int32)? {
   let len = text.length()
   let at = json_skip_ws(text, start)
@@ -748,12 +755,14 @@ fn json_parse_partial_success(
   if text.unsafe_get(at).to_int() != 0x7B {
     return None
   }
+  let mut rejected = initial_rejected
+  let mut message = initial_message
   let mut cursor = json_skip_ws(text, at + 1)
   if cursor < len && text.unsafe_get(cursor).to_int() == 0x7D {
-    return Some((0L, "", cursor + 1))
+    // An empty object contributes no fields, so an earlier occurrence's
+    // values remain in effect.
+    return Some((rejected, message, cursor + 1))
   }
-  let mut rejected : Int64 = 0L
-  let mut message = ""
   while true {
     let (key, after_key) = match json_field_id_at(
       text,
@@ -877,7 +886,7 @@ pub fn decode_export_response_json(body : Bytes) -> @sdk.ExportResult {
     pos = json_skip_ws(text, pos + 1)
     if key == 0 {
       let (count, text_message, after) = match
-        json_parse_partial_success(text, pos) {
+        json_parse_partial_success(text, pos, rejected, message) {
         Some(triple) => triple
         None => return malformed_json_response()
       }
