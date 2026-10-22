@@ -169,6 +169,65 @@ pub fn TextMapCarrier::get(self : TextMapCarrier, key : String) -> String? {
   }
 }
 
+// Look up every header value for `key`, matching names case-insensitively. A
+// repeated header is represented by one element per stored value, in insertion
+// order. External getters can only return one value, so a read-through carrier
+// yields at most one element. An empty array means the header is absent. This
+// is the accessor propagators use to combine repeated fields, as required by
+// RFC 7230, and to reject a duplicated `traceparent`.
+
+///|
+pub fn TextMapCarrier::get_all(
+  self : TextMapCarrier,
+  key : String,
+) -> Array[String] {
+  let values : Array[String] = []
+  if self.entries.length() > 0 {
+    for candidate, value in self.entries {
+      if ascii_case_insensitive_equal(candidate, key) {
+        values.push(value)
+      }
+    }
+  }
+  if values.length() == 0 {
+    match self.getter {
+      Some(get) =>
+        match get(key) {
+          Some(value) => values.push(value)
+          None => ()
+        }
+      None => ()
+    }
+  }
+  values
+}
+
+// Look up a header and combine repeated values into one comma-separated field
+// value, as required by RFC 7230 section 3.2.2. Returns `None` when the header
+// is absent.
+
+///|
+pub fn TextMapCarrier::get_combined(
+  self : TextMapCarrier,
+  key : String,
+) -> String? {
+  let values = self.get_all(key)
+  match values.length() {
+    0 => None
+    1 => Some(values[0])
+    _ => {
+      let sb = StringBuilder()
+      for i, value in values {
+        if i > 0 {
+          sb.write_string(", ")
+        }
+        sb.write_string(value)
+      }
+      Some(sb.to_string())
+    }
+  }
+}
+
 // Set a single header value. Write-through carriers forward the value to their
 // external store instead of keeping it locally.
 

@@ -112,6 +112,8 @@ pub fn TextMapCarrier::from_getter_setter((String) -> String?, (String, String) 
 pub fn TextMapCarrier::from_map(Map[String, String]) -> Self
 pub fn TextMapCarrier::from_setter((String, String) -> Unit) -> Self
 pub fn TextMapCarrier::get(Self, String) -> String?
+pub fn TextMapCarrier::get_all(Self, String) -> Array[String]
+pub fn TextMapCarrier::get_combined(Self, String) -> String?
 pub fn TextMapCarrier::length(Self) -> Int32
 pub fn TextMapCarrier::new() -> Self
 pub fn TextMapCarrier::remove(Self, String) -> Unit

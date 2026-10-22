@@ -628,23 +628,26 @@ pub fn inject(sc : @api.SpanContext, carrier : TextMapCarrier) -> Unit {
 
 // Extract a SpanContext from the carrier's `traceparent` header, attaching the
 // `tracestate` header when it is present and valid. An invalid `tracestate`
-// is ignored, as required by the specification.
+// is ignored, as required by the specification. A missing `traceparent`, or
+// more than one field with that name under any casing, yields `None`: a
+// duplicated field is ambiguous and the trace must be restarted. Repeated
+// `tracestate` fields are combined into one comma-separated value first.
 
 ///|
 pub fn extract(carrier : TextMapCarrier) -> @api.SpanContext? {
-  match carrier.get(traceparent_header_name()) {
-    Some(value) =>
-      match parse_traceparent(value) {
-        Some(sc) =>
-          match carrier.get(tracestate_header_name()) {
-            Some(state) =>
-              match parse_tracestate(state) {
-                Some(normalized) => Some(sc.with_tracestate(normalized))
-                None => Some(sc)
-              }
+  let traceparents = carrier.get_all(traceparent_header_name())
+  if traceparents.length() != 1 {
+    return None
+  }
+  match parse_traceparent(traceparents[0]) {
+    Some(sc) =>
+      match carrier.get_combined(tracestate_header_name()) {
+        Some(state) =>
+          match parse_tracestate(state) {
+            Some(normalized) => Some(sc.with_tracestate(normalized))
             None => Some(sc)
           }
-        None => None
+        None => Some(sc)
       }
     None => None
   }
@@ -694,12 +697,13 @@ pub fn inject_with_tracestate(
   }
 }
 
-// Extract the raw `tracestate` header value, if present.
-// The value is passed through unchanged.
+// Extract the raw `tracestate` header value, if present. Repeated fields are
+// combined into one comma-separated value; the value is otherwise passed
+// through unchanged.
 
 ///|
 pub fn extract_tracestate(carrier : TextMapCarrier) -> String? {
-  carrier.get(tracestate_header_name())
+  carrier.get_combined(tracestate_header_name())
 }
 
 ///|

@@ -305,6 +305,11 @@ let carrier = @propagation.TextMapCarrier::new()
 let parent = @propagation.extract(carrier)        // SpanContext?
 ```
 
+Header names are matched case-insensitively. Repeated `tracestate` and
+`baggage` fields are combined into one comma-separated value before parsing,
+as required for HTTP fields; a duplicated `traceparent` (under any casing) is
+ambiguous, so `extract` ignores the header and restarts the trace.
+
 Parsing is strict about the specification (version `ff`, all-zero IDs,
 field lengths, version-00 extra fields) and, per the version-00 `HEXDIGLC`
 ABNF, requires lowercase hex for `version=00` headers; future versions

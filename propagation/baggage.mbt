@@ -1220,24 +1220,26 @@ pub fn inject_baggage(
 }
 
 // Extract the baggage of a carrier as an ordered list of key/value pairs.
-// Properties are dropped; use `extract_baggage_entries` to keep them.
+// Properties are dropped; use `extract_baggage_entries` to keep them. Repeated
+// `baggage` fields are combined into one comma-separated value first.
 
 ///|
 pub fn extract_baggage(carrier : TextMapCarrier) -> Array[(String, String)] {
-  match carrier.get(baggage_header_name()) {
+  match carrier.get_combined(baggage_header_name()) {
     Some(value) => parse_baggage(value)
     None => []
   }
 }
 
 // Extract the baggage of a carrier as an ordered list of members, keeping the
-// properties of each member.
+// properties of each member. Repeated `baggage` fields are combined into one
+// comma-separated value first.
 
 ///|
 pub fn extract_baggage_entries(
   carrier : TextMapCarrier,
 ) -> Array[BaggageEntry] {
-  match carrier.get(baggage_header_name()) {
+  match carrier.get_combined(baggage_header_name()) {
     Some(value) => parse_baggage_entries(value)
     None => []
   }
