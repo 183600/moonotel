@@ -97,3 +97,25 @@ test "rfc850_two_digit_year_uses_the_current_year_window" {
   assert_eq(expand_two_digit_year(20, 2201), 2220)
   assert_eq(expand_two_digit_year(80, 2201), 2180)
 }
+
+///|
+fn two_digit_year(year : Int32) -> String {
+  let remainder = year % 100
+  if remainder < 10 {
+    "0" + remainder.to_string()
+  } else {
+    remainder.to_string()
+  }
+}
+
+///|
+test "rfc850_compares_the_full_timestamp_to_the_fifty_year_window" {
+  // The candidate year is exactly 50 years ahead, but the date is later in the
+  // year than today, so the timestamp is more than 50 years in the future and
+  // RFC 9110 requires resolving it to the most recent past year.
+  let future_year = current_utc_year() + 50
+  let value = "Sunday, 31-Dec-" +
+    two_digit_year(future_year) +
+    " 23:59:59 GMT"
+  assert_eq(retry_after_millis(value), Some(0))
+}

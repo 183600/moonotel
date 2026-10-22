@@ -236,7 +236,7 @@ fn is_full_weekday(name : StringView) -> Bool {
 // `civil_from_days` algorithm (the inverse of `days_from_civil`).
 
 ///|
-fn civil_year_from_days(days : Int64) -> Int32 {
+fn civil_date_from_days(days : Int64) -> (Int32, Int32, Int32) {
   let z = days + 719468L
   let era = if z >= 0L { z / 146097L } else { (z - 146096L) / 146097L }
   let doe = z - era * 146097L
@@ -244,8 +244,34 @@ fn civil_year_from_days(days : Int64) -> Int32 {
   let y = yoe + era * 400L
   let doy = doe - (365L * yoe + yoe / 4L - yoe / 100L)
   let mp = (5L * doy + 2L) / 153L
+  let day = doy - (153L * mp + 2L) / 5L + 1L
   let month = if mp < 10L { mp + 3L } else { mp - 9L }
-  (if month <= 2L { y + 1L } else { y }).to_int()
+  let year = if month <= 2L { y + 1L } else { y }
+  (year.to_int(), month.to_int(), day.to_int())
+}
+
+///|
+fn civil_year_from_days(days : Int64) -> Int32 {
+  civil_date_from_days(days).0
+}
+
+// The current UTC date and time, used to compare an RFC 850 timestamp against
+// the RFC 9110 50-year window.
+
+///|
+fn current_utc_datetime() -> (Int32, Int32, Int32, Int32, Int32, Int32) {
+  let now_seconds = (@env.now() / 1000).reinterpret_as_int64()
+  let days = now_seconds / 86400L
+  let seconds_of_day = (now_seconds % 86400L).to_int()
+  let (year, month, day) = civil_date_from_days(days)
+  (
+    year,
+    month,
+    day,
+    seconds_of_day / 3600,
+    seconds_of_day / 60 % 60,
+    seconds_of_day % 60,
+  )
 }
 
 // The current UTC year, used to expand an RFC 850 two-digit year.
@@ -270,6 +296,43 @@ fn expand_two_digit_year(year_pair : Int32, current_year : Int32) -> Int32 {
   } else {
     candidate
   }
+}
+
+// Whether a validated timestamp in `year` appears to be more than 50 years in
+// the future. RFC 9110 compares the whole timestamp, not just its year, so a
+// date in exactly `current_year + 50` can still be more than 50 years ahead.
+
+///|
+fn is_more_than_fifty_years_future(
+  year : Int32,
+  month : Int32,
+  day : Int32,
+  hour : Int32,
+  minute : Int32,
+  second : Int32,
+) -> Bool {
+  let (now_year, now_month, now_day, now_hour, now_minute, now_second) =
+    current_utc_datetime()
+  let cutoff_year = now_year + 50
+  if year > cutoff_year {
+    return true
+  }
+  if year < cutoff_year {
+    return false
+  }
+  if month != now_month {
+    return month > now_month
+  }
+  if day != now_day {
+    return day > now_day
+  }
+  if hour != now_hour {
+    return hour > now_hour
+  }
+  if minute != now_minute {
+    return minute > now_minute
+  }
+  second > now_second
 }
 
 // Convert validated civil date/time fields to seconds since the Unix epoch.
@@ -399,7 +462,7 @@ fn parse_rfc850_date_seconds(value : StringView) -> Int64? {
     Some(value) => value
     None => return None
   }
-  let year = expand_two_digit_year(year_pair, current_utc_year())
+  let mut year = expand_two_digit_year(year_pair, current_utc_year())
   let hour = match http_date_two_digits(value, start + 10) {
     Some(value) => value
     None => return None
@@ -411,6 +474,12 @@ fn parse_rfc850_date_seconds(value : StringView) -> Int64? {
   let second = match http_date_two_digits(value, start + 16) {
     Some(value) => value
     None => return None
+  }
+  // The year-only expansion keeps a candidate exactly 50 years ahead. RFC 9110
+  // asks whether the full timestamp is more than 50 years in the future, so a
+  // later date in that same year represents the most recent past year instead.
+  if is_more_than_fifty_years_future(year, month, day, hour, minute, second) {
+    year = year - 100
   }
   civil_time_seconds(year, month, day, hour, minute, second)
 }
