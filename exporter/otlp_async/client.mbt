@@ -405,7 +405,7 @@ async fn post_trace_request_with_headers(
       }
     }
     retry_after = None
-    let timeout = config.timeout_millis
+    let timeout = config.effective_timeout_millis()
     // The HTTP client adds transport headers (at least `Host`) by mutating the
     // map it receives. Hand it a fresh copy for every attempt so the cached
     // exporter headers stay unchanged across retries and concurrent exports.

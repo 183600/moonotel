@@ -149,3 +149,37 @@ test "direct_config_urls_are_trimmed_but_not_rewritten" {
   )
   assert_eq(root.traces_url(), "http://specific:4318/")
 }
+
+///|
+test "direct_config_negative_timeout_uses_the_default" {
+  let config = direct_config(
+    "http://collector:4318",
+    None,
+    Map([]),
+    -1,
+    "none",
+    @otlp.OTLP_HTTP_PROTOBUF_PROTOCOL,
+    0,
+  )
+  assert_eq(config.effective_timeout_millis(), 10000)
+  let zero = direct_config(
+    "http://collector:4318",
+    None,
+    Map([]),
+    0,
+    "none",
+    @otlp.OTLP_HTTP_PROTOBUF_PROTOCOL,
+    0,
+  )
+  assert_eq(zero.effective_timeout_millis(), 0)
+  let explicit = direct_config(
+    "http://collector:4318",
+    None,
+    Map([]),
+    2500,
+    "none",
+    @otlp.OTLP_HTTP_PROTOBUF_PROTOCOL,
+    0,
+  )
+  assert_eq(explicit.effective_timeout_millis(), 2500)
+}

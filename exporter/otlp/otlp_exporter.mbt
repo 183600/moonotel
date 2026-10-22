@@ -69,6 +69,12 @@ fn default_user_agent() -> String {
 ///|
 const DEFAULT_MAX_RETRIES : Int32 = 3
 
+// Default request timeout. Zero explicitly means "no timeout"; a negative
+// programmatic value falls back to this default.
+
+///|
+const DEFAULT_TIMEOUT_MILLIS : Int32 = 10000
+
 // Whether `protocol` is one of the OTLP/HTTP encodings supported by this
 // exporter (`http/protobuf` and `http/json`). Other values (for example
 // `grpc`) are rejected at export time.
@@ -126,6 +132,20 @@ fn effective_compression(compression : String) -> String {
   }
 }
 
+// The request timeout actually used for an export. A negative programmatic
+// value falls back to the 10s default, matching `OtlpHttpConfig::new`; zero
+// explicitly disables the timeout. This matters for a config built directly
+// from the public fields, which has not passed through the constructor.
+pub fn OtlpHttpConfig::effective_timeout_millis(
+  self : OtlpHttpConfig,
+) -> Int32 {
+  if self.timeout_millis < 0 {
+    DEFAULT_TIMEOUT_MILLIS
+  } else {
+    self.timeout_millis
+  }
+}
+
 // Create a configuration with sensible defaults
 // (endpoint `http://localhost:4318`, no compression, `http/protobuf`, 10s
 // timeout, 3 retries for retryable statuses). When `traces_endpoint` is given
@@ -148,7 +168,7 @@ pub fn OtlpHttpConfig::new(
   max_retries? : Int32,
 ) -> OtlpHttpConfig {
   let retries = max_retries.unwrap_or(DEFAULT_MAX_RETRIES)
-  let timeout = timeout_millis.unwrap_or(10000)
+  let timeout = timeout_millis.unwrap_or(DEFAULT_TIMEOUT_MILLIS)
   let compression = normalize_enum(compression.unwrap_or("none"))
   let protocol = normalize_enum(protocol.unwrap_or(OTLP_HTTP_PROTOBUF_PROTOCOL))
   let endpoint = match endpoint {
@@ -183,7 +203,7 @@ pub fn OtlpHttpConfig::new(
       None => Map([])
     },
     timeout_millis: if timeout < 0 {
-      10000
+      DEFAULT_TIMEOUT_MILLIS
     } else {
       timeout
     },
@@ -438,7 +458,7 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
     None =>
       match parse_timeout_env("OTEL_EXPORTER_OTLP_TIMEOUT") {
         Some(value) => value
-        None => 10000
+        None => DEFAULT_TIMEOUT_MILLIS
       }
   }
   {

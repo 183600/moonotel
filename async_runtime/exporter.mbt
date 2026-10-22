@@ -242,7 +242,7 @@ async fn OtlpHttpAsyncSpanExporter::send(
     self.active_sends = self.active_sends - 1
     self.send_finished.broadcast()
   }
-  let timeout = self.exporter.config().timeout_millis
+  let timeout = self.exporter.config().effective_timeout_millis()
   let _ = @async.protect_from_cancel(() => {
     let outcome : @sdk.ExportResult? = if timeout > 0 {
       Some(
