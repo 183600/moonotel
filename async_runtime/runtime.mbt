@@ -94,6 +94,25 @@ pub fn[G, X] spawn(
   )
 }
 
+// Normalize an optional programmatic endpoint override. Blank values are
+// unset, and surrounding whitespace is not part of the URL, matching the
+// environment-variable path and `OtlpHttpConfig::new`.
+
+///|
+fn normalized_endpoint_override(endpoint : String?) -> String? {
+  match endpoint {
+    Some(value) => {
+      let value = value.trim().to_owned()
+      if value == "" {
+        None
+      } else {
+        Some(value)
+      }
+    }
+    None => None
+  }
+}
+
 // One-call native setup: build a TracerProvider that exports over OTLP/HTTP
 // through a background task in `group`, and install it as the process-wide
 // provider. The exporters are selected by the `exporters` list when it is
@@ -141,17 +160,7 @@ pub fn[G] setup(
   // Mirror `OtlpHttpConfig::new`: a blank programmatic endpoint is treated as
   // unset, so it neither replaces the environment endpoint nor suppresses an
   // environment traces endpoint.
-  let endpoint_override = match endpoint {
-    Some(value) => {
-      let value = value.trim().to_owned()
-      if value == "" {
-        None
-      } else {
-        Some(value)
-      }
-    }
-    None => None
-  }
+  let endpoint_override = normalized_endpoint_override(endpoint)
   let config : @otlp.OtlpHttpConfig = {
     ..base,
     endpoint: endpoint_override.unwrap_or(base.endpoint),
