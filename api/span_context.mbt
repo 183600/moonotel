@@ -102,10 +102,15 @@ pub fn SpanContext::with_tracestate(
 
 // Whether this context was received from a remote parent (through a
 // propagator). All-zero contexts and contexts created locally return `false`.
+// A caller can zero an aliased ID array after construction, so the live IDs are
+// revalidated here as well: an unusable context is never reported as remote.
 
 ///|
 pub fn SpanContext::is_remote(self : SpanContext) -> Bool {
-  self.is_remote
+  self.is_remote &&
+  self.is_valid() &&
+  has_nonzero_byte(self.trace_id) &&
+  has_nonzero_byte(self.span_id)
 }
 
 // Derive a copy of this context with the given `is_remote` flag.
@@ -115,7 +120,13 @@ pub fn SpanContext::with_remote(
   self : SpanContext,
   is_remote : Bool,
 ) -> SpanContext {
-  { ..self.copy(), is_remote: is_remote && self.is_valid(), }
+  {
+    ..self.copy(),
+    is_remote: is_remote &&
+      self.is_valid() &&
+      has_nonzero_byte(self.trace_id) &&
+      has_nonzero_byte(self.span_id),
+  }
 }
 
 // Check if SpanContext is valid. The construction-time flag is snapshotted so
