@@ -574,7 +574,8 @@ pub fn SpanSdk::update_name(self : SpanSdk, name : String) -> Unit {
 
 // Set a single attribute. No-op for non-recording or ended spans. When the
 // attribute count limit is reached, the attribute is dropped and counted.
-// String values are truncated to the configured value length limit.
+// String values are truncated to the configured value length limit. An empty
+// key is invalid and is ignored without affecting the drop counters.
 
 ///|
 pub fn SpanSdk::set_attribute(
@@ -589,7 +590,7 @@ pub fn SpanSdk::set_attribute(
 
 // Set multiple attributes. No-op for non-recording or ended spans. Every
 // attribute is subject to the same count and value length limits as
-// `set_attribute`.
+// `set_attribute`; entries with an empty key are ignored.
 
 ///|
 pub fn SpanSdk::set_attributes(
@@ -711,7 +712,7 @@ pub fn SpanSdk::set_double_array_attribute(
 // Add an event to the span. No-op for non-recording or ended spans. When the
 // event count limit is reached the event is dropped and counted; attributes
 // beyond the event attribute count limit are dropped and counted on the
-// event.
+// event. Event attributes with an empty key are ignored.
 
 ///|
 pub fn SpanSdk::add_event(
@@ -774,6 +775,7 @@ fn SpanSdk::link_count(self : SpanSdk) -> Int32 {
 // OpenTelemetry specification. No-op for non-recording or ended spans. When
 // the link count limit is reached the link is dropped and counted; attributes
 // beyond the link attribute count limit are dropped and counted on the link.
+// Link attributes with an empty key are ignored.
 
 ///|
 pub fn SpanSdk::add_link(self : SpanSdk, link : SpanLink) -> Unit {

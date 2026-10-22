@@ -230,7 +230,9 @@ pub fn Resource::empty() -> Resource {
   { attributes: Map([], capacity=1), }
 }
 
-// Create a resource from an attribute map. The map is copied.
+// Create a resource from an attribute map. The map is copied and entries with
+// an empty key are dropped, since the OpenTelemetry data model requires
+// non-empty attribute keys.
 
 ///|
 pub fn Resource::new(attributes? : Map[String, AttributeValue]) -> Resource {
@@ -280,7 +282,8 @@ pub fn Resource::is_empty(self : Resource) -> Bool {
 }
 
 // Derive a resource with `key` set to `value`. The original is unchanged;
-// an existing value of `key` is replaced.
+// an existing value of `key` is replaced. An empty key is ignored and leaves
+// the resource unchanged.
 
 ///|
 pub fn Resource::with_attribute(
@@ -354,9 +357,10 @@ pub struct ResourceAttributes {
   mut own : Map[String, AttributeValue]?
 }
 
-// Wrap an attribute map as a resource snapshot. The map is not copied; the
-// caller must not mutate it after handing it over (the SDK only hands over the
-// provider's private resource map).
+// Wrap an attribute map as a resource snapshot. The map is shared and not
+// copied; the caller must not mutate it after handing it over (the SDK only
+// hands over the provider's private resource map). An empty attribute key is
+// invalid, so a map containing one is copied without that entry.
 
 ///|
 pub fn ResourceAttributes::new(
@@ -418,7 +422,8 @@ pub fn ResourceAttributes::get(
 }
 
 // Store `value` under `key`. The first write copies the shared map, so a
-// snapshot can be mutated without affecting the provider or other spans.
+// snapshot can be mutated without affecting the provider or other spans. An
+// empty key is invalid and leaves the snapshot unchanged.
 
 ///|
 pub fn ResourceAttributes::set(
