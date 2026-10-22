@@ -520,16 +520,27 @@ fn path_and_suffix(endpoint : String) -> (String, String) {
 // sent to `/`; the query and fragment components are preserved.
 fn with_root_path(url : String) -> String {
   let (path, suffix) = path_and_suffix(url)
-  match path.find("://") {
-    Some(scheme_end) => {
-      let after_scheme = path[scheme_end + 3:]
-      if after_scheme.find("/") is None {
-        path + "/" + suffix
-      } else {
-        url
-      }
+  // A network-path reference (`//host:4318`) also has an authority but no
+  // path. Add the root path for it, just like an absolute URL.
+  if path.has_prefix("//") {
+    let after_authority = path[2:]
+    if after_authority.find("/") is None {
+      path + "/" + suffix
+    } else {
+      url
     }
-    None => url
+  } else {
+    match path.find("://") {
+      Some(scheme_end) => {
+        let after_scheme = path[scheme_end + 3:]
+        if after_scheme.find("/") is None {
+          path + "/" + suffix
+        } else {
+          url
+        }
+      }
+      None => url
+    }
   }
 }
 
