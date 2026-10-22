@@ -140,6 +140,7 @@ pub fn BatchSpanProcessor::flush_batch(Self) -> Unit
 pub fn BatchSpanProcessor::flush_interval_millis(Self) -> Int32
 pub fn BatchSpanProcessor::force_flush(Self) -> Unit
 pub fn BatchSpanProcessor::from_env(&SpanExporter) -> Self
+pub fn BatchSpanProcessor::is_draining(Self) -> Bool
 pub fn BatchSpanProcessor::is_shutdown(Self) -> Bool
 pub fn BatchSpanProcessor::new(&SpanExporter, max_queue_size? : Int32, max_export_batch_size? : Int32, flush_interval_millis? : Int32) -> Self
 pub fn BatchSpanProcessor::on_end(Self, SpanData) -> Unit
@@ -204,9 +205,11 @@ pub struct MultiSpanProcessor {
   drained : Array[@ref.Ref[Bool]]
   shutdown_called : @ref.Ref[Bool]
   draining : @ref.Ref[Bool]
+  flushing : @ref.Ref[Bool]
 }
 pub fn MultiSpanProcessor::drain_before_shutdown(Self) -> Unit
 pub fn MultiSpanProcessor::force_flush(Self) -> Unit
+pub fn MultiSpanProcessor::is_draining(Self) -> Bool
 pub fn MultiSpanProcessor::is_shutdown(Self) -> Bool
 pub fn MultiSpanProcessor::new(processors? : Array[&SpanProcessor]) -> Self
 pub fn MultiSpanProcessor::on_end(Self, SpanData) -> Unit
@@ -292,6 +295,7 @@ pub struct SimpleSpanProcessor {
 pub fn SimpleSpanProcessor::drain_before_shutdown(Self) -> Unit
 pub fn SimpleSpanProcessor::export_failures(Self) -> UInt64
 pub fn SimpleSpanProcessor::force_flush(Self) -> Unit
+pub fn SimpleSpanProcessor::is_draining(Self) -> Bool
 pub fn SimpleSpanProcessor::is_shutdown(Self) -> Bool
 pub fn SimpleSpanProcessor::new(&SpanExporter) -> Self
 pub fn SimpleSpanProcessor::on_end(Self, SpanData) -> Unit
@@ -432,6 +436,7 @@ pub struct TracerProviderSdk {
   disabled : Bool
   shutdown_called : @ref.Ref[Bool]
   draining : @ref.Ref[Bool]
+  flushing : @ref.Ref[Bool]
   processor_shutdowns : Array[@ref.Ref[Bool]]
 }
 pub fn TracerProviderSdk::force_flush(Self) -> Unit
@@ -472,5 +477,6 @@ pub(open) trait SpanProcessor {
   fn on_end(Self, SpanData) -> Unit
   fn force_flush(Self) -> Unit
   fn drain_before_shutdown(Self) -> Unit = _
+  fn is_draining(Self) -> Bool = _
   fn shutdown(Self) -> Unit
 }

@@ -17,6 +17,9 @@ pub struct MultiSpanProcessor {
   // Guards the drain/shutdown sequence against reentry from a child processor
   // or an exporter it calls.
   draining : Ref[Bool]
+  // Guards `force_flush` against reentry from a child processor. The outer pass
+  // already owns the children, so a nested request must return immediately.
+  flushing : Ref[Bool]
 }
 
 ///|
@@ -39,6 +42,7 @@ pub fn MultiSpanProcessor::new(
     drained,
     shutdown_called: Ref(false),
     draining: Ref(false),
+    flushing: Ref(false),
   }
 }
 
@@ -99,10 +103,13 @@ pub impl SpanProcessor for MultiSpanProcessor with fn on_end(self, data) {
 
 ///|
 pub impl SpanProcessor for MultiSpanProcessor with fn force_flush(self) {
-  // A drain or shutdown in progress owns the children; do not re-enter it.
-  if self.draining.val {
+  // A drain, shutdown or another flush in progress owns the children; do not
+  // re-enter it.
+  if self.draining.val || self.flushing.val {
     return
   }
+  self.flushing.val = true
+  defer { self.flushing.val = false }
   for i, processor in self.processors {
     // A child's flush may shut this processor down reentrantly; the outer
     // `shutdown` has already drained and closed the remaining children.
@@ -145,6 +152,11 @@ pub impl SpanProcessor for MultiSpanProcessor with fn drain_before_shutdown(
 }
 
 ///|
+pub impl SpanProcessor for MultiSpanProcessor with fn is_draining(self) {
+  self.draining.val
+}
+
+///|
 pub impl SpanProcessor for MultiSpanProcessor with fn shutdown(self) {
   // A child processor or exporter may call back into `shutdown`; let the outer
   // call finish the drain and shutdown sequence.
@@ -180,5 +192,6 @@ pub extend MultiSpanProcessor with SpanProcessor::{
   on_start,
   force_flush,
   drain_before_shutdown,
+  is_draining,
   shutdown,
 }

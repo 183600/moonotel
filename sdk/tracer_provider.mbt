@@ -15,6 +15,10 @@ pub struct TracerProviderSdk {
   // exporter. Shared with provider copies so a callback cannot start a second
   // concurrent drain of the same processors.
   draining : Ref[Bool]
+  // Guards `force_flush` against reentry from a processor. A processor is
+  // allowed to ask the provider to flush again, but the outer pass already
+  // owns the processors, so the nested request must return immediately.
+  flushing : Ref[Bool]
   // Per-processor shutdown state, shared with provider copies that contain the
   // same processor. A processor added to a copy starts out unshut-down even
   // when the provider itself was already shut down.
@@ -148,6 +152,7 @@ pub fn TracerProviderSdk::new(service_name? : String) -> TracerProviderSdk {
     disabled,
     shutdown_called: Ref(false),
     draining: Ref(false),
+    flushing: Ref(false),
     processor_shutdowns: [],
   }
 }
@@ -319,10 +324,14 @@ pub fn TracerProviderSdk::get_tracer(
 
 ///|
 pub fn TracerProviderSdk::force_flush(self : TracerProviderSdk) -> Unit {
-  // A drain or shutdown in progress owns the processors; do not re-enter it.
-  if self.draining.val {
+  // A drain, shutdown or another flush in progress owns the processors; do not
+  // re-enter it. Without the flush guard a processor that calls back into
+  // `force_flush` would restart the whole loop from the first processor.
+  if self.draining.val || self.flushing.val {
     return
   }
+  self.flushing.val = true
+  defer { self.flushing.val = false }
   for i, processor in self.processors {
     // A reentrant shutdown may have started while an earlier processor was
     // being flushed; the shutdown sequence drains and closes the remaining
@@ -361,6 +370,15 @@ pub fn TracerProviderSdk::shutdown(self : TracerProviderSdk) -> Unit {
   for i, processor in self.processors {
     if !self.processor_shutdowns[i].val {
       processor.drain_before_shutdown()
+    }
+  }
+  // A processor may have been in the middle of its own direct `shutdown` drain
+  // when the exporter called back into the provider. That outer drain owns the
+  // queues and the shared exporter; closing any processor here would make the
+  // remaining queued spans fail to export. Leave the close to the outer call.
+  for processor in self.processors {
+    if processor.is_draining() {
+      return
     }
   }
   let mut i = 0
@@ -414,6 +432,7 @@ pub fn no_op_tracer_provider() -> TracerProviderSdk {
         disabled: true,
         shutdown_called: Ref(false),
         draining: Ref(false),
+        flushing: Ref(false),
         processor_shutdowns: [],
       }
       noop_provider.val = Some(provider)

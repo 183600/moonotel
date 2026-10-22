@@ -49,7 +49,17 @@ pub(open) trait SpanProcessor {
   // processors that share an exporter cannot lose queued spans because an
   // earlier shutdown closed that exporter. The default is a no-op.
   fn drain_before_shutdown(Self) -> Unit = _
+  // Whether this processor is currently draining its own queue. A provider
+  // shutdown invoked from inside that drain must not close a shared exporter
+  // while the outer drain still has spans to send. The default is false.
+  fn is_draining(Self) -> Bool = _
   fn shutdown(Self) -> Unit
+}
+
+///|
+impl SpanProcessor with is_draining(self) {
+  let _ = self
+  false
 }
 
 ///|

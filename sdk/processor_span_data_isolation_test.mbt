@@ -60,6 +60,7 @@ pub extend IsolationMutatingProcessor with @sdk.SpanProcessor::{
   on_start,
   on_end,
   force_flush,
+  is_draining,
   shutdown,
 }
 
@@ -159,6 +160,7 @@ pub extend IsolationObserverProcessor with @sdk.SpanProcessor::{
   on_start,
   on_end,
   force_flush,
+  is_draining,
   shutdown,
 }
 

@@ -49,6 +49,7 @@ pub extend MultiCopyFlushChild with SpanProcessor::{
   on_end,
   force_flush,
   drain_before_shutdown,
+  is_draining,
   shutdown,
 }
 
