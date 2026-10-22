@@ -576,6 +576,11 @@ pub fn OtlpHttpExporter::export_spans_http(
     }
     if attempt > 0 {
       (self.retry_wait)(attempt)
+      // The wait strategy may shut the exporter down reentrantly; do not send
+      // another attempt after that.
+      if self.shutdown_called {
+        return @sdk.ExportFailure("OTLP exporter is shut down")
+      }
     }
     // The transport receives its own copy: a client wrapper may normalize or
     // add headers, and that must not mutate the exporter's reusable snapshot
