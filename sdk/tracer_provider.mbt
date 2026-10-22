@@ -303,6 +303,9 @@ pub fn TracerProviderSdk::get_tracer(
 
 ///|
 pub fn TracerProviderSdk::force_flush(self : TracerProviderSdk) -> Unit {
+  if self.shutdown_called.val {
+    return
+  }
   for processor in self.processors {
     processor.force_flush()
   }

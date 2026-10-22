@@ -174,3 +174,14 @@ test "copy_shutdown_does_not_shut_a_shared_processor_twice" {
   assert_eq(first.shutdowns.val, 1)
   assert_eq(second.shutdowns.val, 1)
 }
+
+///|
+test "force_flush_after_shutdown_is_ignored" {
+  let processor = counting_processor()
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
+    .with_span_processor(processor)
+  provider.shutdown()
+  assert_eq(processor.flushes.val, 0)
+  provider.force_flush()
+  assert_eq(processor.flushes.val, 0)
+}
