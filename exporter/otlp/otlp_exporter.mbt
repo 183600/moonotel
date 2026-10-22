@@ -196,7 +196,7 @@ fn decode_header_value(value : StringView) -> String {
         }
         j = j + 1
       }
-      for byte in @utf8.encode(value.view(start_offset=run_start, end_offset=j)) {
+      for byte in encode_utf8_lossy(value.view(start_offset=run_start, end_offset=j)) {
         bytes.push(byte)
       }
       i = j

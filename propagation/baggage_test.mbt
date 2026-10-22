@@ -134,3 +134,21 @@ test "inject_baggage_omits_removed_keys" {
   @propagation.inject_baggage(context, carrier)
   assert_eq(carrier.get(@propagation.baggage_header_name()), Some("user.id=42"))
 }
+
+///|
+test "percent_encode_replaces_unpaired_high_surrogate" {
+  let lone = String::from_array([(0xD800).unsafe_to_char()])
+  assert_eq(@propagation.percent_encoded_length("a" + lone + "b"), 11)
+  assert_eq(@propagation.percent_encode("a" + lone + "b"), "a%EF%BF%BDb")
+}
+
+///|
+test "percent_encode_replaces_unpaired_low_surrogate" {
+  let lone = String::from_array([(0xDC00).unsafe_to_char()])
+  assert_eq(@propagation.percent_encode(lone + "a"), "%EF%BF%BDa")
+}
+
+///|
+test "percent_encode_keeps_valid_surrogate_pairs" {
+  assert_eq(@propagation.percent_encode("😀"), "%F0%9F%98%80")
+}
