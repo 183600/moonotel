@@ -176,7 +176,12 @@ pub fn OtlpHttpConfig::new(
   {
     endpoint,
     traces_endpoint,
-    headers: headers.unwrap_or(Map([])),
+    // The config owns a snapshot of the headers: mutating the caller's map
+    // afterwards cannot change what an exporter built from this config sends.
+    headers: match headers {
+      Some(values) => values.copy()
+      None => Map([])
+    },
     timeout_millis: if timeout < 0 {
       10000
     } else {
