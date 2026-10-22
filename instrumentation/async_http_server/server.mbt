@@ -858,7 +858,7 @@ pub async fn run_server_on(
   }
   server.run_forever(
     async fn(request, body, connection) {
-      let _ = serve_call(
+      let call = serve_call(
         request,
         body,
         connection,
@@ -867,6 +867,12 @@ pub async fn run_server_on(
         None,
         None,
       )
+      // The handler must finish exactly one response. If it returns without
+      // doing so, close the connection instead of leaving the client waiting
+      // for a response while the server attempts to read another request.
+      if !call.responded && !call.connection_closed {
+        connection.close()
+      }
     },
     allow_failure?,
     max_connections?,
