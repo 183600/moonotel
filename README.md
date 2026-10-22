@@ -92,9 +92,13 @@ ignored (it is not recorded, exported or counted as dropped by a limit).
 
 Samplers: `always_on`, `always_off`, `record_only`, `trace_id_ratio_based`
 and `parent_based(root)` (the OTel default). The ratio sampler uses the
-rightmost 8 bytes of the trace ID, like the OpenTelemetry SDKs in other
-languages, so a timestamp or other structured prefix does not bias the
-decision. Processors: `SimpleSpanProcessor` (export on end) and
+rightmost 8 bytes of the trace ID with a deterministic threshold, so a
+timestamp or other structured prefix does not bias the decision, a given trace
+ID always gets the same decision, and a higher ratio samples every trace a
+lower ratio would. The exact `TraceIdRatioBased` algorithm is not standardized
+(the OpenTelemetry specification explicitly warns that different SDKs may
+disagree), so do not rely on the same trace ID being sampled identically by
+another language's SDK. Processors: `SimpleSpanProcessor` (export on end) and
 `BatchSpanProcessor` (bounded queue, batched export).
 
 A recording span keeps its data readable after `end()`: the accessors return a
@@ -323,6 +327,11 @@ environment configuration:
   `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_REQUEST` and
   `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_RESPONSE` opt into
   header capture as span attributes.
+
+Header-capture values are comma-separated lists of header names matched
+case-insensitively; `*` captures every header. Prefer explicit names: a
+wildcard also captures credential-bearing headers such as `Authorization` and
+`Cookie`, so only enable it when those values are safe to record.
 
 ## Testing and CI
 
