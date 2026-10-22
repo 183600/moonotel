@@ -69,15 +69,26 @@ pub fn traces_exporter_enabled(name : String) -> Bool {
       } else {
         let mut found = false
         let mut disabled = false
+        let mut named = false
         for item in trimmed.split(",") {
           let item = item.trim().to_lower()
+          if item == "" {
+            continue
+          }
+          named = true
           if item == "none" {
             disabled = true
           } else if item == wanted {
             found = true
           }
         }
-        found && !disabled
+        // A list made only of separators/whitespace carries no exporter name,
+        // so it behaves like an unset or blank variable.
+        if !named {
+          wanted == "otlp"
+        } else {
+          found && !disabled
+        }
       }
     }
   }
