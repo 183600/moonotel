@@ -58,6 +58,16 @@ let jf_ints : Array[Int64] = [
 ]
 
 ///|
+// Timestamps are protobuf `fixed64` fields, so their JSON string form is the
+// unsigned decimal value of the bit pattern (the encoder must not use the
+// signed `Int64` formatter for them).
+
+///|
+fn jf_uint64_string(value : Int64) -> String {
+  value.reinterpret_as_uint64().to_string()
+}
+
+///|
 fn jf_random_text(rng : JfRng, max_fragments : Int) -> String {
   let sb = StringBuilder()
   let count = rng.below(max_fragments + 1)
@@ -388,11 +398,11 @@ fn jf_check_span(json_span : Json, data : @sdk.SpanData) -> Unit raise {
   )
   assert_eq(
     jf_string(jf_member(json_span, "startTimeUnixNano")),
-    data.start_time_unix_nano.to_string(),
+    jf_uint64_string(data.start_time_unix_nano),
   )
   assert_eq(
     jf_string(jf_member(json_span, "endTimeUnixNano")),
-    data.end_time_unix_nano.to_string(),
+    jf_uint64_string(data.end_time_unix_nano),
   )
   assert_eq(
     jf_number(jf_member(json_span, "kind")),
@@ -412,7 +422,7 @@ fn jf_check_span(json_span : Json, data : @sdk.SpanData) -> Unit raise {
       assert_eq(jf_string(jf_member(json_event, "name")), event.name)
       assert_eq(
         jf_string(jf_member(json_event, "timeUnixNano")),
-        event.time_unix_nano.to_string(),
+        jf_uint64_string(event.time_unix_nano),
       )
       jf_check_attributes(json_event, event.attributes)
       i = i + 1

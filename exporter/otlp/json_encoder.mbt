@@ -450,8 +450,8 @@ fn json_write_uint32(sb : JsonBuf, value : Int32) -> Unit {
   json_write_decimal_digits(sb, value.reinterpret_as_uint().to_uint64())
 }
 
-// Append a 64-bit integer as a JSON string, the protobuf JSON representation
-// of `int64`/`uint64` values.
+// Append a signed 64-bit integer as a JSON string, the protobuf JSON
+// representation of `int64` values (for example `AnyValue.int_value`).
 
 ///|
 fn json_write_int64_string(sb : JsonBuf, value : Int64) -> Unit {
@@ -466,9 +466,22 @@ fn json_write_int64_string(sb : JsonBuf, value : Int64) -> Unit {
   sb.write_char('"')
 }
 
+// Append an unsigned 64-bit integer as a JSON string, the protobuf JSON
+// representation of `fixed64`/`uint64` values such as the Unix-nanosecond
+// timestamps. The bit pattern is rendered as an unsigned decimal number, which
+// stays consistent with the protobuf encoder for values with the sign bit set.
+
+///|
+fn json_write_uint64_string(sb : JsonBuf, value : UInt64) -> Unit {
+  sb.write_char('"')
+  json_write_decimal_digits(sb, value)
+  sb.write_char('"')
+}
+
 // Append a double as a JSON number. Non-finite values are encoded as the
 // strings "NaN", "Infinity" and "-Infinity", as required by the protobuf JSON
-// mapping.
+// mapping. Negative zero keeps its sign bit instead of being rendered as the
+// positive zero by the generic float formatter.
 
 ///|
 fn json_write_double(sb : JsonBuf, value : Double) -> Unit {
@@ -478,6 +491,9 @@ fn json_write_double(sb : JsonBuf, value : Double) -> Unit {
     sb.write_bytes(b"\"Infinity\"")
   } else if value < -1.7976931348623157e308 {
     sb.write_bytes(b"\"-Infinity\"")
+  } else if value == 0.0 &&
+    (value.reinterpret_as_uint64() & 0x8000000000000000UL) != 0UL {
+    sb.write_bytes(b"-0")
   } else {
     sb.write_string(value.to_string())
   }
@@ -633,7 +649,7 @@ fn json_write_scope(
 ///|
 fn json_write_event(sb : JsonBuf, event : @sdk.SpanEvent) -> Unit {
   sb.write_bytes(b"{\"timeUnixNano\":")
-  json_write_int64_string(sb, event.time_unix_nano)
+  json_write_uint64_string(sb, event.time_unix_nano.reinterpret_as_uint64())
   sb.write_bytes(b",\"name\":")
   json_write_escaped(sb, event.name)
   if event.attributes.length() > 0 {
@@ -720,9 +736,9 @@ fn json_write_span(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
   sb.write_bytes(b",\"kind\":")
   json_write_int32(sb, data.kind.otlp_value())
   sb.write_bytes(b",\"startTimeUnixNano\":")
-  json_write_int64_string(sb, data.start_time_unix_nano)
+  json_write_uint64_string(sb, data.start_time_unix_nano.reinterpret_as_uint64())
   sb.write_bytes(b",\"endTimeUnixNano\":")
-  json_write_int64_string(sb, data.end_time_unix_nano)
+  json_write_uint64_string(sb, data.end_time_unix_nano.reinterpret_as_uint64())
   if data.attributes.length() > 0 {
     sb.write_bytes(b",\"attributes\":")
     json_write_attributes(sb, data.attributes)
