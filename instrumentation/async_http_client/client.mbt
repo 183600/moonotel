@@ -273,7 +273,14 @@ fn split_url_parts(url : String) -> (String, String, Int32) {
         let host = host_port[:close + 1].to_owned()
         let rest = host_port[close + 1:]
         let port = match rest.find(":") {
-          Some(colon) => parse_port(rest[colon + 1:])
+          Some(colon) =>
+            // RFC 3986 allows an empty port, which denotes the scheme's
+            // default port (e.g. `https://example.com:/path`).
+            if colon + 1 == rest.length() {
+              default_port
+            } else {
+              parse_port(rest[colon + 1:])
+            }
           None => default_port
         }
         (scheme, host, port)
@@ -286,7 +293,11 @@ fn split_url_parts(url : String) -> (String, String, Int32) {
         (
           scheme,
           host_port[:colon].to_owned(),
-          parse_port(host_port[colon + 1:]),
+          if colon + 1 == host_port.length() {
+            default_port
+          } else {
+            parse_port(host_port[colon + 1:])
+          },
         )
       None => (scheme, host_port.to_owned(), default_port)
     }
@@ -509,12 +520,12 @@ pub async fn request(
       if url_query != "" {
         span.set_attribute(@sdk.URL_QUERY, @sdk.StringValue(url_query))
       }
-      span.set_attribute(
-        @sdk.SERVER_ADDRESS,
-        @sdk.StringValue(strip_ipv6_brackets(host)),
-      )
-      if port > 0 {
-        span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
+      let host = strip_ipv6_brackets(host)
+      if host != "" {
+        span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(host))
+        if port > 0 {
+          span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
+        }
       }
       let sent_headers = traced_headers(
         headers,
