@@ -616,7 +616,13 @@ pub fn ServerCall::connection_close_requested(self : ServerCall) -> Bool {
 
 ///|
 pub fn ServerCall::close_connection(self : ServerCall) -> Unit {
-  self.connection.close()
+  if self.responded {
+    // The response is already on the wire, so the connection can be closed
+    // immediately.
+    self.connection.close()
+  }
+  // Before the response is sent, the close is deferred to `respond`: closing
+  // the socket first would make the response impossible to send.
   self.connection_closed = true
 }
 
@@ -679,7 +685,9 @@ pub async fn ServerCall::respond(
   if close_requested {
     extra_headers.set(@http.CaseInsensitiveString("connection"), "close")
   }
-  let mut close_after_response = close_requested
+  // A handler may have requested the close before sending the response; the
+  // socket must stay open until the response has been written.
+  let mut close_after_response = close_requested || self.connection_closed
   match extra_headers.get(@http.CaseInsensitiveString("connection")) {
     Some(value) =>
       if has_close_token(value) {
@@ -911,6 +919,12 @@ async fn serve_call(
   })
   defer end_span(span)
   let outcome = Ok(handler(call)) catch { error => Err(error) }
+  // A handler that asked to close the connection without responding leaves
+  // no response to wait for: close the socket now. (When it did respond,
+  // `respond` has already closed the socket.)
+  if call.connection_closed && !call.responded {
+    call.connection.close()
+  }
   match outcome {
     Ok(_) => call
     Err(error) => {
