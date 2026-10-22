@@ -316,11 +316,14 @@ pub fn TracerProviderSdk::force_flush(self : TracerProviderSdk) -> Unit {
 ///|
 pub fn TracerProviderSdk::shutdown(self : TracerProviderSdk) -> Unit {
   self.shutdown_called.val = true
-  // Drain every batch processor before shutting any exporter down. Processors
-  // may share an exporter, and a simple processor registered before a batch
-  // processor would otherwise close that exporter before the batch is drained.
-  for processor in self.processors {
-    processor.drain_before_shutdown()
+  // Drain every not-yet-shut-down processor before shutting any exporter down.
+  // Processors may share an exporter, and a simple processor registered before
+  // a batch processor would otherwise close that exporter before the batch is
+  // drained.
+  for i, processor in self.processors {
+    if !self.processor_shutdowns[i].val {
+      processor.drain_before_shutdown()
+    }
   }
   let mut i = 0
   while i < self.processors.length() {

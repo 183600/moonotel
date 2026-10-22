@@ -91,10 +91,12 @@ pub impl SpanProcessor for MultiSpanProcessor with fn drain_before_shutdown(
 ///|
 pub impl SpanProcessor for MultiSpanProcessor with fn shutdown(self) {
   self.shutdown_called.val = true
-  // Drain all children before shutting any of them down, matching the
-  // provider's shutdown order when children share an exporter.
-  for processor in self.processors {
-    processor.drain_before_shutdown()
+  // Drain all not-yet-shut-down children before shutting any of them down,
+  // matching the provider's shutdown order when children share an exporter.
+  for i, processor in self.processors {
+    if !self.shutdowns[i].val {
+      processor.drain_before_shutdown()
+    }
   }
   let mut i = 0
   while i < self.processors.length() {
