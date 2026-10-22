@@ -626,6 +626,57 @@ pub fn ServerCall::close_connection(self : ServerCall) -> Unit {
   self.connection_closed = true
 }
 
+// Replace unpaired UTF-16 surrogates with U+FFFD so that a response body can
+// always be encoded as UTF-8. Well-formed strings are returned unchanged.
+
+///|
+fn sanitize_utf16_surrogates(value : String) -> String {
+  let len = value.length()
+  let mut i = 0
+  while i < len {
+    let unit = value.unsafe_get(i).to_int()
+    if unit >= 0xD800 && unit <= 0xDBFF {
+      if i + 1 < len {
+        let next = value.unsafe_get(i + 1).to_int()
+        if next >= 0xDC00 && next <= 0xDFFF {
+          i = i + 2
+          continue
+        }
+      }
+      break
+    } else if unit >= 0xDC00 && unit <= 0xDFFF {
+      break
+    }
+    i = i + 1
+  }
+  if i >= len {
+    return value
+  }
+  let sb = StringBuilder(size_hint=len)
+  let mut j = 0
+  while j < len {
+    let unit = value.unsafe_get(j).to_int()
+    if unit >= 0xD800 && unit <= 0xDBFF {
+      if j + 1 < len {
+        let next = value.unsafe_get(j + 1).to_int()
+        if next >= 0xDC00 && next <= 0xDFFF {
+          sb.write_char(unit.unsafe_to_char())
+          sb.write_char(next.unsafe_to_char())
+          j = j + 2
+          continue
+        }
+      }
+      sb.write_char((0xFFFD).unsafe_to_char())
+    } else if unit >= 0xDC00 && unit <= 0xDFFF {
+      sb.write_char((0xFFFD).unsafe_to_char())
+    } else {
+      sb.write_char(unit.unsafe_to_char())
+    }
+    j = j + 1
+  }
+  sb.to_string()
+}
+
 // Number of UTF-8 bytes a string encodes to.
 // Surrogate pairs count as one four-byte character.
 
@@ -716,12 +767,15 @@ pub async fn ServerCall::respond(
   match body {
     Some(text) =>
       if body_allowed {
-        self.connection.write(text)
+        // An unpaired surrogate cannot be encoded as UTF-8 by the transport;
+        // substitute U+FFFD instead of aborting the connection task.
+        let response_body = sanitize_utf16_surrogates(text)
+        self.connection.write(response_body)
         match self.span {
           Some(span) =>
             span.set_attribute(
               @sdk.HTTP_RESPONSE_BODY_SIZE,
-              @sdk.IntValue(utf8_byte_length(text).to_int64()),
+              @sdk.IntValue(utf8_byte_length(response_body).to_int64()),
             )
           None => ()
         }
