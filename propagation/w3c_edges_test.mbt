@@ -40,8 +40,23 @@ test "parse_traceparent_trims_ows" {
 }
 
 ///|
-test "parse_rejects_empty_future_version_extension" {
+test "parse_accepts_empty_future_version_extension" {
+  // W3C Trace Context only requires the flags to be followed by the end of
+  // the value or a dash; a future version may append an empty extension.
   let value = "01-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01-"
+  let parsed = @propagation.parse_traceparent(value)
+  assert_true(parsed is Some(_))
+  let sc = parsed.unwrap()
+  assert_eq(sc.trace_id_hex(), "4bf92f359d1e75b7618a2d1f3c4e5a6b")
+  assert_eq(sc.span_id_hex(), "00f067aa0ba902b7")
+  assert_true(sc.is_sampled())
+}
+
+///|
+test "parse_rejects_future_version_extension_without_delimiter" {
+  // A character directly after the flags is neither the end of the value nor
+  // a dash, so the header is malformed even for a future version.
+  let value = "01-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01x"
   assert_true(@propagation.parse_traceparent(value) is None)
 }
 

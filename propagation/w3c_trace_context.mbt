@@ -448,9 +448,11 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
   if flags_hi < 0 || flags_lo < 0 {
     return None
   }
-  if len > 55 &&
-    (value.unsafe_get(55).unsafe_to_char() != '-' || len == 56) {
-    // A future-version extension must contain at least one character.
+  if len > 55 && value.unsafe_get(55).unsafe_to_char() != '-' {
+    // W3C Trace Context only requires the two flag characters to be followed
+    // by the end of the value or by a dash. Anything after that dash is a
+    // future-version extension and must not be interpreted (it may even be
+    // empty, as in `01-...-01-`).
     return None
   }
   if version_hi == '0' && version_lo == '0' && len > 55 {

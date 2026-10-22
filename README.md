@@ -272,9 +272,11 @@ let parent = @propagation.extract(carrier)        // SpanContext?
 Parsing is strict about the specification (version `ff`, all-zero IDs,
 field lengths, version-00 extra fields) and, per the version-00 `HEXDIGLC`
 ABNF, requires lowercase hex for `version=00` headers; future versions
-(`>= 01`) accept hex in either case. `inject_with_tracestate` validates and
-normalizes its explicit `tracestate` override, dropping a malformed value
-instead of writing an invalid header.
+(`>= 01`) accept hex in either case. For a future version the two flag
+characters must be followed by the end of the value or by a dash; any
+extension after that dash is ignored (it may be empty). `inject_with_tracestate`
+validates and normalizes its explicit `tracestate` override, dropping a
+malformed value instead of writing an invalid header.
 
 ## Context
 
