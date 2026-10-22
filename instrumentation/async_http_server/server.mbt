@@ -769,6 +769,23 @@ pub async fn ServerCall::respond(
     sanitize_utf16_surrogates(reason.unwrap_or(status_reason(status_code))),
     extra_headers~,
   )
+  // The status line and headers are on the wire now. Record the status before
+  // writing the body: a client may disconnect while a large body is still
+  // being sent, and the response status must survive that write failure.
+  match self.span {
+    Some(span) => {
+      span.set_attribute(
+        @sdk.HTTP_RESPONSE_STATUS_CODE,
+        @sdk.IntValue(status_code.to_int64()),
+      )
+      if status_code >= 500 {
+        let status_text = status_code.to_string()
+        span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(status_text))
+        span.set_status(@api.StatusCode::Error)
+      }
+    }
+    None => ()
+  }
   let body_allowed = match (self.request.meth, status_code) {
     (Head, _) => false
     (Connect, 200..<300) => false
@@ -798,20 +815,6 @@ pub async fn ServerCall::respond(
   if close_after_response {
     self.connection.close()
     self.connection_closed = true
-  }
-  match self.span {
-    Some(span) => {
-      span.set_attribute(
-        @sdk.HTTP_RESPONSE_STATUS_CODE,
-        @sdk.IntValue(status_code.to_int64()),
-      )
-      if status_code >= 500 {
-        let status_text = status_code.to_string()
-        span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(status_text))
-        span.set_status(@api.StatusCode::Error)
-      }
-    }
-    None => ()
   }
 }
 

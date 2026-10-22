@@ -159,3 +159,39 @@ async test "server suppresses a response body for no-content responses" {
     assert_eq(data.status, @api.StatusCode::Unset)
   }
 }
+
+///|
+async test "server records the status when the client aborts the response body" {
+  let (tracer, exporter) = body_size_server_tracer("server-aborted-body")
+  // Large enough that the server cannot finish writing it into the socket
+  // buffer before the client closes the connection.
+  let large_body = "x".repeat(2 * 1024 * 1024)
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_on(
+        server,
+        call => call.respond(200, body=large_body),
+        tracer~,
+      )
+    }
+    let client = @http.Client("http://127.0.0.1:\{port}")
+    client.request(@http.Get, "/large")
+    let response = client.end_request()
+    assert_eq(response.code, 200)
+    // Do not consume the body; close while the server is still writing it.
+    client.close()
+    let mut waited = 0
+    while exporter.spans.val.length() == 0 && waited < 2000 {
+      @async.sleep(10)
+      waited = waited + 10
+    }
+    assert_eq(exporter.spans.val.length(), 1)
+    let data = exporter.spans.val[0]
+    assert_eq(
+      data.attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE),
+      Some(@sdk.IntValue(200)),
+    )
+  }
+}
