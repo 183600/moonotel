@@ -438,7 +438,7 @@ fn ProtoWriter::write_string_field(
     let code = value.unsafe_get(i).to_int()
     if code >= 0x80 {
       self.len = start
-      let encoded = @utf8.encode(value)
+      let encoded = encode_utf8_lossy(value[:])
       self.write_bytes(encoded)
       return
     }

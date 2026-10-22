@@ -124,13 +124,13 @@ fn JsonBuf::write_char(self : JsonBuf, c : Char) -> Unit {
     self.buf.unsafe_set(self.len, code.to_byte())
     self.len = self.len + 1
   } else {
-    self.write_bytes(@utf8.encode(String::from_array([c])))
+    self.write_bytes(encode_utf8_lossy(String::from_array([c])[:]))
   }
 }
 
 // Append a string view as UTF-8: ASCII runs are copied directly and every run
-// of non-ASCII code units is encoded with `@utf8.encode` so that surrogate
-// pairs keep the exact same encoding as the rest of the SDK.
+// of non-ASCII code units is encoded with `encode_utf8_lossy` so that invalid
+// UTF-16 surrogate sequences are replaced instead of aborting the encoder.
 
 ///|
 fn JsonBuf::write_view(self : JsonBuf, value : StringView) -> Unit {
@@ -173,7 +173,9 @@ fn JsonBuf::write_view(self : JsonBuf, value : StringView) -> Unit {
       run_end = run_end + 1
     }
     self.write_bytes(
-      @utf8.encode(value.view(start_offset=ascii_end, end_offset=run_end)),
+      encode_utf8_lossy(
+        value.view(start_offset=ascii_end, end_offset=run_end),
+      ),
     )
     i = run_end
   }

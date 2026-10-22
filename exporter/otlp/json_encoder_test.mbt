@@ -375,3 +375,37 @@ test "json_encoder_groups_by_resource_and_scope" {
   assert_eq(json_string_value(json_member(first_spans[0], "name")), "one")
   assert_eq(json_string_value(json_member(second_spans[0], "name")), "two")
 }
+
+///|
+test "json_encoder_replaces_unpaired_surrogates" {
+  let lone_high = String::from_array([(0xD800).unsafe_to_char()])
+  let lone_low = String::from_array([(0xDC00).unsafe_to_char()])
+  let span : @sdk.SpanData = {
+    ..json_test_span(),
+    name: "high" + lone_high + "low" + lone_low,
+  }
+  let root = encode_json([span])
+  let parsed = json_span_of(
+    json_array_value(json_member(root, "resourceSpans"))[0],
+    0,
+  )
+  assert_eq(
+    json_string_value(json_member(parsed, "name")),
+    "high\u{FFFD}low\u{FFFD}",
+  )
+}
+
+///|
+test "json_encoder_preserves_valid_surrogate_pairs" {
+  let pair = String::from_array([
+    (0xD83D).unsafe_to_char(),
+    (0xDE00).unsafe_to_char(),
+  ])
+  let span : @sdk.SpanData = { ..json_test_span(), name: "icon " + pair, }
+  let root = encode_json([span])
+  let parsed = json_span_of(
+    json_array_value(json_member(root, "resourceSpans"))[0],
+    0,
+  )
+  assert_eq(json_string_value(json_member(parsed, "name")), "icon \u{1F600}")
+}

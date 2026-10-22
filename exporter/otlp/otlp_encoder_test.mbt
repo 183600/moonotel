@@ -377,3 +377,31 @@ test "encode_trace_request_message_larger_than_two_megabytes" {
   let span_fields = parse_fields(spans[0].payload)
   assert_eq(attribute_value(span_fields, "big"), Some(big))
 }
+
+///|
+test "encode_span_replaces_unpaired_surrogates" {
+  let lone_high = String::from_array([(0xD800).unsafe_to_char()])
+  let span : @sdk.SpanData = {
+    ..sample_span(),
+    name: "bad" + lone_high + "name",
+  }
+  let span_fields = link_test_span_fields(span)
+  assert_eq(
+    first_of(span_fields, 5).unwrap().payload |> @utf8.decode_lossy,
+    "bad\u{FFFD}name",
+  )
+}
+
+///|
+test "encode_span_preserves_valid_surrogate_pairs" {
+  let pair = String::from_array([
+    (0xD83D).unsafe_to_char(),
+    (0xDE00).unsafe_to_char(),
+  ])
+  let span : @sdk.SpanData = { ..sample_span(), name: "icon " + pair, }
+  let span_fields = link_test_span_fields(span)
+  assert_eq(
+    first_of(span_fields, 5).unwrap().payload |> @utf8.decode_lossy,
+    "icon \u{1F600}",
+  )
+}
