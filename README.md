@@ -99,6 +99,12 @@ A recording span keeps its data readable after `end()`: the accessors return a
 snapshot of the recorded attributes, events and links, including when the
 provider has no processors registered.
 
+A `SpanContext` snapshots its validity when it is constructed. The ID views are
+read-only by contract; if an aliased ID array is shortened or zeroed anyway, the
+context is treated as invalid wherever it is consumed: starting a child creates
+a new root trace, an attribute-less link is dropped (a link carrying attributes
+or tracestate is kept), and no all-zero `traceparent` is written.
+
 `BatchSpanProcessor` keeps span completion cheap in the common case: `on_end`
 just enqueues, and when the queue is full it overwrites the oldest buffered
 span, increments `dropped_spans()`, and continues; export failures are counted
