@@ -1198,8 +1198,10 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
   }
 }
 
-// Inject the baggage of `context` into the carrier as a `baggage` header.
-// Does nothing when the context carries no baggage.
+// Inject the baggage of `context` into the carrier as a `baggage` header. When
+// the context carries no (valid) baggage, a stale `baggage` header left in a
+// reused carrier is removed instead: the header must never describe baggage
+// that is not in the context being propagated.
 
 ///|
 pub fn inject_baggage(
@@ -1208,7 +1210,7 @@ pub fn inject_baggage(
 ) -> Unit {
   match context_baggage_header(context) {
     Some(formatted) => carrier.set(baggage_header_name(), formatted)
-    None => ()
+    None => carrier.remove(baggage_header_name())
   }
 }
 
@@ -1237,7 +1239,8 @@ pub fn extract_baggage_entries(
 }
 
 // Inject an ordered list of baggage members into the carrier as a `baggage`
-// header. Does nothing when no member survives formatting.
+// header. When no member survives formatting, a stale `baggage` header left in
+// a reused carrier is removed.
 
 ///|
 pub fn inject_baggage_entries(
@@ -1247,6 +1250,8 @@ pub fn inject_baggage_entries(
   let formatted = format_baggage_entries(entries)
   if formatted != "" {
     carrier.set(baggage_header_name(), formatted)
+  } else {
+    carrier.remove(baggage_header_name())
   }
 }
 

@@ -302,7 +302,10 @@ validates and normalizes its explicit `tracestate` override, dropping a
 malformed value instead of writing an invalid header. `inject` removes a
 `tracestate` left in the carrier by an earlier injection when the context
 carries no valid state, so a stale value is never paired with a new
-`traceparent`.
+`traceparent`. The same rule applies to baggage: `inject_baggage` (and the
+baggage propagator) removes a stale `baggage` header from a reused carrier when
+the context carries no visible member. Baggage parsing and formatting enforce
+the W3C limits of 64 members and 8192 bytes; excess members are dropped whole.
 
 ## Context
 
