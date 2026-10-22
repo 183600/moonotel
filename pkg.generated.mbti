@@ -160,6 +160,14 @@ pub fn parse_traceparent(String) -> @api.SpanContext?
 
 pub fn parse_tracestate(String) -> String?
 
+pub fn percent_decode(String) -> String?
+
+pub fn percent_encode(String) -> String
+
+pub fn percent_encoded_length(String) -> Int32
+
+pub fn redact_sensitive_query_string(String) -> String
+
 pub fn reset_global_propagator() -> Unit
 
 pub fn sampling_decision_drop() -> @sdk.SamplingDecision
@@ -183,6 +191,8 @@ pub fn span_context(Array[Int32], Array[Int32], Int32, tracestate? : String, is_
 pub fn span_context_from_hex(String, String, Int32) -> @api.SpanContext
 
 pub fn traceparent_header_name() -> String
+
+pub fn traces_exporter_disabled() -> Bool
 
 pub fn traces_exporter_enabled(String) -> Bool
 
@@ -228,6 +238,10 @@ pub using @otlp {type OtlpHttpConfig}
 pub using @otlp {type OtlpHttpExporter}
 
 pub using @sdk {type Resource}
+
+pub using @sdk {type ResourceAttributes}
+
+pub type RetryWait = (Int32) -> Unit
 
 pub using @sdk {type Sampler}
 
