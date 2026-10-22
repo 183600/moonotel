@@ -559,7 +559,10 @@ pub fn OtlpHttpExporter::export_spans_http(
     if attempt > 0 {
       (self.retry_wait)(attempt)
     }
-    let response = (self.transport)(url, headers, body)
+    // The transport receives its own copy: a client wrapper may normalize or
+    // add headers, and that must not mutate the exporter's reusable snapshot
+    // or the headers of later attempts.
+    let response = (self.transport)(url, headers.copy(), body)
     if response.status_code == 200 {
       if json {
         return decode_export_response_json(response.body)
