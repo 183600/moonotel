@@ -199,12 +199,13 @@ pub fn[G] setup(
         }
     }
     provider = provider.with_span_processor(processor)
-    // The exporter's sender lives in `group`. Once the group exits the sender
-    // is gone, so shut the provider down to stop accepting spans that could
-    // never be exported. Defer registration order makes this run before the
-    // exporter's final drain, so queued spans are still flushed.
-    group.add_defer(() => provider.shutdown())
   }
+  // The setup is scoped to `group`: once it exits, stop accepting spans so a
+  // process-wide provider installed here cannot outlive the infrastructure it
+  // was built with. For OTLP the exporter's sender also lives in `group`;
+  // defer registration order makes this shutdown run before the exporter's
+  // final drain, so queued spans are still flushed.
+  group.add_defer(() => provider.shutdown())
   if install_global.unwrap_or(true) {
     @sdk.set_global_tracer_provider(provider)
   }

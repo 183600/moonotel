@@ -62,3 +62,22 @@ async test "async_setup_shuts_down_the_provider_when_its_group_exits" {
     None => fail("setup did not return a provider")
   }
 }
+
+///|
+async test "async_setup_shuts_down_console_provider_when_group_exits" {
+  let saved : Ref[@sdk.TracerProviderSdk?] = Ref(None)
+  @async.with_task_group() <| group => {
+    let provider = @async_runtime.setup(
+      group,
+      service_name="async-console-group-exit",
+      exporters=["console"],
+      install_global=false,
+    )
+    assert_false(provider.is_shutdown())
+    saved.val = Some(provider)
+  }
+  match saved.val {
+    Some(provider) => assert_true(provider.is_shutdown())
+    None => fail("setup did not return a provider")
+  }
+}
