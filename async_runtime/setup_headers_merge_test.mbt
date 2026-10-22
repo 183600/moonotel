@@ -22,12 +22,16 @@ async test "async setup merges programmatic and environment headers" {
     let seen : Ref[Map[String, String]?] = Ref(None)
     outer.spawn_bg(no_wait=true) <| () => {
       server.run_forever() <| ((request, body, connection) => {
-        let _ = body.read_all()
-        let headers : Map[String, String] = Map([])
-        for name, value in request.headers {
-          headers.set(name.to_string(), value)
+        let text = @utf8.decode_lossy(body.read_all().binary().exact_view())
+        // Ignore a stray retry from a concurrently running test that happens
+        // to reuse the ephemeral port.
+        if text.contains("async-header-merge") {
+          let headers : Map[String, String] = Map([])
+          for name, value in request.headers {
+            headers.set(name.to_string(), value)
+          }
+          seen.val = Some(headers)
         }
-        seen.val = Some(headers)
         connection.send_response(200, "OK")
       })
     }
