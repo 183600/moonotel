@@ -667,24 +667,46 @@ fn json_write_event(sb : JsonBuf, event : @sdk.SpanEvent) -> Unit {
 
 ///|
 fn json_write_link(sb : JsonBuf, link : @sdk.SpanLink) -> Unit {
-  sb.write_bytes(b"{\"traceId\":")
-  json_write_hex_quoted(sb, link.span_context.trace_id_view())
-  sb.write_bytes(b",\"spanId\":")
-  json_write_hex_quoted(sb, link.span_context.span_id_view())
+  sb.write_char('{')
+  let mut first = true
+  // An invalid link keeps its attributes/tracestate, but its IDs are not
+  // representable in OTLP and must not be written as a short hex string.
+  if has_encodable_link_ids(link.span_context) {
+    sb.write_bytes(b"\"traceId\":")
+    json_write_hex_quoted(sb, link.span_context.trace_id_view())
+    sb.write_bytes(b",\"spanId\":")
+    json_write_hex_quoted(sb, link.span_context.span_id_view())
+    first = false
+  }
   let tracestate = link.span_context.tracestate()
   if tracestate != "" {
-    sb.write_bytes(b",\"traceState\":")
+    if !first {
+      sb.write_char(',')
+    }
+    sb.write_bytes(b"\"traceState\":")
     json_write_escaped(sb, tracestate)
+    first = false
   }
   if link.attributes.length() > 0 {
-    sb.write_bytes(b",\"attributes\":")
+    if !first {
+      sb.write_char(',')
+    }
+    sb.write_bytes(b"\"attributes\":")
     json_write_attributes(sb, link.attributes)
+    first = false
   }
   if link.dropped_attributes_count > 0 {
-    sb.write_bytes(b",\"droppedAttributesCount\":")
+    if !first {
+      sb.write_char(',')
+    }
+    sb.write_bytes(b"\"droppedAttributesCount\":")
     json_write_int32(sb, link.dropped_attributes_count)
+    first = false
   }
-  sb.write_bytes(b",\"flags\":")
+  if !first {
+    sb.write_char(',')
+  }
+  sb.write_bytes(b"\"flags\":")
   json_write_uint32(sb, otlp_flags(link.span_context.trace_flags()))
   sb.write_char('}')
 }
@@ -790,6 +812,7 @@ fn json_write_span(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
 
 ///|
 pub fn encode_trace_request_json(spans : Array[@sdk.SpanData]) -> Bytes {
+  let spans = filter_encodable_spans(spans)
   if spans.length() == 0 {
     return b""
   }

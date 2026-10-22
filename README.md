@@ -248,6 +248,12 @@ Exporters are single-use sinks. `OtlpHttpExporter` rejects every batch after
 its queue on shutdown. Shutting a provider down drains batch processors before
 shutting their exporters down, so already-ending spans are not lost.
 
+The OTLP encoders validate live IDs at export time. A span whose trace ID is no
+longer exactly 16 nonzero bytes or whose span ID is no longer exactly 8 nonzero
+bytes is skipped instead of being serialized with a malformed `traceId` /
+`spanId`. A link with such an ID loses only its ID fields; its attributes and
+tracestate are still exported.
+
 ## Configuration
 
 Besides the OTLP variables above, the SDK reads the standard OpenTelemetry
