@@ -57,3 +57,20 @@ async test "async exporter does not mutate its cached request headers" {
     )
   }
 }
+
+///|
+test "async exporter config accessor returns an isolated header snapshot" {
+  let config = @otlp.OtlpHttpConfig::new(
+    endpoint="http://collector:4318",
+    headers=Map([("authorization", "Bearer token")]),
+  )
+  let exporter = OtlpHttpAsyncExporter::new(config)
+  let returned = exporter.config()
+  returned.headers.set("authorization", "changed")
+  returned.headers.set("x-added-later", "1")
+  assert_eq(
+    exporter.config().headers.get("authorization"),
+    Some("Bearer token"),
+  )
+  assert_eq(exporter.config().headers.get("x-added-later"), None)
+}

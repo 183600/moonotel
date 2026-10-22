@@ -604,11 +604,12 @@ pub fn OtlpHttpExporter::new(
   }
 }
 
-// The exporter configuration.
+// The exporter configuration, as an isolated copy: mutating the returned
+// header map cannot change the exporter or the headers of a later export.
 
 ///|
 pub fn OtlpHttpExporter::config(self : OtlpHttpExporter) -> OtlpHttpConfig {
-  self.config
+  { ..self.config, headers: self.config.headers.copy() }
 }
 
 // Whether `shutdown` has been called. A shut-down exporter rejects further

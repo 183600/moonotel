@@ -610,13 +610,14 @@ pub fn OtlpHttpAsyncExporter::new(
   }
 }
 
-// The exporter configuration.
+// The exporter configuration, as an isolated copy: mutating the returned
+// header map cannot change the exporter or its cached request headers.
 
 ///|
 pub fn OtlpHttpAsyncExporter::config(
   self : OtlpHttpAsyncExporter,
 ) -> @otlp.OtlpHttpConfig {
-  self.config
+  { ..self.config, headers: self.config.headers.copy() }
 }
 
 // Export a batch of finished spans.
