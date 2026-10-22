@@ -42,22 +42,31 @@ pub fn invalid_span_context() -> SpanContext {
 // `is_remote` must be `true` for contexts received through a propagator.
 
 ///|
-// Whether the serialized form of a byte array contains a nonzero byte. Values
-// outside 0..255 are serialized through their low eight bits (`bytes_to_hex`
-// and the OTLP/traceparent encoders all agree on that), so validity must use
-// the same interpretation: a context whose decimal IDs serialize to all zeros
-// is not valid even if the raw `Int32` elements are nonzero.
+// The byte produced by the hex/OTLP serializers for one ID element. In-range
+// values are used as-is; out-of-range values are rendered like `bytes_to_hex`
+// (the high nibble becomes "0" and the low nibble is kept).
+fn serialized_byte(value : Int32) -> Int32 {
+  if value >= 0 && value < 256 {
+    value
+  } else {
+    value & 0x0F
+  }
+}
+
+// Whether the serialized form of a byte array contains a nonzero byte. A
+// context whose decimal IDs serialize to all zeros is not valid even if the
+// raw `Int32` elements are nonzero.
 fn has_nonzero_byte(bytes : Array[Int32]) -> Bool {
   let len = bytes.length()
   let mut i = 0
   while i + 1 < len {
-    if (bytes.unsafe_get(i) & 0xFF) != 0 ||
-      (bytes.unsafe_get(i + 1) & 0xFF) != 0 {
+    if serialized_byte(bytes.unsafe_get(i)) != 0 ||
+      serialized_byte(bytes.unsafe_get(i + 1)) != 0 {
       return true
     }
     i = i + 2
   }
-  i < len && (bytes.unsafe_get(i) & 0xFF) != 0
+  i < len && serialized_byte(bytes.unsafe_get(i)) != 0
 }
 
 ///|

@@ -18,10 +18,19 @@ test "span_context_with_serially_zero_ids_is_invalid" {
   let sc = @api.span_context(trace_id, span_id, 1)
   assert_false(sc.is_valid())
   assert_eq(sc.span_id_hex(), "0000000000000000")
+
+  // 272 has a nonzero low byte (0x10) but serializes to "00" because only the
+  // low nibble is kept for out-of-range values.
+  let trace_id = Array::make(16, 0)
+  trace_id[0] = 272
+  let span_id = Array::make(8, 1)
+  let sc = @api.span_context(trace_id, span_id, 1)
+  assert_false(sc.is_valid())
+  assert_eq(sc.trace_id_hex(), "00000000000000000000000000000000")
 }
 
 ///|
-test "span_context_uses_the_low_byte_for_validity" {
+test "span_context_uses_the_serialized_byte_for_validity" {
   let trace_id = Array::make(16, 0)
   trace_id[0] = 256
   trace_id[1] = 1
