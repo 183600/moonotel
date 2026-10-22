@@ -318,6 +318,35 @@ async test "ServerCall::set_route records http.route and renames the span" {
 }
 
 ///|
+async test "ServerCall::set_route trims surrounding optional whitespace" {
+  let (tracer, exporter) = test_tracer("server-test-route-ows")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_on(
+        server,
+        call => {
+          assert_true(call.set_route(" \t/items/:id  "))
+          call.respond(200)
+        },
+        tracer~,
+      )
+    }
+    let (response, _body) = @http.get("http://127.0.0.1:\{port}/items/42")
+    assert_eq(response.code, 200)
+    @async.sleep(50)
+    assert_eq(exporter.spans.val.length(), 1)
+    let data = exporter.spans.val[0]
+    assert_eq(data.name, "GET /items/:id")
+    assert_eq(
+      data.attributes.get(@sdk.HTTP_ROUTE),
+      Some(@sdk.StringValue("/items/:id")),
+    )
+  }
+}
+
+///|
 async test "ServerCall::set_route ignores an empty or blank route" {
   let (tracer, exporter) = test_tracer("server-test-empty-route")
   @async.with_task_group() <| group => {

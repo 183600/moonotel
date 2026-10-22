@@ -535,9 +535,11 @@ pub fn ServerCall::set_route(self : ServerCall, route : String) -> Bool {
       // `http.route` describes a matched route. An empty or whitespace-only
       // value means that no route could be matched, so leave the span name and
       // attributes unchanged instead of recording an empty route or renaming
-      // the span to `"METHOD "`. The return value still reports whether tracing
-      // is enabled.
-      if route.trim() != "" {
+      // the span to `"METHOD "`. Surrounding OWS is not part of a route, so a
+      // padded match is recorded in its normalized form. The return value still
+      // reports whether tracing is enabled.
+      let route = route.trim().to_owned()
+      if route != "" {
         span.set_attribute(@sdk.HTTP_ROUTE, @sdk.StringValue(route))
         span.update_name(http_method_name(self.request.meth) + " " + route)
       }
