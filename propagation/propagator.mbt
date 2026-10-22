@@ -151,8 +151,10 @@ pub extend CompositePropagator with TextMapPropagator::{inject, extract}
 // Build a composite propagator from `OTEL_PROPAGATORS`, a comma-separated
 // list of propagator names. Unset or blank values select the default
 // `tracecontext,baggage`; `none` disables propagation; unknown names are
-// ignored. Names are matched case-insensitively and duplicates (including
-// `none` alongside other names) are reduced to their first occurrence.
+// ignored. When every provided name is unknown, the default is used as well,
+// so a typo cannot silently disable propagation. Names are matched
+// case-insensitively and duplicates (including `none` alongside other names)
+// are reduced to their first occurrence.
 
 ///|
 pub fn CompositePropagator::from_env() -> CompositePropagator {
@@ -191,6 +193,15 @@ pub fn CompositePropagator::from_env() -> CompositePropagator {
         }
       _ => ()
     }
+  }
+  if propagators.length() == 0 {
+    // The variable held only unsupported names (for example `b3`). Treat the
+    // setting as invalid and keep the documented default instead of silently
+    // disabling all propagation.
+    let created : &TextMapPropagator = TraceContextPropagator::new()
+    propagators.push(created)
+    let created : &TextMapPropagator = BaggagePropagator::new()
+    propagators.push(created)
   }
   CompositePropagator::new(propagators)
 }
