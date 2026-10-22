@@ -329,11 +329,11 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
     Some(value) => value
     None => "http://localhost:4318"
   }
-  let headers = match @env.get_env_var("OTEL_EXPORTER_OTLP_HEADERS") {
+  let headers = match non_blank_env_value("OTEL_EXPORTER_OTLP_HEADERS") {
     Some(value) => parse_headers(value)
     None => Map([])
   }
-  match @env.get_env_var("OTEL_EXPORTER_OTLP_TRACES_HEADERS") {
+  match non_blank_env_value("OTEL_EXPORTER_OTLP_TRACES_HEADERS") {
     Some(value) => {
       let specific = parse_headers(value)
       for key, header_value in specific {
