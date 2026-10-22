@@ -817,7 +817,7 @@ pub fn SpanSdk::add_link(self : SpanSdk, link : SpanLink) -> Unit {
       break
     }
   }
-  let record = link.span_context.is_valid() ||
+  let record = has_live_valid_ids(link.span_context) ||
     has_attribute ||
     link.span_context.tracestate() != ""
   if record {
