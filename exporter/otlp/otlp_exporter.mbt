@@ -50,6 +50,16 @@ pub const OTLP_HTTP_PROTOBUF_PROTOCOL : String = "http/protobuf"
 ///|
 pub const OTLP_HTTP_JSON_PROTOCOL : String = "http/json"
 
+// Default `User-Agent` header value. The OTLP exporter specification asks
+// protocol exporters to identify themselves, their language and their version
+// (`OTel-OTLP-Exporter-<Language>/<Version>`).
+// https://opentelemetry.io/docs/specs/otel/protocol/exporter/#user-agent
+
+///|
+fn default_user_agent() -> String {
+  "OTel-OTLP-Exporter-MoonBit/" + @sdk.SDK_VERSION
+}
+
 // Number of retries used when `max_retries` is not set explicitly. OTLP
 // requires transient errors (429/502/503/504 and transport failures) to be
 // retried, so retries are enabled by default.
@@ -489,8 +499,11 @@ fn map_capacity_for_entries(entries : Int) -> Int {
 ///|
 fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
   let headers = Map(
-    [], capacity=map_capacity_for_entries(config.headers.length() + 2),
+    [], capacity=map_capacity_for_entries(config.headers.length() + 3),
   )
+  // Install the default `User-Agent` first: an explicitly configured one is
+  // copied below and replaces it case-insensitively.
+  set_header(headers, "user-agent", default_user_agent())
   for key, value in config.headers {
     // HTTP header names are case-insensitive, so drop any user-configured
     // `Content-Type`, `Accept` or `Content-Encoding` spelling before adding

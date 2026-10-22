@@ -42,6 +42,14 @@ fn is_json_protocol(protocol : String) -> Bool {
   normalize_enum(protocol) == @otlp.OTLP_HTTP_JSON_PROTOCOL
 }
 
+// Default `User-Agent` header value, following the OTLP exporter
+// specification (`OTel-OTLP-Exporter-<Language>/<Version>`).
+
+///|
+fn default_user_agent() -> String {
+  "OTel-OTLP-Exporter-MoonBit/" + @sdk.SDK_VERSION
+}
+
 ///|
 fn is_gzip_compression(compression : String) -> Bool {
   normalize_enum(compression) == "gzip"
@@ -54,8 +62,11 @@ fn request_headers(
 ) -> Map[@http.CaseInsensitiveString, String] {
   let headers = Map(
     [],
-    capacity=map_capacity_for_entries(config.headers.length() + 3),
+    capacity=map_capacity_for_entries(config.headers.length() + 4),
   )
+  // Install the default `User-Agent` first: a configured one below replaces
+  // it case-insensitively.
+  headers.set(@http.CaseInsensitiveString("user-agent"), default_user_agent())
   for key, value in config.headers {
     headers.set(@http.CaseInsensitiveString(key), value)
   }
