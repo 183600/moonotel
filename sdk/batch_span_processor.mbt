@@ -24,6 +24,8 @@ pub struct BatchSpanProcessor {
   mut count : Int32
   mut last_flush_time_millis : UInt64
   mut shutdown_called : Bool
+  // Guards the drain sequence against a reentrant `shutdown` from an exporter.
+  mut draining : Bool
   mut dropped_spans : UInt64
   mut export_failures : UInt64
 }
@@ -63,6 +65,7 @@ pub fn BatchSpanProcessor::new(
     count: 0,
     last_flush_time_millis: @env.now(),
     shutdown_called: false,
+    draining: false,
     dropped_spans: 0,
     export_failures: 0,
   }
@@ -281,7 +284,16 @@ pub impl SpanProcessor for BatchSpanProcessor with fn force_flush(self) {
 pub impl SpanProcessor for BatchSpanProcessor with fn drain_before_shutdown(
   self,
 ) {
-  if !self.shutdown_called && self.count > 0 {
+  // An exporter may call `shutdown` reentrantly while draining. Let the outer
+  // drain finish so the exporter is not closed before the provider has drained
+  // the remaining processors that may share it. The provider calls `shutdown`
+  // after every drain, which performs the actual close exactly once.
+  if self.shutdown_called || self.draining {
+    return
+  }
+  self.draining = true
+  defer { self.draining = false }
+  if self.count > 0 {
     let now = @env.now()
     while self.count > 0 {
       self.flush_batch_at(now)
@@ -291,6 +303,11 @@ pub impl SpanProcessor for BatchSpanProcessor with fn drain_before_shutdown(
 
 ///|
 pub impl SpanProcessor for BatchSpanProcessor with fn shutdown(self) {
+  if self.draining {
+    // A drain is in progress (and may have triggered this call through the
+    // exporter). The provider will call `shutdown` again after all drains.
+    return
+  }
   if !self.shutdown_called {
     // Mark the processor shut down before draining. An exporter may call back
     // into `shutdown` from `export_spans`; the reentrant call must not drain

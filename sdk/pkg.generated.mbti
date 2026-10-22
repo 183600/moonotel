@@ -129,6 +129,7 @@ pub struct BatchSpanProcessor {
   mut count : Int32
   mut last_flush_time_millis : UInt64
   mut shutdown_called : Bool
+  mut draining : Bool
   mut dropped_spans : UInt64
   mut export_failures : UInt64
 }
