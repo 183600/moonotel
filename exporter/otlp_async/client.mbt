@@ -807,6 +807,18 @@ pub async fn export_spans(
   if spans.length() == 0 {
     return @sdk.ExportSuccess
   }
+  // Validate the configuration before encoding. An all-malformed batch also
+  // produces an empty body, but an unusable protocol or compression setting
+  // is still an export failure rather than a silent success.
+  if !@otlp.is_supported_protocol(effective_protocol(config.protocol)) {
+    return @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol)
+  }
+  let compression = effective_compression(config.compression)
+  if compression != "gzip" && compression != "none" {
+    return @sdk.ExportFailure(
+      "unsupported OTLP compression: " + config.compression,
+    )
+  }
   let body = if is_json_protocol(config.protocol) {
     @otlp.encode_trace_request_json(spans)
   } else {
