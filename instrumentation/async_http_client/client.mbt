@@ -503,6 +503,32 @@ fn plain_headers(
   }
 }
 
+// Trim HTTP optional whitespace (SP / HTAB only) from both ends of a header
+// value. The semantic conventions define captured header values and
+// `user_agent.original` without the surrounding OWS.
+
+///|
+fn trim_header_ows(value : StringView) -> StringView {
+  let len = value.length()
+  let mut start = 0
+  while start < len {
+    let code = value.unsafe_get(start).to_int()
+    if code != 0x20 && code != 0x09 {
+      break
+    }
+    start = start + 1
+  }
+  let mut end = len
+  while end > start {
+    let code = value.unsafe_get(end - 1).to_int()
+    if code != 0x20 && code != 0x09 {
+      break
+    }
+    end = end - 1
+  }
+  value.view(start_offset=start, end_offset=end)
+}
+
 ///|
 fn traced_headers(
   headers : Map[String, String]?,
@@ -677,6 +703,17 @@ pub async fn request(
         @http_header_capture.ENV_CLIENT_REQUEST_HEADERS,
       )
       request_capture.record_request(sent_headers, span)
+      // Record the User-Agent actually sent (the HTTP client supplies one when
+      // the caller does not). The surrounding optional whitespace is not part
+      // of the header value, so `user_agent.original` omits it.
+      match sent_headers.get(@http.CaseInsensitiveString("user-agent")) {
+        Some(value) =>
+          span.set_attribute(
+            @sdk.USER_AGENT_ORIGINAL,
+            @sdk.StringValue(trim_header_ows(value[:]).to_owned()),
+          )
+        None => ()
+      }
       let (response, client) = match outcome {
         Ok(result) => result
         Err(error) => {
