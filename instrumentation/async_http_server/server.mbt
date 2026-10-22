@@ -728,7 +728,12 @@ pub async fn ServerCall::respond(
   match headers {
     Some(values) =>
       for key, value in values {
-        extra_headers.set(@http.CaseInsensitiveString(key), value)
+        // Header strings are written as UTF-8 by the transport; replace
+        // unpaired surrogates instead of aborting the connection task.
+        extra_headers.set(
+          @http.CaseInsensitiveString(sanitize_utf16_surrogates(key)),
+          sanitize_utf16_surrogates(value),
+        )
       }
     None => ()
   }
@@ -755,7 +760,7 @@ pub async fn ServerCall::respond(
   }
   self.connection.send_response(
     status_code,
-    reason.unwrap_or(status_reason(status_code)),
+    sanitize_utf16_surrogates(reason.unwrap_or(status_reason(status_code))),
     extra_headers~,
   )
   let body_allowed = match (self.request.meth, status_code) {

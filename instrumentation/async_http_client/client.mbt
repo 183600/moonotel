@@ -410,6 +410,58 @@ fn map_capacity_for_entries(entries : Int) -> Int {
   }
 }
 
+// Replace unpaired UTF-16 surrogates with U+FFFD so that request header
+// strings can always be encoded as UTF-8. Well-formed strings are returned
+// unchanged.
+
+///|
+fn sanitize_utf16_surrogates(value : String) -> String {
+  let len = value.length()
+  let mut i = 0
+  while i < len {
+    let unit = value.unsafe_get(i).to_int()
+    if unit >= 0xD800 && unit <= 0xDBFF {
+      if i + 1 < len {
+        let next = value.unsafe_get(i + 1).to_int()
+        if next >= 0xDC00 && next <= 0xDFFF {
+          i = i + 2
+          continue
+        }
+      }
+      break
+    } else if unit >= 0xDC00 && unit <= 0xDFFF {
+      break
+    }
+    i = i + 1
+  }
+  if i >= len {
+    return value
+  }
+  let sb = StringBuilder(size_hint=len)
+  let mut j = 0
+  while j < len {
+    let unit = value.unsafe_get(j).to_int()
+    if unit >= 0xD800 && unit <= 0xDBFF {
+      if j + 1 < len {
+        let next = value.unsafe_get(j + 1).to_int()
+        if next >= 0xDC00 && next <= 0xDFFF {
+          sb.write_char(unit.unsafe_to_char())
+          sb.write_char(next.unsafe_to_char())
+          j = j + 2
+          continue
+        }
+      }
+      sb.write_char((0xFFFD).unsafe_to_char())
+    } else if unit >= 0xDC00 && unit <= 0xDFFF {
+      sb.write_char((0xFFFD).unsafe_to_char())
+    } else {
+      sb.write_char(unit.unsafe_to_char())
+    }
+    j = j + 1
+  }
+  sb.to_string()
+}
+
 ///|
 fn plain_headers(
   headers : Map[String, String]?,
@@ -421,7 +473,12 @@ fn plain_headers(
       let total = values.length() + extra
       let out = Map([], capacity=map_capacity_for_entries(total))
       for key, value in values {
-        out.set(@http.CaseInsensitiveString(key), value)
+        // Header strings are written as UTF-8 by the transport; replace
+        // unpaired surrogates instead of aborting the request.
+        out.set(
+          @http.CaseInsensitiveString(sanitize_utf16_surrogates(key)),
+          sanitize_utf16_surrogates(value),
+        )
       }
       out
     }

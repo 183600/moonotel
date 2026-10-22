@@ -57,3 +57,28 @@ async test "server response body replaces unpaired surrogates with U+FFFD" {
     )
   }
 }
+
+///|
+async test "server response header values replace unpaired surrogates" {
+  let high = String::from_array([(0xD800).unsafe_to_char()])
+  let low = String::from_array([(0xDC00).unsafe_to_char()])
+  let replacement = (0xFFFD).unsafe_to_char().to_string()
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_on(server, call => {
+        let headers : Map[String, String] = Map([
+          ("x-surrogate", "v" + high + "w" + low + "x"),
+        ])
+        call.respond(200, headers~)
+      })
+    }
+    let (response, _body) = @http.get("http://127.0.0.1:\{port}/header")
+    assert_eq(response.code, 200)
+    assert_eq(
+      response.headers.get(@http.CaseInsensitiveString("x-surrogate")),
+      Some("v" + replacement + "w" + replacement + "x"),
+    )
+  }
+}
