@@ -620,6 +620,18 @@ pub async fn request(
       let (scheme, host, port) = split_url_parts(url)
       if scheme != "" {
         span.set_attribute(@sdk.URL_SCHEME, @sdk.StringValue(scheme))
+        let host = strip_ipv6_brackets(host)
+        // A relative reference has no authority, so it has no known server
+        // address or port. Do not turn its first path segment into fabricated
+        // `server.*` attributes.
+        if host != "" {
+          span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(host))
+          // `-1` marks an invalid explicit port; port 0 is a valid explicit
+          // value and must still be recorded.
+          if port >= 0 {
+            span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
+          }
+        }
       }
       let (url_path, url_query) = split_url_path_query(url)
       span.set_attribute(
@@ -629,15 +641,6 @@ pub async fn request(
       let url_query = @sdk.redact_sensitive_query_string(url_query)
       if url_query != "" {
         span.set_attribute(@sdk.URL_QUERY, @sdk.StringValue(url_query))
-      }
-      let host = strip_ipv6_brackets(host)
-      if host != "" {
-        span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(host))
-        // `-1` marks an invalid explicit port; port 0 is a valid explicit
-        // value and must still be recorded.
-        if port >= 0 {
-          span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
-        }
       }
       let sent_headers = traced_headers(
         headers,
