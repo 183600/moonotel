@@ -105,6 +105,32 @@ pub fn HeaderCapture::captures(self : HeaderCapture, name : String) -> Bool {
   }
 }
 
+// Trim HTTP optional whitespace (SP / HTAB) from both ends of a header value.
+// Header values in span attributes follow the semantic conventions and omit
+// the surrounding OWS.
+
+///|
+fn trim_header_ows(value : StringView) -> StringView {
+  let len = value.length()
+  let mut start = 0
+  while start < len {
+    let code = value.unsafe_get(start).to_int()
+    if code != 0x20 && code != 0x09 {
+      break
+    }
+    start = start + 1
+  }
+  let mut end = len
+  while end > start {
+    let code = value.unsafe_get(end - 1).to_int()
+    if code != 0x20 && code != 0x09 {
+      break
+    }
+    end = end - 1
+  }
+  value.view(start_offset=start, end_offset=end)
+}
+
 ///|
 fn record_headers(
   capture : HeaderCapture,
@@ -116,7 +142,7 @@ fn record_headers(
     for name, value in headers {
       span.set_attribute(
         prefix + name.to_string().to_lower(),
-        @sdk.StringArrayValue([value]),
+        @sdk.StringArrayValue([trim_header_ows(value[:]).to_owned()]),
       )
     }
   } else if capture.names.length() > 0 {
@@ -125,7 +151,7 @@ fn record_headers(
         Some(value) =>
           span.set_attribute(
             prefix + name,
-            @sdk.StringArrayValue([value]),
+            @sdk.StringArrayValue([trim_header_ows(value[:]).to_owned()]),
           )
         None => ()
       }

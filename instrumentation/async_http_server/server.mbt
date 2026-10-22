@@ -951,7 +951,7 @@ async fn serve_call(
         Some(agent) =>
           server_span.set_attribute(
             @sdk.USER_AGENT_ORIGINAL,
-            @sdk.StringValue(agent),
+            @sdk.StringValue(trim_header_ows(agent[:]).to_owned()),
           )
         None => ()
       }

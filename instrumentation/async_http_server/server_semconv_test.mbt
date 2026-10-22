@@ -89,3 +89,39 @@ async test "server omits user_agent.original when the header is absent" {
     assert_eq(data.attributes.get(@sdk.USER_AGENT_ORIGINAL), None)
   }
 }
+
+///|
+async test "server trims optional whitespace around user_agent.original" {
+  let exporter : SemconvRecordingExporter = { spans: Ref([]), }
+  let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
+  let provider = @sdk.TracerProviderSdk::new(
+    service_name="semconv-ows-test",
+  ).with_span_processor(processor)
+  let tracer = provider.get_tracer("semconv-ows-test")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_on(
+        server,
+        call => call.respond(204),
+        tracer~,
+      )
+    }
+    let connection = @socket.Tcp::connect(
+      @socket.Addr::parse("127.0.0.1:\{port}"),
+    )
+    connection.write(
+      "GET /ows-agent HTTP/1.1\r\nHost: 127.0.0.1\r\nUser-Agent:   padded agent  \t\r\nConnection: close\r\n\r\n",
+    )
+    let _ = connection.read_all()
+    connection.close()
+    @async.sleep(50)
+    assert_eq(exporter.spans.val.length(), 1)
+    let data = exporter.spans.val[0]
+    assert_eq(
+      data.attributes.get(@sdk.USER_AGENT_ORIGINAL),
+      Some(@sdk.StringValue("padded agent")),
+    )
+  }
+}

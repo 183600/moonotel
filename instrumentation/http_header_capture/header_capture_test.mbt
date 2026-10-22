@@ -145,3 +145,24 @@ test "disabled capture records nothing" {
   assert_eq(data.attributes.get("http.request.header.x-one"), None)
   assert_eq(data.attributes.get("http.response.header.x-one"), None)
 }
+
+///|
+test "captured header values omit surrounding optional whitespace" {
+  let (span, exporter) = capture_span()
+  let headers : @http.Headers = Map([
+    (@http.CaseInsensitiveString("X-Padded"), " \tvalue  "),
+    (@http.CaseInsensitiveString("X-Other"), "\t other \t"),
+  ])
+  let capture = @http_header_capture.HeaderCapture::parse("x-padded,*")
+  capture.record_request(headers, span)
+  span.end()
+  let data = exporter.spans.val[0]
+  assert_eq(
+    data.attributes.get("http.request.header.x-padded"),
+    Some(@sdk.StringArrayValue(["value"])),
+  )
+  assert_eq(
+    data.attributes.get("http.request.header.x-other"),
+    Some(@sdk.StringArrayValue(["other"])),
+  )
+}
