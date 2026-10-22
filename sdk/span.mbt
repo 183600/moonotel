@@ -977,6 +977,24 @@ fn snapshot_links(links : Array[SpanLink]) -> Array[SpanLink] {
   links
 }
 
+// Deep-copy a span snapshot, including every collection and ID array. Span
+// processors receive one copy each, so a processor that mutates its
+// `SpanData` cannot change what a later processor, the span accessors or the
+// exporter sees.
+
+///|
+fn SpanData::copy(self : SpanData) -> SpanData {
+  {
+    ..self,
+    span_context: @api.SpanContext::copy(self.span_context),
+    parent_span_id: self.parent_span_id.copy(),
+    attributes: copy_attribute_map(self.attributes),
+    events: copy_events(self.events),
+    links: copy_links(self.links),
+    resource: self.resource.copy(),
+  }
+}
+
 // Build the immutable export snapshot of a span, moving its attribute, event
 // and link collections into the snapshot. The maps and arrays are not shared
 // with anything else: the span clears its own references in `end`, and
@@ -1039,10 +1057,12 @@ pub fn SpanSdk::end(self : SpanSdk, end_time_unix_nano? : Int64) -> Unit {
   if self.recording && self.processors.length() > 0 {
     let data = SpanData::take_from_span(self)
     // Keep the snapshot reachable so accessors still report the recorded
-    // collections after the mutable fields have been cleared.
+    // collections after the mutable fields have been cleared. Each processor
+    // gets its own copy so one processor cannot mutate the snapshot seen by a
+    // later processor or by the span accessors.
     self.snapshot = Some(data)
     for processor in self.processors {
-      processor.on_end(data)
+      processor.on_end(data.copy())
     }
   }
 }
