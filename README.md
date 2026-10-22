@@ -111,12 +111,14 @@ canonical 16/8-byte and 32/16-character shapes by reporting a shortened or grown
 ID as the all-zero ID. An invalid context is never reported as remote.
 
 `BatchSpanProcessor` keeps span completion cheap in the common case: `on_end`
-just enqueues, and when the queue is full it overwrites the oldest buffered
-span, increments `dropped_spans()`, and continues; export failures are counted
-separately in `export_failures()`. Note that export itself runs
-synchronously: once the live queue reaches `max_export_batch_size` the batch
-is exported on the thread that ends the span, and `tick()` likewise exports on
-its caller (the async exporter in
+just enqueues, and export failures are counted separately in
+`export_failures()`. The effective export batch size is capped at the queue
+size, so the synchronous processor normally flushes as soon as a batch is full;
+the queue-overflow path is defensive: if the queue ever does fill, the oldest
+buffered span is overwritten and counted by `dropped_spans()`. Note that export
+itself runs synchronously: once the live queue reaches
+`max_export_batch_size` the batch is exported on the thread that ends the span,
+and `tick()` likewise exports on its caller (the async exporter in
 `183600/moonotel/async_runtime` moves this off the hot path). The queue
 size, batch size, and flush interval are configurable through `BatchConfig` /
 `OTEL_BSP_*`. Timed flushes are driven by `tick()` (or by span completion), so
@@ -173,7 +175,11 @@ while the handler runs, and ends the span afterwards. `set_route` records
 `http.route` and renames the span to `METHOD route`; an empty or blank route is
 ignored because no route was matched. `respond` records
 `http.response.status_code` and marks 5xx spans as `Error`. Handler
-exceptions are recorded as `exception` events and re-raised.
+exceptions are recorded as `exception` events and re-raised. `http_method()`,
+`header(name)` and `span_context()` expose the request method, a header lookup
+and the server span context to the handler; `start_span` creates a child span
+explicitly parented to the request, even when several connections run
+concurrently.
 
 ### Client
 
