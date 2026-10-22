@@ -114,7 +114,7 @@ pub struct SpanSdk {
   processors : Array[&SpanProcessor]
   // Shared with the provider. Once it is set, no further processor callbacks
   // may run, even when a processor shuts the provider down reentrantly.
-  provider_shutdown : Ref[Bool]
+  priv provider_shutdown : Ref[Bool]
   resource : Map[String, AttributeValue]
   scope_name : String
   scope_version : String
