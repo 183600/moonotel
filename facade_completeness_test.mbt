@@ -68,3 +68,17 @@ test "facade_reexports_http_header_validation" {
   assert_true(@moonotel.is_valid_http_header_value("café"))
   assert_false(@moonotel.is_valid_http_header_value("a\r\nb"))
 }
+
+///|
+test "facade_exposes_batch_config_fields" {
+  // `BatchConfig` mirrors the `OTEL_BSP_*` settings. Expose the normalized
+  // fields so facade users can inspect the configuration they pass around.
+  let config = @moonotel.BatchConfig::new(
+    max_queue_size=4,
+    max_export_batch_size=10,
+    flush_interval_millis=0,
+  )
+  assert_eq(config.max_queue_size, 4)
+  assert_eq(config.max_export_batch_size, 4)
+  assert_eq(config.flush_interval_millis, 0)
+}

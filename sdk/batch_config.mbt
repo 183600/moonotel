@@ -34,7 +34,7 @@ fn env_duration(name : String, default : Int32) -> Int32 {
 }
 
 ///|
-pub struct BatchConfig {
+pub(all) struct BatchConfig {
   max_queue_size : Int32
   max_export_batch_size : Int32
   flush_interval_millis : Int32

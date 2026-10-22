@@ -110,7 +110,7 @@ pub fn AttributeValue::equal(Self, Self) -> Bool
 pub fn AttributeValue::not_equal(Self, Self) -> Bool
 pub fn AttributeValue::to_repr(Self) -> @debug.Repr
 
-pub struct BatchConfig {
+pub(all) struct BatchConfig {
   max_queue_size : Int32
   max_export_batch_size : Int32
   flush_interval_millis : Int32
