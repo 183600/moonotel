@@ -582,47 +582,51 @@ fn remove_trace_context(carrier : TextMapCarrier) -> Unit {
 // Inject a SpanContext into the carrier as a `traceparent` header, plus a
 // `tracestate` header when the SpanContext carries a valid one. A stale
 // `tracestate` already present in the carrier is removed when the context has
-// no valid state, so it cannot be paired with the new `traceparent`.
-// Does nothing when the SpanContext is invalid.
+// no valid state, so it cannot be paired with the new `traceparent`. An
+// invalid SpanContext writes no trace headers and clears any left in the
+// carrier by an earlier injection, so a reused carrier cannot leak an old
+// trace into an outgoing request.
 
 ///|
 pub fn inject(sc : @api.SpanContext, carrier : TextMapCarrier) -> Unit {
-  if sc.is_valid() {
-    let formatted = format_traceparent(sc)
-    if formatted == "" {
-      // The live IDs no longer form a valid traceparent (for example a caller
-      // zeroed an aliased ID array). Do not write an empty header, and do not
-      // leave a stale one that would be paired with an unrelated tracestate.
-      remove_trace_context(carrier)
-      return
-    }
-    // Replace any header left under a different spelling, so the carrier holds
-    // exactly one `traceparent` value rather than both the old and new one.
-    carrier.remove(traceparent_header_name())
-    carrier.set(traceparent_header_name(), formatted)
-    let state = sc.tracestate()
-    if state != "" {
-      match normalized_tracestate_for_inject(state) {
-        Some(normalized) =>
-          if normalized != "" {
-            // See above: a differently-cased stale header must not survive
-            // alongside the normalized value just written.
-            carrier.remove(tracestate_header_name())
-            carrier.set(tracestate_header_name(), normalized)
-          } else {
-            // The context carries no members: do not leave an unrelated
-            // `tracestate` from an earlier injection attached to the new
-            // `traceparent`.
-            carrier.remove(tracestate_header_name())
-          }
-        None =>
-          // An invalid state is dropped; a stale header would otherwise be
-          // propagated with a `traceparent` it does not belong to.
+  if !sc.is_valid() {
+    remove_trace_context(carrier)
+    return
+  }
+  let formatted = format_traceparent(sc)
+  if formatted == "" {
+    // The live IDs no longer form a valid traceparent (for example a caller
+    // zeroed an aliased ID array). Do not write an empty header, and do not
+    // leave a stale one that would be paired with an unrelated tracestate.
+    remove_trace_context(carrier)
+    return
+  }
+  // Replace any header left under a different spelling, so the carrier holds
+  // exactly one `traceparent` value rather than both the old and new one.
+  carrier.remove(traceparent_header_name())
+  carrier.set(traceparent_header_name(), formatted)
+  let state = sc.tracestate()
+  if state != "" {
+    match normalized_tracestate_for_inject(state) {
+      Some(normalized) =>
+        if normalized != "" {
+          // See above: a differently-cased stale header must not survive
+          // alongside the normalized value just written.
           carrier.remove(tracestate_header_name())
-      }
-    } else {
-      carrier.remove(tracestate_header_name())
+          carrier.set(tracestate_header_name(), normalized)
+        } else {
+          // The context carries no members: do not leave an unrelated
+          // `tracestate` from an earlier injection attached to the new
+          // `traceparent`.
+          carrier.remove(tracestate_header_name())
+        }
+      None =>
+        // An invalid state is dropped; a stale header would otherwise be
+        // propagated with a `traceparent` it does not belong to.
+        carrier.remove(tracestate_header_name())
     }
+  } else {
+    carrier.remove(tracestate_header_name())
   }
 }
 
@@ -653,7 +657,8 @@ pub fn extract(carrier : TextMapCarrier) -> @api.SpanContext? {
   }
 }
 
-// Inject both `traceparent` and (when non-empty) `tracestate`.
+// Inject both `traceparent` and (when non-empty) `tracestate`. An invalid
+// SpanContext clears any trace headers left in a reused carrier.
 
 ///|
 pub fn inject_with_tracestate(
@@ -662,6 +667,7 @@ pub fn inject_with_tracestate(
   carrier : TextMapCarrier,
 ) -> Unit {
   if !sc.is_valid() {
+    remove_trace_context(carrier)
     return
   }
   match tracestate {
@@ -677,8 +683,7 @@ pub fn inject_with_tracestate(
       if formatted == "" {
         // The live IDs cannot be serialized as a valid traceparent; suppress
         // both headers rather than writing an empty or stale pair.
-        carrier.remove(traceparent_header_name())
-        carrier.remove(tracestate_header_name())
+        remove_trace_context(carrier)
         return
       }
       carrier.remove(traceparent_header_name())
