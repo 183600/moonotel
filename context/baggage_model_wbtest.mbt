@@ -85,10 +85,17 @@ test "context baggage semantics" {
           }
         D(k) => if !probe_seen(seen, k) { seen.push(k) }
         M(pairs) =>
-          for pair in pairs {
-            if !probe_seen(seen, pair.0) {
-              seen.push(pair.0)
-              expected.push(BaggageEntry::new(pair.0, pair.1))
+          if pairs.length() == 0 {
+            // An empty baggage update hides every older operation. Values
+            // added after it (already visited by this backwards scan) stay
+            // visible.
+            i = -1
+          } else {
+            for pair in pairs {
+              if !probe_seen(seen, pair.0) {
+                seen.push(pair.0)
+                expected.push(BaggageEntry::new(pair.0, pair.1))
+              }
             }
           }
       }

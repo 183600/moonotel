@@ -16,6 +16,9 @@ pub struct Context {
   // Baggage members carried by this context node, used by
   // `with_baggage_entries`.
   baggage_list : Array[BaggageEntry]?
+  // When set, every baggage value stored in an outer node is hidden. This is
+  // the marker installed by `without_baggage` and by an empty baggage update.
+  clear_baggage : Bool
   parent : Context?
 }
 
@@ -71,6 +74,7 @@ let root_context : Context = {
   properties: None,
   baggage_map: None,
   baggage_list: None,
+  clear_baggage: false,
   parent: None,
 }
 
@@ -94,6 +98,7 @@ pub fn Context::with_span(self : Context, sc : @api.SpanContext) -> Context {
     properties: None,
     baggage_map: None,
     baggage_list: None,
+    clear_baggage: false,
     parent: Some(self),
   }
 }
@@ -113,6 +118,7 @@ pub fn Context::with_value(
     properties: None,
     baggage_map: None,
     baggage_list: None,
+    clear_baggage: false,
     parent: Some(self),
   }
 }
@@ -139,6 +145,7 @@ pub fn Context::with_baggage_entry(
     properties,
     baggage_map: None,
     baggage_list: None,
+    clear_baggage: false,
     parent: Some(self),
   }
 }
@@ -156,6 +163,26 @@ pub fn Context::without_value(self : Context, key : String) -> Context {
     properties: None,
     baggage_map: None,
     baggage_list: None,
+    clear_baggage: false,
+    parent: Some(self),
+  }
+}
+
+// Derive a context in which no baggage value is visible: every value stored in
+// an outer context is hidden, including keys added later only if they are added
+// to the derived context itself. A later `with_value`/`with_baggage` call can
+// introduce new members.
+
+///|
+pub fn Context::without_baggage(self : Context) -> Context {
+  {
+    span_ctx: None,
+    key: None,
+    value: None,
+    properties: None,
+    baggage_map: None,
+    baggage_list: None,
+    clear_baggage: true,
     parent: Some(self),
   }
 }
@@ -169,7 +196,7 @@ pub fn Context::with_baggage(
   values : Map[String, String],
 ) -> Context {
   if values.length() == 0 {
-    return self
+    return self.without_baggage()
   }
   let baggage : Map[String, String] = Map(
     [], capacity=map_capacity_for_entries(values.length()),
@@ -184,6 +211,7 @@ pub fn Context::with_baggage(
     properties: None,
     baggage_map: Some(baggage),
     baggage_list: None,
+    clear_baggage: false,
     parent: Some(self),
   }
 }
@@ -197,7 +225,7 @@ pub fn Context::with_baggage_owned(
   values : Map[String, String],
 ) -> Context {
   if values.length() == 0 {
-    return self
+    return self.without_baggage()
   }
   {
     span_ctx: None,
@@ -206,6 +234,7 @@ pub fn Context::with_baggage_owned(
     properties: None,
     baggage_map: Some(values),
     baggage_list: None,
+    clear_baggage: false,
     parent: Some(self),
   }
 }
@@ -221,7 +250,7 @@ pub fn Context::with_baggage_entries(
   entries : Array[BaggageEntry],
 ) -> Context {
   if entries.length() == 0 {
-    return self
+    return self.without_baggage()
   }
   // Walking from the last entry to the first keeps the innermost occurrence of
   // each key; the result is ordered from innermost to outermost.
@@ -248,6 +277,7 @@ pub fn Context::with_baggage_entries(
     properties: None,
     baggage_map: None,
     baggage_list: Some(list),
+    clear_baggage: false,
     parent: Some(self),
   }
 }
@@ -274,9 +304,15 @@ pub fn Context::with_baggage_from(
       Some(context) => {
         let has_baggage = context.key is Some(_) ||
           context.baggage_map is Some(_) ||
-          context.baggage_list is Some(_)
+          context.baggage_list is Some(_) ||
+          context.clear_baggage
         if has_baggage {
           nodes.push(context)
+        }
+        // A clear marker hides every outer node, so they cannot contribute to
+        // the merged context.
+        if context.clear_baggage {
+          break
         }
         cursor = context.parent
       }
@@ -294,6 +330,7 @@ pub fn Context::with_baggage_from(
       properties: node.properties,
       baggage_map: node.baggage_map,
       baggage_list: node.baggage_list,
+      clear_baggage: node.clear_baggage,
       parent: Some(result),
     }
     i = i - 1
@@ -350,7 +387,10 @@ pub fn Context::value(self : Context, key : String) -> String? {
   let mut cursor : Context? = Some(self)
   while true {
     match cursor {
-      Some(context) =>
+      Some(context) => {
+        if context.clear_baggage {
+          return None
+        }
         match context.key {
           Some(entry_key) =>
             if entry_key == key {
@@ -377,6 +417,7 @@ pub fn Context::value(self : Context, key : String) -> String? {
             }
           }
         }
+      }
       None => break
     }
   }
@@ -391,7 +432,10 @@ pub fn Context::baggage_entry(self : Context, key : String) -> BaggageEntry? {
   let mut cursor : Context? = Some(self)
   while true {
     match cursor {
-      Some(context) =>
+      Some(context) => {
+        if context.clear_baggage {
+          return None
+        }
         match context.key {
           Some(entry_key) =>
             if entry_key == key {
@@ -433,6 +477,7 @@ pub fn Context::baggage_entry(self : Context, key : String) -> BaggageEntry? {
             }
           }
         }
+      }
       None => break
     }
   }
@@ -452,6 +497,9 @@ pub fn Context::baggage_entries(self : Context) -> Array[BaggageEntry] {
   while true {
     match cursor {
       Some(context) => {
+        if context.clear_baggage {
+          break
+        }
         match context.key {
           Some(key) => {
             let mut visible = true
@@ -552,6 +600,9 @@ pub fn Context::has_baggage(self : Context) -> Bool {
   while true {
     match cursor {
       Some(context) => {
+        if context.clear_baggage {
+          return false
+        }
         match context.key {
           Some(key) => {
             let mut removed = false
@@ -621,6 +672,9 @@ pub fn Context::baggage(self : Context) -> Map[String, String] {
   while true {
     match cursor {
       Some(context) => {
+        if context.clear_baggage {
+          break
+        }
         match context.key {
           Some(key) =>
             if values.get(key) is None {

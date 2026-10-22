@@ -273,7 +273,9 @@ instead of writing an invalid header.
 `Context` is an immutable chain carrying the current span and string baggage.
 `@context.with_context(ctx, fn() { ... })`, `attach`/`detach` and
 `with_span_context` scope it; `Tracer::start_span_with_context` picks up the
-current context automatically.
+current context automatically. An empty baggage update
+(`with_baggage(Map([]))`, or `without_baggage()`) hides every value stored in
+outer contexts while keeping values added afterwards.
 
 ## Development
 
