@@ -75,3 +75,36 @@ test "ratio_small_is_deterministic" {
     sampler.should_sample(None, ratio_trace_id(0xFFFFFFFFFFFFFFFF)).is_sampled,
   )
 }
+
+///|
+test "ratio_sampler_pads_short_trace_ids_on_the_right" {
+  // A short trace ID uses its bytes as the leading bytes of the 8-byte
+  // prefix; the missing bytes are zero, exactly like the equivalent padded ID.
+  let sampler = @sdk.Sampler::trace_id_ratio_based(0.5)
+  assert_false(sampler.should_sample(None, [0x80]).is_sampled)
+  assert_false(
+    sampler.should_sample(None, ratio_trace_id(0x8000000000000000)).is_sampled,
+  )
+  let one_percent = @sdk.Sampler::trace_id_ratio_based(0.01)
+  assert_true(one_percent.should_sample(None, [0x01]).is_sampled)
+  assert_false(one_percent.should_sample(None, [0x80]).is_sampled)
+  let prefixes : Array[Array[Int32]] = [
+    [], [0x00], [0x01], [0x7F], [0x80], [0xFF], [0x01, 0x02, 0x03],
+    [0x80, 0x00, 0x00, 0x01], [0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+    [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80],
+  ]
+  for prefix in prefixes {
+    let padded : Array[Int32] = Array::make(8, 0)
+    for i, byte in prefix {
+      padded[i] = byte
+    }
+    assert_eq(
+      sampler.should_sample(None, prefix).is_sampled,
+      sampler.should_sample(None, padded).is_sampled,
+    )
+    assert_eq(
+      one_percent.should_sample(None, prefix).is_sampled,
+      one_percent.should_sample(None, padded).is_sampled,
+    )
+  }
+}

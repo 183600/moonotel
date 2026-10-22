@@ -53,22 +53,42 @@ fn trace_id_byte(value : Int32) -> UInt64 {
 
 ///|
 fn trace_id_fraction(trace_id : Array[Int32]) -> UInt64 {
-  let mut value : UInt64 = 0
   let n = if trace_id.length() < 8 { trace_id.length() } else { 8 }
-  let mut i = 0
-  while i + 4 <= n {
-    let b0 = trace_id_byte(trace_id.unsafe_get(i))
-    let b1 = trace_id_byte(trace_id.unsafe_get(i + 1))
-    let b2 = trace_id_byte(trace_id.unsafe_get(i + 2))
-    let b3 = trace_id_byte(trace_id.unsafe_get(i + 3))
-    value = (value << 32) | (b0 << 24) | (b1 << 16) | (b2 << 8) | b3
-    i = i + 4
+  // An 8-byte prefix has a fast path that consumes four bytes per iteration.
+  if n == 8 {
+    let b0 = trace_id_byte(trace_id.unsafe_get(0))
+    let b1 = trace_id_byte(trace_id.unsafe_get(1))
+    let b2 = trace_id_byte(trace_id.unsafe_get(2))
+    let b3 = trace_id_byte(trace_id.unsafe_get(3))
+    let b4 = trace_id_byte(trace_id.unsafe_get(4))
+    let b5 = trace_id_byte(trace_id.unsafe_get(5))
+    let b6 = trace_id_byte(trace_id.unsafe_get(6))
+    let b7 = trace_id_byte(trace_id.unsafe_get(7))
+    (b0 << 56) |
+    (b1 << 48) |
+    (b2 << 40) |
+    (b3 << 32) |
+    (b4 << 24) |
+    (b5 << 16) |
+    (b6 << 8) |
+    b7
+  } else {
+    // A short (malformed) trace ID still has a deterministic decision: its
+    // bytes are the leading bytes of the 8-byte prefix and the missing bytes
+    // are zero, so every length is sampled like the equivalent padded ID.
+    let mut value : UInt64 = 0
+    let mut i = 0
+    while i < n {
+      value = (value << 8) | trace_id_byte(trace_id.unsafe_get(i))
+      i = i + 1
+    }
+    let mut padding = n
+    while padding < 8 {
+      value = value << 8
+      padding = padding + 1
+    }
+    value
   }
-  while i < n {
-    value = (value << 8) | trace_id_byte(trace_id.unsafe_get(i))
-    i = i + 1
-  }
-  value
 }
 
 // The threshold is `ratio * 2^63` and the trace ID is shifted right by one bit
