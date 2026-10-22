@@ -24,6 +24,12 @@ pub struct OtlpHttpAsyncSpanExporter {
   mut dropped : UInt64
   mut failures : UInt64
   mut active_sends : Int
+  // Number of batches accepted by `enqueue` and number of those batches whose
+  // export attempt has finished (including batches discarded on overflow).
+  // `flush` uses the difference to wait for a batch that was handed directly to
+  // a blocked background reader, before that reader has started sending it.
+  mut accepted_batches : UInt64
+  mut completed_batches : UInt64
   send_finished : @cond_var.Cond
 }
 
@@ -48,6 +54,8 @@ pub fn[G] OtlpHttpAsyncSpanExporter::new(
     dropped: 0,
     failures: 0,
     active_sends: 0,
+    accepted_batches: 0,
+    completed_batches: 0,
     send_finished: @cond_var.Cond(),
   }
   group.spawn_bg(no_wait=true) <| () => { exporter.run() }
@@ -110,7 +118,8 @@ pub async fn OtlpHttpAsyncSpanExporter::flush(
 ) -> Unit {
   while true {
     self.drain()
-    if self.active_sends == 0 {
+    if self.completed_batches >= self.accepted_batches &&
+      self.active_sends == 0 {
       return
     }
     self.send_finished.wait()
@@ -130,6 +139,7 @@ fn OtlpHttpAsyncSpanExporter::enqueue(
   }
   let accepted = self.queue.try_put(spans) catch { _ => false }
   if accepted {
+    self.accepted_batches = self.accepted_batches + 1
     return @sdk.ExportSuccess
   }
   // The queue is full: discard the oldest batch to make room, then retry once.
@@ -144,8 +154,13 @@ fn OtlpHttpAsyncSpanExporter::enqueue(
   let accepted = self.queue.try_put(spans) catch { _ => false }
   if discarded {
     self.dropped = self.dropped + 1
+    // The evicted batch will never be exported; mark it finished so a waiting
+    // `flush` does not wait for it forever.
+    self.completed_batches = self.completed_batches + 1
+    self.send_finished.broadcast()
   }
   if accepted {
+    self.accepted_batches = self.accepted_batches + 1
     @sdk.ExportSuccess
   } else {
     @sdk.ExportFailure("OTLP async export queue is full")
@@ -160,10 +175,12 @@ fn OtlpHttpAsyncSpanExporter::enqueue(
 async fn OtlpHttpAsyncSpanExporter::export_available(
   self : OtlpHttpAsyncSpanExporter,
   first : Array[@sdk.SpanData],
-) -> Unit {
+) -> Int32 {
   // Coalescing appends queued spans to `batch`; own the array so the caller's
   // batch is never modified.
   let mut pending = first.copy()
+  // Number of accepted batches this call finishes, including `first`.
+  let mut processed = 1
   let mut split = false
   while pending.length() > 0 {
     // The queue loop below only enforces the limit on spans appended from the
@@ -182,6 +199,7 @@ async fn OtlpHttpAsyncSpanExporter::export_available(
       let next : Array[@sdk.SpanData]? = self.queue.try_get() catch { _ => None }
       match next {
         Some(items) => {
+          processed = processed + 1
           let remaining = MAX_EXPORT_SPANS - batch.length()
           if items.length() <= remaining {
             batch.append(items)
@@ -201,6 +219,7 @@ async fn OtlpHttpAsyncSpanExporter::export_available(
     }
     split = false
   }
+  processed
 }
 
 // Send one OTLP request. The request is protected from cancellation so that a
@@ -243,6 +262,18 @@ async fn OtlpHttpAsyncSpanExporter::send(
   })
 }
 
+// Record that `count` accepted batches have been fully handled and wake any
+// `flush` waiting for them.
+
+///|
+fn OtlpHttpAsyncSpanExporter::finish_batches(
+  self : OtlpHttpAsyncSpanExporter,
+  count : Int32,
+) -> Unit {
+  self.completed_batches = self.completed_batches + count.to_uint64()
+  self.send_finished.broadcast()
+}
+
 // Drain and export everything left in the queue.
 
 ///|
@@ -252,7 +283,10 @@ async fn OtlpHttpAsyncSpanExporter::drain(
   while true {
     let next : Array[@sdk.SpanData]? = self.queue.try_get() catch { _ => None }
     match next {
-      Some(batch) => self.export_available(batch)
+      Some(batch) => {
+        let processed = self.export_available(batch)
+        self.finish_batches(processed)
+      }
       None => break
     }
   }
@@ -273,7 +307,10 @@ async fn OtlpHttpAsyncSpanExporter::run(
       _ => None
     }
     match next {
-      Some(batch) => self.export_available(batch)
+      Some(batch) => {
+        let processed = self.export_available(batch)
+        self.finish_batches(processed)
+      }
       None => break
     }
   }

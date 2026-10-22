@@ -23,12 +23,14 @@ async test "export_available keeps the caller's first batch unchanged" {
       dropped: 0,
       failures: 0,
       active_sends: 0,
+      accepted_batches: 0,
+      completed_batches: 0,
       send_finished: @cond_var.Cond(),
     }
     let first = Array::make(1, split_probe_span("first"))
     let queued = Array::make(1, split_probe_span("queued"))
     let _ = queue.try_put(queued) catch { _ => false }
-    exporter.export_available(first)
+    let _ = exporter.export_available(first)
     assert_eq(first.length(), 1)
     assert_eq(first[0].name, "first")
   }

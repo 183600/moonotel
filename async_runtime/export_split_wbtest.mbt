@@ -74,6 +74,8 @@ async test "oversized queued batch is re-split after a partial fill" {
       dropped: 0,
       failures: 0,
       active_sends: 0,
+      accepted_batches: 0,
+      completed_batches: 0,
       send_finished: @cond_var.Cond(),
     }
     // The first batch takes one slot, so 511 spans of the queued 1025 fit in
@@ -84,7 +86,7 @@ async test "oversized queued batch is re-split after a partial fill" {
       split_probe_span("queued"),
     )
     let _ = queue.try_put(queued) catch { _ => false }
-    exporter.export_available([split_probe_span("first")])
+    let _ = exporter.export_available([split_probe_span("first")])
     assert_eq(spans_per_request.length(), 3)
     assert_eq(spans_per_request[0], 512)
     assert_eq(spans_per_request[1], 512)

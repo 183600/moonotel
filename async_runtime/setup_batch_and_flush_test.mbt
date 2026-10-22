@@ -117,6 +117,30 @@ async test "async exporter flush waits for queued spans to be sent" {
 }
 
 ///|
+async test "async exporter flush waits for a batch handed to the idle sender" {
+  @async.with_task_group() <| outer => {
+    let (port, received) = start_counting_server(outer, "async-flush-handoff")
+    let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:\{port}")
+    @async.with_task_group() <| group => {
+      let exporter = @async_runtime.OtlpHttpAsyncSpanExporter::new(
+        config, group,
+      )
+      // Let the background sender block in `queue.get()`, so the next enqueue
+      // is handed directly to it and never enters the queue buffer.
+      @async.sleep(50)
+      let provider = @sdk.TracerProviderSdk::new(
+        service_name="async-flush-handoff",
+      ).with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+      let tracer = provider.get_tracer("async-flush-handoff")
+      tracer.start_root_span("handoff").end()
+      exporter.flush()
+      assert_true(received.val >= 1)
+      assert_eq(exporter.export_failures(), 0)
+    }
+  }
+}
+
+///|
 async test "async exporter flush waits for an in-flight request" {
   @async.with_task_group() <| outer => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))

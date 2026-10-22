@@ -30,6 +30,8 @@ pub struct OtlpHttpAsyncSpanExporter {
   mut dropped : UInt64
   mut failures : UInt64
   mut active_sends : Int32
+  mut accepted_batches : UInt64
+  mut completed_batches : UInt64
   send_finished : @cond_var.Cond
 }
 pub fn OtlpHttpAsyncSpanExporter::config(Self) -> @otlp.OtlpHttpConfig
