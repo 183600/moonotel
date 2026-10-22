@@ -183,8 +183,10 @@ Supported environment variables:
   uncompressed body under a `Content-Encoding: gzip` header.
 - `OTEL_EXPORTER_OTLP_PROTOCOL` (`http/protobuf`, the default, or `http/json`)
 - `OTEL_EXPORTER_OTLP_TIMEOUT` (milliseconds; enforced by the async exporter
-  — the synchronous exporter runs whatever `Transport` you inject, so the
-  transport itself is expected to enforce any deadline)
+  as one overall budget for the whole export, covering every request attempt
+  and every wait between retries. The synchronous exporter runs whatever
+  `Transport` you inject, so the transport itself is expected to enforce any
+  deadline.)
 - `OTEL_SERVICE_NAME`
 
 The signal-specific `OTEL_EXPORTER_OTLP_TRACES_HEADERS`,

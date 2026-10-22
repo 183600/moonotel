@@ -157,6 +157,37 @@ async test "post_trace_request times out a collector that never responds" {
 }
 
 ///|
+async test "post_trace_request uses one timeout budget across retries" {
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    let requests : Ref[Int32] = Ref(0)
+    group.spawn_bg(no_wait=true) <| () => {
+      server.run_forever() <| ((_request, _body, conn) => {
+        requests.val = requests.val + 1
+        // Never answer within the configured budget, so every attempt would
+        // time out. The export timeout must not be reset for the next retry.
+        @async.sleep(200)
+        conn.send_response(503, "Service Unavailable")
+      })
+    }
+    let config = @otlp.OtlpHttpConfig::new(
+      endpoint="http://127.0.0.1:\{port}",
+      timeout_millis=50,
+      max_retries=3,
+    )
+    let result = @otlp_async.export_spans(config, [test_span_data()])
+    match result {
+      @sdk.ExportFailure(message) => assert_true(message.contains("timed out"))
+      @sdk.ExportSuccess => fail("expected the overall export timeout")
+    }
+    // The retry budget was exhausted by the first attempt, so no second
+    // request may be sent.
+    assert_eq(requests.val, 1)
+  }
+}
+
+///|
 async test "request headers include the OTLP content type" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))

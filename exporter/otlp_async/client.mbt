@@ -5,8 +5,10 @@
 // `ExportTraceServiceRequest` to `<endpoint>/v1/traces`, with
 // `Content-Type: application/x-protobuf` (`http/protobuf`) or
 // `application/json` (`http/json`), decodes the response (including
-// `partial_success`) and retries only retryable HTTP statuses. Each attempt
-// is bounded by `config.timeout_millis`.
+// `partial_success`) and retries only retryable HTTP statuses. The
+// `config.timeout_millis` budget covers the whole export: every attempt and
+// every wait between retries is bounded by the remaining time, so retries
+// cannot extend the configured deadline.
 //
 // The package targets native and wasm, which are the targets the async HTTP
 // stack supports.
@@ -345,6 +347,35 @@ const RETRY_BASE_DELAY_MILLIS : Int32 = 100
 // server that stays unavailable from stalling shutdown for an unbounded time.
 const RETRY_MAX_DELAY_MILLIS : Int32 = 5000
 
+// Milliseconds left before an overall export deadline. The result is clamped
+// to zero once the deadline has passed and to the `Int32` range accepted by
+// `@async.with_timeout` if the wall clock jumps backwards.
+fn remaining_timeout_millis(deadline : UInt64) -> Int32 {
+  let now = @env.now()
+  if now >= deadline {
+    0
+  } else {
+    let remaining = deadline - now
+    if remaining > 2147483647UL {
+      2147483647
+    } else {
+      remaining.to_int()
+    }
+  }
+}
+
+// Failure reported when the overall export timeout expires between attempts
+// (or before an attempt can start). The last attempt error, when there is one,
+// is kept so the caller can see whether the budget was consumed by a timeout
+// or by a retryable HTTP response.
+fn export_timeout_failure(last_failure : String) -> @sdk.ExportResult {
+  if last_failure == "" {
+    @sdk.ExportFailure("OTLP export timed out")
+  } else {
+    @sdk.ExportFailure("OTLP export timed out (last error: " + last_failure + ")")
+  }
+}
+
 // Delay before retry `attempt` (1-based) when the server did not send a
 // `Retry-After` header. The OTLP exporter specification requires an
 // exponential backoff with jitter, so the delay doubles from 100ms up to a 5s
@@ -391,6 +422,15 @@ async fn post_trace_request_with_headers(
   } else {
     config.max_retries
   }
+  let timeout = config.effective_timeout_millis()
+  // The OTLP exporter timeout is one overall budget for the whole export: it
+  // covers every request attempt and every wait between retries and is never
+  // reset for a new attempt. A zero value explicitly means "no timeout".
+  let deadline : UInt64? = if timeout > 0 {
+    Some(@env.now() + timeout.to_uint64())
+  } else {
+    None
+  }
   let mut attempt = 0
   let mut last_failure = ""
   let mut retry_after : Int32? = None
@@ -400,21 +440,49 @@ async fn post_trace_request_with_headers(
         Some(value) => value
         None => retry_backoff_millis(attempt)
       }
-      if delay > 0 {
-        @async.sleep(delay)
+      // The wait between retries is also bounded by the remaining overall
+      // budget. A wait that would overrun the deadline is shortened; the next
+      // loop iteration then reports the timeout instead of sending again.
+      let wait = match deadline {
+        Some(value) => {
+          let remaining = remaining_timeout_millis(value)
+          if remaining <= 0 {
+            return export_timeout_failure(last_failure)
+          }
+          if delay > remaining {
+            remaining
+          } else {
+            delay
+          }
+        }
+        None => delay
+      }
+      if wait > 0 {
+        @async.sleep(wait)
       }
     }
     retry_after = None
-    let timeout = config.effective_timeout_millis()
+    // Each request attempt is bounded by whatever is left of the overall
+    // budget, not by a fresh copy of the configured timeout.
+    let attempt_timeout = match deadline {
+      Some(value) => {
+        let remaining = remaining_timeout_millis(value)
+        if remaining <= 0 {
+          return export_timeout_failure(last_failure)
+        }
+        remaining
+      }
+      None => 0
+    }
     // The HTTP client adds transport headers (at least `Host`) by mutating the
     // map it receives. Hand it a fresh copy for every attempt so the cached
     // exporter headers stay unchanged across retries and concurrent exports.
     let request_headers = headers.copy()
     let outcome = try {
-      if timeout > 0 {
+      if attempt_timeout > 0 {
         Some(
           @async.with_timeout(
-            timeout,
+            attempt_timeout,
             () => @http.post(url, body, headers=request_headers),
           ),
         )
