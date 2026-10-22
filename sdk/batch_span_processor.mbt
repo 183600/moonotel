@@ -283,13 +283,16 @@ pub impl SpanProcessor for BatchSpanProcessor with fn drain_before_shutdown(
 ///|
 pub impl SpanProcessor for BatchSpanProcessor with fn shutdown(self) {
   if !self.shutdown_called {
+    // Mark the processor shut down before draining. An exporter may call back
+    // into `shutdown` from `export_spans`; the reentrant call must not drain
+    // the queue again or shut the exporter down a second time.
+    self.shutdown_called = true
     if self.count > 0 {
       let now = @env.now()
       while self.count > 0 {
         self.flush_batch_at(now)
       }
     }
-    self.shutdown_called = true
     self.exporter.shutdown()
   }
 }
