@@ -112,12 +112,18 @@ pub impl SpanProcessor for MultiSpanProcessor with fn force_flush(self) {
 pub impl SpanProcessor for MultiSpanProcessor with fn drain_before_shutdown(
   self,
 ) {
+  // A child's drain may call `shutdown` reentrantly. Let the outer drain finish
+  // first: shutting a child down while its own drain is still on the stack (and
+  // before the provider has drained the remaining processors) can close an
+  // exporter that another processor still needs to drain. `shutdown` is still
+  // responsible for closing every child once the drain has completed.
+  if self.draining.val {
+    return
+  }
+  self.draining.val = true
+  defer { self.draining.val = false }
   if !self.shutdown_called.val {
     for i, processor in self.processors {
-      // A child's drain may shut this processor down reentrantly. `shutdown`
-      // then drains and closes every remaining child, so continuing here would
-      // drain (and possibly export through) processors that are already shut
-      // down.
       if self.shutdown_called.val {
         break
       }
