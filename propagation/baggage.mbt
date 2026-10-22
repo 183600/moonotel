@@ -788,8 +788,9 @@ fn parse_baggage_plain(value : String) -> Array[(String, String)]? {
 }
 
 // Parse a `baggage` header value into an ordered list of key/value pairs.
-// Members that are malformed are skipped; properties are dropped (use
-// `parse_baggage_entries` to keep them).
+// Members that are malformed are skipped; properties are dropped from the
+// result (use `parse_baggage_entries` to keep them) but still count towards
+// the header's byte budget.
 //
 // Following the W3C Baggage specification, at most `BAGGAGE_MAX_MEMBERS`
 // members and `BAGGAGE_MAX_BYTES` bytes are kept; once a member would exceed

@@ -527,7 +527,9 @@ fn normalized_tracestate_for_inject(state : String) -> String? {
 }
 
 // Inject a SpanContext into the carrier as a `traceparent` header, plus a
-// `tracestate` header when the SpanContext carries a valid one.
+// `tracestate` header when the SpanContext carries a valid one. A stale
+// `tracestate` already present in the carrier is removed when the context has
+// no valid state, so it cannot be paired with the new `traceparent`.
 // Does nothing when the SpanContext is invalid.
 
 ///|
