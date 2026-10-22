@@ -1209,7 +1209,12 @@ pub fn inject_baggage(
   carrier : TextMapCarrier,
 ) -> Unit {
   match context_baggage_header(context) {
-    Some(formatted) => carrier.set(baggage_header_name(), formatted)
+    Some(formatted) => {
+      // Drop a stale header under another spelling before writing the new
+      // value, so the carrier never exposes two `baggage` headers.
+      carrier.remove(baggage_header_name())
+      carrier.set(baggage_header_name(), formatted)
+    }
     None => carrier.remove(baggage_header_name())
   }
 }
@@ -1249,6 +1254,7 @@ pub fn inject_baggage_entries(
 ) -> Unit {
   let formatted = format_baggage_entries(entries)
   if formatted != "" {
+    carrier.remove(baggage_header_name())
     carrier.set(baggage_header_name(), formatted)
   } else {
     carrier.remove(baggage_header_name())

@@ -596,12 +596,18 @@ pub fn inject(sc : @api.SpanContext, carrier : TextMapCarrier) -> Unit {
       remove_trace_context(carrier)
       return
     }
+    // Replace any header left under a different spelling, so the carrier holds
+    // exactly one `traceparent` value rather than both the old and new one.
+    carrier.remove(traceparent_header_name())
     carrier.set(traceparent_header_name(), formatted)
     let state = sc.tracestate()
     if state != "" {
       match normalized_tracestate_for_inject(state) {
         Some(normalized) =>
           if normalized != "" {
+            // See above: a differently-cased stale header must not survive
+            // alongside the normalized value just written.
+            carrier.remove(tracestate_header_name())
             carrier.set(tracestate_header_name(), normalized)
           } else {
             // The context carries no members: do not leave an unrelated
@@ -672,6 +678,7 @@ pub fn inject_with_tracestate(
         carrier.remove(tracestate_header_name())
         return
       }
+      carrier.remove(traceparent_header_name())
       carrier.set(traceparent_header_name(), formatted)
       carrier.remove(tracestate_header_name())
       if !state.is_empty() {
