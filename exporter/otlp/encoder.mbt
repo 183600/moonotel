@@ -553,7 +553,7 @@ fn estimate_span_size(data : @sdk.SpanData) -> Int32 {
 }
 
 // Canonical keys of resources already seen while grouping a batch, matched by
-// physical identity.
+// value.
 
 ///|
 fn cached_resource_key(
@@ -561,7 +561,7 @@ fn cached_resource_key(
   cache : Array[(Map[String, @sdk.AttributeValue], String)],
 ) -> String {
   for entry in cache {
-    if physical_equal(entry.0, resource) {
+    if entry.0 == resource {
       return entry.1
     }
   }
@@ -592,8 +592,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
     let data_resource = data.resource.as_map()
     let index = match last_resource {
       Some(resource) =>
-        if physical_equal(resource, data_resource) ||
-          resource == data_resource {
+        if resource == data_resource {
           last_index
         } else {
           if unindexed {
@@ -740,7 +739,7 @@ pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
   let mut uniform = true
   for i = 1; i < spans.length(); i = i + 1 {
     let data = spans[i]
-    if !physical_equal(shared_resource, data.resource.as_map()) ||
+    if shared_resource != data.resource.as_map() ||
       data.scope_name != first.scope_name ||
       data.scope_version != first.scope_version {
       uniform = false

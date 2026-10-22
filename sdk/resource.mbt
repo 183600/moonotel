@@ -356,17 +356,29 @@ pub fn ResourceAttributes::new(
   { shared: attributes, own: None }
 }
 
-// The map backing this snapshot. The result is the shared map when the
-// snapshot has not been written to, so callers must treat it as read-only.
+// The map backing this snapshot, shared with the SDK itself. Callers inside
+// the SDK may use it for read-only access; it must never be exposed publicly
+// because it may be the provider's shared resource map.
 
 ///|
-pub fn ResourceAttributes::as_map(
+fn ResourceAttributes::raw_map(
   self : ResourceAttributes,
 ) -> Map[String, AttributeValue] {
   match self.own {
     Some(map) => map
     None => self.shared
   }
+}
+
+// A deep copy of the attributes backing this snapshot. Mutating the result
+// (including the payload of an array-valued attribute) cannot change the
+// provider, another span, or this snapshot.
+
+///|
+pub fn ResourceAttributes::as_map(
+  self : ResourceAttributes,
+) -> Map[String, AttributeValue] {
+  copy_attributes(self.raw_map())
 }
 
 // The value stored under `key`, if any.
@@ -419,14 +431,14 @@ pub fn ResourceAttributes::set(
 
 ///|
 pub fn ResourceAttributes::length(self : ResourceAttributes) -> Int32 {
-  self.as_map().length()
+  self.raw_map().length()
 }
 
 // Whether this snapshot carries no attributes.
 
 ///|
 pub fn ResourceAttributes::is_empty(self : ResourceAttributes) -> Bool {
-  self.as_map().length() == 0
+  self.raw_map().length() == 0
 }
 
 // Iterate the attributes of this snapshot in insertion order.
@@ -435,7 +447,7 @@ pub fn ResourceAttributes::is_empty(self : ResourceAttributes) -> Bool {
 pub fn ResourceAttributes::iter(
   self : ResourceAttributes,
 ) -> Iter[(String, AttributeValue)] {
-  self.as_map().iter().map(fn(entry) {
+  self.raw_map().iter().map(fn(entry) {
     let (key, value) = entry
     (key, copy_attribute_value(value))
   })
@@ -445,7 +457,7 @@ pub fn ResourceAttributes::iter(
 pub fn ResourceAttributes::iter2(
   self : ResourceAttributes,
 ) -> Iter2[String, AttributeValue] {
-  let entries = self.as_map().iter()
+  let entries = self.raw_map().iter()
   Iter2::new(fn() {
     match entries.next() {
       Some((key, value)) => Some((key, copy_attribute_value(value)))
@@ -461,7 +473,7 @@ pub fn ResourceAttributes::contains(
   self : ResourceAttributes,
   key : String,
 ) -> Bool {
-  self.as_map().contains(key)
+  self.raw_map().contains(key)
 }
 
 // The value under `key`, or `default` when it is absent.
@@ -472,7 +484,7 @@ pub fn ResourceAttributes::get_or_default(
   key : String,
   default : AttributeValue,
 ) -> AttributeValue {
-  match self.as_map().get(key) {
+  match self.raw_map().get(key) {
     Some(value) => copy_attribute_value(value)
     None => default
   }
@@ -502,7 +514,7 @@ pub fn ResourceAttributes::remove(
 
 ///|
 pub fn ResourceAttributes::clear(self : ResourceAttributes) -> Unit {
-  if self.as_map().length() > 0 {
+  if self.raw_map().length() > 0 {
     self.own = Some(Map([]))
   }
 }
@@ -513,28 +525,28 @@ pub fn ResourceAttributes::clear(self : ResourceAttributes) -> Unit {
 pub fn ResourceAttributes::copy(
   self : ResourceAttributes,
 ) -> ResourceAttributes {
-  { shared: copy_attributes(self.as_map()), own: None }
+  { shared: copy_attributes(self.raw_map()), own: None }
 }
 
 // Iterators over the snapshot's keys and values, and its pairs as an array.
 
 ///|
 pub fn ResourceAttributes::keys(self : ResourceAttributes) -> Iter[String] {
-  self.as_map().keys()
+  self.raw_map().keys()
 }
 
 ///|
 pub fn ResourceAttributes::values(
   self : ResourceAttributes,
 ) -> Iter[AttributeValue] {
-  self.as_map().values().map(fn(value) { copy_attribute_value(value) })
+  self.raw_map().values().map(fn(value) { copy_attribute_value(value) })
 }
 
 ///|
 pub fn ResourceAttributes::to_array(
   self : ResourceAttributes,
 ) -> Array[(String, AttributeValue)] {
-  let entries = self.as_map().to_array()
+  let entries = self.raw_map().to_array()
   for i, entry in entries {
     let (key, value) = entry
     entries[i] = (key, copy_attribute_value(value))

@@ -784,7 +784,7 @@ pub fn encode_trace_request_json(spans : Array[@sdk.SpanData]) -> Bytes {
   let mut uniform = true
   for i = 1; i < spans.length(); i = i + 1 {
     let data = spans[i]
-    if !physical_equal(shared_resource, data.resource.as_map()) ||
+    if shared_resource != data.resource.as_map() ||
       data.scope_name != first.scope_name ||
       data.scope_version != first.scope_version {
       uniform = false

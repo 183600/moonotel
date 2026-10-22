@@ -267,3 +267,72 @@ test "resource_attributes_iterators_do_not_expose_array_payloads" {
   }
   assert_eq(snapshot.get("k"), Some(@sdk.StringArrayValue(["a"])))
 }
+
+///|
+test "resource_attributes_as_map_is_an_isolated_deep_copy" {
+  let snapshot = @sdk.ResourceAttributes::new(
+    Map([
+      ("k", @sdk.StringArrayValue(["a"])),
+      ("plain", @sdk.StringValue("v")),
+    ]),
+  )
+  let exported = snapshot.as_map()
+  exported.set("plain", @sdk.StringValue("changed"))
+  exported.set("injected", @sdk.BoolValue(true))
+  match exported.get("k") {
+    Some(@sdk.StringArrayValue(items)) => items.push("mutated")
+    _ => abort("expected a string array attribute")
+  }
+  assert_eq(snapshot.get("plain"), Some(@sdk.StringValue("v")))
+  assert_eq(snapshot.get("injected"), None)
+  assert_eq(snapshot.get("k"), Some(@sdk.StringArrayValue(["a"])))
+  assert_false(snapshot.contains("injected"))
+}
+
+// An exporter that mutates the resource snapshot it receives, used to check
+// that a span snapshot cannot corrupt the provider's shared resource.
+
+///|
+struct ResourceMutatingExporter {}
+
+///|
+pub impl @sdk.SpanExporter for ResourceMutatingExporter with fn export_spans(
+  self,
+  spans,
+) {
+  let _ = self
+  for data in spans {
+    let resource = data.resource.as_map()
+    resource.set("injected", @sdk.StringValue("x"))
+    match resource.get("arr") {
+      Some(@sdk.StringArrayValue(items)) => items.push("mutated")
+      _ => ()
+    }
+  }
+  @sdk.ExportSuccess
+}
+
+///|
+pub impl @sdk.SpanExporter for ResourceMutatingExporter with fn shutdown(
+  self,
+) {
+  let _ = self
+}
+
+///|
+test "span_resource_snapshot_cannot_mutate_the_provider_resource" {
+  let exporter : ResourceMutatingExporter = ResourceMutatingExporter::{}
+  let resource = @sdk.Resource::new(
+    attributes=Map([("arr", @sdk.StringArrayValue(["a"]))]),
+  )
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
+    .with_resource(resource)
+    .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+  let tracer = provider.get_tracer("resource-isolation")
+  tracer.start_root_span("one").end()
+  assert_eq(provider.resource().get("injected"), None)
+  assert_eq(
+    provider.resource().get("arr"),
+    Some(@sdk.StringArrayValue(["a"])),
+  )
+}
