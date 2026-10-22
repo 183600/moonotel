@@ -147,7 +147,9 @@ well-known sensitive query parameters listed by the HTTP semantic
 conventions (`X-Amz-Signature`, `X-Amz-Credential`, `X-Amz-Security-Token`,
 `AWSAccessKeyId`, `Signature`, `sig`, and `X-Goog-Signature`). Captured header
 values and `user_agent.original` have surrounding HTTP optional whitespace
-removed.
+removed. The server records the received `User-Agent`, and the client records
+the `User-Agent` it actually sent (including one supplied by the HTTP client
+when the caller did not set it).
 
 ### Server
 
@@ -167,7 +169,9 @@ async fn main {
 `run_server` extracts `traceparent` from each request, starts a `Server`
 span with the standard HTTP attributes (`http.request.method`, `url.path`,
 `url.query`, `server.address`, `client.address`, …), installs the context
-while the handler runs, and ends the span afterwards. `respond` records
+while the handler runs, and ends the span afterwards. `set_route` records
+`http.route` and renames the span to `METHOD route`; an empty or blank route is
+ignored because no route was matched. `respond` records
 `http.response.status_code` and marks 5xx spans as `Error`. Handler
 exceptions are recorded as `exception` events and re-raised.
 
@@ -183,7 +187,8 @@ URL, resolved server address/port and response status, and marks the span as
 `Error` for 4xx/5xx responses. Only URLs with an explicit scheme and authority
 record `server.address`/`server.port`; a relative reference cannot contribute
 those attributes. The `url.full` attribute strips credentials from both
-absolute URLs and network-path references (`//user:pass@host/path`).
+absolute URLs and network-path references (`//user:pass@host/path`), and
+`user_agent.original` records the request's `User-Agent` value.
 
 ## OTLP/HTTP export
 
