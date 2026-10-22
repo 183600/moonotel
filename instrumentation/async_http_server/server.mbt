@@ -738,9 +738,6 @@ pub async fn ServerCall::respond(
     None => ()
   }
   let close_requested = self.connection_close_requested()
-  if close_requested {
-    extra_headers.set(@http.CaseInsensitiveString("connection"), "close")
-  }
   // A handler may have requested the close before sending the response; the
   // socket must stay open until the response has been written.
   let mut close_after_response = close_requested || self.connection_closed
@@ -750,6 +747,13 @@ pub async fn ServerCall::respond(
         close_after_response = true
       }
     None => ()
+  }
+  if close_after_response {
+    // Announce the close on every path that will close the socket: a request
+    // `Connection: close`, a response header containing the token, or a
+    // handler that called `close_connection`. Without this header an HTTP/1.1
+    // client may try to reuse a connection the server is about to close.
+    extra_headers.set(@http.CaseInsensitiveString("connection"), "close")
   }
   match self.span {
     Some(span) =>

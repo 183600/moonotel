@@ -88,3 +88,31 @@ async test "close_connection without respond closes the connection" {
     connection.close()
   }
 }
+
+///|
+async test "close_connection before respond announces Connection: close" {
+  let (tracer, _) = close_connection_tracer("close-connection-header")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_on(
+        server,
+        call => {
+          call.close_connection()
+          call.respond(200, body="closing")
+        },
+        tracer~,
+      )
+    }
+    let connection = @socket.Tcp::connect(
+      @socket.Addr::parse("127.0.0.1:\{port}"),
+    )
+    connection.write("GET /close-header HTTP/1.1\r\nHost: test\r\n\r\n")
+    let response = @async.with_timeout(5000, () => connection.read_all().text())
+    connection.close()
+    assert_true(response.contains("200 OK"))
+    assert_true(response.to_lower().contains("connection: close"))
+    assert_true(response.contains("closing"))
+  }
+}
