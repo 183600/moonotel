@@ -110,3 +110,85 @@ test "copy shutdown does not drain a child that a shared copy already drained" {
     "a:drain", "b:drain", "a:shutdown", "b:shutdown",
   ])
 }
+
+///|
+struct EventProbeProcessor {
+  name : String
+  log : Ref[Array[String]]
+  multi : Ref[@sdk.MultiSpanProcessor?]
+  shutdown_on_event : Bool
+}
+
+///|
+pub impl @sdk.SpanProcessor for EventProbeProcessor with fn on_start(
+  self,
+  span,
+) {
+  self.log.val.push(self.name + ":start:" + span.name())
+  if self.shutdown_on_event {
+    match self.multi.val {
+      Some(multi) => multi.shutdown()
+      None => ()
+    }
+  }
+}
+
+///|
+pub impl @sdk.SpanProcessor for EventProbeProcessor with fn on_end(
+  self,
+  data,
+) {
+  self.log.val.push(self.name + ":end:" + data.name)
+  if self.shutdown_on_event {
+    match self.multi.val {
+      Some(multi) => multi.shutdown()
+      None => ()
+    }
+  }
+}
+
+///|
+pub impl @sdk.SpanProcessor for EventProbeProcessor with fn force_flush(
+  self,
+) {
+  let _ = self
+}
+
+///|
+pub impl @sdk.SpanProcessor for EventProbeProcessor with fn shutdown(self) {
+  self.log.val.push(self.name + ":shutdown")
+}
+
+///|
+fn event_probe(
+  name : String,
+  log : Ref[Array[String]],
+  shutdown_on_event? : Bool,
+) -> EventProbeProcessor {
+  {
+    name,
+    log,
+    multi: Ref(None),
+    shutdown_on_event: shutdown_on_event.unwrap_or(false),
+  }
+}
+
+///|
+test "span events stop at a child that shuts the multi processor down" {
+  let log : Ref[Array[String]] = Ref([])
+  let first = event_probe("a", log, shutdown_on_event=true)
+  let second = event_probe("b", log)
+  let multi = @sdk.MultiSpanProcessor::new(processors=[first, second])
+  first.multi.val = Some(multi)
+  let provider = @sdk.TracerProviderSdk::new(
+    service_name="multi-event-reentrant",
+  ).with_span_processor(multi)
+  let span = provider.get_tracer("multi-event-reentrant").start_root_span("op")
+  span.end()
+  // `a` shuts the processor down while handling `on_start`, so `b` must not
+  // see the start or the end event, and `a` itself is no longer active when
+  // the span ends.
+  assert_eq(log.val, [
+    "a:start:op", "a:shutdown", "b:shutdown",
+  ])
+}
