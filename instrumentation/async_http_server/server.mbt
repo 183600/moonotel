@@ -630,7 +630,7 @@ pub async fn ServerCall::respond(
       if status_code >= 500 {
         let status_text = status_code.to_string()
         span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(status_text))
-        span.set_status(@api.StatusCode::Error, description=status_text)
+        span.set_status(@api.StatusCode::Error)
       }
     }
     None => ()

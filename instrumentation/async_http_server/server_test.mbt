@@ -164,6 +164,7 @@ async test "5xx responses set the server span status to Error" {
       data.attributes.get(@sdk.ERROR_TYPE),
       Some(@sdk.StringValue("500")),
     )
+    assert_eq(data.status_description, "")
   }
 }
 

@@ -557,7 +557,7 @@ pub async fn request(
       if response.code >= 400 {
         let status_text = response.code.to_string()
         span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(status_text))
-        span.set_status(@api.StatusCode::Error, description=status_text)
+        span.set_status(@api.StatusCode::Error)
       }
       (response, response_body)
     }

@@ -255,6 +255,7 @@ async test "client span is marked as error for 5xx responses" {
       data.attributes.get(@sdk.ERROR_TYPE),
       Some(@sdk.StringValue("503")),
     )
+    assert_eq(data.status_description, "")
   }
 }
 
