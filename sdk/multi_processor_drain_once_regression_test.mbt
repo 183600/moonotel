@@ -4,7 +4,7 @@
 // child to be drained again after it has already been shut down.
 
 ///|
-struct DrainProbeProcessor {
+struct MultiDrainOnceProcessor {
   name : String
   log : Ref[Array[String]]
   multi : Ref[@sdk.MultiSpanProcessor?]
@@ -12,7 +12,7 @@ struct DrainProbeProcessor {
 }
 
 ///|
-pub impl @sdk.SpanProcessor for DrainProbeProcessor with fn on_start(
+pub impl @sdk.SpanProcessor for MultiDrainOnceProcessor with fn on_start(
   self,
   _span,
 ) {
@@ -20,7 +20,7 @@ pub impl @sdk.SpanProcessor for DrainProbeProcessor with fn on_start(
 }
 
 ///|
-pub impl @sdk.SpanProcessor for DrainProbeProcessor with fn on_end(
+pub impl @sdk.SpanProcessor for MultiDrainOnceProcessor with fn on_end(
   self,
   _data,
 ) {
@@ -28,14 +28,14 @@ pub impl @sdk.SpanProcessor for DrainProbeProcessor with fn on_end(
 }
 
 ///|
-pub impl @sdk.SpanProcessor for DrainProbeProcessor with fn force_flush(
+pub impl @sdk.SpanProcessor for MultiDrainOnceProcessor with fn force_flush(
   self,
 ) {
   let _ = self
 }
 
 ///|
-pub impl @sdk.SpanProcessor for DrainProbeProcessor with fn drain_before_shutdown(
+pub impl @sdk.SpanProcessor for MultiDrainOnceProcessor with fn drain_before_shutdown(
   self,
 ) {
   self.log.val.push(self.name + ":drain")
@@ -48,16 +48,16 @@ pub impl @sdk.SpanProcessor for DrainProbeProcessor with fn drain_before_shutdow
 }
 
 ///|
-pub impl @sdk.SpanProcessor for DrainProbeProcessor with fn shutdown(self) {
+pub impl @sdk.SpanProcessor for MultiDrainOnceProcessor with fn shutdown(self) {
   self.log.val.push(self.name + ":shutdown")
 }
 
 ///|
-fn drain_probe(
+fn multi_drain_once_processor(
   name : String,
   log : Ref[Array[String]],
   reenter? : Bool,
-) -> DrainProbeProcessor {
+) -> MultiDrainOnceProcessor {
   {
     name,
     log,
@@ -70,8 +70,8 @@ fn drain_probe(
 test "provider shutdown drains multi children once before shutting them down" {
   let log : Ref[Array[String]] = Ref([])
   let multi = @sdk.MultiSpanProcessor::new(processors=[
-    drain_probe("a", log),
-    drain_probe("b", log),
+    multi_drain_once_processor("a", log),
+    multi_drain_once_processor("b", log),
   ])
   let provider = @sdk.TracerProviderSdk::new(
     service_name="multi-drain-once",
@@ -85,8 +85,8 @@ test "provider shutdown drains multi children once before shutting them down" {
 ///|
 test "reentrant shutdown during a child drain keeps remaining children ordered" {
   let log : Ref[Array[String]] = Ref([])
-  let first = drain_probe("a", log, reenter=true)
-  let second = drain_probe("b", log)
+  let first = multi_drain_once_processor("a", log, reenter=true)
+  let second = multi_drain_once_processor("b", log)
   let multi = @sdk.MultiSpanProcessor::new(processors=[first, second])
   first.multi.val = Some(multi)
   let provider = @sdk.TracerProviderSdk::new(
@@ -101,8 +101,8 @@ test "reentrant shutdown during a child drain keeps remaining children ordered" 
 ///|
 test "copy shutdown does not drain a child that a shared copy already drained" {
   let log : Ref[Array[String]] = Ref([])
-  let multi = @sdk.MultiSpanProcessor::new(processors=[drain_probe("a", log)])
-  let copy = multi.with_processor(drain_probe("b", log))
+  let multi = @sdk.MultiSpanProcessor::new(processors=[multi_drain_once_processor("a", log)])
+  let copy = multi.with_processor(multi_drain_once_processor("b", log))
   multi.drain_before_shutdown()
   assert_eq(log.val, ["a:drain"])
   copy.shutdown()
@@ -112,7 +112,7 @@ test "copy shutdown does not drain a child that a shared copy already drained" {
 }
 
 ///|
-struct EventProbeProcessor {
+struct MultiDrainOnceEventProcessor {
   name : String
   log : Ref[Array[String]]
   multi : Ref[@sdk.MultiSpanProcessor?]
@@ -120,7 +120,7 @@ struct EventProbeProcessor {
 }
 
 ///|
-pub impl @sdk.SpanProcessor for EventProbeProcessor with fn on_start(
+pub impl @sdk.SpanProcessor for MultiDrainOnceEventProcessor with fn on_start(
   self,
   span,
 ) {
@@ -134,7 +134,7 @@ pub impl @sdk.SpanProcessor for EventProbeProcessor with fn on_start(
 }
 
 ///|
-pub impl @sdk.SpanProcessor for EventProbeProcessor with fn on_end(
+pub impl @sdk.SpanProcessor for MultiDrainOnceEventProcessor with fn on_end(
   self,
   data,
 ) {
@@ -148,23 +148,23 @@ pub impl @sdk.SpanProcessor for EventProbeProcessor with fn on_end(
 }
 
 ///|
-pub impl @sdk.SpanProcessor for EventProbeProcessor with fn force_flush(
+pub impl @sdk.SpanProcessor for MultiDrainOnceEventProcessor with fn force_flush(
   self,
 ) {
   let _ = self
 }
 
 ///|
-pub impl @sdk.SpanProcessor for EventProbeProcessor with fn shutdown(self) {
+pub impl @sdk.SpanProcessor for MultiDrainOnceEventProcessor with fn shutdown(self) {
   self.log.val.push(self.name + ":shutdown")
 }
 
 ///|
-fn event_probe(
+fn multi_drain_once_event_processor(
   name : String,
   log : Ref[Array[String]],
   shutdown_on_event? : Bool,
-) -> EventProbeProcessor {
+) -> MultiDrainOnceEventProcessor {
   {
     name,
     log,
@@ -176,8 +176,8 @@ fn event_probe(
 ///|
 test "span events stop at a child that shuts the multi processor down" {
   let log : Ref[Array[String]] = Ref([])
-  let first = event_probe("a", log, shutdown_on_event=true)
-  let second = event_probe("b", log)
+  let first = multi_drain_once_event_processor("a", log, shutdown_on_event=true)
+  let second = multi_drain_once_event_processor("b", log)
   let multi = @sdk.MultiSpanProcessor::new(processors=[first, second])
   first.multi.val = Some(multi)
   let provider = @sdk.TracerProviderSdk::new(
