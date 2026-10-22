@@ -201,25 +201,64 @@ fn days_in_month(year : Int32, month : Int32) -> Int32 {
   }
 }
 
-// Parse the IMF-fixdate form of an HTTP date (`Sun, 06 Nov 1994 08:49:37 GMT`)
-// into seconds since the Unix epoch. The obsolete RFC 850 and asctime forms
-// and any other value yield `None`.
+// Whether the three-letter weekday abbreviation at `name` is a valid day name.
+fn is_short_weekday(name : StringView) -> Bool {
+  name == "Mon" ||
+  name == "Tue" ||
+  name == "Wed" ||
+  name == "Thu" ||
+  name == "Fri" ||
+  name == "Sat" ||
+  name == "Sun"
+}
+
+// Whether `name` is a full English weekday name (the form used by the obsolete
+// RFC 850 HTTP-date format).
 
 ///|
-fn parse_http_date_seconds(value : StringView) -> Int64? {
+fn is_full_weekday(name : StringView) -> Bool {
+  name == "Monday" ||
+  name == "Tuesday" ||
+  name == "Wednesday" ||
+  name == "Thursday" ||
+  name == "Friday" ||
+  name == "Saturday" ||
+  name == "Sunday"
+}
+
+// Convert validated civil date/time fields to seconds since the Unix epoch.
+// `second` may be 60 for a leap second, as allowed by HTTP-date.
+
+///|
+fn civil_time_seconds(
+  year : Int32,
+  month : Int32,
+  day : Int32,
+  hour : Int32,
+  minute : Int32,
+  second : Int32,
+) -> Int64? {
+  if day < 1 ||
+    day > days_in_month(year, month) ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 60 {
+    return None
+  }
+  let days = days_from_civil(year, month, day)
+  Some(days * 86400L + (hour * 3600 + minute * 60 + second).to_int64())
+}
+
+// Parse the IMF-fixdate form of an HTTP date
+// (`Sun, 06 Nov 1994 08:49:37 GMT`) into seconds since the Unix epoch.
+
+///|
+fn parse_imf_fixdate_seconds(value : StringView) -> Int64? {
   // `Www, dd Mmm yyyy HH:MM:SS GMT` is exactly 29 characters.
   if value.length() != 29 {
     return None
   }
-  let day_name = value.view(start_offset=0, end_offset=3)
-  let known_day = day_name == "Mon" ||
-    day_name == "Tue" ||
-    day_name == "Wed" ||
-    day_name == "Thu" ||
-    day_name == "Fri" ||
-    day_name == "Sat" ||
-    day_name == "Sun"
-  if !known_day ||
+  if !is_short_weekday(value.view(start_offset=0, end_offset=3)) ||
     value.unsafe_get(3).to_int() != 0x2C ||
     value.unsafe_get(4).to_int() != 0x20 ||
     value.unsafe_get(7).to_int() != 0x20 ||
@@ -261,23 +300,155 @@ fn parse_http_date_seconds(value : StringView) -> Int64? {
     Some(value) => value
     None => return None
   }
-  if day < 1 ||
-    day > days_in_month(year, month) ||
-    hour > 23 ||
-    minute > 59 ||
-    second > 60 {
-    return None
-  }
-  let days = days_from_civil(year, month, day)
-  Some(days * 86400L + (hour * 3600 + minute * 60 + second).to_int64())
+  civil_time_seconds(year, month, day, hour, minute, second)
 }
 
-// Parse an HTTP `Retry-After` header value, which is either a non-negative
-// number of seconds or an IMF-fixdate HTTP date (for example
-// `Sun, 06 Nov 1994 08:49:37 GMT`). Returns the delay in milliseconds, capped
-// at 60 seconds so that a misbehaving server cannot stall the exporter
-// indefinitely. Dates in the past yield a zero delay; other values yield
-// `None`.
+// Parse the obsolete RFC 850 HTTP-date form
+// (`Sunday, 06-Nov-94 08:49:37 GMT`) into seconds since the Unix epoch. The
+// two-digit year is interpreted as the most recent year with that suffix up to
+// 2069 (the RFC 9110 "50 years in the future" rule approximated without a
+// clock input). Both full and abbreviated weekday names are accepted.
+
+///|
+fn parse_rfc850_date_seconds(value : StringView) -> Int64? {
+  let comma = match value.find(",") {
+    Some(index) => index
+    None => return None
+  }
+  if !is_full_weekday(value.view(start_offset=0, end_offset=comma)) &&
+    !is_short_weekday(value.view(start_offset=0, end_offset=comma)) {
+    return None
+  }
+  // `", "` + `dd-Mmm-yy HH:MM:SS GMT` is 24 characters.
+  let start = comma + 2
+  if value.length() != start + 22 {
+    return None
+  }
+  if value.unsafe_get(start + 2).to_int() != 0x2D ||
+    value.unsafe_get(start + 6).to_int() != 0x2D ||
+    value.unsafe_get(start + 9).to_int() != 0x20 ||
+    value.unsafe_get(start + 12).to_int() != 0x3A ||
+    value.unsafe_get(start + 15).to_int() != 0x3A ||
+    value.unsafe_get(start + 18).to_int() != 0x20 ||
+    value.unsafe_get(start + 19).unsafe_to_char() != 'G' ||
+    value.unsafe_get(start + 20).unsafe_to_char() != 'M' ||
+    value.unsafe_get(start + 21).unsafe_to_char() != 'T' {
+    return None
+  }
+  let day = match http_date_two_digits(value, start) {
+    Some(value) => value
+    None => return None
+  }
+  let month = match
+    http_date_month(value.view(start_offset=start + 3, end_offset=start + 6)) {
+    Some(value) => value
+    None => return None
+  }
+  let year_pair = match http_date_two_digits(value, start + 7) {
+    Some(value) => value
+    None => return None
+  }
+  let year = if year_pair < 70 { 2000 + year_pair } else { 1900 + year_pair }
+  let hour = match http_date_two_digits(value, start + 10) {
+    Some(value) => value
+    None => return None
+  }
+  let minute = match http_date_two_digits(value, start + 13) {
+    Some(value) => value
+    None => return None
+  }
+  let second = match http_date_two_digits(value, start + 16) {
+    Some(value) => value
+    None => return None
+  }
+  civil_time_seconds(year, month, day, hour, minute, second)
+}
+
+// Parse the obsolete asctime HTTP-date form (`Sun Nov  6 08:49:37 1994`) into
+// seconds since the Unix epoch. The day is space-padded to two characters.
+
+///|
+fn parse_asctime_date_seconds(value : StringView) -> Int64? {
+  // `Www Mmm dd HH:MM:SS yyyy` is exactly 24 characters.
+  if value.length() != 24 {
+    return None
+  }
+  if !is_short_weekday(value.view(start_offset=0, end_offset=3)) ||
+    value.unsafe_get(3).to_int() != 0x20 ||
+    value.unsafe_get(7).to_int() != 0x20 ||
+    value.unsafe_get(10).to_int() != 0x20 ||
+    value.unsafe_get(13).to_int() != 0x3A ||
+    value.unsafe_get(16).to_int() != 0x3A ||
+    value.unsafe_get(19).to_int() != 0x20 {
+    return None
+  }
+  let month = match http_date_month(value.view(start_offset=4, end_offset=7)) {
+    Some(value) => value
+    None => return None
+  }
+  let day = if value.unsafe_get(8).to_int() == 0x20 {
+    let digit = value.unsafe_get(9).to_int()
+    if digit < 0x30 || digit > 0x39 {
+      return None
+    }
+    digit - 0x30
+  } else {
+    match http_date_two_digits(value, 8) {
+      Some(value) => value
+      None => return None
+    }
+  }
+  let hour = match http_date_two_digits(value, 11) {
+    Some(value) => value
+    None => return None
+  }
+  let minute = match http_date_two_digits(value, 14) {
+    Some(value) => value
+    None => return None
+  }
+  let second = match http_date_two_digits(value, 17) {
+    Some(value) => value
+    None => return None
+  }
+  let year = match http_date_two_digits(value, 20) {
+    Some(high) =>
+      match http_date_two_digits(value, 22) {
+        Some(low) => high * 100 + low
+        None => return None
+      }
+    None => return None
+  }
+  civil_time_seconds(year, month, day, hour, minute, second)
+}
+
+// Parse an IMF-fixdate HTTP-date into seconds since the Unix epoch. This is
+// the format generated by senders per RFC 9110; the obsolete formats are
+// handled by `parse_retry_after_date_seconds` for `Retry-After`.
+
+///|
+fn parse_http_date_seconds(value : StringView) -> Int64? {
+  parse_imf_fixdate_seconds(value)
+}
+
+// Parse an HTTP-date accepted by RFC 9110 recipients into seconds since the
+// Unix epoch: IMF-fixdate plus the obsolete RFC 850 and asctime forms. Any
+// other value yields `None`.
+
+///|
+fn parse_retry_after_date_seconds(value : StringView) -> Int64? {
+  if value.length() == 29 {
+    parse_http_date_seconds(value)
+  } else {
+    match parse_rfc850_date_seconds(value) {
+      Some(seconds) => Some(seconds)
+      None => parse_asctime_date_seconds(value)
+    }
+  }
+}
+
+// Parse the delta-seconds form of an HTTP `Retry-After` header value. The
+// result is capped at 60 seconds. Other forms yield `None` so that the caller
+// can try the HTTP-date forms.
 
 ///|
 fn parse_retry_after_seconds(value : StringView) -> Int32? {
@@ -303,6 +474,12 @@ fn parse_retry_after_seconds(value : StringView) -> Int32? {
   Some(seconds)
 }
 
+// Parse an HTTP `Retry-After` header value: delta-seconds or an HTTP-date
+// (IMF-fixdate, or the obsolete RFC 850 / asctime forms that RFC 9110 requires
+// recipients to accept). Returns the delay in milliseconds, capped at 60
+// seconds so that a misbehaving server cannot stall the exporter indefinitely.
+// Dates in the past yield a zero delay; other values yield `None`.
+
 ///|
 fn retry_after_millis(value : String) -> Int32? {
   let trimmed = value.trim()
@@ -312,8 +489,10 @@ fn retry_after_millis(value : String) -> Int32? {
   match parse_retry_after_seconds(trimmed) {
     Some(seconds) => Some(seconds * 1000)
     None =>
-      // Not a delta-seconds value: many servers send an IMF-fixdate instead.
-      match parse_http_date_seconds(trimmed[:]) {
+      // Not a delta-seconds value: many servers send an HTTP-date instead,
+      // occasionally in one of the obsolete formats RFC 9110 still requires
+      // recipients to accept.
+      match parse_retry_after_date_seconds(trimmed[:]) {
         Some(epoch_seconds) => {
           let now_seconds = (@env.now() / 1000).reinterpret_as_int64()
           let delay_seconds = epoch_seconds - now_seconds
