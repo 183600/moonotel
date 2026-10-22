@@ -96,3 +96,32 @@ async test "blank direct config is also accepted by the async exporter object" {
     assert_eq(requests.val, 1)
   }
 }
+
+///|
+async test "direct_zero_timeout_and_negative_retries_send_once" {
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    let requests : Ref[Int32] = Ref(0)
+    group.spawn_bg(no_wait=true) <| () => {
+      server.run_forever() <| ((_request, _body, conn) => {
+        requests.val = requests.val + 1
+        conn.send_response(200, "OK")
+      })
+    }
+    let config : @otlp.OtlpHttpConfig = {
+      endpoint: "http://127.0.0.1:\{port}",
+      traces_endpoint: None,
+      headers: Map([]),
+      // Zero explicitly disables the overall deadline; a negative retry count
+      // still allows the first attempt.
+      timeout_millis: 0,
+      compression: "none",
+      protocol: "http/protobuf",
+      max_retries: -1,
+    }
+    let result = @otlp_async.export_spans(config, [blank_config_span_data()])
+    assert_true(result.is_success())
+    assert_eq(requests.val, 1)
+  }
+}
