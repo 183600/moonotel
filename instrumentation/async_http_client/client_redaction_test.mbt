@@ -23,6 +23,15 @@ test "redact_url_removes_user_and_password" {
     @async_http_client.redact_url("http://user:p%40ss@host.test:9000/"),
     "http://host.test:9000/",
   )
+  // Network-path references carry an authority even without a scheme.
+  assert_eq(
+    @async_http_client.redact_url("//user:pass@example.com/path"),
+    "//example.com/path",
+  )
+  assert_eq(
+    @async_http_client.redact_url("//user:pass@[::1]:8080?q=1#f"),
+    "//[::1]:8080?q=1#f",
+  )
 }
 
 ///|
@@ -39,6 +48,11 @@ test "redact_url_leaves_urls_without_userinfo_unchanged" {
     @async_http_client.redact_url("example.com/path"),
     "example.com/path",
   )
+  assert_eq(
+    @async_http_client.redact_url("//example.com/path"),
+    "//example.com/path",
+  )
+  assert_eq(@async_http_client.redact_url("///path"), "///path")
   assert_eq(@async_http_client.redact_url(""), "")
 }
 

@@ -335,30 +335,39 @@ fn strip_ipv6_brackets(address : String) -> String {
   }
 }
 
-// Remove the `userinfo` (credentials) component from an absolute URL.
-// URLs without an authority or without userinfo are returned unchanged;
-// `@` outside the authority (in a path, query or fragment) is preserved.
+// Remove the `userinfo` (credentials) component from an absolute URL or a
+// network-path reference (`//user:pass@host/path`). URLs without an authority
+// or without userinfo are returned unchanged; `@` outside the authority (in a
+// path, query or fragment) is preserved.
 
 ///|
 fn strip_url_userinfo(url : String) -> String {
-  let scheme_end = match url.find("://") {
-    Some(index) =>
-      // A `://` sequence only introduces an authority after a valid scheme;
-      // otherwise it is part of a relative path and must be preserved.
-      if split_scheme(url) == "" {
-        return url
-      } else {
-        index + 3
-      }
+  let authority_start = if url.has_prefix("//") {
+    Some(2)
+  } else {
+    match url.find("://") {
+      Some(index) =>
+        // A `://` sequence only introduces an authority after a valid scheme;
+        // otherwise it is part of a relative path and must be preserved.
+        if split_scheme(url) == "" {
+          None
+        } else {
+          Some(index + 3)
+        }
+      None => None
+    }
+  }
+  let authority_start = match authority_start {
+    Some(value) => value
     None => return url
   }
-  let rest = url[scheme_end:]
+  let rest = url[authority_start:]
   let authority_end = find_authority_end(rest)
   let authority = rest[:authority_end]
   match authority.rev_find("@") {
     Some(at) => {
       let sb = StringBuilder(size_hint=url.length() * 2)
-      sb.write_stringview(url[:scheme_end])
+      sb.write_stringview(url[:authority_start])
       sb.write_stringview(authority[at + 1:])
       sb.write_stringview(rest[authority_end:])
       sb.to_string()
@@ -390,10 +399,10 @@ fn redact_url_query(url : String) -> String {
   sb.to_string()
 }
 
-// Sanitize an absolute URL for the `url.full` attribute: remove the
-// `userinfo` (credentials) component and redact known sensitive query
-// parameter values. The fragment is preserved, as the HTTP semantic
-// conventions require.
+// Sanitize an absolute URL or network-path reference for the `url.full`
+// attribute: remove the `userinfo` (credentials) component and redact known
+// sensitive query parameter values. The fragment is preserved, as the HTTP
+// semantic conventions require.
 
 ///|
 pub fn redact_url(url : String) -> String {
