@@ -38,3 +38,10 @@ test "facade_reexports_retry_wait" {
   let wait : @moonotel.RetryWait = fn(_attempt) { () }
   wait(1)
 }
+
+///|
+test "facade_reexports_api_hex_helpers" {
+  assert_eq(@moonotel.byte_to_hex_char(10), "a")
+  assert_true(@moonotel.is_zero(Array::make(16, 0)))
+  assert_false(@moonotel.is_zero([1]))
+}

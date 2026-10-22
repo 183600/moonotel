@@ -11,6 +11,8 @@ pub using @api {
   span_context_from_hex,
   bytes_to_hex,
   bytes_from_hex,
+  byte_to_hex_char,
+  is_zero,
   TRACE_FLAGS_SAMPLED,
   TRACE_FLAGS_RANDOM,
 }

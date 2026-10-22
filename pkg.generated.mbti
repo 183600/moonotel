@@ -86,6 +86,8 @@ pub fn attach(@context.Context) -> @context.Context
 
 pub fn baggage_header_name() -> String
 
+pub fn byte_to_hex_char(Int32) -> String
+
 pub fn bytes_from_hex(String) -> Array[Int32]?
 
 pub fn bytes_to_hex(Array[Int32]) -> String
@@ -149,6 +151,8 @@ pub fn inject_with_tracestate(@api.SpanContext, String?, @propagation.TextMapCar
 pub fn invalid_span_context() -> @api.SpanContext
 
 pub fn is_supported_protocol(String) -> Bool
+
+pub fn is_zero(Array[Int32]) -> Bool
 
 pub fn no_op_tracer_provider() -> @sdk.TracerProviderSdk
 
