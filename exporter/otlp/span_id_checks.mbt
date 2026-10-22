@@ -31,6 +31,9 @@ fn has_nonzero_id_byte(bytes : Array[Int32], count : Int32) -> Bool {
 
 ///|
 fn has_encodable_link_ids(context : @api.SpanContext) -> Bool {
+  if !context.is_valid() {
+    return false
+  }
   let trace_id = context.trace_id_view()
   let span_id = context.span_id_view()
   trace_id.length() == 16 &&
@@ -41,7 +44,7 @@ fn has_encodable_link_ids(context : @api.SpanContext) -> Bool {
 
 ///|
 fn has_encodable_span_ids(context : @api.SpanContext) -> Bool {
-  context.is_valid() && has_encodable_link_ids(context)
+  has_encodable_link_ids(context)
 }
 
 ///|
