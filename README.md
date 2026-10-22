@@ -203,7 +203,8 @@ success.
 The retryable statuses are exactly the OTLP transient set: 429/502/503/504.
 Transport failures and those statuses are retried up to `max_retries`. The
 async exporter honors a `Retry-After` header (delta-seconds or an IMF-fixdate
-HTTP-date, capped at 60s) ahead of the jittered linear backoff. The synchronous
+HTTP-date, capped at 60s) ahead of an exponential backoff with jitter (100ms,
+doubling up to a 5s cap). The synchronous
 exporter's `TransportResponse` does not expose response headers, so its waits
 are supplied through the injected `RetryWait` function instead. Other 4xx/5xx
 responses, including 500, are terminal and returned as an export failure.

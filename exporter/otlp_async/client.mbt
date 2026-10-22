@@ -311,16 +311,42 @@ fn retry_after_millis(value : String) -> Int32? {
 // decoded with the matching encoding. Network errors and retryable statuses
 // (429, 502, 503, 504) are retried up to `config.max_retries` times. The delay
 // before a retry is taken from the response's `Retry-After` header when it
-// holds a number of seconds or an HTTP date, and a short jittered linear
-// backoff is used otherwise.
+// holds a number of seconds or an HTTP date, and an exponentially increasing,
+// jittered backoff is used otherwise.
+
+// Base delay of the exponential retry backoff, in milliseconds.
+const RETRY_BASE_DELAY_MILLIS : Int32 = 100
+
+// Upper bound of the fallback retry delay, in milliseconds. A cap keeps a
+// server that stays unavailable from stalling shutdown for an unbounded time.
+const RETRY_MAX_DELAY_MILLIS : Int32 = 5000
 
 // Delay before retry `attempt` (1-based) when the server did not send a
-// `Retry-After` header. The deterministic +/-20% jitter avoids a synchronized
-// retry wave from many exporters while keeping tests reproducible.
+// `Retry-After` header. The OTLP exporter specification requires an
+// exponential backoff with jitter, so the delay doubles from 100ms up to a 5s
+// cap. The deterministic +/-20% jitter avoids a synchronized retry wave from
+// many exporters while keeping tests reproducible.
 fn retry_backoff_millis(attempt : Int32) -> Int32 {
-  let base = 100 * attempt
-  let jitter_percent = (attempt * 37) % 41 - 20
+  let attempt = if attempt < 1 { 1 } else { attempt }
+  let mut base = RETRY_BASE_DELAY_MILLIS
+  let mut exponent = 1
+  while exponent < attempt && base < RETRY_MAX_DELAY_MILLIS {
+    base = base * 2
+    if base > RETRY_MAX_DELAY_MILLIS {
+      base = RETRY_MAX_DELAY_MILLIS
+    }
+    exponent = exponent + 1
+  }
+  // Clamp the jitter input as well: a very large retry count must not overflow
+  // the multiplication used to derive the deterministic jitter.
+  let jitter_attempt = if attempt > 1000 { 1000 } else { attempt }
+  let jitter_percent = (jitter_attempt * 37) % 41 - 20
   let delay = base + base * jitter_percent / 100
+  let delay = if delay > RETRY_MAX_DELAY_MILLIS {
+    RETRY_MAX_DELAY_MILLIS
+  } else {
+    delay
+  }
   if delay < 1 {
     1
   } else {
