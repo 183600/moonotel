@@ -167,13 +167,13 @@ async test "post_trace_request uses one timeout budget across retries" {
         requests.val = requests.val + 1
         // Never answer within the configured budget, so every attempt would
         // time out. The export timeout must not be reset for the next retry.
-        @async.sleep(200)
+        @async.sleep(5000)
         conn.send_response(503, "Service Unavailable")
       })
     }
     let config = @otlp.OtlpHttpConfig::new(
       endpoint="http://127.0.0.1:\{port}",
-      timeout_millis=50,
+      timeout_millis=500,
       max_retries=3,
     )
     let result = @otlp_async.export_spans(config, [test_span_data()])
