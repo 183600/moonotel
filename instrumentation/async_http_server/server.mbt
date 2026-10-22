@@ -744,7 +744,7 @@ async fn serve_call(
         protocol_version_http_1_1,
       )
       let path = call.path()
-      let query = call.query()
+      let query = @sdk.redact_sensitive_query_string(call.query())
       server_span.set_attribute(@sdk.URL_PATH, @sdk.StringValue(path))
       if query != "" {
         server_span.set_attribute(@sdk.URL_QUERY, @sdk.StringValue(query))

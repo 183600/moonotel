@@ -163,7 +163,7 @@ async test "get creates a client span and injects traceparent" {
 }
 
 ///|
-async test "client span records the url path and query" {
+async test "client span records and sanitizes the url path and query" {
   let (tracer, exporter) = test_tracer("client-url-parts")
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -173,8 +173,9 @@ async test "client span records the url path and query" {
         conn.send_response(200, "OK")
       })
     }
+    let url = "http://127.0.0.1:\{port}/search?q=moonbit&X-Amz-Signature=secret&lang=zh"
     let (response, _body) = @async_http_client.get(
-      "http://127.0.0.1:\{port}/search?q=moonbit&lang=zh",
+      url,
       tracer~,
       context=@context.Context::root(),
     )
@@ -186,7 +187,15 @@ async test "client span records the url path and query" {
     )
     assert_eq(
       data.attributes.get(@sdk.URL_QUERY),
-      Some(@sdk.StringValue("q=moonbit&lang=zh")),
+      Some(@sdk.StringValue("q=moonbit&X-Amz-Signature=REDACTED&lang=zh")),
+    )
+    assert_eq(
+      data.attributes.get(@sdk.URL_FULL),
+      Some(
+        @sdk.StringValue(
+          "http://127.0.0.1:\{port}/search?q=moonbit&X-Amz-Signature=REDACTED&lang=zh",
+        ),
+      ),
     )
   }
 }

@@ -57,3 +57,17 @@ test "redact_url_preserves_at_signs_outside_the_authority" {
     "http://example.com#a@b",
   )
 }
+
+///|
+test "redact_url_redacts_sensitive_query_values_and_keeps_the_fragment" {
+  assert_eq(
+    @async_http_client.redact_url(
+      "http://user:pass@example.com/search?q=1&X-Amz-Signature=secret&X-Amz-Credential=cred#section",
+    ),
+    "http://example.com/search?q=1&X-Amz-Signature=REDACTED&X-Amz-Credential=REDACTED#section",
+  )
+  assert_eq(
+    @async_http_client.redact_url("http://example.com#?sig=secret"),
+    "http://example.com#?sig=secret",
+  )
+}

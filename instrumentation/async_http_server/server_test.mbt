@@ -362,7 +362,7 @@ async test "server records absolute-form request target components" {
       @socket.Addr::parse("127.0.0.1:\{port}"),
     )
     connection.write(
-      "GET https://example.com/items?q=1 HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+      "GET https://example.com/items?q=1&X-Amz-Signature=secret HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
     )
     let _ = @async.with_timeout(5000, () => connection.read_all().text())
     connection.close()
@@ -370,7 +370,10 @@ async test "server records absolute-form request target components" {
     assert_eq(exporter.spans.val.length(), 1)
     let data = exporter.spans.val[0]
     assert_eq(data.attributes.get(@sdk.URL_PATH), Some(@sdk.StringValue("/items")))
-    assert_eq(data.attributes.get(@sdk.URL_QUERY), Some(@sdk.StringValue("q=1")))
+    assert_eq(
+      data.attributes.get(@sdk.URL_QUERY),
+      Some(@sdk.StringValue("q=1&X-Amz-Signature=REDACTED")),
+    )
     assert_eq(data.attributes.get(@sdk.URL_SCHEME), Some(@sdk.StringValue("https")))
   }
 }

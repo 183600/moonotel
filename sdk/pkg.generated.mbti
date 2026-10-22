@@ -77,6 +77,8 @@ pub fn global_tracer_provider() -> TracerProviderSdk?
 
 pub fn no_op_tracer_provider() -> TracerProviderSdk
 
+pub fn redact_sensitive_query_string(String) -> String
+
 pub fn sampling_decision_drop() -> SamplingDecision
 
 pub fn sampling_decision_record_and_sample() -> SamplingDecision

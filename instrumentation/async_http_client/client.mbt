@@ -324,13 +324,12 @@ fn strip_ipv6_brackets(address : String) -> String {
   }
 }
 
-// Remove the `userinfo` (credentials) component from an absolute URL, as
-// required by the HTTP semantic conventions for the `url.full` attribute.
+// Remove the `userinfo` (credentials) component from an absolute URL.
 // URLs without an authority or without userinfo are returned unchanged;
 // `@` outside the authority (in a path, query or fragment) is preserved.
 
 ///|
-pub fn redact_url(url : String) -> String {
+fn strip_url_userinfo(url : String) -> String {
   let scheme_end = match url.find("://") {
     Some(index) =>
       // A `://` sequence only introduces an authority after a valid scheme;
@@ -355,6 +354,39 @@ pub fn redact_url(url : String) -> String {
     }
     None => url
   }
+}
+
+// Redact known sensitive values in the query component, leaving the path and
+// fragment untouched.
+
+///|
+fn redact_url_query(url : String) -> String {
+  let fragment_start = match url.find("#") {
+    Some(index) => index
+    None => url.length()
+  }
+  let query_start = match url.find("?") {
+    Some(index) => if index < fragment_start { index } else { return url }
+    None => return url
+  }
+  let query_begin = query_start + 1
+  let query = url[query_begin:fragment_start].to_owned()
+  let redacted = @sdk.redact_sensitive_query_string(query)
+  let sb = StringBuilder(size_hint=url.length())
+  sb.write_stringview(url[:query_begin])
+  sb.write_string(redacted)
+  sb.write_stringview(url[fragment_start:])
+  sb.to_string()
+}
+
+// Sanitize an absolute URL for the `url.full` attribute: remove the
+// `userinfo` (credentials) component and redact known sensitive query
+// parameter values. The fragment is preserved, as the HTTP semantic
+// conventions require.
+
+///|
+pub fn redact_url(url : String) -> String {
+  redact_url_query(strip_url_userinfo(url))
 }
 
 ///|
@@ -473,6 +505,7 @@ pub async fn request(
         @sdk.URL_PATH,
         @sdk.StringValue(if url_path == "" { "/" } else { url_path }),
       )
+      let url_query = @sdk.redact_sensitive_query_string(url_query)
       if url_query != "" {
         span.set_attribute(@sdk.URL_QUERY, @sdk.StringValue(url_query))
       }
