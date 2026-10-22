@@ -109,7 +109,7 @@ fn is_json_protocol(protocol : String) -> Bool {
 //
 // Invalid boundary values fall back to those defaults: a negative timeout is
 // invalid (0 explicitly means "no timeout"), a negative retry count means no
-// retries, and blank enum values are treated as unset, matching the
+// retries, and blank endpoint or enum values are treated as unset, matching the
 // environment-variable path.
 
 ///|
@@ -126,8 +126,30 @@ pub fn OtlpHttpConfig::new(
   let timeout = timeout_millis.unwrap_or(10000)
   let compression = normalize_enum(compression.unwrap_or("none"))
   let protocol = normalize_enum(protocol.unwrap_or(OTLP_HTTP_PROTOBUF_PROTOCOL))
+  let endpoint = match endpoint {
+    Some(value) => {
+      let value = value.trim().to_owned()
+      if value == "" {
+        "http://localhost:4318"
+      } else {
+        value
+      }
+    }
+    None => "http://localhost:4318"
+  }
+  let traces_endpoint = match traces_endpoint {
+    Some(value) => {
+      let value = value.trim().to_owned()
+      if value == "" {
+        None
+      } else {
+        Some(value)
+      }
+    }
+    None => None
+  }
   {
-    endpoint: endpoint.unwrap_or("http://localhost:4318"),
+    endpoint,
     traces_endpoint,
     headers: headers.unwrap_or(Map([])),
     timeout_millis: if timeout < 0 {
