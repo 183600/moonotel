@@ -36,3 +36,18 @@ test "invalid_span_context_views_do_not_alias_their_calls" {
   trace_view[1] = 0
   assert_eq(invalid.trace_id_view()[1], 0)
 }
+
+///|
+test "validity_requires_the_live_id_array_lengths" {
+  let sc = @api.span_context(Array::make(16, 1), Array::make(8, 1), 1)
+  assert_true(sc.is_valid())
+  sc.trace_id_view().clear()
+  assert_false(sc.is_valid())
+  sc.trace_id_view().push(1)
+  assert_false(sc.is_valid())
+  assert_eq(sc.trace_id_view().length(), 1)
+
+  let grown = @api.span_context(Array::make(16, 1), Array::make(8, 1), 1)
+  grown.span_id_view().push(1)
+  assert_false(grown.is_valid())
+}

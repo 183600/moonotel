@@ -276,3 +276,14 @@ test "format_traceparent_never_reads_past_a_shortened_aliased_id" {
   both.span_id_view().clear()
   assert_eq(@propagation.format_traceparent(both), "")
 }
+
+///|
+test "inject_ignores_a_context_with_shortened_live_ids" {
+  let sc = make_context()
+  sc.trace_id_view().clear()
+  let carrier = @propagation.TextMapCarrier::new()
+  @propagation.inject(sc, carrier)
+  assert_eq(carrier.length(), 0)
+  @propagation.inject_with_tracestate(sc, Some("a=1"), carrier)
+  assert_eq(carrier.length(), 0)
+}

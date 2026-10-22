@@ -116,11 +116,16 @@ pub fn SpanContext::with_remote(
   { ..self.copy(), is_remote, }
 }
 
-// Check if SpanContext is valid
+// Check if SpanContext is valid. The construction-time flag is snapshotted so
+// that mutating ID *values* through a view does not silently change validity,
+// but the backing arrays must still have the exact 16/8 byte shape a valid
+// context needs. A caller can shorten or grow an aliased array after
+// construction, and such a context can no longer be serialized or used as a
+// parent.
 
 ///|
 pub fn SpanContext::is_valid(self : SpanContext) -> Bool {
-  self.is_valid
+  self.is_valid && self.trace_id.length() == 16 && self.span_id.length() == 8
 }
 
 // Get trace ID as hex string
