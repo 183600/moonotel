@@ -67,7 +67,7 @@ test "batch_processor_from_env_ignores_non_positive_values" {
 }
 
 ///|
-test "batch_processor_counts_dropped_spans_when_full" {
+test "batch_processor_caps_batch_size_before_dropping" {
   let exporter : ProbeExporter = { names: [], }
   let processor = @sdk.BatchSpanProcessor::new(
     exporter,
@@ -77,10 +77,10 @@ test "batch_processor_counts_dropped_spans_when_full" {
   processor.on_end(probe_span("s0"))
   processor.on_end(probe_span("s1"))
   assert_eq(processor.dropped_spans(), 0UL)
+  assert_true(probe_names_equal(exporter.names, ["s0", "s1"]))
   processor.on_end(probe_span("s2"))
-  assert_eq(processor.dropped_spans(), 1UL)
   processor.on_end(probe_span("s3"))
-  assert_eq(processor.dropped_spans(), 2UL)
+  assert_eq(processor.dropped_spans(), 0UL)
   processor.force_flush()
-  assert_true(probe_names_equal(exporter.names, ["s2", "s3"]))
+  assert_true(probe_names_equal(exporter.names, ["s0", "s1", "s2", "s3"]))
 }

@@ -271,7 +271,7 @@ test "batch_processor_flushes_at_threshold" {
 }
 
 ///|
-test "batch_processor_drops_oldest_when_full" {
+test "batch_processor_caps_batch_size_at_queue_size" {
   let exporter = recording_exporter()
   let processor = @sdk.BatchSpanProcessor::new(
     exporter,
@@ -285,11 +285,17 @@ test "batch_processor_drops_oldest_when_full" {
   tracer.start_root_span("op-0").end()
   tracer.start_root_span("op-1").end()
   tracer.start_root_span("op-2").end()
-  assert_eq(processor.queue_size(), 2)
+  // The batch size is capped at the queue size, so spans are exported instead
+  // of the queue overflowing and dropping the oldest one. The odd third span
+  // remains buffered until the next flush.
+  assert_eq(processor.queue_size(), 1)
+  assert_eq(processor.dropped_spans(), 0UL)
   provider.force_flush()
-  assert_eq(exporter.spans.length(), 2)
-  assert_eq(exporter.spans[0].name, "op-1")
-  assert_eq(exporter.spans[1].name, "op-2")
+  assert_eq(processor.queue_size(), 0)
+  assert_eq(exporter.spans.length(), 3)
+  assert_eq(exporter.spans[0].name, "op-0")
+  assert_eq(exporter.spans[1].name, "op-1")
+  assert_eq(exporter.spans[2].name, "op-2")
 }
 
 ///|

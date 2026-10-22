@@ -40,26 +40,16 @@ pub fn BatchSpanProcessor::new(
   max_export_batch_size? : Int32,
   flush_interval_millis? : Int32,
 ) -> BatchSpanProcessor {
-  let queue_size = max_queue_size.unwrap_or(2048)
-  let batch_size = max_export_batch_size.unwrap_or(512)
-  let interval = flush_interval_millis.unwrap_or(5000)
+  let config = BatchConfig::new(
+    max_queue_size?,
+    max_export_batch_size?,
+    flush_interval_millis?,
+  )
   {
     exporter,
-    max_queue_size: if queue_size < 1 {
-      1
-    } else {
-      queue_size
-    },
-    max_export_batch_size: if batch_size < 1 {
-      1
-    } else {
-      batch_size
-    },
-    flush_interval_millis: if interval < 0 {
-      0
-    } else {
-      interval
-    },
+    max_queue_size: config.max_queue_size,
+    max_export_batch_size: config.max_export_batch_size,
+    flush_interval_millis: config.flush_interval_millis,
     queue: [],
     head: 0,
     count: 0,

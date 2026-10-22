@@ -43,7 +43,9 @@ pub struct BatchConfig {
 // Create a batch configuration. Defaults: queue size 2048, export batch size
 // 512, flush interval 5000ms. Non-positive queue and batch sizes are clamped
 // to 1 and a negative interval is clamped to 0, matching the behavior of
-// `BatchSpanProcessor::new`.
+// `BatchSpanProcessor::new`. The export batch size is also capped at the queue
+// size, as required by the OpenTelemetry SDK specification: a larger batch can
+// never be filled and would silently lose spans when the queue overflows.
 
 ///|
 pub fn BatchConfig::new(
@@ -51,17 +53,15 @@ pub fn BatchConfig::new(
   max_export_batch_size? : Int32,
   flush_interval_millis? : Int32,
 ) -> BatchConfig {
-  let queue_size = max_queue_size.unwrap_or(2048)
-  let batch_size = max_export_batch_size.unwrap_or(512)
+  let requested_queue = max_queue_size.unwrap_or(2048)
+  let queue_size = if requested_queue < 1 { 1 } else { requested_queue }
+  let requested_batch = max_export_batch_size.unwrap_or(512)
+  let batch_size = if requested_batch < 1 { 1 } else { requested_batch }
   let interval = flush_interval_millis.unwrap_or(5000)
   {
-    max_queue_size: if queue_size < 1 {
-      1
-    } else {
+    max_queue_size: queue_size,
+    max_export_batch_size: if batch_size > queue_size {
       queue_size
-    },
-    max_export_batch_size: if batch_size < 1 {
-      1
     } else {
       batch_size
     },
