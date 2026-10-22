@@ -911,9 +911,7 @@ async fn serve_call(
   client_address : String?,
   client_port : Int32?,
 ) -> ServerCall {
-  let (parent_context, parent_has_baggage) = extract_context_with_baggage(
-    request.headers,
-  )
+  let parent_context = extract_context(request.headers)
   let parent = parent_context.span_context()
   let method_name = http_method_name(request.meth)
   let span = match active_tracer {
@@ -994,20 +992,14 @@ async fn serve_call(
     }
     None => ()
   }
-  let attached : @context.Context? = match span {
-    Some(server_span) =>
-      Some(@context.attach(parent_context.with_span(server_span.context())))
-    None =>
-      if parent_has_baggage {
-        Some(@context.attach(parent_context))
-      } else {
-        None
-      }
-  }
-  defer (match attached {
-    Some(previous) => @context.detach(previous)
-    None => ()
+  // Install the extracted request context for the handler even when tracing
+  // is disabled: the incoming parent span and baggage remain visible, and the
+  // server task's own ambient context cannot leak into the request.
+  let attached = @context.attach(match span {
+    Some(server_span) => parent_context.with_span(server_span.context())
+    None => parent_context
   })
+  defer @context.detach(attached)
   defer end_span(span)
   let outcome = Ok(handler(call)) catch { error => Err(error) }
   // A handler that asked to close the connection without responding leaves
