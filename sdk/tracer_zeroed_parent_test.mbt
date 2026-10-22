@@ -65,3 +65,25 @@ test "parent_based_sampler_ignores_zeroed_live_parent_ids" {
   assert_false(decision.is_recorded)
   assert_false(decision.is_sampled)
 }
+
+///|
+test "parent_ids_that_serialize_to_zero_start_a_new_root_trace" {
+  let provider = @sdk.TracerProviderSdk::new(service_name="serialized-parent")
+    .with_sampler(@sdk.Sampler::always_on())
+  let tracer = provider.get_tracer("serialized-parent")
+  // Out-of-range values serialize with their low nibble only, so 256 becomes
+  // the zero wire byte. Such a context must not be used as a parent.
+  let parent = @api.span_context(
+    Array::make(16, 256),
+    Array::make(8, 256),
+    @api.TRACE_FLAGS_SAMPLED,
+  )
+  let child = tracer.start_span("child", parent~)
+  assert_true(child.context().is_valid())
+  assert_false(all_zero(child.context().trace_id()))
+  assert_eq(child.parent_span_id().length(), 0)
+  let sampler = @sdk.Sampler::parent_based(@sdk.Sampler::always_off())
+  let decision = sampler.should_sample(Some(parent), Array::make(16, 3))
+  assert_false(decision.is_recorded)
+  assert_false(decision.is_sampled)
+}
