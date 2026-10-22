@@ -356,13 +356,20 @@ async fn post_trace_request_with_headers(
     }
     retry_after = None
     let timeout = config.timeout_millis
+    // The HTTP client adds transport headers (at least `Host`) by mutating the
+    // map it receives. Hand it a fresh copy for every attempt so the cached
+    // exporter headers stay unchanged across retries and concurrent exports.
+    let request_headers = headers.copy()
     let outcome = try {
       if timeout > 0 {
         Some(
-          @async.with_timeout(timeout, () => @http.post(url, body, headers~)),
+          @async.with_timeout(
+            timeout,
+            () => @http.post(url, body, headers=request_headers),
+          ),
         )
       } else {
-        Some(@http.post(url, body, headers~))
+        Some(@http.post(url, body, headers=request_headers))
       }
     } catch {
       error => {

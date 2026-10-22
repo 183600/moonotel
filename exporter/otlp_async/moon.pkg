@@ -18,3 +18,8 @@ import {
 pkgtype(kind: "library")
 
 supported_targets = "native+wasm"
+
+import {
+  "moonbitlang/async/socket",
+  "183600/moonotel/api",
+} for "wbtest"
