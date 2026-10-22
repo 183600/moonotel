@@ -328,7 +328,8 @@ field lengths, version-00 extra fields) and, per the version-00 `HEXDIGLC`
 ABNF, requires lowercase hex for `version=00` headers; future versions
 (`>= 01`) accept hex in either case. A root span created from the SDK's random
 trace-ID generator sets the W3C Level 2 random-trace-id flag, and a child span
-preserves the parent's flag. For a future version the two flag
+preserves the parent's flag; a custom generator opts in with
+`IdGenerator::new(..., trace_id_is_random=true)`. For a future version the two flag
 characters must be followed by the end of the value or by a dash; any
 extension after that dash is ignored (it may be empty). Empty and
 whitespace-only `tracestate` headers are accepted as carrying no state, and
@@ -351,7 +352,12 @@ and 8192 bytes; excess members are dropped whole.
 `Context` is an immutable chain carrying the current span and string baggage.
 `@context.with_context(ctx, fn() { ... })`, `attach`/`detach` and
 `with_span_context` scope it; `Tracer::start_span_with_context` picks up the
-current context automatically. An empty baggage update
+current context automatically. The default ambient storage is a single
+process-global slot, which is correct for synchronous single-flow code. It is
+not coroutine-local: concurrent tasks that interleave `attach`/`detach` must
+pass an explicit `Context` to the code they run (the HTTP instrumentation does
+this) or install a task-aware backend with `@context.set_context_storage`.
+An empty baggage update
 (`with_baggage(Map([]))`, or `without_baggage()`) hides every value stored in
 outer contexts while keeping values added afterwards. Baggage names must be
 non-empty (as required by the OpenTelemetry Baggage API); setters and removals
