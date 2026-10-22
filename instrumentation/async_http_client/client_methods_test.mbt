@@ -108,3 +108,35 @@ async test "trace and connect use the right methods" {
     )
   }
 }
+
+///|
+async test "put sends the request body and records the method" {
+  let (tracer, exporter) = methods_test_tracer("client-methods")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    let received : Ref[String] = Ref("")
+    group.spawn_bg(no_wait=true) <| () => {
+      server.run_forever() <| ((request, body, conn) => {
+        if request.meth == @http.RequestMethod::Put {
+          received.val = body.read_all().text()
+        }
+        conn.send_response(200, "OK")
+      })
+    }
+    let url = "http://127.0.0.1:\{port}/put"
+    let (response, _) = @async_http_client.put(url, "payload", tracer~)
+    assert_eq(response.code, 200)
+    assert_eq(received.val, "payload")
+    assert_eq(exporter.spans.val.length(), 1)
+    assert_eq(exporter.spans.val[0].name, "PUT")
+    assert_eq(
+      exporter.spans.val[0].attributes.get(@sdk.HTTP_REQUEST_METHOD),
+      Some(@sdk.StringValue("PUT")),
+    )
+    assert_eq(
+      exporter.spans.val[0].attributes.get(@sdk.HTTP_REQUEST_BODY_SIZE),
+      Some(@sdk.IntValue(7)),
+    )
+  }
+}
