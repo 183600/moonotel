@@ -901,9 +901,9 @@ pub fn parse_tracestate(value : String) -> String? {
   } else {
     let normalized = write_normalized_tracestate(view, len)
     if normalized == "" {
-      // The header held no list-member at all, so it carries no state. An
-      // empty `tracestate` is not a valid header value and must be dropped
-      // instead of being propagated.
+      // The header held no list-member at all, so it carries no state. Empty
+      // and whitespace-only `tracestate` headers must be accepted (W3C Trace
+      // Context Level 2), but they are not propagated.
       None
     } else {
       Some(normalized)

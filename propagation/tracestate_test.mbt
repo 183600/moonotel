@@ -181,9 +181,39 @@ test "extract_without_tracestate_leaves_it_empty" {
 }
 
 ///|
+test "extract_accepts_an_empty_tracestate_header" {
+  // W3C Trace Context requires accepting empty and whitespace-only
+  // `tracestate` headers. They carry no state, so extraction must keep the
+  // valid `traceparent` instead of treating the whole context as invalid.
+  let sc = tracestate_test_context()
+  for state in ["", " ", "\t", ", ", " , "] {
+    let carrier = @propagation.TextMapCarrier::new()
+    carrier.set(
+      @propagation.traceparent_header_name(),
+      @propagation.format_traceparent(sc),
+    )
+    carrier.set(@propagation.tracestate_header_name(), state)
+    let extracted = @propagation.extract(carrier)
+    assert_true(extracted is Some(_))
+    let extracted = extracted.unwrap()
+    assert_eq(extracted.trace_id_hex(), sc.trace_id_hex())
+    assert_eq(extracted.span_id_hex(), sc.span_id_hex())
+    assert_eq(extracted.tracestate(), "")
+  }
+}
+
+///|
+test "parse_or_empty_treats_memberless_headers_as_empty" {
+  for state in ["", " ", "\t", ", ", " , "] {
+    assert_true(@propagation.Tracestate::parse_or_empty(state).is_empty())
+  }
+  assert_false(@propagation.Tracestate::parse_or_empty("a=1").is_empty())
+}
+
+///|
 test "parse_tracestate_rejects_headers_without_members" {
-  // A header that holds no list-member at all carries no state; an empty
-  // `tracestate` is not a valid header value.
+  // A header that holds no list-member at all carries no state, so the
+  // low-level parser reports it as absent rather than as an empty list.
   assert_eq(@propagation.parse_tracestate(","), None)
   assert_eq(@propagation.parse_tracestate(", ,"), None)
   assert_eq(@propagation.parse_tracestate("   "), None)

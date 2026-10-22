@@ -110,9 +110,10 @@ pub fn Tracestate::parse(value : String) -> Tracestate? {
     start = end + 1
   }
   if members.length() == 0 {
-    // A header that holds no list-member at all carries no state. An empty
-    // `tracestate` is not a valid header value; callers can use
-    // `Tracestate::empty()` when an empty list is intended.
+    // A header that holds no list-member at all carries no state. It must be
+    // accepted on extraction (W3C Trace Context Level 2) but is reported as
+    // absent here; callers can use `Tracestate::empty()` when an empty list is
+    // intended.
     return None
   }
   Some({ members, })
