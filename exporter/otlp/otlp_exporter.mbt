@@ -556,6 +556,11 @@ pub fn OtlpHttpExporter::export_spans_http(
   let mut attempt = 0
   let mut last_failure = ""
   while attempt <= max_retries {
+    // The transport or retry wait may have shut the exporter down reentrantly;
+    // a shut-down exporter must not send further attempts.
+    if self.shutdown_called {
+      return @sdk.ExportFailure("OTLP exporter is shut down")
+    }
     if attempt > 0 {
       (self.retry_wait)(attempt)
     }
