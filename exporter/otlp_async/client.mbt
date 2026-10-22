@@ -59,6 +59,10 @@ fn request_headers(
   for key, value in config.headers {
     headers.set(@http.CaseInsensitiveString(key), value)
   }
+  // `Content-Encoding` must describe the body this exporter actually sends.
+  // Drop any configured spelling, then add `gzip` below when the body is
+  // compressed.
+  headers.remove(@http.CaseInsensitiveString("content-encoding"))
   let content_type = @otlp.content_type_for_protocol(config.protocol)
   headers.set(@http.CaseInsensitiveString("content-type"), content_type)
   // The OTLP/HTTP specification asks the client to announce the response
