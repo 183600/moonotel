@@ -4,19 +4,21 @@
 struct CapturingTransport {
   urls : Array[String]
   bodies : Array[Bytes]
+  headers : Array[Map[String, String]]
   status : Int32
 }
 
 ///|
 fn capturing_transport() -> CapturingTransport {
-  { urls: [], bodies: [], status: 200, }
+  { urls: [], bodies: [], headers: [], status: 200, }
 }
 
 ///|
 fn CapturingTransport::send(self : CapturingTransport) -> @otlp.Transport {
-  fn(url, _headers, body) {
+  fn(url, headers, body) {
     self.urls.push(url)
     self.bodies.push(body)
+    self.headers.push(headers)
     { status_code: self.status, body: b"", }
   }
 }

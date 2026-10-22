@@ -225,6 +225,24 @@ pub fn OtlpHttpConfig::new(
   }
 }
 
+// Merge `headers` into this configuration's headers, returning a new config.
+// HTTP header names are case-insensitive, so an override replaces any existing
+// header with the same spelling regardless of casing. The original config is
+// unchanged, which lets `setup` layer programmatic headers over the values
+// read from the `OTEL_EXPORTER_OTLP_*_HEADERS` environment variables.
+
+///|
+pub fn OtlpHttpConfig::with_headers(
+  self : OtlpHttpConfig,
+  headers : Map[String, String],
+) -> OtlpHttpConfig {
+  let merged = self.headers.copy()
+  for key, value in headers {
+    set_header(merged, key, value)
+  }
+  { ..self, headers: merged, }
+}
+
 ///|
 // Reverse table: the 0-15 value of each ASCII hex digit, -1 for every other
 // code unit below 128.

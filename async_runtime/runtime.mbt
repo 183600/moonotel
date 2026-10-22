@@ -121,8 +121,9 @@ fn normalized_endpoint_override(endpoint : String?) -> String? {
 // `console` prints every finished span, and `none` disables export entirely
 // (spans are recorded but not exported).
 //
-// `endpoint` and `headers` override the values read from the
-// OTEL_EXPORTER_OTLP_* environment variables, `resource` replaces the
+// `endpoint` overrides the value read from the OTEL_EXPORTER_OTLP_*
+// environment variables, `headers` is merged into the environment headers
+// (overriding same-named entries case-insensitively), `resource` replaces the
 // resource built from the environment, `resource_attributes` are merged into
 // it, and `span_limits` replaces the limits read from the OTEL_SPAN_*
 // environment variables. Spans are handed to the background task when they
@@ -168,7 +169,12 @@ pub fn[G] setup(
       Some(_) => None
       None => base.traces_endpoint
     },
-    headers: headers.unwrap_or(base.headers),
+  }
+  // Programmatic headers override same-named environment headers but do not
+  // discard the other headers configured through the environment.
+  let config = match headers {
+    Some(values) => config.with_headers(values)
+    None => config
   }
   let mut provider = @sdk.TracerProviderSdk::new(service_name?)
   match resource {

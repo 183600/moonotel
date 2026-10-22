@@ -164,8 +164,9 @@ pub using @otlp {
 // selected by `OTEL_TRACES_EXPORTER`, and install it as the process-wide
 // provider.
 //
-// `endpoint` and `headers` override the values read from the
-// OTEL_EXPORTER_OTLP_* environment variables. `resource` replaces the
+// `endpoint` overrides the value read from the OTEL_EXPORTER_OTLP_*
+// environment variables. `headers` is merged into the environment headers,
+// overriding same-named entries case-insensitively. `resource` replaces the
 // resource built from the environment, `resource_attributes` are merged into
 // it, and `span_limits` replaces the limits read from the OTEL_SPAN_*
 // environment variables.
@@ -254,7 +255,12 @@ pub fn setup(
             Some(_) => None
             None => base.traces_endpoint
           },
-          headers: headers.unwrap_or(base.headers),
+        }
+        // Programmatic headers override same-named environment headers but do
+        // not discard the other headers configured through the environment.
+        let config = match headers {
+          Some(values) => config.with_headers(values)
+          None => config
         }
         let exporter = @otlp.OtlpHttpExporter::new(config, send)
         let processor : &@sdk.SpanProcessor = match batch {
