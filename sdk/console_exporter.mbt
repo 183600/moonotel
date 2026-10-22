@@ -61,6 +61,15 @@ fn format_array(items : Array[String]) -> String {
 // return).
 
 ///|
+fn write_console_unicode_escape(out : StringBuilder, code : Int32) -> Unit {
+  out.write_string("\\u")
+  out.write_char(hex_nibble_char((code >> 12) & 0x0F))
+  out.write_char(hex_nibble_char((code >> 8) & 0x0F))
+  out.write_char(hex_nibble_char((code >> 4) & 0x0F))
+  out.write_char(hex_nibble_char(code & 0x0F))
+}
+
+///|
 fn write_escaped_console_text(out : StringBuilder, text : String) -> Unit {
   let len = text.length()
   let mut i = 0
@@ -74,16 +83,28 @@ fn write_escaped_console_text(out : StringBuilder, text : String) -> Unit {
       out.write_string("\\r")
     } else if code == 0x09 {
       out.write_string("\\t")
+    } else if code >= 0xD800 && code <= 0xDBFF {
+      // Keep a well-formed surrogate pair together; an unpaired high
+      // surrogate cannot be encoded as UTF-8 and must not reach the output.
+      if i + 1 < len {
+        let low = text.unsafe_get(i + 1).to_int()
+        if low >= 0xDC00 && low <= 0xDFFF {
+          out.write_char(code.unsafe_to_char())
+          out.write_char(low.unsafe_to_char())
+          i = i + 2
+          continue
+        }
+      }
+      write_console_unicode_escape(out, code)
+    } else if code >= 0xDC00 && code <= 0xDFFF {
+      // A lone low surrogate is just as invalid as a lone high surrogate.
+      write_console_unicode_escape(out, code)
     } else if code < 0x20 ||
       code == 0x7F ||
       (code >= 0x80 && code <= 0x9F) ||
       code == 0x2028 ||
       code == 0x2029 {
-      out.write_string("\\u")
-      out.write_char(hex_nibble_char((code >> 12) & 0x0F))
-      out.write_char(hex_nibble_char((code >> 8) & 0x0F))
-      out.write_char(hex_nibble_char((code >> 4) & 0x0F))
-      out.write_char(hex_nibble_char(code & 0x0F))
+      write_console_unicode_escape(out, code)
     } else {
       out.write_char(code.unsafe_to_char())
     }
