@@ -138,10 +138,24 @@ pub fn[G] setup(
   install_global? : Bool,
 ) -> @sdk.TracerProviderSdk {
   let base = @otlp.OtlpHttpConfig::from_env()
+  // Mirror `OtlpHttpConfig::new`: a blank programmatic endpoint is treated as
+  // unset, so it neither replaces the environment endpoint nor suppresses an
+  // environment traces endpoint.
+  let endpoint_override = match endpoint {
+    Some(value) => {
+      let value = value.trim().to_owned()
+      if value == "" {
+        None
+      } else {
+        Some(value)
+      }
+    }
+    None => None
+  }
   let config : @otlp.OtlpHttpConfig = {
     ..base,
-    endpoint: endpoint.unwrap_or(base.endpoint),
-    traces_endpoint: match endpoint {
+    endpoint: endpoint_override.unwrap_or(base.endpoint),
+    traces_endpoint: match endpoint_override {
       Some(_) => None
       None => base.traces_endpoint
     },
