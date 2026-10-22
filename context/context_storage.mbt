@@ -70,8 +70,14 @@ pub fn attach(context : Context) -> Context {
   let backend = storage.val
   let previous = (backend.current)()
   (backend.set)(context)
-  pending_attachments.push((previous, backend))
-  previous
+  // The token is a distinct copy of the previous context. Several logical
+  // flows can attach from the same context value (for example two backends
+  // that both currently hold `Context::root()`), so matching on the value
+  // alone would route `detach` through the wrong backend. `physical_equal`
+  // identifies the exact attachment returned by this call.
+  let token = { ..previous }
+  pending_attachments.push((token, backend))
+  token
 }
 
 // Restore the context that was current before the matching `attach`. The
