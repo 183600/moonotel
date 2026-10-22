@@ -77,7 +77,9 @@ pub fn span_context(
     trace_flags,
     tracestate: tracestate.unwrap_or(""),
     is_valid,
-    is_remote: is_remote.unwrap_or(false),
+    // An invalid context is never remote: the flag only describes where a
+    // usable trace context came from.
+    is_remote: is_remote.unwrap_or(false) && is_valid,
   }
 }
 
@@ -113,7 +115,7 @@ pub fn SpanContext::with_remote(
   self : SpanContext,
   is_remote : Bool,
 ) -> SpanContext {
-  { ..self.copy(), is_remote, }
+  { ..self.copy(), is_remote: is_remote && self.is_valid(), }
 }
 
 // Check if SpanContext is valid. The construction-time flag is snapshotted so
@@ -128,18 +130,22 @@ pub fn SpanContext::is_valid(self : SpanContext) -> Bool {
   self.is_valid && self.trace_id.length() == 16 && self.span_id.length() == 8
 }
 
-// Get trace ID as hex string
+// Get trace ID as hex string. An ID that no longer has its required 16-byte
+// shape (for example because a view shortened it) is reported as the canonical
+// all-zero ID, so the result always has the 32-character form required by the
+// Trace API.
 
 ///|
 pub fn SpanContext::trace_id_hex(self : SpanContext) -> String {
-  bytes_to_hex(self.trace_id)
+  bytes_to_hex(self.trace_id())
 }
 
-// Get span ID as hex string
+// Get span ID as hex string. An ID that no longer has its required 8-byte
+// shape is reported as the canonical all-zero ID (16 hex characters).
 
 ///|
 pub fn SpanContext::span_id_hex(self : SpanContext) -> String {
-  bytes_to_hex(self.span_id)
+  bytes_to_hex(self.span_id())
 }
 
 // Check if trace flags indicate sampled
@@ -390,18 +396,30 @@ pub fn SpanContext::trace_flags(self : SpanContext) -> Int32 {
   self.trace_flags
 }
 
-// Get a copy of the trace ID bytes
+// Get a copy of the trace ID bytes. The result always has the 16-byte shape
+// required by the Trace API; an ID that was shortened through a view is
+// reported as the canonical all-zero ID.
 
 ///|
 pub fn SpanContext::trace_id(self : SpanContext) -> Array[Int32] {
-  self.trace_id.copy()
+  if self.trace_id.length() == 16 {
+    self.trace_id.copy()
+  } else {
+    Array::make(16, 0)
+  }
 }
 
-// Get a copy of the span ID bytes
+// Get a copy of the span ID bytes. The result always has the 8-byte shape
+// required by the Trace API; an ID that was shortened through a view is
+// reported as the canonical all-zero ID.
 
 ///|
 pub fn SpanContext::span_id(self : SpanContext) -> Array[Int32] {
-  self.span_id.copy()
+  if self.span_id.length() == 8 {
+    self.span_id.copy()
+  } else {
+    Array::make(8, 0)
+  }
 }
 
 // Deep-copy this context so that mutating either copy's ID arrays cannot
