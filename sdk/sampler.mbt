@@ -33,6 +33,19 @@ pub fn sampling_decision_drop() -> SamplingDecision {
   { is_recorded: false, is_sampled: false, }
 }
 
+// The byte that the hex/OTLP/propagator serializers produce for one trace ID
+// element. In-range values are used as-is; out-of-range values are rendered
+// with the low nibble only (the high nibble becomes "0"). The sampler must use
+// the same value so that a trace ID is sampled identically before and after it
+// crosses a wire boundary.
+fn trace_id_byte(value : Int32) -> UInt64 {
+  if value >= 0 && value < 256 {
+    value.to_uint64()
+  } else {
+    (value & 0x0F).to_uint64()
+  }
+}
+
 // Compose the trace ID's leading 8 bytes into an unsigned 64-bit integer.
 // This is the value used by ratio-based sampling; the OpenTelemetry
 // specification does not mandate a particular byte range or algorithm, so
@@ -44,15 +57,15 @@ fn trace_id_fraction(trace_id : Array[Int32]) -> UInt64 {
   let n = if trace_id.length() < 8 { trace_id.length() } else { 8 }
   let mut i = 0
   while i + 4 <= n {
-    let b0 = trace_id.unsafe_get(i).to_uint64() & 0xFF
-    let b1 = trace_id.unsafe_get(i + 1).to_uint64() & 0xFF
-    let b2 = trace_id.unsafe_get(i + 2).to_uint64() & 0xFF
-    let b3 = trace_id.unsafe_get(i + 3).to_uint64() & 0xFF
+    let b0 = trace_id_byte(trace_id.unsafe_get(i))
+    let b1 = trace_id_byte(trace_id.unsafe_get(i + 1))
+    let b2 = trace_id_byte(trace_id.unsafe_get(i + 2))
+    let b3 = trace_id_byte(trace_id.unsafe_get(i + 3))
     value = (value << 32) | (b0 << 24) | (b1 << 16) | (b2 << 8) | b3
     i = i + 4
   }
   while i < n {
-    value = (value << 8) | (trace_id.unsafe_get(i).to_uint64() & 0xFF)
+    value = (value << 8) | trace_id_byte(trace_id.unsafe_get(i))
     i = i + 1
   }
   value
