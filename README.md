@@ -191,6 +191,12 @@ Transport failures and those statuses are retried up to `max_retries`; a
 precedence over the jittered linear backoff. Other 4xx/5xx responses,
 including 500, are terminal and returned as an export failure.
 
+Exporters are single-use sinks. `OtlpHttpExporter` rejects every batch after
+`shutdown()` — including an empty one — with
+`ExportFailure("OTLP exporter is shut down")`; the async span exporter closes
+its queue on shutdown. Shutting a provider down drains batch processors before
+shutting their exporters down, so already-ending spans are not lost.
+
 ## Testing and CI
 
 ```sh
@@ -217,7 +223,9 @@ let parent = @propagation.extract(carrier)        // SpanContext?
 Parsing is strict about the specification (version `ff`, all-zero IDs,
 field lengths, version-00 extra fields) and, per the version-00 `HEXDIGLC`
 ABNF, requires lowercase hex for `version=00` headers; future versions
-(`>= 01`) accept hex in either case.
+(`>= 01`) accept hex in either case. `inject_with_tracestate` validates and
+normalizes its explicit `tracestate` override, dropping a malformed value
+instead of writing an invalid header.
 
 ## Context
 
