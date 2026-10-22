@@ -89,7 +89,10 @@ pub impl SpanProcessor for MultiSpanProcessor with fn on_end(self, data) {
       if self.shutdown_called.val {
         break
       }
-      processor.on_end(data)
+      // `SpanData` is immutable by contract. Give each child its own snapshot
+      // so a processor that mutates its copy cannot change what a later child
+      // (or the ended span's accessors) observes.
+      processor.on_end(data.copy())
     }
   }
 }

@@ -208,3 +208,48 @@ test "processors receive independent span snapshots" {
   assert_eq(@api.bytes_to_hex(span.parent_span_id()), parent_hex)
   provider.shutdown()
 }
+
+///|
+test "multi_processor_children_receive_independent_span_snapshots" {
+  let trace_hex = "0102030405060708090a0b0c0d0e0f10"
+  let span_hex = "1112131415161718"
+  let parent_hex = "2122232425262728"
+  let parent = @api.span_context(
+    @api.bytes_from_hex(trace_hex).unwrap(),
+    @api.bytes_from_hex(parent_hex).unwrap(),
+    @api.TRACE_FLAGS_SAMPLED,
+  )
+  let observer = IsolationObserverProcessor::new(trace_hex, span_hex, parent_hex)
+  let mutating : &@sdk.SpanProcessor = IsolationMutatingProcessor::new()
+  let observing : &@sdk.SpanProcessor = observer
+  let provider = @sdk.TracerProviderSdk::new(
+      service_name="multi-snapshot-isolation",
+    )
+    .with_span_processor(@sdk.MultiSpanProcessor::new(processors=[
+      mutating,
+      observing,
+    ]))
+    .with_sampler(@sdk.Sampler::always_on())
+  let tracer = provider.get_tracer("multi-snapshot-isolation")
+  let span = tracer.start_span(
+    "op",
+    parent~,
+    links=[
+      @sdk.SpanLink::new(
+        parent,
+        attributes=Map([("link", @sdk.StringValue("kept"))]),
+      ),
+    ],
+  )
+  observer.expected_span_id.val = span.context().span_id_hex()
+  span.set_attribute("kept", @sdk.IntValue(7L))
+  span.add_event(
+    "event",
+    attributes=Map([("event", @sdk.StringValue("kept"))]),
+  )
+  span.end()
+  if observer.failures.length() != 0 {
+    abort("multi-processor snapshots were shared: " + observer.failures.join("; "))
+  }
+  provider.shutdown()
+}
