@@ -106,6 +106,11 @@ fn is_json_protocol(protocol : String) -> Bool {
 // timeout, 3 retries for retryable statuses). When `traces_endpoint` is given
 // it is the full trace URL and is used verbatim, taking precedence over
 // `endpoint`.
+//
+// Invalid boundary values fall back to those defaults: a negative timeout is
+// invalid (0 explicitly means "no timeout"), a negative retry count means no
+// retries, and blank enum values are treated as unset, matching the
+// environment-variable path.
 
 ///|
 pub fn OtlpHttpConfig::new(
@@ -118,15 +123,28 @@ pub fn OtlpHttpConfig::new(
   max_retries? : Int32,
 ) -> OtlpHttpConfig {
   let retries = max_retries.unwrap_or(DEFAULT_MAX_RETRIES)
+  let timeout = timeout_millis.unwrap_or(10000)
+  let compression = normalize_enum(compression.unwrap_or("none"))
+  let protocol = normalize_enum(protocol.unwrap_or(OTLP_HTTP_PROTOBUF_PROTOCOL))
   {
     endpoint: endpoint.unwrap_or("http://localhost:4318"),
     traces_endpoint,
     headers: headers.unwrap_or(Map([])),
-    timeout_millis: timeout_millis.unwrap_or(10000),
-    compression: normalize_enum(compression.unwrap_or("none")),
-    protocol: normalize_enum(
-      protocol.unwrap_or(OTLP_HTTP_PROTOBUF_PROTOCOL),
-    ),
+    timeout_millis: if timeout < 0 {
+      10000
+    } else {
+      timeout
+    },
+    compression: if compression == "" {
+      "none"
+    } else {
+      compression
+    },
+    protocol: if protocol == "" {
+      OTLP_HTTP_PROTOBUF_PROTOCOL
+    } else {
+      protocol
+    },
     max_retries: if retries < 0 {
       0
     } else {
