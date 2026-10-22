@@ -36,6 +36,14 @@ let storage : Ref[ContextStorage] = Ref({
   set: global_set,
 })
 
+// Attach tokens that still need to be detached, paired with the backend that
+// served the matching `attach`. A token is just the previous `Context`, so the
+// backend cannot be recovered from it later; remembering it here lets
+// `detach` restore through that backend even if `set_context_storage` swapped
+// the process-wide backend in between (the same hazard `with_context` guards
+// against).
+let pending_attachments : Array[(Context, ContextStorage)] = []
+
 // Replace the storage backend and return the previous one (pass it back to
 // restore the default behavior). Intended for runtime integrations that can
 // scope the current context to a logical flow.
@@ -59,16 +67,34 @@ pub fn current_context() -> Context {
 
 ///|
 pub fn attach(context : Context) -> Context {
-  let previous = current_context()
-  (storage.val.set)(context)
+  let backend = storage.val
+  let previous = (backend.current)()
+  (backend.set)(context)
+  pending_attachments.push((previous, backend))
   previous
 }
 
-// Restore the context that was current before the matching `attach`.
+// Restore the context that was current before the matching `attach`. The
+// restore is routed through the backend that served `attach`, so a scoped
+// context cannot remain installed in that backend when the process-wide
+// backend was swapped in between. A token with no outstanding attachment (for
+// example because `detach` is called twice) falls back to the current backend.
 
 ///|
 pub fn detach(previous : Context) -> Unit {
-  (storage.val.set)(previous)
+  let mut found = pending_attachments.length() - 1
+  while found >= 0 {
+    if physical_equal(pending_attachments.unsafe_get(found).0, previous) {
+      break
+    }
+    found = found - 1
+  }
+  if found >= 0 {
+    let (_, backend) = pending_attachments.remove(found)
+    (backend.set)(previous)
+  } else {
+    (storage.val.set)(previous)
+  }
 }
 
 // Run `f` with `context` as the current context and restore the previous
