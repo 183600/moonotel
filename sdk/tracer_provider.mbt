@@ -319,17 +319,24 @@ pub fn TracerProviderSdk::get_tracer(
 
 ///|
 pub fn TracerProviderSdk::force_flush(self : TracerProviderSdk) -> Unit {
-  if self.shutdown_called.val {
+  // A drain or shutdown in progress owns the processors; do not re-enter it.
+  if self.draining.val {
     return
   }
-  for processor in self.processors {
-    // A processor's flush may shut the provider down reentrantly. The remaining
-    // processors have then already been drained and shut down by `shutdown`, so
-    // flushing them again would call into closed exporters.
-    if self.shutdown_called.val {
+  for i, processor in self.processors {
+    // A reentrant shutdown may have started while an earlier processor was
+    // being flushed; the shutdown sequence drains and closes the remaining
+    // processors.
+    if self.draining.val {
       break
     }
-    processor.force_flush()
+    // A processor added to a copy of an already shut-down provider starts out
+    // unshut-down (its own exporter is still open), so it can still be flushed
+    // even though the provider's shared shutdown marker is set. Processors that
+    // were already shut down must not be called again.
+    if !self.processor_shutdowns[i].val {
+      processor.force_flush()
+    }
   }
 }
 
