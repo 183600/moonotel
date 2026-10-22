@@ -807,8 +807,18 @@ pub fn SpanSdk::add_link(self : SpanSdk, link : SpanLink) -> Unit {
   )
   // Empty attribute keys are not attributes. An invalid link therefore only
   // survives when it carries a real (non-empty-key) attribute or tracestate.
+  // Decide this from the supplied attributes, not the limited result: a link
+  // attribute count limit of zero removes every attribute but must not make
+  // the link itself disappear.
+  let mut has_attribute = false
+  for key, _ in link.attributes {
+    if key != "" {
+      has_attribute = true
+      break
+    }
+  }
   let record = link.span_context.is_valid() ||
-    link_attributes.length() > 0 ||
+    has_attribute ||
     link.span_context.tracestate() != ""
   if record {
     if !within_limit(self.link_count(), self.limits.link_count_limit) {

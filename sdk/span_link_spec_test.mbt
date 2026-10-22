@@ -102,3 +102,25 @@ test "add_link_keeps_only_real_attributes_on_an_invalid_context_link" {
   assert_eq(span.links()[0].dropped_attributes_count, 0)
   span.end()
 }
+
+///|
+test "invalid_context_link_survives_a_zero_link_attribute_limit" {
+  let exporter = link_spec_exporter()
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
+    .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+    .with_sampler(@sdk.Sampler::always_on())
+    .with_span_limits(
+      @sdk.SpanLimits::new(link_attribute_count_limit=0),
+    )
+  let tracer = provider.get_tracer("links")
+  let span = tracer.start_span("op")
+  let attributes : Map[String, @sdk.AttributeValue] = Map([])
+  attributes.set("link.reason", @sdk.StringValue("retry"))
+  span.add_link(@sdk.SpanLink::new(@api.invalid_span_context(), attributes~))
+  assert_eq(span.links().length(), 1)
+  assert_eq(span.links()[0].attributes.length(), 0)
+  assert_eq(span.links()[0].dropped_attributes_count, 1)
+  assert_eq(span.dropped_links_count(), 0)
+  span.end()
+  assert_eq(exporter.exported_spans()[0].links.length(), 1)
+}
