@@ -173,7 +173,10 @@ let (response, body) = @client.post(url, "payload", tracer=tracer)
 
 Each call starts a `Client` span, injects `traceparent`, records the method,
 URL, resolved server address/port and response status, and marks the span as
-`Error` for 4xx/5xx responses.
+`Error` for 4xx/5xx responses. Only URLs with an explicit scheme and authority
+record `server.address`/`server.port`; a relative reference cannot contribute
+those attributes. The `url.full` attribute strips credentials from both
+absolute URLs and network-path references (`//user:pass@host/path`).
 
 ## OTLP/HTTP export
 
@@ -214,6 +217,10 @@ The signal-specific `OTEL_EXPORTER_OTLP_TRACES_HEADERS`,
 `OTEL_EXPORTER_OTLP_TRACES_COMPRESSION`, `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`
 and `OTEL_EXPORTER_OTLP_TRACES_TIMEOUT` variables take precedence over their
 generic counterparts.
+
+The facade and async `setup` functions merge their explicit `headers` argument
+into the headers read from the environment: same-named entries are replaced
+case-insensitively, while unrelated environment headers are still sent.
 
 Requests announce `Content-Type` and `Accept` for the configured protocol and
 carry a default `User-Agent` identifying the exporter and SDK version
