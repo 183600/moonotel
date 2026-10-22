@@ -118,7 +118,7 @@ They degrade gracefully: when no tracer is available the wrappers simply
 forward the request. URL attributes strip userinfo and redact the values of
 the well-known sensitive query parameters listed by the HTTP semantic
 conventions (`X-Amz-Signature`, `X-Amz-Credential`, `X-Amz-Security-Token`,
-`sig`, and `X-Goog-Signature`).
+`AWSAccessKeyId`, `Signature`, `sig`, and `X-Goog-Signature`).
 
 ### Server
 
