@@ -177,7 +177,9 @@ Supported environment variables:
   precedence over the generic endpoint; do not append `/v1/traces` yourself.
 - `OTEL_EXPORTER_OTLP_HEADERS` (`key=value,key2=value2`)
 - `OTEL_EXPORTER_OTLP_COMPRESSION` (`none` or `gzip`; any other value is
-  rejected with a clear error)
+  rejected with a clear error). `gzip` is implemented by the async exporter;
+  the synchronous `exporter/otlp` exporter rejects it rather than sending an
+  uncompressed body under a `Content-Encoding: gzip` header.
 - `OTEL_EXPORTER_OTLP_PROTOCOL` (`http/protobuf`, the default, or `http/json`)
 - `OTEL_EXPORTER_OTLP_TIMEOUT` (milliseconds; enforced by the async exporter
   — the synchronous exporter runs whatever `Transport` you inject, so the
@@ -188,6 +190,12 @@ The signal-specific `OTEL_EXPORTER_OTLP_TRACES_HEADERS`,
 `OTEL_EXPORTER_OTLP_TRACES_COMPRESSION`, `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`
 and `OTEL_EXPORTER_OTLP_TRACES_TIMEOUT` variables take precedence over their
 generic counterparts.
+
+Requests announce `Content-Type` and `Accept` for the configured protocol and
+carry a default `User-Agent` identifying the exporter and SDK version
+(`OTel-OTLP-Exporter-MoonBit/<version>`); a `User-Agent` supplied through
+`OTEL_EXPORTER_OTLP_HEADERS` / `OTEL_EXPORTER_OTLP_TRACES_HEADERS` is kept
+instead.
 
 HTTP 200 is never retried, but a `partial_success` payload is surfaced as an
 export failure (`ExportFailure("partial success: …")`) rather than as a
