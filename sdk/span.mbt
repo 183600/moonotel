@@ -266,6 +266,16 @@ fn truncate_string(value : String, limit : Int32) -> String {
     // The value ends on a lone high surrogate: drop it instead of keeping
     // half of a pair.
     end = end - 1
+  } else if last >= 0xDC00 && last <= 0xDFFF {
+    // A trailing low surrogate that is not preceded by its high half is an
+    // unpaired surrogate. Dropping it keeps the truncated value valid UTF-16;
+    // a complete pair was consumed together by the loop above and is kept.
+    let paired = end >= 2 &&
+      value.unsafe_get(end - 2).to_int() >= 0xD800 &&
+      value.unsafe_get(end - 2).to_int() <= 0xDBFF
+    if !paired {
+      end = end - 1
+    }
   }
   value[:end].to_owned()
 }
