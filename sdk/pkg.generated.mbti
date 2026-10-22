@@ -196,6 +196,7 @@ pub impl SpanExporter for InMemorySpanExporter
 
 pub struct MultiSpanProcessor {
   processors : Array[&SpanProcessor]
+  shutdowns : Array[@ref.Ref[Bool]]
   mut shutdown_called : Bool
 }
 pub fn MultiSpanProcessor::force_flush(Self) -> Unit

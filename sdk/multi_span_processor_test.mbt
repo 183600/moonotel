@@ -102,6 +102,24 @@ test "multi_span_processor_with_processor_does_not_mutate_the_source" {
 }
 
 ///|
+test "shutdown_of_a_copy_releases_processors_added_after_the_source_shutdown" {
+  let log : Ref[Array[String]] = Ref([])
+  let first = composite_probe("first", log)
+  let multi = @sdk.MultiSpanProcessor::new(processors=[first])
+  multi.shutdown()
+  assert_eq(first.shutdowns.val, 1)
+  let second = composite_probe("second", log)
+  let copy = multi.with_processor(second)
+  assert_true(copy.is_shutdown())
+  assert_eq(second.shutdowns.val, 0)
+  // The new child is released once, and the child that was already shut down
+  // is not shut down a second time through the copy.
+  copy.shutdown()
+  assert_eq(first.shutdowns.val, 1)
+  assert_eq(second.shutdowns.val, 1)
+}
+
+///|
 test "provider_registers_several_processors_at_once" {
   let log : Ref[Array[String]] = Ref([])
   let first = composite_probe("first", log)

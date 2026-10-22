@@ -1,6 +1,10 @@
 ///|
 pub struct MultiSpanProcessor {
   processors : Array[&SpanProcessor]
+  // Per-child shutdown state, shared with copies that contain the same child.
+  // A processor added to a copy starts out unshut-down even when the copy
+  // itself already is, so `shutdown` can release it exactly once.
+  shutdowns : Array[Ref[Bool]]
   mut shutdown_called : Bool
 }
 
@@ -8,11 +12,17 @@ pub struct MultiSpanProcessor {
 pub fn MultiSpanProcessor::new(
   processors? : Array[&SpanProcessor],
 ) -> MultiSpanProcessor {
+  let processors = match processors {
+    Some(values) => values.copy()
+    None => []
+  }
+  let shutdowns : Array[Ref[Bool]] = Array(capacity=processors.length())
+  for _ in processors {
+    shutdowns.push(Ref(false))
+  }
   {
-    processors: match processors {
-      Some(values) => values.copy()
-      None => []
-    },
+    processors,
+    shutdowns,
     shutdown_called: false,
   }
 }
@@ -24,7 +34,9 @@ pub fn MultiSpanProcessor::with_processor(
 ) -> MultiSpanProcessor {
   let processors = self.processors.copy()
   processors.push(processor)
-  { ..self, processors, }
+  let shutdowns = self.shutdowns.copy()
+  shutdowns.push(Ref(false))
+  { ..self, processors, shutdowns, }
 }
 
 ///|
@@ -66,11 +78,14 @@ pub impl SpanProcessor for MultiSpanProcessor with fn force_flush(self) {
 
 ///|
 pub impl SpanProcessor for MultiSpanProcessor with fn shutdown(self) {
-  if !self.shutdown_called {
-    self.shutdown_called = true
-    for processor in self.processors {
-      processor.shutdown()
+  self.shutdown_called = true
+  let mut i = 0
+  while i < self.processors.length() {
+    if !self.shutdowns[i].val {
+      self.shutdowns[i].val = true
+      self.processors[i].shutdown()
     }
+    i = i + 1
   }
 }
 
