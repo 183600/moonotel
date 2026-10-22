@@ -13,6 +13,11 @@
 ///|
 pub struct TextMapCarrier {
   entries : Map[String, String]
+  // Set when `from_entries` received more than one `traceparent` field. The
+  // repeated values are combined for ordinary header access, but a duplicated
+  // `traceparent` is ambiguous and must make extraction restart the trace even
+  // when the first combined value happens to parse as a future-version header.
+  mut duplicate_traceparent : Bool
   // External read view, consulted when a key is not stored locally.
   getter : ((String) -> String?)?
   // External write target. When present, `set` forwards to it.
@@ -27,7 +32,7 @@ pub struct TextMapCarrier {
 
 ///|
 pub fn TextMapCarrier::new() -> TextMapCarrier {
-  { entries: Map([]), getter: None, setter: None, remover: None, }
+  { entries: Map([]), duplicate_traceparent: false, getter: None, setter: None, remover: None, }
 }
 
 // Create a carrier backed by an existing map (values are shared, not copied)
@@ -36,7 +41,7 @@ pub fn TextMapCarrier::new() -> TextMapCarrier {
 pub fn TextMapCarrier::from_map(
   entries : Map[String, String],
 ) -> TextMapCarrier {
-  { entries, getter: None, setter: None, remover: None, }
+  { entries, duplicate_traceparent: false, getter: None, setter: None, remover: None, }
 }
 
 // Create a carrier from an array of key/value pairs. A repeated key is
@@ -48,9 +53,15 @@ pub fn TextMapCarrier::from_entries(
   entries : Array[(String, String)],
 ) -> TextMapCarrier {
   let map : Map[String, String] = Map([])
+  let mut duplicate_traceparent = false
   for entry in entries {
     match map.get(entry.0) {
-      Some(existing) => map.set(entry.0, existing + ", " + entry.1)
+      Some(existing) => {
+        if ascii_case_insensitive_equal(entry.0, traceparent_header_name()) {
+          duplicate_traceparent = true
+        }
+        map.set(entry.0, existing + ", " + entry.1)
+      }
       None => {
         let mut matched : (String, String)? = None
         for candidate, existing in map {
@@ -60,14 +71,24 @@ pub fn TextMapCarrier::from_entries(
           }
         }
         match matched {
-          Some((candidate, existing)) =>
+          Some((candidate, existing)) => {
+            if ascii_case_insensitive_equal(candidate, traceparent_header_name()) {
+              duplicate_traceparent = true
+            }
             map.set(candidate, existing + ", " + entry.1)
+          }
           None => map.set(entry.0, entry.1)
         }
       }
     }
   }
-  { entries: map, getter: None, setter: None, remover: None, }
+  {
+    entries: map,
+    duplicate_traceparent,
+    getter: None,
+    setter: None,
+    remover: None,
+  }
 }
 
 // Create a read-only carrier that looks up keys through `get` when they are
@@ -78,7 +99,7 @@ pub fn TextMapCarrier::from_entries(
 pub fn TextMapCarrier::from_getter(
   get : (String) -> String?,
 ) -> TextMapCarrier {
-  { entries: Map([]), getter: Some(get), setter: None, remover: None, }
+  { entries: Map([]), duplicate_traceparent: false, getter: Some(get), setter: None, remover: None, }
 }
 
 // Create a write-through carrier: `set` forwards every write to `set`.
@@ -88,7 +109,7 @@ pub fn TextMapCarrier::from_getter(
 pub fn TextMapCarrier::from_setter(
   set : (String, String) -> Unit,
 ) -> TextMapCarrier {
-  { entries: Map([]), getter: None, setter: Some(set), remover: None, }
+  { entries: Map([]), duplicate_traceparent: false, getter: None, setter: Some(set), remover: None, }
 }
 
 // Create a carrier that both reads through `get` and writes through `set`.
@@ -103,6 +124,7 @@ pub fn TextMapCarrier::from_getter_setter(
 ) -> TextMapCarrier {
   {
     entries: Map([]),
+    duplicate_traceparent: false,
     getter: Some(get),
     setter: Some(set),
     remover: remove,
@@ -202,6 +224,18 @@ pub fn TextMapCarrier::get_all(
   values
 }
 
+// Whether this carrier was built from repeated `traceparent` fields whose
+// values were combined for ordinary header access. Such a field is ambiguous:
+// a future-version first value can otherwise swallow the comma and the second
+// field as an opaque extension.
+
+///|
+fn TextMapCarrier::has_duplicate_traceparent(
+  self : TextMapCarrier,
+) -> Bool {
+  self.duplicate_traceparent
+}
+
 // Look up a header and combine repeated values into one comma-separated field
 // value, as required by RFC 7230 section 3.2.2. Returns `None` when the header
 // is absent.
@@ -237,6 +271,11 @@ pub fn TextMapCarrier::set(
   key : String,
   value : String,
 ) -> Unit {
+  // A single write makes the field unambiguous again, even when the carrier
+  // was built from repeated `traceparent` entries.
+  if ascii_case_insensitive_equal(key, traceparent_header_name()) {
+    self.duplicate_traceparent = false
+  }
   match self.setter {
     Some(set) => set(key, value)
     None => self.entries.set(key, value)
@@ -249,6 +288,9 @@ pub fn TextMapCarrier::set(
 
 ///|
 pub fn TextMapCarrier::remove(self : TextMapCarrier, key : String) -> Unit {
+  if ascii_case_insensitive_equal(key, traceparent_header_name()) {
+    self.duplicate_traceparent = false
+  }
   self.entries.remove(key)
   // Collect the keys that match `key` case-insensitively, then remove them.
   let mut matches : Array[String]? = None

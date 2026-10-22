@@ -102,6 +102,7 @@ pub impl TextMapPropagator for CompositePropagator
 
 pub struct TextMapCarrier {
   entries : Map[String, String]
+  mut duplicate_traceparent : Bool
   getter : ((String) -> String?)?
   setter : ((String, String) -> Unit)?
   remover : ((String) -> Unit)?

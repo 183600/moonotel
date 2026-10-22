@@ -640,7 +640,7 @@ pub fn inject(sc : @api.SpanContext, carrier : TextMapCarrier) -> Unit {
 ///|
 pub fn extract(carrier : TextMapCarrier) -> @api.SpanContext? {
   let traceparents = carrier.get_all(traceparent_header_name())
-  if traceparents.length() != 1 {
+  if traceparents.length() != 1 || carrier.has_duplicate_traceparent() {
     return None
   }
   match parse_traceparent(traceparents[0]) {
