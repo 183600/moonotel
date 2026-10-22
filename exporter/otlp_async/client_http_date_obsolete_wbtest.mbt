@@ -8,7 +8,7 @@ test "http_date_parser_accepts_rfc850_dates" {
     ("Sunday, 06-Nov-94 08:49:37 GMT", 784111777L),
     // A three-letter weekday is accepted as well; some intermediaries send it.
     ("Sun, 06-Nov-94 08:49:37 GMT", 784111777L),
-    // Two-digit years below 70 are interpreted as 20xx.
+    // A recent two-digit year resolves to the current century.
     ("Monday, 01-Jan-24 00:00:00 GMT", 1704067200L),
     ("Wednesday, 16-Nov-94 08:49:37 GMT", 784975777L),
   ]
@@ -70,4 +70,22 @@ test "retry_after_millis_accepts_obsolete_http_dates" {
   )
   assert_eq(retry_after_millis("Fri Dec 31 23:59:59 9999"), Some(60000))
   assert_eq(retry_after_millis("Sunday, 31-Feb-24 00:00:00 GMT"), None)
+}
+
+///|
+test "rfc850_two_digit_year_uses_the_current_year_window" {
+  // RFC 9110: a timestamp more than 50 years in the future denotes the most
+  // recent past year with the same last two digits. Years exactly 50 years
+  // ahead are still future.
+  assert_eq(expand_two_digit_year(0, 2026), 2000)
+  assert_eq(expand_two_digit_year(24, 2026), 2024)
+  assert_eq(expand_two_digit_year(26, 2026), 2026)
+  assert_eq(expand_two_digit_year(76, 2026), 2076)
+  assert_eq(expand_two_digit_year(77, 2026), 1977)
+  assert_eq(expand_two_digit_year(99, 2026), 1999)
+  // The window moves with the current year instead of using a fixed cutoff.
+  assert_eq(expand_two_digit_year(20, 2050), 2020)
+  assert_eq(expand_two_digit_year(20, 2150), 2120)
+  assert_eq(expand_two_digit_year(20, 2201), 2220)
+  assert_eq(expand_two_digit_year(80, 2201), 2180)
 }

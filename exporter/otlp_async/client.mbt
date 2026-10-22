@@ -226,6 +226,46 @@ fn is_full_weekday(name : StringView) -> Bool {
   name == "Sunday"
 }
 
+// Year of a count of days since the Unix epoch, using Howard Hinnant's
+// `civil_from_days` algorithm (the inverse of `days_from_civil`).
+
+///|
+fn civil_year_from_days(days : Int64) -> Int32 {
+  let z = days + 719468L
+  let era = if z >= 0L { z / 146097L } else { (z - 146096L) / 146097L }
+  let doe = z - era * 146097L
+  let yoe = (doe - doe / 1460L + doe / 36524L - doe / 146096L) / 365L
+  let y = yoe + era * 400L
+  let doy = doe - (365L * yoe + yoe / 4L - yoe / 100L)
+  let mp = (5L * doy + 2L) / 153L
+  let month = if mp < 10L { mp + 3L } else { mp - 9L }
+  (if month <= 2L { y + 1L } else { y }).to_int()
+}
+
+// The current UTC year, used to expand an RFC 850 two-digit year.
+
+///|
+fn current_utc_year() -> Int32 {
+  let now_seconds = (@env.now() / 1000).reinterpret_as_int64()
+  civil_year_from_days(now_seconds / 86400L)
+}
+
+// Expand an RFC 850 two-digit year following the RFC 9110 rule: a timestamp
+// that appears to be more than 50 years in the future represents the most
+// recent past year with the same last two digits. The comparison uses whole
+// years, so a year exactly 50 years ahead is still treated as future.
+
+///|
+fn expand_two_digit_year(year_pair : Int32, current_year : Int32) -> Int32 {
+  let century = current_year - current_year % 100
+  let candidate = century + year_pair
+  if candidate > current_year + 50 {
+    candidate - 100
+  } else {
+    candidate
+  }
+}
+
 // Convert validated civil date/time fields to seconds since the Unix epoch.
 // `second` may be 60 for a leap second, as allowed by HTTP-date.
 
@@ -305,9 +345,9 @@ fn parse_imf_fixdate_seconds(value : StringView) -> Int64? {
 
 // Parse the obsolete RFC 850 HTTP-date form
 // (`Sunday, 06-Nov-94 08:49:37 GMT`) into seconds since the Unix epoch. The
-// two-digit year is interpreted as the most recent year with that suffix up to
-// 2069 (the RFC 9110 "50 years in the future" rule approximated without a
-// clock input). Both full and abbreviated weekday names are accepted.
+// two-digit year is expanded relative to the current UTC year using the RFC
+// 9110 "more than 50 years in the future" rule. Both full and abbreviated
+// weekday names are accepted.
 
 ///|
 fn parse_rfc850_date_seconds(value : StringView) -> Int64? {
@@ -348,7 +388,7 @@ fn parse_rfc850_date_seconds(value : StringView) -> Int64? {
     Some(value) => value
     None => return None
   }
-  let year = if year_pair < 70 { 2000 + year_pair } else { 1900 + year_pair }
+  let year = expand_two_digit_year(year_pair, current_utc_year())
   let hour = match http_date_two_digits(value, start + 10) {
     Some(value) => value
     None => return None
