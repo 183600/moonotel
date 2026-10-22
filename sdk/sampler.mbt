@@ -232,7 +232,7 @@ pub fn Sampler::parent_based(
   Sampler::new("ParentBased{" + root.description() + "}", fn(parameters) {
     match parameters.parent {
       Some(ctx) =>
-        if ctx.is_valid() {
+        if has_live_valid_ids(ctx) {
           let sampled = (ctx.trace_flags() & 1) != 0
           let delegate = if ctx.is_remote() {
             if sampled {

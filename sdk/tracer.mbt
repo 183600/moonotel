@@ -52,7 +52,7 @@ pub fn Tracer::start_span(
   start_time_unix_nano? : Int64,
 ) -> SpanSdk {
   let valid_parent = match parent {
-    Some(ctx) => if ctx.is_valid() { Some(ctx) } else { None }
+    Some(ctx) => if has_live_valid_ids(ctx) { Some(ctx) } else { None }
     None => None
   }
   let span_kind = kind.unwrap_or(@api.SpanKind::Internal)
