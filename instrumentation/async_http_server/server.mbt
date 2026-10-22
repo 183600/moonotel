@@ -154,6 +154,51 @@ fn parse_port(text : StringView) -> Int32 {
   port
 }
 
+// Parse a non-negative decimal `Content-Length` value. Values that do not fit
+// in an `Int64` are rejected so a hostile header cannot overflow the attribute.
+
+///|
+fn parse_content_length(text : StringView) -> Int64? {
+  let len = text.length()
+  if len == 0 {
+    return None
+  }
+  let max = 9223372036854775807UL
+  let mut value : UInt64 = 0
+  let mut i = 0
+  while i < len {
+    let code = text.unsafe_get(i).to_int()
+    if code < 0x30 || code > 0x39 {
+      return None
+    }
+    let digit = (code - 0x30).to_uint64()
+    if value > (max - digit) / 10UL {
+      return None
+    }
+    value = value * 10UL + digit
+    i = i + 1
+  }
+  Some(value.reinterpret_as_int64())
+}
+
+// Declared request body size, from `Content-Length`. A `Transfer-Encoding`
+// header means the body length is not given by `Content-Length` (RFC 9112),
+// so the attribute is omitted in that case.
+
+///|
+fn request_body_size(
+  headers : Map[@http.CaseInsensitiveString, String],
+) -> Int64? {
+  match headers.get(@http.CaseInsensitiveString("transfer-encoding")) {
+    Some(value) => if value.trim() != "" { return None }
+    None => ()
+  }
+  match headers.get(@http.CaseInsensitiveString("content-length")) {
+    Some(value) => parse_content_length(value[:])
+    None => None
+  }
+}
+
 ///|
 fn split_path_query(path : String) -> (String, String) {
   let lower = path.to_lower()
@@ -788,6 +833,16 @@ async fn serve_call(
             @sdk.USER_AGENT_ORIGINAL,
             @sdk.StringValue(agent),
           )
+        None => ()
+      }
+      match request_body_size(request.headers) {
+        Some(size) =>
+          if size > 0L {
+            server_span.set_attribute(
+              @sdk.HTTP_REQUEST_BODY_SIZE,
+              @sdk.IntValue(size),
+            )
+          }
         None => ()
       }
       @http_header_capture.HeaderCapture::from_env(
