@@ -22,3 +22,26 @@ test "attribute_truncation_drops_an_unpaired_low_surrogate" {
   assert_eq(data.attributes.get("lone"), Some(@sdk.StringValue("a")))
   assert_eq(data.attributes.get("pair"), Some(@sdk.StringValue("a" + pair)))
 }
+
+///|
+test "attribute_truncation_drops_a_lone_low_exposed_by_dropping_a_high" {
+  let exporter = @sdk.InMemorySpanExporter::new()
+  let provider = @sdk.TracerProviderSdk::new(
+      service_name="surrogate-truncation-chain",
+    )
+    .with_span_limits(@sdk.SpanLimits::new(attribute_value_length_limit=2))
+    .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+    .with_sampler(@sdk.Sampler::always_on())
+  let tracer = provider.get_tracer("surrogate-truncation-chain")
+  let high = (0xD800).unsafe_to_char()
+  let low = (0xDC00).unsafe_to_char()
+  // The cut falls after the unpaired high surrogate. Dropping that high
+  // exposes the unpaired low before it, which must be dropped as well: the
+  // truncated value may never end in half of a surrogate pair.
+  let value = String::from_array([low, high, 'x'])
+  let span = tracer.start_root_span("op")
+  span.set_attribute("mixed", @sdk.StringValue(value))
+  span.end()
+  let data = exporter.exported_spans()[0]
+  assert_eq(data.attributes.get("mixed"), Some(@sdk.StringValue("")))
+}
