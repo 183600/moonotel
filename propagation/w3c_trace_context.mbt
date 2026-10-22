@@ -569,6 +569,16 @@ fn normalized_tracestate_for_inject(state : String) -> String? {
   }
 }
 
+// Remove any trace context left in a carrier by an earlier injection. The
+// context-level propagators use this when the new context has no valid span,
+// so a reused carrier never sends an old trace parent alongside new baggage.
+
+///|
+fn remove_trace_context(carrier : TextMapCarrier) -> Unit {
+  carrier.remove(traceparent_header_name())
+  carrier.remove(tracestate_header_name())
+}
+
 // Inject a SpanContext into the carrier as a `traceparent` header, plus a
 // `tracestate` header when the SpanContext carries a valid one. A stale
 // `tracestate` already present in the carrier is removed when the context has
@@ -583,8 +593,7 @@ pub fn inject(sc : @api.SpanContext, carrier : TextMapCarrier) -> Unit {
       // The live IDs no longer form a valid traceparent (for example a caller
       // zeroed an aliased ID array). Do not write an empty header, and do not
       // leave a stale one that would be paired with an unrelated tracestate.
-      carrier.remove(traceparent_header_name())
-      carrier.remove(tracestate_header_name())
+      remove_trace_context(carrier)
       return
     }
     carrier.set(traceparent_header_name(), formatted)

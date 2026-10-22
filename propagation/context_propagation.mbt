@@ -6,7 +6,8 @@
 // the `traceparent`/`tracestate` propagator with the `baggage` propagator.
 
 // Inject the trace context and the baggage carried by `context` into
-// `carrier`. A context without a valid span propagates only its baggage.
+// `carrier`. A context without a valid span propagates only its baggage; any
+// stale trace headers left in a reused carrier are removed.
 
 ///|
 pub fn inject_context(
@@ -14,8 +15,13 @@ pub fn inject_context(
   carrier : TextMapCarrier,
 ) -> Unit {
   match context.span_context() {
-    Some(sc) => inject(sc, carrier)
-    None => ()
+    Some(sc) =>
+      if sc.is_valid() {
+        inject(sc, carrier)
+      } else {
+        remove_trace_context(carrier)
+      }
+    None => remove_trace_context(carrier)
   }
   inject_baggage(context, carrier)
 }

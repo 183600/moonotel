@@ -38,8 +38,13 @@ pub impl TextMapPropagator for TraceContextPropagator with fn inject(
 ) {
   let _ = self
   match context.span_context() {
-    Some(sc) => inject(sc, carrier)
-    None => ()
+    Some(sc) =>
+      if sc.is_valid() {
+        inject(sc, carrier)
+      } else {
+        remove_trace_context(carrier)
+      }
+    None => remove_trace_context(carrier)
   }
 }
 

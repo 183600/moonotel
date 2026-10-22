@@ -101,3 +101,48 @@ test "inject_context with an invalid span writes only baggage" {
   assert_true(carrier.get("traceparent") is None)
   assert_eq(carrier.get("baggage"), Some("user.id=42"))
 }
+
+///|
+test "inject_context without a span clears stale trace headers" {
+  let carrier = @propagation.TextMapCarrier::new()
+  @propagation.inject(context_propagation_span(), carrier)
+  assert_true(carrier.get("traceparent") is Some(_))
+  assert_true(carrier.get("tracestate") is Some(_))
+  @propagation.inject_context(
+    @context.Context::root().with_value("user.id", "42"),
+    carrier,
+  )
+  assert_true(carrier.get("traceparent") is None)
+  assert_true(carrier.get("tracestate") is None)
+  assert_eq(carrier.get("baggage"), Some("user.id=42"))
+}
+
+///|
+test "inject_context with an invalid span clears stale trace headers" {
+  let carrier = @propagation.TextMapCarrier::new()
+  @propagation.inject(context_propagation_span(), carrier)
+  @propagation.inject_context(
+    @context.Context::root()
+    .with_span(@api.invalid_span_context())
+    .with_value("user.id", "42"),
+    carrier,
+  )
+  assert_true(carrier.get("traceparent") is None)
+  assert_true(carrier.get("tracestate") is None)
+  assert_eq(carrier.get("baggage"), Some("user.id=42"))
+}
+
+///|
+test "trace_context_propagator_without_a_span_clears_stale_trace_headers" {
+  let carrier = @propagation.TextMapCarrier::new()
+  @propagation.inject(context_propagation_span(), carrier)
+  let propagator = @propagation.TraceContextPropagator::new()
+  propagator.inject(
+    @context.Context::root().with_value("user.id", "42"),
+    carrier,
+  )
+  assert_true(carrier.get("traceparent") is None)
+  assert_true(carrier.get("tracestate") is None)
+  // Baggage is the responsibility of its own propagator.
+  assert_true(carrier.get("baggage") is None)
+}
