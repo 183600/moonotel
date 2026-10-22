@@ -3,8 +3,9 @@
 //
 // A carrier can also view external storage through the callbacks installed by
 // `from_getter`, `from_setter` and `from_getter_setter`. Instrumentations use
-// this to propagate through an existing header map without copying it: reads
-// fall back to the getter, writes are forwarded to the setter and (when an
+// this to propagate through an existing header map without copying it: single
+// value reads fall back to the getter, `get_all` reports both locally stored
+// and external values, writes are forwarded to the setter and (when an
 // external `remove` callback is supplied) deletions are forwarded as well.
 // Without an external setter, `set` stores values in the carrier itself;
 // `length` and `to_map` always operate on the carrier's own entries only.
@@ -171,10 +172,11 @@ pub fn TextMapCarrier::get(self : TextMapCarrier, key : String) -> String? {
 
 // Look up every header value for `key`, matching names case-insensitively. A
 // repeated header is represented by one element per stored value, in insertion
-// order. External getters can only return one value, so a read-through carrier
-// yields at most one element. An empty array means the header is absent. This
-// is the accessor propagators use to combine repeated fields, as required by
-// RFC 7230, and to reject a duplicated `traceparent`.
+// order. The external getter (when present) contributes one additional value
+// after the locally stored ones, so a carrier that combines local writes with a
+// read-through view still reports both fields. An empty array means the header
+// is absent. This is the accessor propagators use to combine repeated fields,
+// as required by RFC 7230, and to reject a duplicated `traceparent`.
 
 ///|
 pub fn TextMapCarrier::get_all(
@@ -189,15 +191,13 @@ pub fn TextMapCarrier::get_all(
       }
     }
   }
-  if values.length() == 0 {
-    match self.getter {
-      Some(get) =>
-        match get(key) {
-          Some(value) => values.push(value)
-          None => ()
-        }
-      None => ()
-    }
+  match self.getter {
+    Some(get) =>
+      match get(key) {
+        Some(value) => values.push(value)
+        None => ()
+      }
+    None => ()
   }
   values
 }
