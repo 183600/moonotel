@@ -216,8 +216,7 @@ Transport failures and those statuses are retried up to `max_retries`. The
 async exporter honors a `Retry-After` header (delta-seconds or an HTTP-date,
 including the obsolete RFC 850 and asctime forms that RFC 9110 requires
 recipients to accept, capped at 60s) ahead of an exponential backoff with
-jitter (100ms,
-doubling up to a 5s cap). The synchronous
+jitter (100ms, doubling up to a 5s cap). The synchronous
 exporter's `TransportResponse` does not expose response headers, so its waits
 are supplied through the injected `RetryWait` function instead; a non-positive
 `status_code` reports a transport failure that never received an HTTP response
