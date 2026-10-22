@@ -173,8 +173,9 @@ Supported environment variables:
 - `OTEL_EXPORTER_OTLP_ENDPOINT` (default `http://localhost:4318`) is a **base
   URL**; `/v1/traces` is appended. If the value already ends in `/v1/traces`
   (or `/v1/traces/`), it is used as-is instead of being doubled.
-- `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` is used **verbatim** and takes
-  precedence over the generic endpoint; do not append `/v1/traces` yourself.
+- `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` is used **verbatim** (a URL with no path
+  part is sent to the root path `/`) and takes precedence over the generic
+  endpoint; do not append `/v1/traces` yourself.
 - `OTEL_EXPORTER_OTLP_HEADERS` (`key=value,key2=value2`)
 - `OTEL_EXPORTER_OTLP_COMPRESSION` (`none` or `gzip`; any other value is
   rejected with a clear error). `gzip` is implemented by the async exporter;

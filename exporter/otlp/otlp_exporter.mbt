@@ -423,8 +423,10 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
 }
 
 // Full URL of the trace export endpoint. The signal-specific
-// `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` value is used verbatim; otherwise
-// `/v1/traces` is appended to the base endpoint.
+// `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` value is used verbatim, except that a
+// URL without a path part is sent to the root path `/` as required by the
+// OTLP/HTTP specification; otherwise `/v1/traces` is appended to the base
+// endpoint.
 //
 // Per the OTLP specification `OTEL_EXPORTER_OTLP_ENDPOINT` is a base URL, not
 // a signal URL. Users still sometimes pass the full `.../v1/traces` URL; in
@@ -445,10 +447,28 @@ fn path_and_suffix(endpoint : String) -> (String, String) {
   (endpoint[:cut].to_owned(), endpoint[cut:].to_owned())
 }
 
+// Add the root path to an absolute URL whose authority has no path part. The
+// OTLP/HTTP specification requires per-signal endpoints without a path to be
+// sent to `/`; the query and fragment components are preserved.
+fn with_root_path(url : String) -> String {
+  let (path, suffix) = path_and_suffix(url)
+  match path.find("://") {
+    Some(scheme_end) => {
+      let after_scheme = path[scheme_end + 3:]
+      if after_scheme.find("/") is None {
+        path + "/" + suffix
+      } else {
+        url
+      }
+    }
+    None => url
+  }
+}
+
 ///|
 pub fn OtlpHttpConfig::traces_url(self : OtlpHttpConfig) -> String {
   match self.traces_endpoint {
-    Some(full_url) => full_url
+    Some(full_url) => with_root_path(full_url)
     None => {
       let (path, suffix) = path_and_suffix(self.endpoint)
       if path.has_suffix("/v1/traces") || path.has_suffix("/v1/traces/") {
