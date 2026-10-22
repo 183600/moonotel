@@ -39,3 +39,26 @@ async test "async_setup_with_none_exporter_list_installs_nothing" {
   }
   @sdk.shutdown_global_tracer_provider()
 }
+
+///|
+async test "async_setup_shuts_down_the_provider_when_its_group_exits" {
+  let saved : Ref[@sdk.TracerProviderSdk?] = Ref(None)
+  @async.with_task_group() <| group => {
+    let provider = @async_runtime.setup(
+      group,
+      service_name="async-group-exit",
+      exporters=["otlp"],
+      install_global=false,
+    )
+    assert_false(provider.is_shutdown())
+    saved.val = Some(provider)
+  }
+  match saved.val {
+    Some(provider) => {
+      assert_true(provider.is_shutdown())
+      let span = provider.get_tracer("async-group-exit").start_root_span("late")
+      assert_false(span.is_recording())
+    }
+    None => fail("setup did not return a provider")
+  }
+}
