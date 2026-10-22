@@ -801,6 +801,11 @@ pub async fn export_spans(
   } else {
     @otlp.encode_trace_request(spans)
   }
+  // All spans were skipped because their live IDs were malformed; there is no
+  // request body to send.
+  if body.length() == 0 {
+    return @sdk.ExportSuccess
+  }
   post_trace_request(config, body)
 }
 
@@ -868,6 +873,11 @@ pub async fn OtlpHttpAsyncExporter::export_batch(
     @otlp.encode_trace_request_json(spans)
   } else {
     @otlp.encode_trace_request(spans)
+  }
+  // All spans were skipped because their live IDs were malformed; there is no
+  // request body to send.
+  if body.length() == 0 {
+    return @sdk.ExportSuccess
   }
   let body = if gzip {
     match gzip_body(body) {

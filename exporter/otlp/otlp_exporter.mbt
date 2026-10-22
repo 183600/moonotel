@@ -699,6 +699,11 @@ pub fn OtlpHttpExporter::export_spans_http(
   } else {
     encode_trace_request(spans)
   }
+  // Every span in the batch was skipped because its live IDs were malformed.
+  // There is nothing to send, so do not issue an empty ExportTraceServiceRequest.
+  if body.length() == 0 {
+    return @sdk.ExportSuccess
+  }
   let url = self.url
   let headers = self.headers
   let max_retries = if self.config.max_retries < 0 {
