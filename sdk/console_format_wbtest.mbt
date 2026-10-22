@@ -11,6 +11,7 @@ test "console format includes attributes and events" {
   attributes.set("feature.enabled", BoolValue(true))
   attributes.set("ratio", DoubleValue(0.5))
   attributes.set("tags", StringArrayValue(["a", "b"]))
+  attributes.set("flags", BoolArrayValue([true, false]))
   let data : SpanData = {
     name: "GET /hello",
     span_context: @api.span_context(
@@ -27,6 +28,12 @@ test "console format includes attributes and events" {
       {
         name: "request.started",
         time_unix_nano: 0L,
+        attributes: Map([]),
+        dropped_attributes_count: 0,
+      },
+      {
+        name: "request.finished",
+        time_unix_nano: 2L,
         attributes: Map([]),
         dropped_attributes_count: 0,
       },
@@ -47,14 +54,15 @@ test "console format includes attributes and events" {
   assert_true(rendered.contains("status=error"))
   assert_true(rendered.contains("status_description=boom"))
   assert_true(rendered.contains("duration_ms=3"))
-  assert_true(rendered.contains("attributes=5"))
+  assert_true(rendered.contains("attributes=6"))
   assert_true(rendered.contains("http.method=GET"))
   assert_true(rendered.contains("http.status_code=200"))
   assert_true(rendered.contains("feature.enabled=true"))
   assert_true(rendered.contains("ratio=0.5"))
   assert_true(rendered.contains("tags=[a, b]"))
-  assert_true(rendered.contains("events=1"))
-  assert_true(rendered.contains("request.started"))
+  assert_true(rendered.contains("flags=[true, false]"))
+  assert_true(rendered.contains("events=2"))
+  assert_true(rendered.contains("request.started, request.finished"))
 }
 
 ///|
