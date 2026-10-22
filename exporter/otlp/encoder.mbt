@@ -1,6 +1,15 @@
 // Encodes SDK SpanData into an OTLP `ExportTraceServiceRequest` protobuf
 // message (opentelemetry-proto v1 trace service).
 
+// Bits 0-7 of the OTLP `flags` field hold the W3C trace flags; the remaining
+// bits are reserved. A runtime SpanContext may carry a wider `Int32` value, so
+// the encoders keep only the documented trace-flag byte.
+
+///|
+fn otlp_flags(trace_flags : Int32) -> Int32 {
+  trace_flags & 0xFF
+}
+
 // Encode one typed array element into its `AnyValue` form (field 5 of the
 // enclosing `AnyValue` holds the repeated elements).
 
@@ -306,7 +315,7 @@ fn encode_link(writer : ProtoWriter, link : @sdk.SpanLink) -> Unit {
   }
   writer.write_fixed32_field(
     6,
-    link.span_context.trace_flags().reinterpret_as_uint(),
+    otlp_flags(link.span_context.trace_flags()).reinterpret_as_uint(),
   )
   writer.end_message(len_pos)
 }
@@ -360,7 +369,7 @@ fn encode_span_fields(span : ProtoWriter, data : @sdk.SpanData) -> Unit {
   encode_status(span, data)
   span.write_fixed32_field(
     16,
-    data.span_context.trace_flags().reinterpret_as_uint(),
+    otlp_flags(data.span_context.trace_flags()).reinterpret_as_uint(),
   )
 }
 
