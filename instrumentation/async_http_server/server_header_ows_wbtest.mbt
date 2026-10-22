@@ -73,3 +73,17 @@ test "record_host_attributes omits an empty host" {
   assert_eq(data.attributes.get(@sdk.SERVER_ADDRESS), None)
   assert_eq(data.attributes.get(@sdk.SERVER_PORT), None)
 }
+
+///|
+test "record_host_attributes ignores host for an absolute target without authority" {
+  let (span, exporter) = host_attribute_span()
+  record_host_attributes(
+    span,
+    ows_header_map([("Host", "external.example.com")]),
+    "http:///path",
+  )
+  span.end()
+  let data = exporter.exported_spans()[0]
+  assert_eq(data.attributes.get(@sdk.SERVER_ADDRESS), None)
+  assert_eq(data.attributes.get(@sdk.SERVER_PORT), None)
+}

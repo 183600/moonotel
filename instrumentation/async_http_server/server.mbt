@@ -357,6 +357,12 @@ fn absolute_target_authority(path : String) -> String? {
 }
 
 ///|
+fn is_absolute_target(path : String) -> Bool {
+  let lower = path.to_lower()
+  lower.has_prefix("http://") || lower.has_prefix("https://")
+}
+
+///|
 fn record_host_attributes(
   span : @sdk.SpanSdk,
   headers : Map[@http.CaseInsensitiveString, String],
@@ -364,14 +370,20 @@ fn record_host_attributes(
 ) -> Unit {
   // With an absolute-form request target the authority of the target wins
   // over the Host header (HTTP semantic conventions, footnotes [2] and [3];
-  // RFC 9112 also requires servers to ignore Host in that case).
+  // RFC 9112 also requires servers to ignore Host in that case). An
+  // absolute-form target with an empty authority therefore has no server
+  // address; falling back to Host would use a header the request told us to
+  // ignore.
   let host : String? = match absolute_target_authority(path) {
     Some(authority) => Some(authority)
     None =>
-      // A Host header must not contain userinfo, but a malformed or hostile
-      // request may still send it. Discard it exactly like the authority of an
-      // absolute-form target so credentials never reach `server.address`.
-      match headers.get(@http.CaseInsensitiveString("host")) {
+      if is_absolute_target(path) {
+        None
+      } else {
+        // A Host header must not contain userinfo, but a malformed or hostile
+        // request may still send it. Discard it exactly like the authority of
+        // an absolute-form target so credentials never reach `server.address`.
+        match headers.get(@http.CaseInsensitiveString("host")) {
         Some(value) => {
           let value = trim_header_ows(value[:])
           let host = match value.rev_find("@") {
@@ -389,6 +401,7 @@ fn record_host_attributes(
           }
         }
         None => None
+      }
       }
   }
   match host {
