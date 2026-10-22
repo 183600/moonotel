@@ -76,6 +76,11 @@ pub impl SpanProcessor for MultiSpanProcessor with fn on_end(self, data) {
 pub impl SpanProcessor for MultiSpanProcessor with fn force_flush(self) {
   if !self.shutdown_called.val {
     for processor in self.processors {
+      // A child's flush may shut this processor down reentrantly; the outer
+      // `shutdown` has already drained and closed the remaining children.
+      if self.shutdown_called.val {
+        break
+      }
       processor.force_flush()
     }
   }

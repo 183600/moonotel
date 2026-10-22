@@ -323,6 +323,12 @@ pub fn TracerProviderSdk::force_flush(self : TracerProviderSdk) -> Unit {
     return
   }
   for processor in self.processors {
+    // A processor's flush may shut the provider down reentrantly. The remaining
+    // processors have then already been drained and shut down by `shutdown`, so
+    // flushing them again would call into closed exporters.
+    if self.shutdown_called.val {
+      break
+    }
     processor.force_flush()
   }
 }
