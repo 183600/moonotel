@@ -45,3 +45,18 @@ test "facade_reexports_api_hex_helpers" {
   assert_true(@moonotel.is_zero(Array::make(16, 0)))
   assert_false(@moonotel.is_zero([1]))
 }
+
+///|
+test "facade_reexports_context_baggage_entries" {
+  let entry : @moonotel.ContextBaggageEntry = @moonotel.ContextBaggageEntry::new(
+    "user.id",
+    "42",
+    properties=[("ttl", "1")],
+  )
+  let context = @moonotel.Context::root().with_baggage_entries([entry])
+  assert_eq(context.value("user.id"), Some("42"))
+  match context.baggage_entry("user.id") {
+    Some(stored) => assert_eq(stored.properties, [("ttl", "1")])
+    None => fail("expected the context baggage entry to be stored")
+  }
+}

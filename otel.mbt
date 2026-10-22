@@ -101,6 +101,14 @@ pub using @context {
   set_context_storage,
 }
 
+// `Context::with_baggage_entries` and `Context::baggage_entries` use the
+// context package's own baggage member type (it carries W3C properties). It is
+// distinct from the propagation `BaggageEntry` re-exported above, so expose it
+// under a name that is unambiguous for facade-only users.
+
+///|
+pub type ContextBaggageEntry = @context.BaggageEntry
+
 ///|
 pub using @propagation {
   type TextMapCarrier,

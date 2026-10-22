@@ -227,6 +227,8 @@ pub using @sdk {type ConsoleSpanExporter}
 
 pub using @context {type Context}
 
+pub using @context {type BaggageEntry as ContextBaggageEntry}
+
 pub using @context {type ContextStorage}
 
 pub using @sdk {type ExportResult}
