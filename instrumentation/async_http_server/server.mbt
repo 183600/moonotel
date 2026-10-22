@@ -296,7 +296,23 @@ fn record_host_attributes(
   // RFC 9112 also requires servers to ignore Host in that case).
   let host : String? = match absolute_target_authority(path) {
     Some(authority) => Some(authority)
-    None => headers.get(@http.CaseInsensitiveString("host"))
+    None =>
+      // A Host header must not contain userinfo, but a malformed or hostile
+      // request may still send it. Discard it exactly like the authority of an
+      // absolute-form target so credentials never reach `server.address`.
+      match headers.get(@http.CaseInsensitiveString("host")) {
+        Some(value) =>
+          match value.rev_find("@") {
+            Some(index) =>
+              if index + 1 >= value.length() {
+                None
+              } else {
+                Some(value[index + 1:].to_owned())
+              }
+            None => Some(value)
+          }
+        None => None
+      }
   }
   match host {
     Some(host) => {
