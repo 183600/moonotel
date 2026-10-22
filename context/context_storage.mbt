@@ -76,8 +76,13 @@ pub fn detach(previous : Context) -> Unit {
 
 ///|
 pub fn[X] with_context(context : Context, f : () -> X raise?) -> X raise? {
-  let previous = attach(context)
-  defer detach(previous)
+  // Capture the backend that receives the scoped context. If `f` installs a
+  // different backend, restoring through the *current* backend would leave the
+  // captured backend holding the scoped context forever.
+  let backend = storage.val
+  let previous = (backend.current)()
+  (backend.set)(context)
+  defer (backend.set)(previous)
   f()
 }
 
