@@ -581,7 +581,14 @@ pub fn inject_with_tracestate(
   match tracestate {
     Some(state) =>
       if !state.is_empty() {
-        carrier.set(tracestate_header_name(), state)
+        // The explicit value overrides the state carried by `sc`, but only
+        // when it is a valid `tracestate` header. Invalid state is dropped
+        // instead of propagating a malformed header.
+        match parse_tracestate(state) {
+          Some(normalized) =>
+            carrier.set(tracestate_header_name(), normalized)
+          None => ()
+        }
       }
     None => ()
   }

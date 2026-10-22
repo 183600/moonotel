@@ -120,3 +120,29 @@ test "parse_tracestate_accepts_max_length_member_value" {
   assert_eq(@propagation.parse_tracestate(value), Some(value))
   assert_true(@propagation.Tracestate::parse(value) is Some(_))
 }
+
+///|
+test "inject_with_tracestate_normalizes_a_valid_override" {
+  let carrier = @propagation.TextMapCarrier::new()
+  @propagation.inject_with_tracestate(
+    w3c_edge_context(), Some(" a=1 , b=2 "), carrier,
+  )
+  assert_eq(@propagation.extract_tracestate(carrier), Some("a=1,b=2"))
+}
+
+///|
+test "inject_with_tracestate_drops_an_invalid_override" {
+  let carrier = @propagation.TextMapCarrier::new()
+  @propagation.inject_with_tracestate(
+    w3c_edge_context(), Some("not a valid state"), carrier,
+  )
+  assert_true(carrier.get(@propagation.traceparent_header_name()) is Some(_))
+  assert_eq(@propagation.extract_tracestate(carrier), None)
+}
+
+///|
+test "inject_with_tracestate_drops_a_header_without_members" {
+  let carrier = @propagation.TextMapCarrier::new()
+  @propagation.inject_with_tracestate(w3c_edge_context(), Some(" , "), carrier)
+  assert_eq(@propagation.extract_tracestate(carrier), None)
+}
