@@ -151,3 +151,21 @@ test "percent_encoded_length_matches_percent_encode" {
     )
   }
 }
+
+///|
+test "parse_baggage_counts_properties_towards_the_byte_budget" {
+  // The property value is 8186 bytes, so `a=1;p=<value>` is exactly the
+  // 8192-byte limit. Properties are not returned by `parse_baggage`, but they
+  // still occupy the header and must count towards its byte budget.
+  let value = StringBuilder()
+  let mut i = 0
+  while i < 8186 {
+    value.write_char('x')
+    i = i + 1
+  }
+  let header = "a=1;p=" + value.to_string() + ",b=2"
+  let entries = @propagation.parse_baggage_entries(header)
+  assert_eq(entries.length(), 1)
+  assert_eq(entries[0].key, "a")
+  assert_eq(@propagation.parse_baggage(header), [("a", "1")])
+}

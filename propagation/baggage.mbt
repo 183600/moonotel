@@ -870,10 +870,16 @@ fn parse_baggage_general(value : String) -> Array[(String, String)] {
           view.view(start_offset=value_start, end_offset=value_end),
         )
         if encoded_len >= 0 {
-          // Properties are dropped, so they do not contribute to the size.
+          // Properties are dropped from the result, but they still occupy the
+          // header and therefore count towards the byte budget, exactly as in
+          // `parse_baggage_entries`.
+          let properties = parse_baggage_properties(view, semi, item_end)
           let key = key_view.to_owned()
           let separator = if pairs.length() > 0 { 1 } else { 0 }
-          let size = key.length() + 1 + encoded_len + separator
+          let mut size = key.length() + 1 + encoded_len + separator
+          for property in properties {
+            size = size + baggage_property_size(property.0, property.1)
+          }
           if bytes + size > BAGGAGE_MAX_BYTES {
             break
           }
