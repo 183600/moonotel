@@ -4,9 +4,10 @@
 // A carrier can also view external storage through the callbacks installed by
 // `from_getter`, `from_setter` and `from_getter_setter`. Instrumentations use
 // this to propagate through an existing header map without copying it: reads
-// fall back to the getter and writes are forwarded to the setter. Without an
-// external setter, `set` stores values in the carrier itself; `length`,
-// `to_map` and `remove` always operate on the carrier's own entries only.
+// fall back to the getter, writes are forwarded to the setter and (when an
+// external `remove` callback is supplied) deletions are forwarded as well.
+// Without an external setter, `set` stores values in the carrier itself;
+// `length` and `to_map` always operate on the carrier's own entries only.
 
 ///|
 pub struct TextMapCarrier {
@@ -15,13 +16,17 @@ pub struct TextMapCarrier {
   getter : ((String) -> String?)?
   // External write target. When present, `set` forwards to it.
   setter : ((String, String) -> Unit)?
+  // External delete target. When present, `remove` forwards to it so that a
+  // propagator can clear headers stored outside the carrier (for example an
+  // HTTP request's header map).
+  remover : ((String) -> Unit)?
 }
 
 // Create an empty carrier
 
 ///|
 pub fn TextMapCarrier::new() -> TextMapCarrier {
-  { entries: Map([]), getter: None, setter: None, }
+  { entries: Map([]), getter: None, setter: None, remover: None, }
 }
 
 // Create a carrier backed by an existing map (values are shared, not copied)
@@ -30,7 +35,7 @@ pub fn TextMapCarrier::new() -> TextMapCarrier {
 pub fn TextMapCarrier::from_map(
   entries : Map[String, String],
 ) -> TextMapCarrier {
-  { entries, getter: None, setter: None, }
+  { entries, getter: None, setter: None, remover: None, }
 }
 
 // Create a carrier from an array of key/value pairs. A repeated key is
@@ -61,7 +66,7 @@ pub fn TextMapCarrier::from_entries(
       }
     }
   }
-  { entries: map, getter: None, setter: None, }
+  { entries: map, getter: None, setter: None, remover: None, }
 }
 
 // Create a read-only carrier that looks up keys through `get` when they are
@@ -72,7 +77,7 @@ pub fn TextMapCarrier::from_entries(
 pub fn TextMapCarrier::from_getter(
   get : (String) -> String?,
 ) -> TextMapCarrier {
-  { entries: Map([]), getter: Some(get), setter: None, }
+  { entries: Map([]), getter: Some(get), setter: None, remover: None, }
 }
 
 // Create a write-through carrier: `set` forwards every write to `set`.
@@ -82,17 +87,25 @@ pub fn TextMapCarrier::from_getter(
 pub fn TextMapCarrier::from_setter(
   set : (String, String) -> Unit,
 ) -> TextMapCarrier {
-  { entries: Map([]), getter: None, setter: Some(set), }
+  { entries: Map([]), getter: None, setter: Some(set), remover: None, }
 }
 
 // Create a carrier that both reads through `get` and writes through `set`.
+// When `remove` is supplied it is called by `remove`, so propagators can also
+// delete headers stored outside the carrier.
 
 ///|
 pub fn TextMapCarrier::from_getter_setter(
   get : (String) -> String?,
   set : (String, String) -> Unit,
+  remove? : (String) -> Unit,
 ) -> TextMapCarrier {
-  { entries: Map([]), getter: Some(get), setter: Some(set), }
+  {
+    entries: Map([]),
+    getter: Some(get),
+    setter: Some(set),
+    remover: remove,
+  }
 }
 
 // Smallest power-of-two map capacity that holds `entries` entries without a
@@ -171,7 +184,9 @@ pub fn TextMapCarrier::set(
   }
 }
 
-// Remove a single header value. Like `get`, the lookup is case-insensitive.
+// Remove a single header value. Like `get`, the local lookup is
+// case-insensitive. A carrier created with an external `remove` callback also
+// forwards the deletion to that store, so `inject` can clear stale headers.
 
 ///|
 pub fn TextMapCarrier::remove(self : TextMapCarrier, key : String) -> Unit {
@@ -193,6 +208,10 @@ pub fn TextMapCarrier::remove(self : TextMapCarrier, key : String) -> Unit {
       for candidate in list {
         self.entries.remove(candidate)
       }
+    None => ()
+  }
+  match self.remover {
+    Some(remove) => remove(key)
     None => ()
   }
 }

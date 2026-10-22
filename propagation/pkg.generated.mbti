@@ -104,10 +104,11 @@ pub struct TextMapCarrier {
   entries : Map[String, String]
   getter : ((String) -> String?)?
   setter : ((String, String) -> Unit)?
+  remover : ((String) -> Unit)?
 }
 pub fn TextMapCarrier::from_entries(Array[(String, String)]) -> Self
 pub fn TextMapCarrier::from_getter((String) -> String?) -> Self
-pub fn TextMapCarrier::from_getter_setter((String) -> String?, (String, String) -> Unit) -> Self
+pub fn TextMapCarrier::from_getter_setter((String) -> String?, (String, String) -> Unit, remove? : (String) -> Unit) -> Self
 pub fn TextMapCarrier::from_map(Map[String, String]) -> Self
 pub fn TextMapCarrier::from_setter((String, String) -> Unit) -> Self
 pub fn TextMapCarrier::get(Self, String) -> String?

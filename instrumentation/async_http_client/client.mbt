@@ -499,6 +499,7 @@ fn traced_headers(
   let carrier = @propagation.TextMapCarrier::from_getter_setter(
     fn(key) { out.get(@http.CaseInsensitiveString(key)) },
     fn(key, value) { out.set(@http.CaseInsensitiveString(key), value) },
+    remove=fn(key) { out.remove(@http.CaseInsensitiveString(key)) },
   )
   @propagation.global_propagator().inject(
     context.with_span(span_context),
