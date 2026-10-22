@@ -172,11 +172,13 @@ pub fn ExportResult::to_repr(Self) -> @debug.Repr
 pub struct IdGenerator {
   trace_id_source : () -> Array[Int32]
   span_id_source : () -> Array[Int32]
+  // private fields
 }
 pub fn IdGenerator::deterministic(UInt64) -> Self
 pub fn IdGenerator::generate_span_id(Self) -> Array[Int32]
 pub fn IdGenerator::generate_trace_id(Self) -> Array[Int32]
-pub fn IdGenerator::new(() -> Array[Int32], () -> Array[Int32]) -> Self
+pub fn IdGenerator::generates_random_trace_ids(Self) -> Bool
+pub fn IdGenerator::new(() -> Array[Int32], () -> Array[Int32], trace_id_is_random? : Bool) -> Self
 pub fn IdGenerator::random() -> Self
 
 pub struct InMemorySpanExporter {

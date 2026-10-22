@@ -19,16 +19,33 @@ fn splitmix64(state : Ref[UInt64]) -> UInt64 {
 pub struct IdGenerator {
   trace_id_source : () -> Array[Int32]
   span_id_source : () -> Array[Int32]
+  // Whether generated trace IDs meet the W3C Level 2 randomness requirements.
+  // Root spans use this to set the random-trace-id flag.
+  priv trace_id_is_random : Bool
 }
 
-// Build a generator from two byte-array factories.
+// Build a generator from two byte-array factories. `trace_id_is_random` says
+// whether `trace_id_source` produces W3C-random trace IDs; it defaults to
+// `false`, so a custom generator only advertises randomness when it says so.
 
 ///|
 pub fn IdGenerator::new(
   trace_id_source : () -> Array[Int32],
   span_id_source : () -> Array[Int32],
+  trace_id_is_random? : Bool,
 ) -> IdGenerator {
-  { trace_id_source, span_id_source, }
+  {
+    trace_id_source,
+    span_id_source,
+    trace_id_is_random: trace_id_is_random.unwrap_or(false),
+  }
+}
+
+// Whether this generator produces random trace IDs.
+
+///|
+pub fn IdGenerator::generates_random_trace_ids(self : IdGenerator) -> Bool {
+  self.trace_id_is_random
 }
 
 ///|
@@ -166,13 +183,13 @@ pub fn IdGenerator::random() -> IdGenerator {
   if @env.rand(0) is None {
     IdGenerator::new(fn() { pseudo_random_bytes(16, state) }, fn() {
       pseudo_random_bytes(8, state)
-    })
+    }, trace_id_is_random=true)
   } else {
     let pending : Ref[Bytes] = Ref(b"")
     let offset : Ref[Int32] = Ref(0)
     IdGenerator::new(fn() { random_bytes(16, state, pending, offset) }, fn() {
       random_bytes(8, state, pending, offset)
-    })
+    }, trace_id_is_random=true)
   }
 }
 

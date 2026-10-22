@@ -135,7 +135,8 @@ async test "get creates a client span and injects traceparent" {
       data.span_context.trace_id_hex() +
       "-" +
       data.span_context.span_id_hex() +
-      "-01"
+      // The SDK's random trace-ID generator sets the W3C random flag too.
+      "-03"
     assert_eq(traceparent.val, expected)
     assert_eq(
       data.attributes.get(@sdk.HTTP_REQUEST_METHOD),

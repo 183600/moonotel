@@ -12,7 +12,9 @@ test "drop_decision_never_sets_the_sampled_flag" {
   let span = provider.get_tracer("flag-probe").start_root_span("span")
   assert_false(span.is_recording())
   assert_false(span.context().is_sampled())
-  assert_eq(span.context().trace_flags(), 0)
+  // The random-trace-id flag still describes the generated trace ID, but the
+  // sampled bit must never be set without a recording decision.
+  assert_eq(span.context().trace_flags(), @api.TRACE_FLAGS_RANDOM)
 }
 
 ///|
@@ -22,5 +24,8 @@ test "record_and_sample_decision_sets_the_sampled_flag" {
   let span = provider.get_tracer("flag-probe").start_root_span("span")
   assert_true(span.is_recording())
   assert_true(span.context().is_sampled())
-  assert_eq(span.context().trace_flags(), @api.TRACE_FLAGS_SAMPLED)
+  assert_eq(
+    span.context().trace_flags(),
+    @api.TRACE_FLAGS_SAMPLED | @api.TRACE_FLAGS_RANDOM,
+  )
 }

@@ -326,7 +326,9 @@ ambiguous, so `extract` ignores the header and restarts the trace.
 Parsing is strict about the specification (version `ff`, all-zero IDs,
 field lengths, version-00 extra fields) and, per the version-00 `HEXDIGLC`
 ABNF, requires lowercase hex for `version=00` headers; future versions
-(`>= 01`) accept hex in either case. For a future version the two flag
+(`>= 01`) accept hex in either case. A root span created from the SDK's random
+trace-ID generator sets the W3C Level 2 random-trace-id flag, and a child span
+preserves the parent's flag. For a future version the two flag
 characters must be followed by the end of the value or by a dash; any
 extension after that dash is ignored (it may be empty). Empty and
 whitespace-only `tracestate` headers are accepted as carrying no state, and
