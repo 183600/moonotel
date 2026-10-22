@@ -154,6 +154,29 @@ fn parse_port(text : StringView) -> Int32 {
   port
 }
 
+// Trim HTTP optional whitespace (SP / HTAB only) from both ends of a header
+// value. The HTTP reader used by the instrumentation strips at most one leading
+// space and keeps trailing whitespace, so numeric and authority values must be
+// trimmed here before parsing.
+
+///|
+fn trim_header_ows(value : StringView) -> StringView {
+  let len = value.length()
+  let mut start = 0
+  while start < len && is_http_ows(value.unsafe_get(start).unsafe_to_char()) {
+    start = start + 1
+  }
+  let mut end = len
+  while end > start && is_http_ows(value.unsafe_get(end - 1).unsafe_to_char()) {
+    end = end - 1
+  }
+  if start == 0 && end == len {
+    value
+  } else {
+    value.view(start_offset=start, end_offset=end)
+  }
+}
+
 // Parse a non-negative decimal `Content-Length` value. Values that do not fit
 // in an `Int64` are rejected so a hostile header cannot overflow the attribute.
 
@@ -190,11 +213,14 @@ fn request_body_size(
   headers : Map[@http.CaseInsensitiveString, String],
 ) -> Int64? {
   match headers.get(@http.CaseInsensitiveString("transfer-encoding")) {
-    Some(value) => if value.trim() != "" { return None }
+    Some(value) =>
+      if trim_header_ows(value[:]).length() != 0 {
+        return None
+      }
     None => ()
   }
   match headers.get(@http.CaseInsensitiveString("content-length")) {
-    Some(value) => parse_content_length(value[:])
+    Some(value) => parse_content_length(trim_header_ows(value[:]))
     None => None
   }
 }
@@ -346,16 +372,22 @@ fn record_host_attributes(
       // request may still send it. Discard it exactly like the authority of an
       // absolute-form target so credentials never reach `server.address`.
       match headers.get(@http.CaseInsensitiveString("host")) {
-        Some(value) =>
-          match value.rev_find("@") {
+        Some(value) => {
+          let value = trim_header_ows(value[:])
+          let host = match value.rev_find("@") {
             Some(index) =>
               if index + 1 >= value.length() {
                 None
               } else {
                 Some(value[index + 1:].to_owned())
               }
-            None => Some(value)
+            None => Some(value.to_owned())
           }
+          match host {
+            Some(value) => if value == "" { None } else { Some(value) }
+            None => None
+          }
+        }
         None => None
       }
   }
@@ -370,12 +402,12 @@ fn record_host_attributes(
           }
         None => (host, -1)
       }
-      span.set_attribute(
-        @sdk.SERVER_ADDRESS,
-        @sdk.StringValue(strip_ipv6_brackets(address)),
-      )
-      if port > 0 {
-        span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
+      let address = strip_ipv6_brackets(address)
+      if address != "" {
+        span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(address))
+        if port > 0 {
+          span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
+        }
       }
     }
     None => ()
