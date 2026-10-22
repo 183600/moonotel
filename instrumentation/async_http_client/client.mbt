@@ -581,7 +581,9 @@ pub async fn request(
       let host = strip_ipv6_brackets(host)
       if host != "" {
         span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(host))
-        if port > 0 {
+        // `-1` marks an invalid explicit port; port 0 is a valid explicit
+        // value and must still be recorded.
+        if port >= 0 {
           span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
         }
       }

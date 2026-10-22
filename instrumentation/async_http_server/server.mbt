@@ -417,7 +417,9 @@ fn record_host_attributes(
       let address = strip_ipv6_brackets(address)
       if address != "" {
         span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(address))
-        if port > 0 {
+        // `-1` marks an absent or invalid port; an explicit port 0 is valid
+        // and must still be recorded.
+        if port >= 0 {
           span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
         }
       }
