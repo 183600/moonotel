@@ -784,11 +784,15 @@ fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
     // `Content-Type`, `Accept` or `Content-Encoding` spelling before adding
     // the protocol's own values, and collapse differently-cased duplicates of
     // other headers. This exporter never compresses request bodies, so a
-    // configured `Content-Encoding` would describe the body incorrectly.
+    // configured `Content-Encoding` would describe the body incorrectly. The
+    // transport owns body framing (`Content-Length` / `Transfer-Encoding`), so
+    // a configured value cannot contradict the bytes actually sent.
     let lower = key.to_lower()
     if lower != "content-type" &&
       lower != "accept" &&
-      lower != "content-encoding" {
+      lower != "content-encoding" &&
+      lower != "content-length" &&
+      lower != "transfer-encoding" {
       set_header(headers, key, value)
     }
   }

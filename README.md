@@ -250,7 +250,11 @@ Configured headers are validated before they are sent. A name must be a
 non-empty HTTP token, and a value must not contain CR, LF, NUL or any control
 character other than HTAB; malformed entries are dropped both when the
 `OTEL_EXPORTER_OTLP_*_HEADERS` variables are parsed and when the request
-headers are built from a directly assembled `OtlpHttpConfig`.
+headers are built from a directly assembled `OtlpHttpConfig`. Transport-managed
+body-framing headers (`Content-Length` and `Transfer-Encoding`) are not
+forwarded, so a configured value cannot contradict the bytes actually sent;
+`Content-Type`, `Accept` and `Content-Encoding` are likewise set by the
+exporter.
 
 Requests announce `Content-Type` and `Accept` for the configured protocol and
 carry a default `User-Agent` identifying the exporter and SDK version
