@@ -55,17 +55,61 @@ fn format_array(items : Array[String]) -> String {
   "[" + items.join(", ") + "]"
 }
 
+// Append text with control characters and backslashes escaped, so a span name,
+// event name, attribute value or status description can never introduce an
+// extra line into the console summary (or hide its start with a carriage
+// return).
+
+///|
+fn write_escaped_console_text(out : StringBuilder, text : String) -> Unit {
+  let len = text.length()
+  let mut i = 0
+  while i < len {
+    let code = text.unsafe_get(i).to_int()
+    if code == 0x5C {
+      out.write_string("\\\\")
+    } else if code == 0x0A {
+      out.write_string("\\n")
+    } else if code == 0x0D {
+      out.write_string("\\r")
+    } else if code == 0x09 {
+      out.write_string("\\t")
+    } else if code < 0x20 ||
+      code == 0x7F ||
+      (code >= 0x80 && code <= 0x9F) ||
+      code == 0x2028 ||
+      code == 0x2029 {
+      out.write_string("\\u")
+      out.write_char(hex_nibble_char((code >> 12) & 0x0F))
+      out.write_char(hex_nibble_char((code >> 8) & 0x0F))
+      out.write_char(hex_nibble_char((code >> 4) & 0x0F))
+      out.write_char(hex_nibble_char(code & 0x0F))
+    } else {
+      out.write_char(code.unsafe_to_char())
+    }
+    i = i + 1
+  }
+}
+
+///|
+fn escape_console_text(text : String) -> String {
+  let out = StringBuilder(size_hint=text.length())
+  write_escaped_console_text(out, text)
+  out.to_string()
+}
+
 // Render a single attribute value compactly, so the console output stays on
 // one line regardless of the value's shape.
 
 ///|
 fn format_attribute_value(value : AttributeValue) -> String {
   match value {
-    StringValue(text) => text
+    StringValue(text) => escape_console_text(text)
     BoolValue(flag) => flag.to_string()
     IntValue(number) => number.to_string()
     DoubleValue(number) => number.to_string()
-    StringArrayValue(items) => format_array(items)
+    StringArrayValue(items) =>
+      format_array(items.map(fn(item) { escape_console_text(item) }))
     BoolArrayValue(items) => format_array(items.map(fn(item) { item.to_string() }))
     IntArrayValue(items) => format_array(items.map(fn(item) { item.to_string() }))
     DoubleArrayValue(items) => format_array(items.map(fn(item) { item.to_string() }))
@@ -77,12 +121,13 @@ fn format_attribute_value(value : AttributeValue) -> String {
 //  status=<status> duration_ms=<n> attributes=<n>{key=value,...} events=<n>
 //  links=<n>`. Attribute values and event names are appended after the counts
 // so the line stays useful for demos without breaking the summary prefix.
+// User-provided text is escaped so it cannot introduce another line.
 
 ///|
 fn format_span(data : SpanData) -> String {
   let out = StringBuilder()
   out.write_string("span name=")
-  out.write_string(data.name)
+  write_escaped_console_text(out, data.name)
   out.write_string(" trace_id=")
   out.write_string(data.span_context.trace_id_hex())
   out.write_string(" span_id=")
@@ -99,7 +144,7 @@ fn format_span(data : SpanData) -> String {
   out.write_string(data.status.to_string())
   if data.status_description.length() > 0 {
     out.write_string(" status_description=")
-    out.write_string(data.status_description)
+    write_escaped_console_text(out, data.status_description)
   }
   out.write_string(" duration_ms=")
   out.write_string(duration_millis.to_string())
@@ -113,7 +158,7 @@ fn format_span(data : SpanData) -> String {
         out.write_string(", ")
       }
       first = false
-      out.write_string(key)
+      write_escaped_console_text(out, key)
       out.write_char('=')
       out.write_string(format_attribute_value(value))
     }
@@ -127,7 +172,7 @@ fn format_span(data : SpanData) -> String {
       if i > 0 {
         out.write_string(", ")
       }
-      out.write_string(data.events[i].name)
+      write_escaped_console_text(out, data.events[i].name)
     }
     out.write_char(']')
   }

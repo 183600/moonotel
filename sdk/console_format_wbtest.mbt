@@ -120,3 +120,69 @@ test "console format renders parent ids like bytes_to_hex" {
     rendered.contains(" parent_span_id=" + @api.bytes_to_hex(data.parent_span_id)),
   )
 }
+
+///|
+test "console escaping keeps control characters out of the raw output" {
+  assert_eq(escape_console_text("plain text"), "plain text")
+  assert_eq(
+    escape_console_text("a\nb\rc\td\\e"),
+    "a\\nb\\rc\\td\\\\e",
+  )
+  let controls = String::from_array([
+    (0x01).unsafe_to_char(),
+    (0x1F).unsafe_to_char(),
+    (0x7F).unsafe_to_char(),
+    (0x2028).unsafe_to_char(),
+    (0x2029).unsafe_to_char(),
+  ])
+  assert_eq(
+    escape_console_text(controls),
+    "\\u0001\\u001f\\u007f\\u2028\\u2029",
+  )
+}
+
+///|
+test "console format escapes newlines in names attributes and events" {
+  let attributes : Map[String, AttributeValue] = Map([])
+  attributes.set("key\nline", StringValue("value\twith\\slash"))
+  let data : SpanData = {
+    name: "span\nname",
+    span_context: @api.span_context(
+      @api.bytes_from_hex("55555555555555555555555555555555").unwrap(),
+      @api.bytes_from_hex("6666666666666666").unwrap(),
+      1,
+    ),
+    parent_span_id: [],
+    kind: @api.SpanKind::Internal,
+    start_time_unix_nano: 0L,
+    end_time_unix_nano: 0L,
+    attributes,
+    events: [
+      {
+        name: "event\nname",
+        time_unix_nano: 0L,
+        attributes: Map([]),
+        dropped_attributes_count: 0,
+      },
+    ],
+    links: [],
+    dropped_attributes_count: 0,
+    dropped_events_count: 0,
+    dropped_links_count: 0,
+    status: @api.StatusCode::Error,
+    status_description: "bad\r\nstatus",
+    resource: ResourceAttributes::new(Map([])),
+    scope_name: "probe",
+    scope_version: "0.0.1",
+  }
+  let rendered = format_span(data)
+  assert_false(rendered.contains("\n"))
+  assert_false(rendered.contains("\r"))
+  assert_false(rendered.contains("\t"))
+  assert_true(rendered.contains("name=span\\nname"))
+  assert_true(rendered.contains("status_description=bad\\r\\nstatus"))
+  assert_true(
+    rendered.contains("key\\nline=value\\twith\\\\slash"),
+  )
+  assert_true(rendered.contains("event\\nname"))
+}
