@@ -265,6 +265,7 @@ pub struct Sampler {
 }
 pub fn Sampler::always_off() -> Self
 pub fn Sampler::always_on() -> Self
+pub fn Sampler::always_record(Self) -> Self
 pub fn Sampler::description(Self) -> String
 pub fn Sampler::from_env() -> Self
 pub fn Sampler::new(String, (SamplingParameters) -> SamplingDecision) -> Self

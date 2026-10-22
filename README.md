@@ -99,7 +99,9 @@ lower ratio would. The exact `TraceIdRatioBased` algorithm is not standardized
 (the OpenTelemetry specification explicitly warns that different SDKs may
 disagree), so do not rely on the same trace ID being sampled identically by
 another language's SDK. Processors: `SimpleSpanProcessor` (export on end) and
-`BatchSpanProcessor` (bounded queue, batched export).
+`BatchSpanProcessor` (bounded queue, batched export). `always_record(root)`
+wraps a sampler so spans it would drop are still recorded locally
+(`RECORD_ONLY`) without being exported, which lets processors see every span.
 
 A recording span keeps its data readable after `end()`: the accessors return a
 snapshot of the recorded attributes, events and links, including when the
