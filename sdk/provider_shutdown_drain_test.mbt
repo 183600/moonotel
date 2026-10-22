@@ -72,3 +72,23 @@ test "shutdown_drains_batches_nested_in_a_multi_processor" {
   provider.shutdown()
   assert_eq(exporter.span_count(), 4)
 }
+
+///|
+test "multi_processor_shutdown_drains_children_before_shutting_them" {
+  let exporter = @sdk.InMemorySpanExporter::new()
+  let simple : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
+  let batch : &@sdk.SpanProcessor = @sdk.BatchSpanProcessor::new(
+    exporter,
+    max_export_batch_size=100,
+  )
+  let multi = @sdk.MultiSpanProcessor::new(processors=[simple, batch])
+  let provider = @sdk.TracerProviderSdk::new(service_name="multi-drain")
+    .with_sampler(@sdk.Sampler::always_on())
+    .with_span_processor(multi)
+  let tracer = provider.get_tracer("multi-drain")
+  tracer.start_root_span("one").end()
+  tracer.start_root_span("two").end()
+  assert_eq(exporter.span_count(), 2)
+  multi.shutdown()
+  assert_eq(exporter.span_count(), 4)
+}
