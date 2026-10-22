@@ -198,6 +198,7 @@ pub impl SpanExporter for InMemorySpanExporter
 pub struct MultiSpanProcessor {
   processors : Array[&SpanProcessor]
   shutdowns : Array[@ref.Ref[Bool]]
+  drained : Array[@ref.Ref[Bool]]
   shutdown_called : @ref.Ref[Bool]
   draining : @ref.Ref[Bool]
 }
