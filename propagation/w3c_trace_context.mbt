@@ -577,20 +577,25 @@ pub fn inject_with_tracestate(
   if !sc.is_valid() {
     return
   }
-  inject(sc, carrier)
   match tracestate {
-    Some(state) =>
+    None =>
+      // No explicit override: propagate the state carried by the context.
+      inject(sc, carrier)
+    Some(state) => {
+      // An explicit value overrides the state carried by `sc`, including an
+      // empty value (which suppresses the header) and a malformed value
+      // (which is dropped instead of being written). Write only the
+      // `traceparent` from the context so its state cannot leak through.
+      carrier.set(traceparent_header_name(), format_traceparent(sc))
+      carrier.remove(tracestate_header_name())
       if !state.is_empty() {
-        // The explicit value overrides the state carried by `sc`, but only
-        // when it is a valid `tracestate` header. Invalid state is dropped
-        // instead of propagating a malformed header.
         match parse_tracestate(state) {
           Some(normalized) =>
             carrier.set(tracestate_header_name(), normalized)
           None => ()
         }
       }
-    None => ()
+    }
   }
 }
 
