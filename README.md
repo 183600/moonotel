@@ -251,7 +251,9 @@ Exporters are single-use sinks. `OtlpHttpExporter` rejects every batch after
 `shutdown()` — including an empty one — with
 `ExportFailure("OTLP exporter is shut down")`; the async span exporter closes
 its queue on shutdown. Shutting a provider down drains batch processors before
-shutting their exporters down, so already-ending spans are not lost.
+shutting their exporters down, so already-ending spans are not lost. Once
+shutdown starts, no further `on_start` / `on_end` callbacks are delivered, even
+when a processor triggers the shutdown from inside one of those callbacks.
 
 The OTLP encoders validate live IDs at export time. A span whose trace ID is no
 longer exactly 16 nonzero bytes or whose span ID is no longer exactly 8 nonzero

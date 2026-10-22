@@ -75,6 +75,7 @@ pub fn Tracer::start_span(
       None,
       self.provider.span_limits(),
       self.provider.processors,
+      self.provider.shutdown_called,
       self.provider.resource.attributes_shared(),
       self.scope_name,
       self.scope_version,
@@ -136,6 +137,7 @@ pub fn Tracer::start_span(
     span_links,
     self.provider.span_limits(),
     self.provider.processors,
+    self.provider.shutdown_called,
     self.provider.resource.attributes_shared(),
     self.scope_name,
     self.scope_version,
@@ -146,6 +148,11 @@ pub fn Tracer::start_span(
   }
   if span.recording {
     for processor in self.provider.processors {
+      // A processor may shut the provider down from inside `on_start`; the
+      // remaining processors must not receive the callback afterwards.
+      if self.provider.is_shutdown() {
+        break
+      }
       processor.on_start(span)
     }
   }

@@ -112,6 +112,9 @@ pub struct SpanSdk {
   mut dropped_events : Int32
   mut dropped_links : Int32
   processors : Array[&SpanProcessor]
+  // Shared with the provider. Once it is set, no further processor callbacks
+  // may run, even when a processor shuts the provider down reentrantly.
+  provider_shutdown : Ref[Bool]
   resource : Map[String, AttributeValue]
   scope_name : String
   scope_version : String
@@ -134,6 +137,7 @@ fn create_span(
   links : Array[SpanLink]?,
   limits : SpanLimits,
   processors : Array[&SpanProcessor],
+  provider_shutdown : Ref[Bool],
   resource : Map[String, AttributeValue],
   scope_name : String,
   scope_version : String,
@@ -158,6 +162,7 @@ fn create_span(
     dropped_events: 0,
     dropped_links: 0,
     processors,
+    provider_shutdown,
     resource,
     scope_name,
     scope_version,
@@ -1097,6 +1102,11 @@ pub fn SpanSdk::end(self : SpanSdk, end_time_unix_nano? : Int64) -> Unit {
     // seen by a later processor or by the span accessors.
     self.snapshot = Some(data)
     for processor in self.processors {
+      // A processor may shut the provider down from inside `on_end`; after
+      // that, the remaining processors must not receive callbacks.
+      if self.provider_shutdown.val {
+        break
+      }
       processor.on_end(data.copy())
     }
   }
