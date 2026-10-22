@@ -162,6 +162,12 @@ fn BatchSpanProcessor::push_span(
 
 ///|
 pub fn BatchSpanProcessor::flush_batch(self : BatchSpanProcessor) -> Unit {
+  // A shut-down processor is a sink that no longer exports, like `tick` and
+  // `on_end`. `shutdown` drains the queue with the internal `flush_batch_at`
+  // before closing the exporter.
+  if self.shutdown_called {
+    return
+  }
   self.flush_batch_at(@env.now())
 }
 
@@ -260,7 +266,10 @@ pub impl SpanProcessor for BatchSpanProcessor with fn on_end(self, data) {
 
 ///|
 pub impl SpanProcessor for BatchSpanProcessor with fn force_flush(self) {
-  if self.count > 0 {
+  // `force_flush` after shutdown is a no-op: `shutdown` has already drained
+  // the queue and closed the exporter, so exporting again would either use a
+  // closed exporter or re-enter the shutdown drain.
+  if !self.shutdown_called && self.count > 0 {
     let now = @env.now()
     while self.count > 0 {
       self.flush_batch_at(now)
