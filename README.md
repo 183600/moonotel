@@ -215,7 +215,11 @@ responses, including 500, are terminal and returned as an export failure.
 `OtlpHttpConfig::new` applies the same defaults to programmatic values as
 `from_env`: a negative timeout (0 means "no timeout") and blank protocol or
 compression values fall back to 10s, `http/protobuf` and `none`; a negative
-`max_retries` means no retries.
+`max_retries` means no retries. A config assembled directly from the public
+fields is normalized the same way when it is used: blank protocol/compression
+values select `http/protobuf` / `none`, blank or whitespace-only endpoints are
+treated as unset, and surrounding whitespace is stripped before the export URL
+is built.
 
 Exporters are single-use sinks. `OtlpHttpExporter` rejects every batch after
 `shutdown()` — including an empty one — with
