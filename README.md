@@ -216,10 +216,10 @@ responses, including 500, are terminal and returned as an export failure.
 `from_env`: a negative timeout (0 means "no timeout") and blank protocol or
 compression values fall back to 10s, `http/protobuf` and `none`; a negative
 `max_retries` means no retries. A config assembled directly from the public
-fields is normalized the same way when it is used: blank protocol/compression
-values select `http/protobuf` / `none`, blank or whitespace-only endpoints are
-treated as unset, and surrounding whitespace is stripped before the export URL
-is built.
+fields is normalized the same way when it is used: a negative timeout falls
+back to 10s, blank protocol/compression values select `http/protobuf` / `none`,
+blank or whitespace-only endpoints are treated as unset, and surrounding
+whitespace is stripped before the export URL is built.
 
 Exporters are single-use sinks. `OtlpHttpExporter` rejects every batch after
 `shutdown()` — including an empty one — with
