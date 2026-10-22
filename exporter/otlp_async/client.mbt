@@ -94,7 +94,13 @@ fn request_headers(
   // it case-insensitively.
   headers.set(@http.CaseInsensitiveString("user-agent"), default_user_agent())
   for key, value in config.headers {
-    headers.set(@http.CaseInsensitiveString(key), value)
+    // A config assembled directly from the public fields has not passed
+    // through the constructor, so validate again before forwarding a header
+    // to the HTTP client. CR/LF in a value would otherwise split the request.
+    if @otlp.is_valid_http_header_name(key) &&
+      @otlp.is_valid_http_header_value(value) {
+      headers.set(@http.CaseInsensitiveString(key), value)
+    }
   }
   // `Content-Encoding` must describe the body this exporter actually sends.
   // Drop any configured spelling, then add `gzip` below when the body is

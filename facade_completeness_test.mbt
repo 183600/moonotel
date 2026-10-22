@@ -60,3 +60,11 @@ test "facade_reexports_context_baggage_entries" {
     None => fail("expected the context baggage entry to be stored")
   }
 }
+
+///|
+test "facade_reexports_http_header_validation" {
+  assert_true(@moonotel.is_valid_http_header_name("x-token"))
+  assert_false(@moonotel.is_valid_http_header_name("bad name"))
+  assert_true(@moonotel.is_valid_http_header_value("café"))
+  assert_false(@moonotel.is_valid_http_header_value("a\r\nb"))
+}

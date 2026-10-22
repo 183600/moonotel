@@ -162,6 +162,8 @@ pub using @otlp {
   OTLP_HTTP_JSON_PROTOCOL,
   is_supported_protocol,
   content_type_for_protocol,
+  is_valid_http_header_name,
+  is_valid_http_header_value,
   decode_export_response,
   decode_export_response_json,
   encode_trace_request,

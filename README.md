@@ -234,6 +234,12 @@ The facade and async `setup` functions merge their explicit `headers` argument
 into the headers read from the environment: same-named entries are replaced
 case-insensitively, while unrelated environment headers are still sent.
 
+Configured headers are validated before they are sent. A name must be a
+non-empty HTTP token, and a value must not contain CR, LF, NUL or any control
+character other than HTAB; malformed entries are dropped both when the
+`OTEL_EXPORTER_OTLP_*_HEADERS` variables are parsed and when the request
+headers are built from a directly assembled `OtlpHttpConfig`.
+
 Requests announce `Content-Type` and `Accept` for the configured protocol and
 carry a default `User-Agent` identifying the exporter and SDK version
 (`OTel-OTLP-Exporter-MoonBit/<version>`); a `User-Agent` supplied through

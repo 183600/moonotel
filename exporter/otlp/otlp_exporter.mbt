@@ -146,6 +146,67 @@ pub fn OtlpHttpConfig::effective_timeout_millis(
   }
 }
 
+// Whether a code unit is an HTTP token character (RFC 9110 `tchar`). Header
+// names must be non-empty tokens; names containing whitespace, `:`, control
+// characters or non-ASCII text cannot be sent as HTTP fields.
+
+///|
+fn is_http_token_code(code : Int32) -> Bool {
+  (code >= 0x30 && code <= 0x39) ||
+  (code >= 0x41 && code <= 0x5A) ||
+  (code >= 0x61 && code <= 0x7A) ||
+  code == 0x21 ||
+  (code >= 0x23 && code <= 0x27) ||
+  code == 0x2A ||
+  code == 0x2B ||
+  code == 0x2D ||
+  code == 0x2E ||
+  code == 0x5E ||
+  code == 0x5F ||
+  code == 0x60 ||
+  code == 0x7C ||
+  code == 0x7E
+}
+
+// Whether `name` is a valid HTTP header name (a non-empty RFC 9110 token).
+
+///|
+pub fn is_valid_http_header_name(name : StringView) -> Bool {
+  let len = name.length()
+  if len == 0 {
+    return false
+  }
+  let mut i = 0
+  while i < len {
+    if !is_http_token_code(name.unsafe_get(i).to_int()) {
+      return false
+    }
+    i = i + 1
+  }
+  true
+}
+
+// Whether `value` can be sent as an HTTP field value. HTTP forbids CR, LF and
+// NUL because they delimit fields, and every other control character except
+// HTAB is not a field-vchar. Non-ASCII text is allowed (obs-text).
+
+///|
+pub fn is_valid_http_header_value(value : String) -> Bool {
+  let len = value.length()
+  let mut i = 0
+  while i < len {
+    let code = value.unsafe_get(i).to_int()
+    if code == 0x00 || code == 0x0A || code == 0x0D || code == 0x7F {
+      return false
+    }
+    if code < 0x20 && code != 0x09 {
+      return false
+    }
+    i = i + 1
+  }
+  true
+}
+
 // Create a configuration with sensible defaults
 // (endpoint `http://localhost:4318`, no compression, `http/protobuf`, 10s
 // timeout, 3 retries for retryable statuses). When `traces_endpoint` is given
@@ -198,8 +259,17 @@ pub fn OtlpHttpConfig::new(
     traces_endpoint,
     // The config owns a snapshot of the headers: mutating the caller's map
     // afterwards cannot change what an exporter built from this config sends.
+    // Only headers that can be represented as HTTP fields are kept.
     headers: match headers {
-      Some(values) => values.copy()
+      Some(values) => {
+        let snapshot = Map([], capacity=values.length())
+        for key, value in values {
+          if is_valid_http_header_name(key) && is_valid_http_header_value(value) {
+            set_header(snapshot, key, value)
+          }
+        }
+        snapshot
+      }
       None => Map([])
     },
     timeout_millis: if timeout < 0 {
@@ -238,7 +308,9 @@ pub fn OtlpHttpConfig::with_headers(
 ) -> OtlpHttpConfig {
   let merged = self.headers.copy()
   for key, value in headers {
-    set_header(merged, key, value)
+    if is_valid_http_header_name(key) && is_valid_http_header_value(value) {
+      set_header(merged, key, value)
+    }
   }
   { ..self, headers: merged, }
 }
@@ -353,12 +425,13 @@ fn parse_headers(value : String) -> Map[String, String] {
     match pair.trim().split_once("=") {
       Some((key, header_value)) => {
         let trimmed_key = key.trim()
-        if trimmed_key != "" {
-          set_header(
-            headers,
-            trimmed_key.to_owned(),
-            decode_header_value(header_value.trim()),
-          )
+        let value = decode_header_value(header_value.trim())
+        // Malformed names and values are not representable as HTTP fields
+        // (and a CR/LF in a value would split the request into extra fields),
+        // so drop the pair instead of forwarding it to the transport.
+        if is_valid_http_header_name(trimmed_key) &&
+          is_valid_http_header_value(value) {
+          set_header(headers, trimmed_key.to_owned(), value)
         }
       }
       None => ()
@@ -672,6 +745,12 @@ fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
   // copied below and replaces it case-insensitively.
   set_header(headers, "user-agent", default_user_agent())
   for key, value in config.headers {
+    // A config assembled directly from the public fields has not passed
+    // through the constructor, so validate again before forwarding a header
+    // to the transport.
+    if !is_valid_http_header_name(key) || !is_valid_http_header_value(value) {
+      continue
+    }
     // HTTP header names are case-insensitive, so drop any user-configured
     // `Content-Type`, `Accept` or `Content-Encoding` spelling before adding
     // the protocol's own values, and collapse differently-cased duplicates of
