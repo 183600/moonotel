@@ -287,7 +287,10 @@ extension after that dash is ignored (it may be empty). Empty and
 whitespace-only `tracestate` headers are accepted as carrying no state, and
 `inject` never writes an empty `tracestate`. `inject_with_tracestate`
 validates and normalizes its explicit `tracestate` override, dropping a
-malformed value instead of writing an invalid header.
+malformed value instead of writing an invalid header. `inject` removes a
+`tracestate` left in the carrier by an earlier injection when the context
+carries no valid state, so a stale value is never paired with a new
+`traceparent`.
 
 ## Context
 

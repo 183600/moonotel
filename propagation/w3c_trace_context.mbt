@@ -540,9 +540,19 @@ pub fn inject(sc : @api.SpanContext, carrier : TextMapCarrier) -> Unit {
         Some(normalized) =>
           if normalized != "" {
             carrier.set(tracestate_header_name(), normalized)
+          } else {
+            // The context carries no members: do not leave an unrelated
+            // `tracestate` from an earlier injection attached to the new
+            // `traceparent`.
+            carrier.remove(tracestate_header_name())
           }
-        None => ()
+        None =>
+          // An invalid state is dropped; a stale header would otherwise be
+          // propagated with a `traceparent` it does not belong to.
+          carrier.remove(tracestate_header_name())
       }
+    } else {
+      carrier.remove(tracestate_header_name())
     }
   }
 }
