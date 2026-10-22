@@ -103,7 +103,9 @@ pub fn Context::with_span(self : Context, sc : @api.SpanContext) -> Context {
   }
 }
 
-// Derive a context carrying a string baggage value.
+// Derive a context carrying a string baggage value. An empty name is not a
+// valid baggage name, as required by the OpenTelemetry Baggage API, so it is
+// ignored and leaves the context unchanged.
 
 ///|
 pub fn Context::with_value(
@@ -111,6 +113,9 @@ pub fn Context::with_value(
   key : String,
   value : String,
 ) -> Context {
+  if key == "" {
+    return self
+  }
   {
     span_ctx: None,
     key: Some(key),
@@ -126,7 +131,7 @@ pub fn Context::with_value(
 // Derive a context carrying a baggage value together with its W3C baggage
 // properties. A copy of the properties array is stored, so mutating the
 // caller's array cannot change the immutable context. An empty properties
-// array is treated as no properties.
+// array is treated as no properties. An empty name is invalid and ignored.
 
 ///|
 pub fn Context::with_baggage_entry(
@@ -135,6 +140,9 @@ pub fn Context::with_baggage_entry(
   value : String,
   properties? : Array[(String, String)],
 ) -> Context {
+  if key == "" {
+    return self
+  }
   let properties = match properties {
     Some(values) =>
       if values.length() == 0 {
@@ -158,10 +166,14 @@ pub fn Context::with_baggage_entry(
 
 // Derive a context in which `key` no longer has a baggage value: values
 // stored in outer contexts are hidden. A later `with_value` call can
-// reintroduce the key.
+// reintroduce the key. An empty name is invalid and leaves the context
+// unchanged.
 
 ///|
 pub fn Context::without_value(self : Context, key : String) -> Context {
+  if key == "" {
+    return self
+  }
   {
     span_ctx: None,
     key: Some(key),
@@ -195,6 +207,9 @@ pub fn Context::without_baggage(self : Context) -> Context {
 
 // Derive a context carrying every key/value pair of `values` as baggage.
 // Pairs are applied in map order; lookups always see the innermost value.
+// An empty baggage map clears every value stored in outer contexts, as before.
+// Empty names are invalid and are skipped; when no valid pair remains the
+// context is left unchanged.
 
 ///|
 pub fn Context::with_baggage(
@@ -208,7 +223,12 @@ pub fn Context::with_baggage(
     [], capacity=map_capacity_for_entries(values.length()),
   )
   for key, value in values {
-    baggage.set(key, value)
+    if key != "" {
+      baggage.set(key, value)
+    }
+  }
+  if baggage.length() == 0 {
+    return self
   }
   {
     span_ctx: None,
@@ -223,7 +243,8 @@ pub fn Context::with_baggage(
 }
 
 // Like `with_baggage`, but takes ownership of `values` instead of copying it.
-// Callers must not mutate the map afterwards.
+// Callers must not mutate the map afterwards. Empty names are invalid and are
+// skipped exactly like `with_baggage`.
 
 ///|
 pub fn Context::with_baggage_owned(
@@ -233,12 +254,39 @@ pub fn Context::with_baggage_owned(
   if values.length() == 0 {
     return self.without_baggage()
   }
+  let mut has_valid = false
+  let mut has_empty = false
+  for key, _ in values {
+    if key == "" {
+      has_empty = true
+    } else {
+      has_valid = true
+    }
+  }
+  if !has_valid {
+    return self
+  }
+  let baggage : Map[String, String] = if has_empty {
+    // Taking ownership cannot skip an invalid entry, so filter into a fresh
+    // map. This only happens for the invalid-input path.
+    let filtered : Map[String, String] = Map(
+      [], capacity=map_capacity_for_entries(values.length()),
+    )
+    for key, value in values {
+      if key != "" {
+        filtered.set(key, value)
+      }
+    }
+    filtered
+  } else {
+    values
+  }
   {
     span_ctx: None,
     key: None,
     value: None,
     properties: None,
-    baggage_map: Some(values),
+    baggage_map: Some(baggage),
     baggage_list: None,
     clear_baggage: false,
     parent: Some(self),
@@ -248,7 +296,9 @@ pub fn Context::with_baggage_owned(
 // Derive a context carrying every member of `entries`. Members are applied in
 // order, so a later member overrides an earlier one with the same key. Each
 // member and its properties are copied, so mutating the caller's arrays cannot
-// change the immutable context.
+// change the immutable context. An empty name is invalid and is skipped; an
+// empty entries array still clears the outer baggage, while an array whose
+// members are all invalid leaves the context unchanged.
 
 ///|
 pub fn Context::with_baggage_entries(
@@ -264,6 +314,10 @@ pub fn Context::with_baggage_entries(
   let mut i = entries.length() - 1
   while i >= 0 {
     let entry = entries.unsafe_get(i)
+    if entry.key == "" {
+      i = i - 1
+      continue
+    }
     let mut duplicate = false
     for existing in list {
       if existing.key == entry.key {
@@ -275,6 +329,9 @@ pub fn Context::with_baggage_entries(
       list.push({ ..entry, properties: entry.properties.copy() })
     }
     i = i - 1
+  }
+  if list.length() == 0 {
+    return self
   }
   {
     span_ctx: None,

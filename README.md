@@ -311,7 +311,10 @@ carries no valid state, so a stale value is never paired with a new
 `with_span_context` scope it; `Tracer::start_span_with_context` picks up the
 current context automatically. An empty baggage update
 (`with_baggage(Map([]))`, or `without_baggage()`) hides every value stored in
-outer contexts while keeping values added afterwards.
+outer contexts while keeping values added afterwards. Baggage names must be
+non-empty (as required by the OpenTelemetry Baggage API); setters and removals
+silently ignore an empty name, and a non-empty update whose names are all
+invalid leaves the context unchanged.
 
 ## Development
 
