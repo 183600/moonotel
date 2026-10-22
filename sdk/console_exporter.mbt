@@ -69,6 +69,20 @@ fn write_console_unicode_escape(out : StringBuilder, code : Int32) -> Unit {
   out.write_char(hex_nibble_char(code & 0x0F))
 }
 
+// Whether `code` is a Unicode bidirectional formatting control. These
+// characters are invisible but can reorder the surrounding terminal output,
+// so the console exporter escapes them instead of letting user-provided text
+// spoof the rest of the summary line.
+
+///|
+fn is_bidi_control_code(code : Int32) -> Bool {
+  code == 0x061C ||
+  code == 0x200E ||
+  code == 0x200F ||
+  (code >= 0x202A && code <= 0x202E) ||
+  (code >= 0x2066 && code <= 0x2069)
+}
+
 ///|
 fn write_escaped_console_text(out : StringBuilder, text : String) -> Unit {
   let len = text.length()
@@ -103,7 +117,8 @@ fn write_escaped_console_text(out : StringBuilder, text : String) -> Unit {
       code == 0x7F ||
       (code >= 0x80 && code <= 0x9F) ||
       code == 0x2028 ||
-      code == 0x2029 {
+      code == 0x2029 ||
+      is_bidi_control_code(code) {
       write_console_unicode_escape(out, code)
     } else {
       out.write_char(code.unsafe_to_char())

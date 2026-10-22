@@ -186,3 +186,20 @@ test "console format escapes newlines in names attributes and events" {
   )
   assert_true(rendered.contains("event\\nname"))
 }
+
+///|
+test "console escaping neutralizes bidirectional formatting controls" {
+  let controls = String::from_array([
+    (0x061C).unsafe_to_char(),
+    (0x200E).unsafe_to_char(),
+    (0x200F).unsafe_to_char(),
+    (0x202A).unsafe_to_char(),
+    (0x202E).unsafe_to_char(),
+    (0x2066).unsafe_to_char(),
+    (0x2069).unsafe_to_char(),
+  ])
+  assert_eq(
+    escape_console_text(controls),
+    "\\u061c\\u200e\\u200f\\u202a\\u202e\\u2066\\u2069",
+  )
+}
