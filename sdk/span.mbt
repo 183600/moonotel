@@ -305,7 +305,12 @@ fn limited_attributes(
 ) -> (Map[String, AttributeValue], Int32) {
   let total = attributes.length()
   if (count_limit < 0 || total <= count_limit) && value_length_limit < 0 {
-    return (copy_attribute_map(attributes), 0)
+    let kept = copy_attribute_map(attributes)
+    // The OpenTelemetry data model requires non-empty attribute keys. An empty
+    // key is not an attribute, so it is ignored rather than counted as
+    // dropped because of a limit.
+    kept.remove("")
+    return (kept, 0)
   }
   let capacity = if count_limit < 0 || count_limit > total {
     total
@@ -317,6 +322,11 @@ fn limited_attributes(
   )
   let mut dropped = 0
   for key, value in attributes {
+    if key == "" {
+      // See above: an empty key is not a valid attribute and does not consume
+      // the count limit or the dropped-attribute counter.
+      continue
+    }
     if within_limit(kept.length(), count_limit) {
       kept.set(
         key,
@@ -340,6 +350,12 @@ fn SpanSdk::set_attribute_limited(
   key : String,
   value : AttributeValue,
 ) -> Unit {
+  if key == "" {
+    // The OpenTelemetry data model requires a non-empty attribute key. Ignore
+    // the invalid attribute instead of exporting it or counting it as dropped
+    // because of a limit.
+    return
+  }
   let attributes = self.mutable_attributes()
   if within_limit(attributes.length(), self.limits.attribute_count_limit) {
     attributes.set(

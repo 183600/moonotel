@@ -204,7 +204,11 @@ fn copy_attributes_with_capacity(
 ) -> Map[String, AttributeValue] {
   let out : Map[String, AttributeValue] = Map([], capacity~)
   for key, value in values {
-    out.set(key, copy_attribute_value(value))
+    // The OpenTelemetry data model requires non-empty attribute keys; a
+    // resource must never expose an attribute the exporters cannot represent.
+    if key != "" {
+      out.set(key, copy_attribute_value(value))
+    }
   }
   out
 }
@@ -284,6 +288,9 @@ pub fn Resource::with_attribute(
   key : String,
   value : AttributeValue,
 ) -> Resource {
+  if key == "" {
+    return self
+  }
   let attributes = copy_attributes_with_capacity(
     self.attributes,
     map_capacity_for_entries(self.attributes.length() + 1),
@@ -302,7 +309,9 @@ pub fn Resource::merge(self : Resource, other : Resource) -> Resource {
     map_capacity_for_entries(self.attributes.length() + other.attributes.length()),
   )
   for key, value in other.attributes {
-    attributes.set(key, copy_attribute_value(value))
+    if key != "" {
+      attributes.set(key, copy_attribute_value(value))
+    }
   }
   { attributes, }
 }
@@ -353,7 +362,13 @@ pub struct ResourceAttributes {
 pub fn ResourceAttributes::new(
   attributes : Map[String, AttributeValue],
 ) -> ResourceAttributes {
-  { shared: attributes, own: None }
+  // Share the map in the common case. Only an invalid empty key forces a
+  // filtered copy, so creating a snapshot stays O(1) for SDK-built resources.
+  if attributes.contains("") {
+    { shared: copy_attributes(attributes), own: None }
+  } else {
+    { shared: attributes, own: None }
+  }
 }
 
 // The map backing this snapshot, shared with the SDK itself. Callers inside
@@ -411,6 +426,10 @@ pub fn ResourceAttributes::set(
   key : String,
   value : AttributeValue,
 ) -> Unit {
+  if key == "" {
+    // Non-empty keys are required by the OpenTelemetry attribute data model.
+    return
+  }
   let map = match self.own {
     Some(map) => map
     None => {

@@ -86,6 +86,10 @@ span.set_status(@api.StatusCode::Ok)
 span.end()
 ```
 
+Attribute keys must be non-empty, as required by the OpenTelemetry data
+model. An empty key passed to a span, event, link or resource setter is
+ignored (it is not recorded, exported or counted as dropped by a limit).
+
 Samplers: `always_on`, `always_off`, `record_only`, `trace_id_ratio_based`
 and `parent_based(root)` (the OTel default). Processors:
 `SimpleSpanProcessor` (export on end) and `BatchSpanProcessor` (bounded
