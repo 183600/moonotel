@@ -272,8 +272,13 @@ pub fn TextMapCarrier::set(
   value : String,
 ) -> Unit {
   // A single write makes the field unambiguous again, even when the carrier
-  // was built from repeated `traceparent` entries.
+  // was built from repeated `traceparent` entries. Those entries may have been
+  // combined under a differently cased spelling, so drop every existing
+  // `traceparent` value first instead of adding a second field next to it.
   if ascii_case_insensitive_equal(key, traceparent_header_name()) {
+    if self.duplicate_traceparent {
+      self.remove(key)
+    }
     self.duplicate_traceparent = false
   }
   match self.setter {
