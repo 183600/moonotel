@@ -266,7 +266,11 @@ fn split_url_parts(url : String) -> (String, String, Int32) {
   let (scheme, scheme_end) = parse_url_scheme(url)
   let after_scheme = match scheme_end {
     Some(index) => url[index:]
-    None => url
+    // A network-path reference (`//authority/path`) has an authority even
+    // though it has no scheme. Treat it like an absolute URL after its scheme
+    // so that `split_url` reports the same host/port as `url.full` and
+    // `url.path` handling.
+    None => if url.has_prefix("//") { url[2:] } else { url }
   }
   let default_port = if scheme == "https" { 443 } else { 80 }
   let authority_end = find_authority_end(after_scheme)
