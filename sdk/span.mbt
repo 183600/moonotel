@@ -797,19 +797,24 @@ fn SpanSdk::link_count(self : SpanSdk) -> Int32 {
 
 ///|
 pub fn SpanSdk::add_link(self : SpanSdk, link : SpanLink) -> Unit {
+  if !(self.recording && !self.ended) {
+    return
+  }
+  let (link_attributes, dropped) = limited_attributes(
+    link.attributes,
+    self.limits.link_attribute_count_limit,
+    self.limits.attribute_value_length_limit,
+  )
+  // Empty attribute keys are not attributes. An invalid link therefore only
+  // survives when it carries a real (non-empty-key) attribute or tracestate.
   let record = link.span_context.is_valid() ||
-    link.attributes.length() > 0 ||
+    link_attributes.length() > 0 ||
     link.span_context.tracestate() != ""
-  if self.recording && !self.ended && record {
+  if record {
     if !within_limit(self.link_count(), self.limits.link_count_limit) {
       self.dropped_links = self.dropped_links + 1
       return
     }
-    let (link_attributes, dropped) = limited_attributes(
-      link.attributes,
-      self.limits.link_attribute_count_limit,
-      self.limits.attribute_value_length_limit,
-    )
     self
     .mutable_links()
     .push({

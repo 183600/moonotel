@@ -74,3 +74,31 @@ test "start_span_records_invalid_context_link_with_attributes" {
     Some(@sdk.StringValue("follows")),
   )
 }
+
+///|
+test "add_link_drops_invalid_context_link_with_only_empty_attribute_keys" {
+  let exporter = link_spec_exporter()
+  let tracer = link_spec_tracer(exporter)
+  let span = tracer.start_span("op")
+  let attributes : Map[String, @sdk.AttributeValue] = Map([])
+  attributes.set("", @sdk.StringValue("not-an-attribute"))
+  span.add_link(@sdk.SpanLink::new(@api.invalid_span_context(), attributes~))
+  assert_eq(span.links().length(), 0)
+  span.end()
+  assert_eq(exporter.exported_spans()[0].links.length(), 0)
+}
+
+///|
+test "add_link_keeps_only_real_attributes_on_an_invalid_context_link" {
+  let exporter = link_spec_exporter()
+  let tracer = link_spec_tracer(exporter)
+  let span = tracer.start_span("op")
+  let attributes : Map[String, @sdk.AttributeValue] = Map([])
+  attributes.set("", @sdk.StringValue("not-an-attribute"))
+  attributes.set("link.reason", @sdk.StringValue("retry"))
+  span.add_link(@sdk.SpanLink::new(@api.invalid_span_context(), attributes~))
+  assert_eq(span.links().length(), 1)
+  assert_eq(span.links()[0].attributes.get(""), None)
+  assert_eq(span.links()[0].dropped_attributes_count, 0)
+  span.end()
+}
