@@ -22,6 +22,43 @@ pub impl @sdk.SpanExporter for LifecycleExporter with fn shutdown(self) {
   let _ = self
 }
 
+// A processor that only counts lifecycle calls, used to observe provider
+// shutdown behavior across copies.
+
+///|
+struct CountingProcessor {
+  flushes : Ref[Int32]
+  shutdowns : Ref[Int32]
+}
+
+///|
+pub impl @sdk.SpanProcessor for CountingProcessor with fn on_start(
+  self,
+  _span,
+) {
+  let _ = self
+}
+
+///|
+pub impl @sdk.SpanProcessor for CountingProcessor with fn on_end(self, _data) {
+  let _ = self
+}
+
+///|
+pub impl @sdk.SpanProcessor for CountingProcessor with fn force_flush(self) {
+  self.flushes.val = self.flushes.val + 1
+}
+
+///|
+pub impl @sdk.SpanProcessor for CountingProcessor with fn shutdown(self) {
+  self.shutdowns.val = self.shutdowns.val + 1
+}
+
+///|
+fn counting_processor() -> CountingProcessor {
+  { flushes: Ref(0), shutdowns: Ref(0) }
+}
+
 ///|
 fn lifecycle_provider() -> (@sdk.TracerProviderSdk, LifecycleExporter) {
   let exporter : LifecycleExporter = { spans: [] }
@@ -121,4 +158,19 @@ test "copy_shutdown_flushes_processors_added_to_the_copy" {
   copy.shutdown()
   assert_eq(exporter.span_count(), 1)
   assert_true(exporter.is_shutdown())
+}
+
+///|
+test "copy_shutdown_does_not_shut_a_shared_processor_twice" {
+  let first = counting_processor()
+  let second = counting_processor()
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
+    .with_span_processor(first)
+  let copy = provider.with_span_processor(second)
+  provider.shutdown()
+  assert_eq(first.shutdowns.val, 1)
+  assert_eq(second.shutdowns.val, 0)
+  copy.shutdown()
+  assert_eq(first.shutdowns.val, 1)
+  assert_eq(second.shutdowns.val, 1)
 }

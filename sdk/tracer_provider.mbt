@@ -11,7 +11,10 @@ pub struct TracerProviderSdk {
   processors : Array[&SpanProcessor]
   disabled : Bool
   shutdown_called : Ref[Bool]
-  processors_shutdown : Ref[Bool]
+  // Per-processor shutdown state, shared with provider copies that contain the
+  // same processor. A processor added to a copy starts out unshut-down even
+  // when the provider itself was already shut down.
+  processor_shutdowns : Array[Ref[Bool]]
 }
 
 // Version reported as `telemetry.sdk.version` in the resource.
@@ -129,7 +132,7 @@ pub fn TracerProviderSdk::new(service_name? : String) -> TracerProviderSdk {
     processors: [],
     disabled,
     shutdown_called: Ref(false),
-    processors_shutdown: Ref(false),
+    processor_shutdowns: [],
   }
 }
 
@@ -220,7 +223,9 @@ pub fn TracerProviderSdk::with_span_processor(
 ) -> TracerProviderSdk {
   let processors = self.processors.copy()
   processors.push(processor)
-  { ..self, processors, processors_shutdown: Ref(false) }
+  let processor_shutdowns = self.processor_shutdowns.copy()
+  processor_shutdowns.push(Ref(false))
+  { ..self, processors, processor_shutdowns, }
 }
 
 ///|
@@ -232,7 +237,11 @@ pub fn TracerProviderSdk::with_span_processors(
   for processor in processors {
     merged.push(processor)
   }
-  { ..self, processors: merged, processors_shutdown: Ref(false) }
+  let processor_shutdowns = self.processor_shutdowns.copy()
+  for _ in processors {
+    processor_shutdowns.push(Ref(false))
+  }
+  { ..self, processors: merged, processor_shutdowns, }
 }
 
 // The resource attributes of this provider, as a fresh copy.
@@ -304,12 +313,13 @@ pub fn TracerProviderSdk::force_flush(self : TracerProviderSdk) -> Unit {
 ///|
 pub fn TracerProviderSdk::shutdown(self : TracerProviderSdk) -> Unit {
   self.shutdown_called.val = true
-  if self.processors_shutdown.val {
-    return
-  }
-  self.processors_shutdown.val = true
-  for processor in self.processors {
-    processor.shutdown()
+  let mut i = 0
+  while i < self.processors.length() {
+    if !self.processor_shutdowns[i].val {
+      self.processor_shutdowns[i].val = true
+      self.processors[i].shutdown()
+    }
+    i = i + 1
   }
 }
 
@@ -353,7 +363,7 @@ pub fn no_op_tracer_provider() -> TracerProviderSdk {
         processors: [],
         disabled: true,
         shutdown_called: Ref(false),
-        processors_shutdown: Ref(false),
+        processor_shutdowns: [],
       }
       noop_provider.val = Some(provider)
       provider

@@ -423,7 +423,7 @@ pub struct TracerProviderSdk {
   processors : Array[&SpanProcessor]
   disabled : Bool
   shutdown_called : @ref.Ref[Bool]
-  processors_shutdown : @ref.Ref[Bool]
+  processor_shutdowns : Array[@ref.Ref[Bool]]
 }
 pub fn TracerProviderSdk::force_flush(Self) -> Unit
 pub fn TracerProviderSdk::get_tracer(Self, String, version? : String) -> Tracer
