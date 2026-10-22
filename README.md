@@ -207,7 +207,9 @@ async exporter honors a `Retry-After` header (delta-seconds or an IMF-fixdate
 HTTP-date, capped at 60s) ahead of an exponential backoff with jitter (100ms,
 doubling up to a 5s cap). The synchronous
 exporter's `TransportResponse` does not expose response headers, so its waits
-are supplied through the injected `RetryWait` function instead. Other 4xx/5xx
+are supplied through the injected `RetryWait` function instead; a non-positive
+`status_code` reports a transport failure that never received an HTTP response
+and is retried. Other 4xx/5xx
 responses, including 500, are terminal and returned as an export failure.
 
 `OtlpHttpConfig::new` applies the same defaults to programmatic values as

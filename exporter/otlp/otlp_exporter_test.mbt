@@ -329,3 +329,18 @@ test "shutdown_is_idempotent" {
   assert_true(exporter.is_shutdown())
   assert_eq(mock.urls.length(), 0)
 }
+
+
+///|
+test "export_retries_a_synchronous_transport_failure" {
+  // A non-positive status means the injected transport could not obtain an
+  // HTTP response. It is a transient failure and is retried like 429/502/503/504.
+  let mock = mock_transport(0)
+  let exporter = @otlp.OtlpHttpExporter::new(
+    @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318", max_retries=2),
+    mock.as_transport(),
+  )
+  let result = exporter.export_spans([test_span()])
+  assert_false(result.is_success())
+  assert_eq(mock.urls.length(), 3)
+}

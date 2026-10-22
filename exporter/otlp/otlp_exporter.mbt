@@ -6,7 +6,9 @@
 // exporter works on any target and can be wired to `moonbitlang/async/http`,
 // a test double, or any other client.
 
-// Response returned by an injected transport.
+// Response returned by an injected transport. A non-positive status code
+// reports a transport-level failure (no HTTP response was received), which is
+// retried like the OTLP transient statuses.
 
 ///|
 pub(all) struct TransportResponse {
@@ -486,7 +488,9 @@ pub fn OtlpHttpConfig::traces_url(self : OtlpHttpConfig) -> String {
 fn is_retryable_status(status_code : Int32) -> Bool {
   match status_code {
     429 | 502 | 503 | 504 => true
-    _ => false
+    // The synchronous transport has no error channel, so a non-positive
+    // status reports that the request could not reach the server.
+    _ => status_code <= 0
   }
 }
 
