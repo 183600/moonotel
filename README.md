@@ -127,7 +127,9 @@ gracefully: when no tracer is available the wrappers simply forward the
 request. URL attributes strip userinfo and redact the values of the
 well-known sensitive query parameters listed by the HTTP semantic
 conventions (`X-Amz-Signature`, `X-Amz-Credential`, `X-Amz-Security-Token`,
-`AWSAccessKeyId`, `Signature`, `sig`, and `X-Goog-Signature`).
+`AWSAccessKeyId`, `Signature`, `sig`, and `X-Goog-Signature`). Captured header
+values and `user_agent.original` have surrounding HTTP optional whitespace
+removed.
 
 ### Server
 
