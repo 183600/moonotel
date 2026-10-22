@@ -55,6 +55,30 @@ fn is_gzip_compression(compression : String) -> Bool {
   normalize_enum(compression) == "gzip"
 }
 
+// The protocol actually used for an export. A blank programmatic value falls
+// back to `http/protobuf`, matching `OtlpHttpConfig::new` and the sync
+// exporter even when the config was built directly instead of with the
+// constructor.
+fn effective_protocol(protocol : String) -> String {
+  let normalized = normalize_enum(protocol)
+  if normalized == "" {
+    @otlp.OTLP_HTTP_PROTOBUF_PROTOCOL
+  } else {
+    normalized
+  }
+}
+
+// The compression actually used for an export. A blank programmatic value
+// means `none`; any other unsupported value is rejected by the caller.
+fn effective_compression(compression : String) -> String {
+  let normalized = normalize_enum(compression)
+  if normalized == "" {
+    "none"
+  } else {
+    normalized
+  }
+}
+
 ///|
 fn request_headers(
   config : @otlp.OtlpHttpConfig,
@@ -442,11 +466,12 @@ pub async fn post_trace_request(
   config : @otlp.OtlpHttpConfig,
   body : Bytes,
 ) -> @sdk.ExportResult {
-  if !@otlp.is_supported_protocol(config.protocol) {
+  if !@otlp.is_supported_protocol(effective_protocol(config.protocol)) {
     return @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol)
   }
-  let gzip = is_gzip_compression(config.compression)
-  if !gzip && normalize_enum(config.compression) != "none" {
+  let compression = effective_compression(config.compression)
+  let gzip = compression == "gzip"
+  if !gzip && compression != "none" {
     return @sdk.ExportFailure(
       "unsupported OTLP compression: " + config.compression,
     )
@@ -537,11 +562,12 @@ pub async fn OtlpHttpAsyncExporter::export_batch(
     return @sdk.ExportSuccess
   }
   let config = self.config
-  if !@otlp.is_supported_protocol(config.protocol) {
+  if !@otlp.is_supported_protocol(effective_protocol(config.protocol)) {
     return @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol)
   }
-  let gzip = is_gzip_compression(config.compression)
-  if !gzip && normalize_enum(config.compression) != "none" {
+  let compression = effective_compression(config.compression)
+  let gzip = compression == "gzip"
+  if !gzip && compression != "none" {
     return @sdk.ExportFailure(
       "unsupported OTLP compression: " + config.compression,
     )

@@ -103,6 +103,29 @@ fn is_json_protocol(protocol : String) -> Bool {
   normalize_enum(protocol) == OTLP_HTTP_JSON_PROTOCOL
 }
 
+// The protocol actually used for an export. A blank programmatic value falls
+// back to the OTLP default (`http/protobuf`), matching `OtlpHttpConfig::new`
+// and the environment-variable path even when the config was built directly.
+fn effective_protocol(protocol : String) -> String {
+  let normalized = normalize_enum(protocol)
+  if normalized == "" {
+    OTLP_HTTP_PROTOBUF_PROTOCOL
+  } else {
+    normalized
+  }
+}
+
+// The compression actually used for an export. A blank programmatic value
+// means `none`; any other unsupported value is rejected at export time.
+fn effective_compression(compression : String) -> String {
+  let normalized = normalize_enum(compression)
+  if normalized == "" {
+    "none"
+  } else {
+    normalized
+  }
+}
+
 // Create a configuration with sensible defaults
 // (endpoint `http://localhost:4318`, no compression, `http/protobuf`, 10s
 // timeout, 3 retries for retryable statuses). When `traces_endpoint` is given
@@ -469,12 +492,33 @@ fn with_root_path(url : String) -> String {
 
 ///|
 pub fn OtlpHttpConfig::traces_url(self : OtlpHttpConfig) -> String {
-  match self.traces_endpoint {
+  // A config built directly (rather than with `new` / `from_env`) may carry
+  // untrimmed or blank strings. Treat surrounding whitespace as insignificant
+  // and blank values like unset, so a direct config behaves like the same
+  // values passed through the constructor.
+  let traces_endpoint = match self.traces_endpoint {
+    Some(full_url) => {
+      let trimmed = full_url.trim().to_owned()
+      if trimmed == "" {
+        None
+      } else {
+        Some(trimmed)
+      }
+    }
+    None => None
+  }
+  match traces_endpoint {
     Some(full_url) => with_root_path(full_url)
     None => {
-      let (path, suffix) = path_and_suffix(self.endpoint)
+      let endpoint = self.endpoint.trim().to_owned()
+      let endpoint = if endpoint == "" {
+        "http://localhost:4318"
+      } else {
+        endpoint
+      }
+      let (path, suffix) = path_and_suffix(endpoint)
       if path.has_suffix("/v1/traces") || path.has_suffix("/v1/traces/") {
-        self.endpoint
+        endpoint
       } else if path.has_suffix("/") {
         path[:path.length() - 1].to_owned() + "/v1/traces" + suffix
       } else {
@@ -607,17 +651,19 @@ pub fn OtlpHttpExporter::export_spans_http(
   if spans.length() == 0 {
     return @sdk.ExportSuccess
   }
-  if !is_supported_protocol(self.config.protocol) {
+  let protocol = effective_protocol(self.config.protocol)
+  if !is_supported_protocol(protocol) {
     return @sdk.ExportFailure(
       "unsupported OTLP protocol: " + self.config.protocol,
     )
   }
-  if normalize_enum(self.config.compression) != "none" {
+  let compression = effective_compression(self.config.compression)
+  if compression != "none" {
     return @sdk.ExportFailure(
       "unsupported OTLP compression: " + self.config.compression,
     )
   }
-  let json = is_json_protocol(self.config.protocol)
+  let json = is_json_protocol(protocol)
   let body = if json {
     encode_trace_request_json(spans)
   } else {
