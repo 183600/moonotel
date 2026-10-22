@@ -1077,12 +1077,14 @@ pub fn SpanSdk::end(self : SpanSdk, end_time_unix_nano? : Int64) -> Unit {
     None =>
       self.end_time_unix_nano = (@env.now() * 1000000).reinterpret_as_int64()
   }
-  if self.recording && self.processors.length() > 0 {
+  if self.recording {
     let data = SpanData::take_from_span(self)
     // Keep the snapshot reachable so accessors still report the recorded
-    // collections after the mutable fields have been cleared. Each processor
-    // gets its own copy so one processor cannot mutate the snapshot seen by a
-    // later processor or by the span accessors.
+    // collections after the mutable fields have been cleared. This also
+    // applies when no processor is registered: a recording span is readable
+    // after it ends even if nothing consumes its export snapshot. Each
+    // processor gets its own copy so one processor cannot mutate the snapshot
+    // seen by a later processor or by the span accessors.
     self.snapshot = Some(data)
     for processor in self.processors {
       processor.on_end(data.copy())

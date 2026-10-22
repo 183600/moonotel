@@ -95,6 +95,10 @@ and `parent_based(root)` (the OTel default). Processors:
 `SimpleSpanProcessor` (export on end) and `BatchSpanProcessor` (bounded
 queue, batched export).
 
+A recording span keeps its data readable after `end()`: the accessors return a
+snapshot of the recorded attributes, events and links, including when the
+provider has no processors registered.
+
 `BatchSpanProcessor` keeps span completion cheap in the common case: `on_end`
 just enqueues, and when the queue is full it overwrites the oldest buffered
 span, increments `dropped_spans()`, and continues; export failures are counted
