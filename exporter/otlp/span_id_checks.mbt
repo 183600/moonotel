@@ -47,6 +47,12 @@ fn has_encodable_span_ids(context : @api.SpanContext) -> Bool {
   has_encodable_link_ids(context)
 }
 
+
+///|
+fn has_encodable_parent_span_id(bytes : Array[Int32]) -> Bool {
+  bytes.length() == 8 && has_nonzero_id_byte(bytes, 8)
+}
+
 ///|
 fn filter_encodable_spans(
   spans : Array[@sdk.SpanData],

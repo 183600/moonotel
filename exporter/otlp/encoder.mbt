@@ -347,7 +347,7 @@ fn encode_span_fields(span : ProtoWriter, data : @sdk.SpanData) -> Unit {
   if tracestate != "" {
     span.write_string_field(3, tracestate)
   }
-  if data.parent_span_id.length() > 0 {
+  if has_encodable_parent_span_id(data.parent_span_id) {
     span.write_bytes_from_int_array(4, data.parent_span_id)
   }
   span.write_string_field(5, data.name)

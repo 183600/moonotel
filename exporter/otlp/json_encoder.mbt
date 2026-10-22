@@ -749,7 +749,7 @@ fn json_write_span(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
     sb.write_bytes(b",\"traceState\":")
     json_write_escaped(sb, tracestate)
   }
-  if data.parent_span_id.length() > 0 {
+  if has_encodable_parent_span_id(data.parent_span_id) {
     sb.write_bytes(b",\"parentSpanId\":")
     json_write_hex_quoted(sb, data.parent_span_id)
   }
