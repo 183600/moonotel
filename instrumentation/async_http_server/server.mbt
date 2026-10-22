@@ -532,8 +532,15 @@ pub fn ServerCall::span_context(self : ServerCall) -> @api.SpanContext? {
 pub fn ServerCall::set_route(self : ServerCall, route : String) -> Bool {
   match self.span {
     Some(span) => {
-      span.set_attribute(@sdk.HTTP_ROUTE, @sdk.StringValue(route))
-      span.update_name(http_method_name(self.request.meth) + " " + route)
+      // `http.route` describes a matched route. An empty or whitespace-only
+      // value means that no route could be matched, so leave the span name and
+      // attributes unchanged instead of recording an empty route or renaming
+      // the span to `"METHOD "`. The return value still reports whether tracing
+      // is enabled.
+      if route.trim() != "" {
+        span.set_attribute(@sdk.HTTP_ROUTE, @sdk.StringValue(route))
+        span.update_name(http_method_name(self.request.meth) + " " + route)
+      }
       true
     }
     None => false
