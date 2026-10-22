@@ -37,11 +37,11 @@ let storage : Ref[ContextStorage] = Ref({
 })
 
 // Attach tokens that still need to be detached, paired with the backend that
-// served the matching `attach`. A token is just the previous `Context`, so the
-// backend cannot be recovered from it later; remembering it here lets
-// `detach` restore through that backend even if `set_context_storage` swapped
-// the process-wide backend in between (the same hazard `with_context` guards
-// against).
+// served the matching `attach`. Each token is a distinct copy of the previous
+// `Context` value, so two attaches that started from equal values still have
+// distinguishable tokens; remembering the backend here lets `detach` restore
+// through that backend even if `set_context_storage` swapped the process-wide
+// backend in between (the same hazard `with_context` guards against).
 let pending_attachments : Array[(Context, ContextStorage)] = []
 
 // Replace the storage backend and return the previous one (pass it back to
