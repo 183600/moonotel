@@ -99,20 +99,34 @@ async test "shutdown closes the queue and stops accepting spans" {
 }
 
 ///|
-async test "queue overflow discards only the batches that were evicted" {
+async test "queue overflow evicts real batches and ignores empty batches" {
   @async.with_task_group() <| group => {
-    let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:1")
+    let config = @otlp.OtlpHttpConfig::new(
+      endpoint="http://127.0.0.1:1",
+      timeout_millis=100,
+      max_retries=0,
+    )
     let exporter = @async_runtime.OtlpHttpAsyncSpanExporter::new(
       config,
       group,
       max_queue_size=1,
     )
-    let batch : Array[@sdk.SpanData] = []
-    assert_true(exporter.export_spans(batch).is_success())
+    let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
+    let provider = @sdk.TracerProviderSdk::new(
+      service_name="queue-overflow",
+    ).with_span_processor(processor)
+    let tracer = provider.get_tracer("queue-overflow")
+    // An empty export is a successful no-op and never takes the only slot.
+    assert_true(exporter.export_spans([]).is_success())
+    assert_eq(exporter.dropped_batches(), 0)
+    tracer.start_root_span("one").end()
     assert_eq(exporter.dropped_batches(), 0)
     // The queue holds one batch, so the next two exports each evict one.
-    assert_true(exporter.export_spans(batch).is_success())
-    assert_true(exporter.export_spans(batch).is_success())
+    tracer.start_root_span("two").end()
+    tracer.start_root_span("three").end()
+    assert_eq(exporter.dropped_batches(), 2)
+    // An empty batch must not evict the real batch still queued.
+    assert_true(exporter.export_spans([]).is_success())
     assert_eq(exporter.dropped_batches(), 2)
   }
 }

@@ -137,6 +137,11 @@ fn OtlpHttpAsyncSpanExporter::enqueue(
   if self.shutdown_called {
     return @sdk.ExportFailure("OTLP async exporter is shut down")
   }
+  // An empty export is a no-op success, like the synchronous and async OTLP
+  // exporters. It must not occupy a queue slot or evict a real batch.
+  if spans.length() == 0 {
+    return @sdk.ExportSuccess
+  }
   let accepted = self.queue.try_put(spans) catch { _ => false }
   if accepted {
     self.accepted_batches = self.accepted_batches + 1
