@@ -36,7 +36,7 @@ async test "client span records an explicit zero server port" {
   // the request attempt, so the exported span still carries the parsed port.
   let failed = try {
     let (_response, _body) = @async_http_client.get(
-      "http://example.com:0/path",
+      "http://127.0.0.1:0/path",
       tracer~,
     )
     false
@@ -48,7 +48,7 @@ async test "client span records an explicit zero server port" {
   let data = exporter.spans.val[0]
   assert_eq(
     data.attributes.get(@sdk.SERVER_ADDRESS),
-    Some(@sdk.StringValue("example.com")),
+    Some(@sdk.StringValue("127.0.0.1")),
   )
   assert_eq(
     data.attributes.get(@sdk.SERVER_PORT),
