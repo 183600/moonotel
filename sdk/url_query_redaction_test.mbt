@@ -34,14 +34,31 @@ test "preserves parameter order and separators" {
 }
 
 ///|
-test "leaves unrelated, valueless and encoded parameter names unchanged" {
+test "leaves unrelated and valueless parameter names unchanged" {
   assert_eq(
     @sdk.redact_sensitive_query_string(
-      "SignatureValue=keep&sig&X%2DAmz%2DSignature=keep",
+      "SignatureValue=keep&sig&X-Amz-SignatureValue=keep",
     ),
-    "SignatureValue=keep&sig&X%2DAmz%2DSignature=keep",
+    "SignatureValue=keep&sig&X-Amz-SignatureValue=keep",
   )
   assert_eq(@sdk.redact_sensitive_query_string(""), "")
+}
+
+///|
+test "redacts percent-encoded sensitive parameter names" {
+  assert_eq(
+    @sdk.redact_sensitive_query_string(
+      "X%2DAmz%2DSignature=secret&%58-Amz-Credential=cred&x%2damz%2dsecurity%2dtoken=tok",
+    ),
+    "X%2DAmz%2DSignature=REDACTED&%58-Amz-Credential=REDACTED&x%2damz%2dsecurity%2dtoken=REDACTED",
+  )
+  // A malformed escape cannot name a sensitive parameter and stays as-is.
+  assert_eq(
+    @sdk.redact_sensitive_query_string(
+      "X%2DAmz%2DSignature=secret&X%ZZ-Amz-Signature=keep&sig%2",
+    ),
+    "X%2DAmz%2DSignature=REDACTED&X%ZZ-Amz-Signature=keep&sig%2",
+  )
 }
 
 ///|
