@@ -244,7 +244,6 @@ fn nibble_to_hex_byte(value : Int32) -> Byte {
 // Write `byte_count` bytes as hex characters into `out` starting at character
 // index `start`. Each character occupies a UTF-16LE code unit (two bytes, low
 // byte first); the high bytes are left zero by the caller's buffer.
-
 ///|
 fn write_hex(
   out : FixedArray[Byte],
@@ -378,8 +377,37 @@ fn write_hex(
 ///|
 const TRACE_FLAGS_KNOWN : Int32 = 0x03
 
+// Whether the first `byte_count` elements of `bytes` serialize to at least one
+// nonzero byte. Values outside 0..255 are serialized like `bytes_to_hex` (the
+// high nibble becomes "0" and the low nibble is kept), so they must not be
+// mistaken for a nonzero wire byte.
+
+///|
+fn has_nonzero_serialized_byte(
+  bytes : Array[Int32],
+  byte_count : Int32,
+) -> Bool {
+  let mut i = 0
+  while i < byte_count {
+    let value = bytes.unsafe_get(i)
+    let serialized = if value >= 0 && value < 256 {
+      value
+    } else {
+      value & 0x0F
+    }
+    if serialized != 0 {
+      return true
+    }
+    i = i + 1
+  }
+  false
+}
+
 // Format a valid SpanContext as a `traceparent` header value (version 00).
-// An invalid SpanContext yields an empty string.
+// An invalid SpanContext yields an empty string. The IDs are revalidated from
+// their live serialized bytes: a caller may zero an aliased ID array through
+// `trace_id_view`/`span_id_view` after construction, and an all-zero ID must
+// never be written into a `traceparent` header.
 
 ///|
 pub fn format_traceparent(sc : @api.SpanContext) -> String {
@@ -388,12 +416,16 @@ pub fn format_traceparent(sc : @api.SpanContext) -> String {
   }
   // The public `span_context` constructor aliases the caller's ID arrays and
   // `trace_id_view`/`span_id_view` expose them for mutation. A caller can
-  // therefore shorten an array after construction while the snapshotted
-  // `is_valid` flag still reads true. Never read past the live array length:
-  // the unambiguous IDs are unavailable, so emit no traceparent instead.
+  // therefore shorten or zero an array after construction while the
+  // snapshotted `is_valid` flag still reads true. Never read past the live
+  // array length, and never emit an all-zero ID: the unambiguous IDs are
+  // unavailable, so emit no traceparent instead.
   let trace_id = sc.trace_id_view()
   let span_id = sc.span_id_view()
-  if trace_id.length() < 16 || span_id.length() < 8 {
+  if trace_id.length() < 16 ||
+    span_id.length() < 8 ||
+    !has_nonzero_serialized_byte(trace_id, 16) ||
+    !has_nonzero_serialized_byte(span_id, 8) {
     return ""
   }
   let flags = sc.trace_flags() & TRACE_FLAGS_KNOWN
@@ -545,7 +577,16 @@ fn normalized_tracestate_for_inject(state : String) -> String? {
 ///|
 pub fn inject(sc : @api.SpanContext, carrier : TextMapCarrier) -> Unit {
   if sc.is_valid() {
-    carrier.set(traceparent_header_name(), format_traceparent(sc))
+    let formatted = format_traceparent(sc)
+    if formatted == "" {
+      // The live IDs no longer form a valid traceparent (for example a caller
+      // zeroed an aliased ID array). Do not write an empty header, and do not
+      // leave a stale one that would be paired with an unrelated tracestate.
+      carrier.remove(traceparent_header_name())
+      carrier.remove(tracestate_header_name())
+      return
+    }
+    carrier.set(traceparent_header_name(), formatted)
     let state = sc.tracestate()
     if state != "" {
       match normalized_tracestate_for_inject(state) {
@@ -613,7 +654,15 @@ pub fn inject_with_tracestate(
       // empty value (which suppresses the header) and a malformed value
       // (which is dropped instead of being written). Write only the
       // `traceparent` from the context so its state cannot leak through.
-      carrier.set(traceparent_header_name(), format_traceparent(sc))
+      let formatted = format_traceparent(sc)
+      if formatted == "" {
+        // The live IDs cannot be serialized as a valid traceparent; suppress
+        // both headers rather than writing an empty or stale pair.
+        carrier.remove(traceparent_header_name())
+        carrier.remove(tracestate_header_name())
+        return
+      }
+      carrier.set(traceparent_header_name(), formatted)
       carrier.remove(tracestate_header_name())
       if !state.is_empty() {
         match parse_tracestate(state) {

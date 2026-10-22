@@ -287,3 +287,52 @@ test "inject_ignores_a_context_with_shortened_live_ids" {
   @propagation.inject_with_tracestate(sc, Some("a=1"), carrier)
   assert_eq(carrier.length(), 0)
 }
+
+///|
+test "format_traceparent_rejects_live_ids_that_serialize_to_all_zero" {
+  let sc = make_context()
+  let trace = sc.trace_id_view()
+  for i = 0; i < trace.length(); i = i + 1 {
+    trace[i] = 0
+  }
+  assert_eq(@propagation.format_traceparent(sc), "")
+
+  let span_zero = make_context()
+  let span = span_zero.span_id_view()
+  for i = 0; i < span.length(); i = i + 1 {
+    span[i] = 0
+  }
+  assert_eq(@propagation.format_traceparent(span_zero), "")
+}
+
+///|
+test "format_traceparent_uses_serialized_bytes_for_live_id_validity" {
+  // Values outside 0..255 serialize with a zero high nibble, so 0x100 is an
+  // all-zero wire byte rather than a nonzero ID element.
+  let sc = make_context()
+  let trace = sc.trace_id_view()
+  for i = 0; i < trace.length(); i = i + 1 {
+    trace[i] = 0x100
+  }
+  assert_eq(@propagation.format_traceparent(sc), "")
+}
+
+///|
+test "inject_removes_headers_for_live_ids_that_serialize_to_all_zero" {
+  let sc = make_context()
+  let trace = sc.trace_id_view()
+  for i = 0; i < trace.length(); i = i + 1 {
+    trace[i] = 0
+  }
+  let carrier = @propagation.TextMapCarrier::new()
+  carrier.set(@propagation.traceparent_header_name(), "stale")
+  carrier.set(@propagation.tracestate_header_name(), "stale=value")
+  @propagation.inject(sc, carrier)
+  assert_eq(carrier.length(), 0)
+
+  let explicit = @propagation.TextMapCarrier::new()
+  explicit.set(@propagation.traceparent_header_name(), "stale")
+  explicit.set(@propagation.tracestate_header_name(), "stale=value")
+  @propagation.inject_with_tracestate(sc, Some("vendor=value"), explicit)
+  assert_eq(explicit.length(), 0)
+}
