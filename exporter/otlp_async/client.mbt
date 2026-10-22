@@ -355,6 +355,11 @@ fn parse_rfc850_date_seconds(value : StringView) -> Int64? {
     Some(index) => index
     None => return None
   }
+  // RFC 850 requires exactly `", "` between the weekday and the date.
+  if comma + 1 >= value.length() ||
+    value.unsafe_get(comma + 1).to_int() != 0x20 {
+    return None
+  }
   if !is_full_weekday(value.view(start_offset=0, end_offset=comma)) &&
     !is_short_weekday(value.view(start_offset=0, end_offset=comma)) {
     return None

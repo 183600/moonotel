@@ -47,6 +47,9 @@ test "http_date_parser_rejects_malformed_obsolete_dates" {
     "Sunday, 06-Nov-94 08:49:37 UTC",
     "Sunday, 06-Nov-94 08:49:37 GMT ",
     "Sunday 06-Nov-94 08:49:37 GMT",
+    // RFC 850 requires a space after the comma, not any other character.
+    "Sunday,X06-Nov-94 08:49:37 GMT",
+    "Sunday,\t06-Nov-94 08:49:37 GMT",
     "Sun Nov  6 08:49:37 1994 ",
     // Truncated forms must not be accepted.
     "Sunday, 06-Nov-94 08:49:37",
@@ -70,6 +73,11 @@ test "retry_after_millis_accepts_obsolete_http_dates" {
   )
   assert_eq(retry_after_millis("Fri Dec 31 23:59:59 9999"), Some(60000))
   assert_eq(retry_after_millis("Sunday, 31-Feb-24 00:00:00 GMT"), None)
+  // A malformed RFC 850 separator must fall back to the retry backoff.
+  assert_eq(
+    retry_after_millis("Sunday,X06-Nov-94 08:49:37 GMT"),
+    None,
+  )
 }
 
 ///|
