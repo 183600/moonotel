@@ -130,6 +130,13 @@ The process-wide provider can be installed once and used from anywhere:
 let tracer = @sdk.global_tracer("checkout")    // or @moonotel.global_tracer(...)
 ```
 
+Native applications that want the OTLP exporter to send from a background task
+can call `@async_runtime.setup(group, ...)` inside a
+`moonbitlang/async` task group instead. It accepts the same `service_name`,
+resource, sampler, span-limit, endpoint, header, exporter-selection and batch
+overrides, uses the same environment variables, and drains pending spans when
+the group exits.
+
 ## HTTP instrumentation (`moonbitlang/async/http`)
 
 The instrumentation packages target native and wasm, matching the async HTTP
@@ -369,7 +376,10 @@ An empty baggage update
 outer contexts while keeping values added afterwards. Baggage names must be
 non-empty (as required by the OpenTelemetry Baggage API); setters and removals
 silently ignore an empty name, and a non-empty update whose names are all
-invalid leaves the context unchanged.
+invalid leaves the context unchanged. `Context::with_baggage_entries` and
+`Context::baggage_entries` use `@moonotel.ContextBaggageEntry` (an alias of
+`@context.BaggageEntry`), which carries W3C baggage properties; it is distinct
+from the propagation `BaggageEntry` used by the `baggage` header helpers.
 
 ## Development
 
