@@ -257,3 +257,22 @@ test "tracestate_empty_is_not_injected" {
   @propagation.inject_with_tracestate(sc, Some(""), carrier)
   assert_eq(@propagation.extract_tracestate(carrier), None)
 }
+
+///|
+test "format_traceparent_never_reads_past_a_shortened_aliased_id" {
+  // `span_context` aliases its input arrays, so a caller can shorten an ID
+  // after construction while the snapshotted validity flag still says true.
+  // Formatting must not read 16/8 elements from the now-shorter arrays.
+  let shortened_trace = make_context()
+  shortened_trace.trace_id_view().clear()
+  assert_eq(@propagation.format_traceparent(shortened_trace), "")
+
+  let shortened_span = make_context()
+  shortened_span.span_id_view().clear()
+  assert_eq(@propagation.format_traceparent(shortened_span), "")
+
+  let both = make_context()
+  both.trace_id_view().clear()
+  both.span_id_view().clear()
+  assert_eq(@propagation.format_traceparent(both), "")
+}

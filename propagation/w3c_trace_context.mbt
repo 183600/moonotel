@@ -386,6 +386,16 @@ pub fn format_traceparent(sc : @api.SpanContext) -> String {
   if !sc.is_valid() {
     return ""
   }
+  // The public `span_context` constructor aliases the caller's ID arrays and
+  // `trace_id_view`/`span_id_view` expose them for mutation. A caller can
+  // therefore shorten an array after construction while the snapshotted
+  // `is_valid` flag still reads true. Never read past the live array length:
+  // the unambiguous IDs are unavailable, so emit no traceparent instead.
+  let trace_id = sc.trace_id_view()
+  let span_id = sc.span_id_view()
+  if trace_id.length() < 16 || span_id.length() < 8 {
+    return ""
+  }
   let flags = sc.trace_flags() & TRACE_FLAGS_KNOWN
   // `00-` + 32 trace chars + `-` + 16 span chars + `-` + 2 flag chars, each
   // character occupying two UTF-16LE bytes.
@@ -393,9 +403,9 @@ pub fn format_traceparent(sc : @api.SpanContext) -> String {
   out.unsafe_set(0, b'0')
   out.unsafe_set(2, b'0')
   out.unsafe_set(4, b'-')
-  write_hex(out, 3, sc.trace_id_view(), 16)
+  write_hex(out, 3, trace_id, 16)
   out.unsafe_set(35 * 2, b'-')
-  write_hex(out, 36, sc.span_id_view(), 8)
+  write_hex(out, 36, span_id, 8)
   out.unsafe_set(52 * 2, b'-')
   out.unsafe_set(53 * 2, nibble_to_hex_byte(flags >> 4))
   out.unsafe_set(54 * 2, nibble_to_hex_byte(flags & 0x0F))
