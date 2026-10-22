@@ -77,3 +77,24 @@ test "header_validation_accepts_token_names_and_unicode_values" {
   assert_false(@otlp.is_valid_http_header_value("a\r\nb"))
   assert_false(@otlp.is_valid_http_header_value("a\u{0}b"))
 }
+
+///|
+test "header_validation_rejects_unpaired_utf16_surrogates" {
+  let high = String::from_array([(0xD800).unsafe_to_char()])
+  let low = String::from_array([(0xDC00).unsafe_to_char()])
+  let pair = String::from_array(
+    [(0xD83D).unsafe_to_char(), (0xDE00).unsafe_to_char()],
+  )
+  assert_false(@otlp.is_valid_http_header_value(high))
+  assert_false(@otlp.is_valid_http_header_value(low))
+  assert_false(@otlp.is_valid_http_header_value("a" + high + "b"))
+  assert_false(@otlp.is_valid_http_header_value(high + low + high))
+  assert_true(@otlp.is_valid_http_header_value(pair))
+  assert_true(@otlp.is_valid_http_header_value("a" + pair + "b"))
+
+  let config = @otlp.OtlpHttpConfig::new(
+    headers=Map([("x-bad", high), ("x-good", pair)]),
+  )
+  assert_eq(config.headers.get("x-bad"), None)
+  assert_eq(config.headers.get("x-good"), Some(pair))
+}

@@ -190,6 +190,35 @@ pub fn is_valid_http_header_name(name : StringView) -> Bool {
 // NUL because they delimit fields, and every other control character except
 // HTAB is not a field-vchar. Non-ASCII text is allowed (obs-text).
 
+// Whether `value` is well-formed UTF-16. A configured header is forwarded to
+// a UTF-8 transport, and an unpaired surrogate cannot be encoded; dropping the
+// header is better than aborting the export. Complete surrogate pairs are
+// valid non-ASCII field text.
+
+///|
+fn has_valid_utf16(value : String) -> Bool {
+  let len = value.length()
+  let mut i = 0
+  while i < len {
+    let code = value.unsafe_get(i).to_int()
+    if code >= 0xD800 && code <= 0xDBFF {
+      if i + 1 >= len {
+        return false
+      }
+      let low = value.unsafe_get(i + 1).to_int()
+      if low < 0xDC00 || low > 0xDFFF {
+        return false
+      }
+      i = i + 2
+    } else if code >= 0xDC00 && code <= 0xDFFF {
+      return false
+    } else {
+      i = i + 1
+    }
+  }
+  true
+}
+
 ///|
 pub fn is_valid_http_header_value(value : String) -> Bool {
   let len = value.length()
@@ -204,7 +233,7 @@ pub fn is_valid_http_header_value(value : String) -> Bool {
     }
     i = i + 1
   }
-  true
+  has_valid_utf16(value)
 }
 
 // Create a configuration with sensible defaults
