@@ -252,6 +252,55 @@ pub fn Context::with_baggage_entries(
   }
 }
 
+// Overlay all baggage stored in `other` onto this context. Unlike
+// `with_baggage_entries`, which only receives the visible members, this copies
+// the baggage nodes of `other` verbatim, including `without_value` removal
+// markers. A later context therefore wins for the same key even when its
+// winning value is an explicit removal. The span context of `other` is
+// ignored; the span of this context is preserved.
+
+///|
+pub fn Context::with_baggage_from(
+  self : Context,
+  other : Context,
+) -> Context {
+  // Collect the baggage-bearing nodes of `other` from innermost to outermost,
+  // then attach them in the opposite order so that `other`'s innermost node
+  // is looked up first after the merge.
+  let nodes : Array[Context] = []
+  let mut cursor : Context? = Some(other)
+  while true {
+    match cursor {
+      Some(context) => {
+        let has_baggage = context.key is Some(_) ||
+          context.baggage_map is Some(_) ||
+          context.baggage_list is Some(_)
+        if has_baggage {
+          nodes.push(context)
+        }
+        cursor = context.parent
+      }
+      None => break
+    }
+  }
+  let mut result = self
+  let mut i = nodes.length() - 1
+  while i >= 0 {
+    let node = nodes.unsafe_get(i)
+    result = {
+      span_ctx: None,
+      key: node.key,
+      value: node.value,
+      properties: node.properties,
+      baggage_map: node.baggage_map,
+      baggage_list: node.baggage_list,
+      parent: Some(result),
+    }
+    i = i - 1
+  }
+  result
+}
+
 // The nearest span context in the chain, if any, as a copy: mutating its ID
 // arrays cannot change the context or other values derived from it.
 

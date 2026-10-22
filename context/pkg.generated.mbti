@@ -54,6 +54,7 @@ pub fn Context::value(Self, String) -> String?
 pub fn Context::with_baggage(Self, Map[String, String]) -> Self
 pub fn Context::with_baggage_entries(Self, Array[BaggageEntry]) -> Self
 pub fn Context::with_baggage_entry(Self, String, String, properties? : Array[(String, String)]) -> Self
+pub fn Context::with_baggage_from(Self, Self) -> Self
 pub fn Context::with_baggage_owned(Self, Map[String, String]) -> Self
 pub fn Context::with_span(Self, @api.SpanContext) -> Self
 pub fn Context::with_value(Self, String, String) -> Self

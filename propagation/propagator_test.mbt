@@ -42,6 +42,32 @@ pub impl @propagation.TextMapPropagator for MarkerPropagator with fn extract(
   }
 }
 
+// A propagator whose extracted context explicitly removes the `marker` key,
+// leaving no visible baggage of its own.
+
+///|
+struct DeletionPropagator {}
+
+///|
+pub impl @propagation.TextMapPropagator for DeletionPropagator with fn inject(
+  self,
+  _context,
+  _carrier,
+) {
+  let _ = self
+}
+
+///|
+pub impl @propagation.TextMapPropagator for DeletionPropagator with fn extract(
+  self,
+  _carrier,
+) {
+  let _ = self
+  @context.Context::root()
+  .with_value("marker", "temporary")
+  .without_value("marker")
+}
+
 ///|
 test "trace_context_propagator_round_trip" {
   let propagator = @propagation.TraceContextPropagator::new()
@@ -122,6 +148,21 @@ test "composite_propagator_runs_members_in_order" {
   // Extraction folds the member contexts; the last member wins.
   let extracted = composite.extract(carrier)
   assert_eq(extracted.value("marker"), Some("second"))
+}
+
+///|
+test "composite_propagator_honors_baggage_removal_from_later_members" {
+  let composite = @propagation.CompositePropagator::new([
+    MarkerPropagator::{ header: "first", },
+    DeletionPropagator::{},
+  ])
+  let carrier = @propagation.TextMapCarrier::new()
+  carrier.set("first", "from-marker")
+  let extracted = composite.extract(carrier)
+  // The later propagator has no visible baggage, but its removal marker must
+  // still hide the value extracted by the earlier member.
+  assert_eq(extracted.value("marker"), None)
+  assert_false(extracted.has_baggage())
 }
 
 ///|
