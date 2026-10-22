@@ -132,6 +132,7 @@ pub struct BatchSpanProcessor {
   mut draining : Bool
   mut dropped_spans : UInt64
   mut export_failures : UInt64
+  mut shutdown_completion : (() -> Unit)?
 }
 pub fn BatchSpanProcessor::drain_before_shutdown(Self) -> Unit
 pub fn BatchSpanProcessor::dropped_spans(Self) -> UInt64
@@ -146,6 +147,7 @@ pub fn BatchSpanProcessor::new(&SpanExporter, max_queue_size? : Int32, max_expor
 pub fn BatchSpanProcessor::on_end(Self, SpanData) -> Unit
 pub fn BatchSpanProcessor::on_start(Self, SpanSdk) -> Unit
 pub fn BatchSpanProcessor::queue_size(Self) -> Int32
+pub fn BatchSpanProcessor::set_shutdown_completion(Self, () -> Unit) -> Unit
 pub fn BatchSpanProcessor::shutdown(Self) -> Unit
 pub fn BatchSpanProcessor::tick(Self) -> Unit
 pub fn BatchSpanProcessor::with_config(&SpanExporter, BatchConfig) -> Self
@@ -206,6 +208,7 @@ pub struct MultiSpanProcessor {
   shutdown_called : @ref.Ref[Bool]
   draining : @ref.Ref[Bool]
   flushing : @ref.Ref[Bool]
+  mut shutdown_completion : (() -> Unit)?
 }
 pub fn MultiSpanProcessor::drain_before_shutdown(Self) -> Unit
 pub fn MultiSpanProcessor::force_flush(Self) -> Unit
@@ -215,6 +218,7 @@ pub fn MultiSpanProcessor::new(processors? : Array[&SpanProcessor]) -> Self
 pub fn MultiSpanProcessor::on_end(Self, SpanData) -> Unit
 pub fn MultiSpanProcessor::on_start(Self, SpanSdk) -> Unit
 pub fn MultiSpanProcessor::processor_count(Self) -> Int32
+pub fn MultiSpanProcessor::set_shutdown_completion(Self, () -> Unit) -> Unit
 pub fn MultiSpanProcessor::shutdown(Self) -> Unit
 pub fn MultiSpanProcessor::with_processor(Self, &SpanProcessor) -> Self
 pub impl SpanProcessor for MultiSpanProcessor
@@ -300,6 +304,7 @@ pub fn SimpleSpanProcessor::is_shutdown(Self) -> Bool
 pub fn SimpleSpanProcessor::new(&SpanExporter) -> Self
 pub fn SimpleSpanProcessor::on_end(Self, SpanData) -> Unit
 pub fn SimpleSpanProcessor::on_start(Self, SpanSdk) -> Unit
+pub fn SimpleSpanProcessor::set_shutdown_completion(Self, () -> Unit) -> Unit
 pub fn SimpleSpanProcessor::shutdown(Self) -> Unit
 pub impl SpanProcessor for SimpleSpanProcessor
 
@@ -478,5 +483,6 @@ pub(open) trait SpanProcessor {
   fn force_flush(Self) -> Unit
   fn drain_before_shutdown(Self) -> Unit = _
   fn is_draining(Self) -> Bool = _
+  fn set_shutdown_completion(Self, () -> Unit) -> Unit = _
   fn shutdown(Self) -> Unit
 }

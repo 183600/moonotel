@@ -28,6 +28,9 @@ pub struct BatchSpanProcessor {
   mut draining : Bool
   mut dropped_spans : UInt64
   mut export_failures : UInt64
+  // Set by a provider shutdown that arrived while this processor was already
+  // draining directly; run once the outer drain has finished.
+  mut shutdown_completion : (() -> Unit)?
 }
 
 // Create a batch processor. Defaults: queue size 2048, batch size 512,
@@ -58,6 +61,7 @@ pub fn BatchSpanProcessor::new(
     draining: false,
     dropped_spans: 0,
     export_failures: 0,
+    shutdown_completion: None,
   }
 }
 
@@ -297,6 +301,15 @@ pub impl SpanProcessor for BatchSpanProcessor with fn is_draining(self) {
 }
 
 ///|
+///|
+pub impl SpanProcessor for BatchSpanProcessor with fn set_shutdown_completion(
+  self,
+  completion,
+) {
+  self.shutdown_completion = Some(completion)
+}
+
+///|
 pub impl SpanProcessor for BatchSpanProcessor with fn shutdown(self) {
   if self.draining {
     // A drain is in progress (and may have triggered this call through the
@@ -319,6 +332,18 @@ pub impl SpanProcessor for BatchSpanProcessor with fn shutdown(self) {
       }
     }
     self.exporter.shutdown()
+    // A provider shutdown that arrived during the drain installed a callback
+    // to finish closing the other processors. Run it only after this drain and
+    // exporter close are complete, and clear it first to keep the callback
+    // idempotent.
+    self.draining = false
+    match self.shutdown_completion {
+      Some(completion) => {
+        self.shutdown_completion = None
+        completion()
+      }
+      None => ()
+    }
   }
 }
 
@@ -329,5 +354,6 @@ pub extend BatchSpanProcessor with SpanProcessor::{
   force_flush,
   drain_before_shutdown,
   is_draining,
+  set_shutdown_completion,
   shutdown,
 }

@@ -53,6 +53,12 @@ pub(open) trait SpanProcessor {
   // shutdown invoked from inside that drain must not close a shared exporter
   // while the outer drain still has spans to send. The default is false.
   fn is_draining(Self) -> Bool = _
+  // Register a callback that the processor runs after its own direct shutdown
+  // drain completes. A provider shutdown that arrives while the processor is
+  // draining cannot close the remaining processors yet; it installs this
+  // callback so the provider can finish the shutdown as soon as the outer
+  // drain is done. The default ignores the callback.
+  fn set_shutdown_completion(Self, () -> Unit) -> Unit = _
   fn shutdown(Self) -> Unit
 }
 
@@ -60,6 +66,12 @@ pub(open) trait SpanProcessor {
 impl SpanProcessor with is_draining(self) {
   let _ = self
   false
+}
+
+///|
+impl SpanProcessor with set_shutdown_completion(self, completion) {
+  let _ = self
+  let _ = completion
 }
 
 ///|

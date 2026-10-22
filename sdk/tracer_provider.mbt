@@ -375,11 +375,19 @@ pub fn TracerProviderSdk::shutdown(self : TracerProviderSdk) -> Unit {
   // A processor may have been in the middle of its own direct `shutdown` drain
   // when the exporter called back into the provider. That outer drain owns the
   // queues and the shared exporter; closing any processor here would make the
-  // remaining queued spans fail to export. Leave the close to the outer call.
+  // remaining queued spans fail to export. Ask the draining processor to run a
+  // completion callback as soon as its drain is done, so the rest of the
+  // provider's processors are still shut down exactly once without racing the
+  // shared exporter.
+  let mut draining = false
   for processor in self.processors {
     if processor.is_draining() {
-      return
+      draining = true
+      processor.set_shutdown_completion(() => self.shutdown())
     }
+  }
+  if draining {
+    return
   }
   let mut i = 0
   while i < self.processors.length() {

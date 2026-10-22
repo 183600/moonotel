@@ -68,5 +68,6 @@ pub extend SimpleSpanProcessor with SpanProcessor::{
   force_flush,
   drain_before_shutdown,
   is_draining,
+  set_shutdown_completion,
   shutdown,
 }

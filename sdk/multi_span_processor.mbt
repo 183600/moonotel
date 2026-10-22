@@ -20,6 +20,9 @@ pub struct MultiSpanProcessor {
   // Guards `force_flush` against reentry from a child processor. The outer pass
   // already owns the children, so a nested request must return immediately.
   flushing : Ref[Bool]
+  // Set by a provider shutdown that arrived while this processor was already
+  // draining directly; run once the outer drain has finished.
+  mut shutdown_completion : (() -> Unit)?
 }
 
 ///|
@@ -43,6 +46,7 @@ pub fn MultiSpanProcessor::new(
     shutdown_called: Ref(false),
     draining: Ref(false),
     flushing: Ref(false),
+    shutdown_completion: None,
   }
 }
 
@@ -157,6 +161,14 @@ pub impl SpanProcessor for MultiSpanProcessor with fn is_draining(self) {
 }
 
 ///|
+pub impl SpanProcessor for MultiSpanProcessor with fn set_shutdown_completion(
+  self,
+  completion,
+) {
+  self.shutdown_completion = Some(completion)
+}
+
+///|
 pub impl SpanProcessor for MultiSpanProcessor with fn shutdown(self) {
   // A child processor or exporter may call back into `shutdown`; let the outer
   // call finish the drain and shutdown sequence.
@@ -184,6 +196,14 @@ pub impl SpanProcessor for MultiSpanProcessor with fn shutdown(self) {
     }
     i = i + 1
   }
+  self.draining.val = false
+  match self.shutdown_completion {
+    Some(completion) => {
+      self.shutdown_completion = None
+      completion()
+    }
+    None => ()
+  }
 }
 
 ///|
@@ -193,5 +213,6 @@ pub extend MultiSpanProcessor with SpanProcessor::{
   force_flush,
   drain_before_shutdown,
   is_draining,
+  set_shutdown_completion,
   shutdown,
 }
