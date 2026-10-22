@@ -508,6 +508,58 @@ fn traced_headers(
   out
 }
 
+// Split an absolute URL into the origin (`scheme://authority`) and the
+// request target (path and query). The fragment is not sent on the wire.
+// Values that do not have a valid `scheme://` prefix are passed to the HTTP
+// client unchanged so that it reports the same URL error as `@http.request`.
+
+///|
+fn split_url_for_transport(url : String) -> (String, String) {
+  match parse_url_scheme(url).1 {
+    Some(scheme_end) => {
+      let after_scheme = url[scheme_end:]
+      let authority_end = find_authority_end(after_scheme)
+      let origin = url[:scheme_end + authority_end].to_owned()
+      let rest = after_scheme[authority_end:]
+      let without_fragment = match rest.find("#") {
+        Some(index) => rest[:index]
+        None => rest
+      }
+      let target = if without_fragment.length() == 0 {
+        "/"
+      } else if without_fragment.unsafe_get(0).unsafe_to_char() == '?' {
+        // An absolute URL without a path is sent to the root path, with the
+        // query preserved.
+        "/" + without_fragment.to_owned()
+      } else {
+        without_fragment.to_owned()
+      }
+      (origin, target)
+    }
+    None => (url, "/")
+  }
+}
+
+// Send one request through the streaming HTTP client and return the response
+// together with the client that still owns the unread body. On failure the
+// client is closed before the error propagates; on success the caller owns it.
+
+///|
+async fn open_request(
+  url : String,
+  request_method : @http.RequestMethod,
+  headers : @http.Headers,
+  body : Bytes,
+) -> (@http.Response, @http.Client) {
+  let (origin, target) = split_url_for_transport(url)
+  let client = @http.Client(origin, headers~)
+  errdefer client.close()
+  client.request(request_method, target)
+  client.write(body)
+  let response = client.end_request()
+  (response, client)
+}
+
 // Perform a traced HTTP request. The response headers, the fully read
 // response body and the client span are returned; the span is ended before
 // this function returns.
@@ -592,9 +644,9 @@ pub async fn request(
         span.context(),
         request_context,
       )
-      let outcome = Ok(
-        @http.request(url, request_method, sent_headers, request_body),
-      ) catch {
+      let outcome = try {
+        Ok(open_request(url, request_method, sent_headers, request_body))
+      } catch {
         error => Err(error)
       }
       // Capture after the request attempt: the HTTP client adds headers that
@@ -605,7 +657,7 @@ pub async fn request(
         @http_header_capture.ENV_CLIENT_REQUEST_HEADERS,
       )
       request_capture.record_request(sent_headers, span)
-      let (response, response_body) = match outcome {
+      let (response, client) = match outcome {
         Ok(result) => result
         Err(error) => {
           let type_name = error.to_string()
@@ -615,6 +667,10 @@ pub async fn request(
           raise error
         }
       }
+      defer client.close()
+      // Record the response status and headers as soon as the response starts
+      // arriving. A failure while reading the body (for example a truncated
+      // Content-Length) must not erase the status that was actually received.
       @http_header_capture.HeaderCapture::from_env(
         @http_header_capture.ENV_CLIENT_RESPONSE_HEADERS,
       ).record_response(response.headers, span)
@@ -622,6 +678,26 @@ pub async fn request(
         @sdk.HTTP_RESPONSE_STATUS_CODE,
         @sdk.IntValue(response.code.to_int64()),
       )
+      if response.code >= 400 {
+        let status_text = response.code.to_string()
+        span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(status_text))
+        span.set_status(@api.StatusCode::Error)
+      }
+      let body_outcome = try {
+        Ok(client.read_all())
+      } catch {
+        error => Err(error)
+      }
+      let response_body = match body_outcome {
+        Ok(body) => body
+        Err(error) => {
+          let type_name = error.to_string()
+          span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(type_name))
+          span.set_status(@api.StatusCode::Error, description=type_name)
+          span.record_exception(error)
+          raise error
+        }
+      }
       // The response body has been fully read, so its size is always known.
       let response_size = response_body.binary().length()
       if response_size > 0 {
@@ -629,11 +705,6 @@ pub async fn request(
           @sdk.HTTP_RESPONSE_BODY_SIZE,
           @sdk.IntValue(response_size.to_int64()),
         )
-      }
-      if response.code >= 400 {
-        let status_text = response.code.to_string()
-        span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(status_text))
-        span.set_status(@api.StatusCode::Error)
       }
       (response, response_body)
     }
