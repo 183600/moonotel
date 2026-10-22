@@ -8,6 +8,8 @@ fn is_sensitive_query_parameter(name : StringView) -> Bool {
   lower == "x-amz-signature" ||
   lower == "x-amz-credential" ||
   lower == "x-amz-security-token" ||
+  lower == "awsaccesskeyid" ||
+  lower == "signature" ||
   lower == "sig" ||
   lower == "x-goog-signature"
 }
