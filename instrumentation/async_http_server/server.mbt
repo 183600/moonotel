@@ -213,10 +213,9 @@ fn request_body_size(
   headers : Map[@http.CaseInsensitiveString, String],
 ) -> Int64? {
   match headers.get(@http.CaseInsensitiveString("transfer-encoding")) {
-    Some(value) =>
-      if trim_header_ows(value[:]).length() != 0 {
-        return None
-      }
+    // Any Transfer-Encoding header, even an empty one, means Content-Length
+    // no longer describes the body (RFC 9112 section 6.3).
+    Some(_) => return None
     None => ()
   }
   match headers.get(@http.CaseInsensitiveString("content-length")) {

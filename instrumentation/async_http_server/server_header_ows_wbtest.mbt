@@ -87,3 +87,12 @@ test "record_host_attributes ignores host for an absolute target without authori
   assert_eq(data.attributes.get(@sdk.SERVER_ADDRESS), None)
   assert_eq(data.attributes.get(@sdk.SERVER_PORT), None)
 }
+
+///|
+test "request_body_size ignores content-length for a blank transfer-encoding" {
+  let headers = ows_header_map([
+    ("Transfer-Encoding", " \t "),
+    ("Content-Length", "5"),
+  ])
+  assert_eq(request_body_size(headers), None)
+}
