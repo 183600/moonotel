@@ -40,7 +40,10 @@ fn limit_test_span(limits : @sdk.SpanLimits) -> @sdk.SpanSdk {
 
 ///|
 fn valid_context(seed : Int32) -> @api.SpanContext {
-  @api.span_context(Array::make(16, seed + 1), Array::make(8, seed + 1), 1)
+  // Keep every ID element in the byte range `0..255`; a value of 256 would
+  // serialize to an all-zero (invalid) ID.
+  let byte = seed % 255 + 1
+  @api.span_context(Array::make(16, byte), Array::make(8, byte), 1)
 }
 
 ///|

@@ -42,6 +42,25 @@ pub fn invalid_span_context() -> SpanContext {
 // `is_remote` must be `true` for contexts received through a propagator.
 
 ///|
+// Whether the serialized form of a byte array contains a nonzero byte. Values
+// outside 0..255 are serialized through their low eight bits (`bytes_to_hex`
+// and the OTLP/traceparent encoders all agree on that), so validity must use
+// the same interpretation: a context whose decimal IDs serialize to all zeros
+// is not valid even if the raw `Int32` elements are nonzero.
+fn has_nonzero_byte(bytes : Array[Int32]) -> Bool {
+  let len = bytes.length()
+  let mut i = 0
+  while i + 1 < len {
+    if (bytes.unsafe_get(i) & 0xFF) != 0 ||
+      (bytes.unsafe_get(i + 1) & 0xFF) != 0 {
+      return true
+    }
+    i = i + 2
+  }
+  i < len && (bytes.unsafe_get(i) & 0xFF) != 0
+}
+
+///|
 pub fn span_context(
   trace_id : Array[Int32],
   span_id : Array[Int32],
@@ -51,8 +70,8 @@ pub fn span_context(
 ) -> SpanContext {
   let is_valid = trace_id.length() == 16 &&
     span_id.length() == 8 &&
-    !is_zero(trace_id) &&
-    !is_zero(span_id)
+    has_nonzero_byte(trace_id) &&
+    has_nonzero_byte(span_id)
   {
     trace_id,
     span_id,
