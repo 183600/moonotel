@@ -82,3 +82,25 @@ async test "server response header values replace unpaired surrogates" {
     )
   }
 }
+
+///|
+async test "server keeps a well-formed surrogate pair in body and headers" {
+  let emoji = "\u{1F600}"
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_on(server, call => {
+        let headers : Map[String, String] = Map([("x-emoji", "v" + emoji)])
+        call.respond(200, body="a" + emoji + "b", headers~)
+      })
+    }
+    let (response, body) = @http.get("http://127.0.0.1:\{port}/emoji")
+    assert_eq(response.code, 200)
+    assert_eq(body.text(), "a" + emoji + "b")
+    assert_eq(
+      response.headers.get(@http.CaseInsensitiveString("x-emoji")),
+      Some("v" + emoji),
+    )
+  }
+}

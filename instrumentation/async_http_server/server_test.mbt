@@ -468,3 +468,30 @@ async test "server ignores non-decimal host ports" {
     assert_eq(data.attributes.get(@sdk.SERVER_PORT), None)
   }
 }
+
+///|
+async test "ServerCall exposes method header and span context" {
+  let (tracer, exporter) = test_tracer("server-test-accessors")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_on(
+        server,
+        call => {
+          assert_eq(call.http_method(), "GET")
+          assert_eq(call.header("X-Probe"), Some("value"))
+          assert_true(call.span_context() is Some(_))
+          call.respond(200)
+        },
+        tracer~,
+      )
+    }
+    let (response, _body) = @http.get("http://127.0.0.1:\{port}/accessors", headers={
+      "X-Probe": "value",
+    })
+    assert_eq(response.code, 200)
+    @async.sleep(50)
+    assert_eq(exporter.spans.val.length(), 1)
+  }
+}
