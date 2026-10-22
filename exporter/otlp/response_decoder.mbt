@@ -106,7 +106,7 @@ pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
       let end = after_size + size.to_int()
       if field == 1 {
         // partial_success { int64 rejected_spans = 1; string error_message = 2; }
-        let partial = data.exact_view(start=after_size, end~)
+        let partial = data.exact_view(start=after_size, end=end)
         let mut inner = 0
         while inner < partial.length() {
           let (inner_tag, inner_after) = match
