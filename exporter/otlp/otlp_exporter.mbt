@@ -439,6 +439,7 @@ pub struct OtlpHttpExporter {
   // Request headers (configured headers plus `content-type`).
   headers : Map[String, String]
   retry_wait : RetryWait
+  mut shutdown_called : Bool
 }
 
 // Create an exporter with an injected transport function and an optional wait
@@ -456,6 +457,7 @@ pub fn OtlpHttpExporter::new(
     url: config.traces_url(),
     headers: exporter_headers(config),
     retry_wait: retry_wait.unwrap_or(fn(_attempt) { () }),
+    shutdown_called: false,
   }
 }
 
@@ -464,6 +466,14 @@ pub fn OtlpHttpExporter::new(
 ///|
 pub fn OtlpHttpExporter::config(self : OtlpHttpExporter) -> OtlpHttpConfig {
   self.config
+}
+
+// Whether `shutdown` has been called. A shut-down exporter rejects further
+// export attempts, as required by the OpenTelemetry exporter specification.
+
+///|
+pub fn OtlpHttpExporter::is_shutdown(self : OtlpHttpExporter) -> Bool {
+  self.shutdown_called
 }
 
 ///|
@@ -514,6 +524,9 @@ pub fn OtlpHttpExporter::export_spans_http(
   self : OtlpHttpExporter,
   spans : Array[@sdk.SpanData],
 ) -> @sdk.ExportResult {
+  if self.shutdown_called {
+    return @sdk.ExportFailure("OTLP exporter is shut down")
+  }
   if spans.length() == 0 {
     return @sdk.ExportSuccess
   }
@@ -572,9 +585,12 @@ pub impl @sdk.SpanExporter for OtlpHttpExporter with fn export_spans(
   self.export_spans_http(spans)
 }
 
+// Shut the exporter down. Idempotent; after this call `export_spans_http`
+// returns an export failure without invoking the transport.
+
 ///|
 pub impl @sdk.SpanExporter for OtlpHttpExporter with fn shutdown(self) {
-  let _ = self
+  self.shutdown_called = true
 }
 
 ///|

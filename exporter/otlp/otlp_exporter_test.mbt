@@ -285,3 +285,47 @@ test "configured_headers_are_deduplicated_case_insensitively" {
   assert_eq(count, 1)
   assert_eq(value, "2")
 }
+
+///|
+test "shutdown_rejects_further_exports_without_calling_transport" {
+  let mock = mock_transport(200)
+  let exporter = @otlp.OtlpHttpExporter::new(
+    @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318"),
+    mock.as_transport(),
+  )
+  assert_false(exporter.is_shutdown())
+  exporter.shutdown()
+  assert_true(exporter.is_shutdown())
+  let result = exporter.export_spans([test_span()])
+  assert_eq(
+    result,
+    @sdk.ExportFailure("OTLP exporter is shut down"),
+  )
+  assert_eq(mock.urls.length(), 0)
+}
+
+///|
+test "shutdown_rejects_even_an_empty_batch" {
+  let mock = mock_transport(200)
+  let exporter = @otlp.OtlpHttpExporter::new(
+    @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318"),
+    mock.as_transport(),
+  )
+  exporter.shutdown()
+  let result = exporter.export_spans([])
+  assert_false(result.is_success())
+  assert_eq(mock.urls.length(), 0)
+}
+
+///|
+test "shutdown_is_idempotent" {
+  let mock = mock_transport(200)
+  let exporter = @otlp.OtlpHttpExporter::new(
+    @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318"),
+    mock.as_transport(),
+  )
+  exporter.shutdown()
+  exporter.shutdown()
+  assert_true(exporter.is_shutdown())
+  assert_eq(mock.urls.length(), 0)
+}

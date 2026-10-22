@@ -44,11 +44,13 @@ pub struct OtlpHttpExporter {
   url : String
   headers : Map[String, String]
   retry_wait : (Int32) -> Unit
+  mut shutdown_called : Bool
 }
 pub fn OtlpHttpExporter::config(Self) -> OtlpHttpConfig
 pub fn OtlpHttpExporter::export_span(Self, @sdk.SpanData) -> @sdk.ExportResult
 pub fn OtlpHttpExporter::export_spans(Self, Array[@sdk.SpanData]) -> @sdk.ExportResult
 pub fn OtlpHttpExporter::export_spans_http(Self, Array[@sdk.SpanData]) -> @sdk.ExportResult
+pub fn OtlpHttpExporter::is_shutdown(Self) -> Bool
 pub fn OtlpHttpExporter::new(OtlpHttpConfig, (String, Map[String, String], Bytes) -> TransportResponse, retry_wait? : (Int32) -> Unit) -> Self
 pub fn OtlpHttpExporter::shutdown(Self) -> Unit
 pub impl @sdk.SpanExporter for OtlpHttpExporter
