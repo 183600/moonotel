@@ -776,6 +776,10 @@ fn json_parse_partial_success(
         Some(pair) => pair
         None => return None
       }
+      // `rejectedSpans` is a span count and cannot be negative.
+      if value < 0L {
+        return None
+      }
       rejected = value
       cursor = after
     } else if key == 1 {

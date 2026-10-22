@@ -80,7 +80,7 @@ pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
   // Repeated occurrences of a message field are merged, so a later
   // `partial_success` may overwrite (including with zero values) fields set by
   // an earlier occurrence. Evaluate only after the whole body is parsed.
-  let mut rejected : UInt64 = 0
+  let mut rejected : Int64 = 0L
   let mut error_message = ""
   while pos < length {
     let (tag, after_tag) = match read_response_varint(data, pos) {
@@ -130,7 +130,12 @@ pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
             }
             inner = value_after
             if inner_field == 1 {
-              rejected = value
+              // `rejected_spans` is an int64 count and cannot be negative.
+              let count = value.reinterpret_as_int64()
+              if count < 0L {
+                return malformed_response()
+              }
+              rejected = count
             }
           } else if inner_wire == 2 {
             let (size2, after2) = match read_response_varint(partial, inner) {
