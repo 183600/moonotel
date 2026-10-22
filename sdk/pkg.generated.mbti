@@ -199,6 +199,7 @@ pub struct MultiSpanProcessor {
   processors : Array[&SpanProcessor]
   shutdowns : Array[@ref.Ref[Bool]]
   shutdown_called : @ref.Ref[Bool]
+  draining : @ref.Ref[Bool]
 }
 pub fn MultiSpanProcessor::drain_before_shutdown(Self) -> Unit
 pub fn MultiSpanProcessor::force_flush(Self) -> Unit
@@ -426,6 +427,7 @@ pub struct TracerProviderSdk {
   processors : Array[&SpanProcessor]
   disabled : Bool
   shutdown_called : @ref.Ref[Bool]
+  draining : @ref.Ref[Bool]
   processor_shutdowns : Array[@ref.Ref[Bool]]
 }
 pub fn TracerProviderSdk::force_flush(Self) -> Unit

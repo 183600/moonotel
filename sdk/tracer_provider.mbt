@@ -11,6 +11,10 @@ pub struct TracerProviderSdk {
   processors : Array[&SpanProcessor]
   disabled : Bool
   shutdown_called : Ref[Bool]
+  // Guards the drain/shutdown sequence against reentry from a processor or
+  // exporter. Shared with provider copies so a callback cannot start a second
+  // concurrent drain of the same processors.
+  draining : Ref[Bool]
   // Per-processor shutdown state, shared with provider copies that contain the
   // same processor. A processor added to a copy starts out unshut-down even
   // when the provider itself was already shut down.
@@ -143,6 +147,7 @@ pub fn TracerProviderSdk::new(service_name? : String) -> TracerProviderSdk {
     processors: [],
     disabled,
     shutdown_called: Ref(false),
+    draining: Ref(false),
     processor_shutdowns: [],
   }
 }
@@ -326,6 +331,15 @@ pub fn TracerProviderSdk::force_flush(self : TracerProviderSdk) -> Unit {
 
 ///|
 pub fn TracerProviderSdk::shutdown(self : TracerProviderSdk) -> Unit {
+  // A processor drain or processor shutdown may call back into `shutdown`
+  // (for example an exporter that tears its provider down from `export_spans`).
+  // The outer call owns the whole sequence; a reentrant call must not start
+  // draining the same processors again.
+  if self.draining.val {
+    return
+  }
+  self.draining.val = true
+  defer { self.draining.val = false }
   self.shutdown_called.val = true
   // Drain every not-yet-shut-down processor before shutting any exporter down.
   // Processors may share an exporter, and a simple processor registered before
@@ -386,6 +400,7 @@ pub fn no_op_tracer_provider() -> TracerProviderSdk {
         processors: [],
         disabled: true,
         shutdown_called: Ref(false),
+        draining: Ref(false),
         processor_shutdowns: [],
       }
       noop_provider.val = Some(provider)

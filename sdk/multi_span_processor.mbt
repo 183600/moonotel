@@ -7,6 +7,9 @@ pub struct MultiSpanProcessor {
   shutdowns : Array[Ref[Bool]]
   // Shared with copies, so shutting down any copy also stops the others.
   shutdown_called : Ref[Bool]
+  // Guards the drain/shutdown sequence against reentry from a child processor
+  // or an exporter it calls.
+  draining : Ref[Bool]
 }
 
 ///|
@@ -25,6 +28,7 @@ pub fn MultiSpanProcessor::new(
     processors,
     shutdowns,
     shutdown_called: Ref(false),
+    draining: Ref(false),
   }
 }
 
@@ -90,6 +94,13 @@ pub impl SpanProcessor for MultiSpanProcessor with fn drain_before_shutdown(
 
 ///|
 pub impl SpanProcessor for MultiSpanProcessor with fn shutdown(self) {
+  // A child processor or exporter may call back into `shutdown`; let the outer
+  // call finish the drain and shutdown sequence.
+  if self.draining.val {
+    return
+  }
+  self.draining.val = true
+  defer { self.draining.val = false }
   self.shutdown_called.val = true
   // Drain all not-yet-shut-down children before shutting any of them down,
   // matching the provider's shutdown order when children share an exporter.
