@@ -5,6 +5,13 @@ pub struct MultiSpanProcessor {
   // A processor added to a copy starts out unshut-down even when the copy
   // itself already is, so `shutdown` can release it exactly once.
   shutdowns : Array[Ref[Bool]]
+  // Per-child drain state, shared with copies that contain the same child.
+  // The provider drains a multi-processor before shutting it down, and
+  // `shutdown` also drains; remembering that a child was already drained keeps
+  // each child's `drain_before_shutdown` called at most once. A drain that
+  // triggers a reentrant shutdown therefore cannot call `drain_before_shutdown`
+  // on a child that `shutdown` has already closed.
+  drained : Array[Ref[Bool]]
   // Shared with copies, so shutting down any copy also stops the others.
   shutdown_called : Ref[Bool]
   // Guards the drain/shutdown sequence against reentry from a child processor
@@ -21,12 +28,15 @@ pub fn MultiSpanProcessor::new(
     None => []
   }
   let shutdowns : Array[Ref[Bool]] = Array(capacity=processors.length())
+  let drained : Array[Ref[Bool]] = Array(capacity=processors.length())
   for _ in processors {
     shutdowns.push(Ref(false))
+    drained.push(Ref(false))
   }
   {
     processors,
     shutdowns,
+    drained,
     shutdown_called: Ref(false),
     draining: Ref(false),
   }
@@ -41,7 +51,9 @@ pub fn MultiSpanProcessor::with_processor(
   processors.push(processor)
   let shutdowns = self.shutdowns.copy()
   shutdowns.push(Ref(false))
-  { ..self, processors, shutdowns, }
+  let drained = self.drained.copy()
+  drained.push(Ref(false))
+  { ..self, processors, shutdowns, drained, }
 }
 
 ///|
@@ -91,8 +103,18 @@ pub impl SpanProcessor for MultiSpanProcessor with fn drain_before_shutdown(
   self,
 ) {
   if !self.shutdown_called.val {
-    for processor in self.processors {
-      processor.drain_before_shutdown()
+    for i, processor in self.processors {
+      // A child's drain may shut this processor down reentrantly. `shutdown`
+      // then drains and closes every remaining child, so continuing here would
+      // drain (and possibly export through) processors that are already shut
+      // down.
+      if self.shutdown_called.val {
+        break
+      }
+      if !self.shutdowns[i].val && !self.drained[i].val {
+        self.drained[i].val = true
+        processor.drain_before_shutdown()
+      }
     }
   }
 }
@@ -107,10 +129,13 @@ pub impl SpanProcessor for MultiSpanProcessor with fn shutdown(self) {
   self.draining.val = true
   defer { self.draining.val = false }
   self.shutdown_called.val = true
-  // Drain all not-yet-shut-down children before shutting any of them down,
+  // Drain all not-yet-drained children before shutting any of them down,
   // matching the provider's shutdown order when children share an exporter.
+  // The provider may already have called `drain_before_shutdown`; a child is
+  // drained at most once so its exporter cannot be used after it is closed.
   for i, processor in self.processors {
-    if !self.shutdowns[i].val {
+    if !self.shutdowns[i].val && !self.drained[i].val {
+      self.drained[i].val = true
       processor.drain_before_shutdown()
     }
   }
