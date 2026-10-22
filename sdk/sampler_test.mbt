@@ -10,6 +10,13 @@ fn trace_id_starting_with(byte : Int32) -> Array[Int32] {
 }
 
 ///|
+fn trace_id_ending_with(byte : Int32) -> Array[Int32] {
+  let id : Array[Int32] = Array::make(15, 0)
+  id.push(byte)
+  id
+}
+
+///|
 test "always_on" {
   let sampler = @sdk.Sampler::always_on()
   let decision = sampler.should_sample(None, trace_id_starting_with(0))
@@ -36,22 +43,25 @@ test "record_only" {
 ///|
 test "ratio_zero_never_samples" {
   let sampler = @sdk.Sampler::trace_id_ratio_based(0.0)
-  let decision = sampler.should_sample(None, trace_id_starting_with(0))
+  let decision = sampler.should_sample(None, trace_id_ending_with(0))
   assert_false(decision.is_sampled)
 }
 
 ///|
 test "ratio_one_always_samples" {
   let sampler = @sdk.Sampler::trace_id_ratio_based(1.0)
-  let decision = sampler.should_sample(None, trace_id_starting_with(255))
+  let decision = sampler.should_sample(None, trace_id_ending_with(255))
   assert_true(decision.is_sampled)
 }
 
 ///|
 test "ratio_half_boundaries" {
   let sampler = @sdk.Sampler::trace_id_ratio_based(0.5)
-  let low = sampler.should_sample(None, trace_id_starting_with(0x00))
-  let high = sampler.should_sample(None, trace_id_starting_with(0xFF))
+  let low = sampler.should_sample(None, trace_id_ending_with(0x00))
+  let high_id : Array[Int32] = Array::make(16, 0)
+  // The decision uses the most significant bit of the rightmost 8 bytes.
+  high_id[8] = 0xFF
+  let high = sampler.should_sample(None, high_id)
   assert_true(low.is_sampled)
   assert_false(high.is_sampled)
 }
@@ -61,9 +71,9 @@ test "ratio_out_of_range_is_clamped" {
   let negative = @sdk.Sampler::trace_id_ratio_based(-1.0)
   let large = @sdk.Sampler::trace_id_ratio_based(2.0)
   assert_false(
-    negative.should_sample(None, trace_id_starting_with(1)).is_sampled,
+    negative.should_sample(None, trace_id_ending_with(1)).is_sampled,
   )
-  assert_true(large.should_sample(None, trace_id_starting_with(1)).is_sampled)
+  assert_true(large.should_sample(None, trace_id_ending_with(1)).is_sampled)
 }
 
 ///|

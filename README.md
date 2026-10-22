@@ -91,9 +91,11 @@ model. An empty key passed to a span, event, link or resource setter is
 ignored (it is not recorded, exported or counted as dropped by a limit).
 
 Samplers: `always_on`, `always_off`, `record_only`, `trace_id_ratio_based`
-and `parent_based(root)` (the OTel default). Processors:
-`SimpleSpanProcessor` (export on end) and `BatchSpanProcessor` (bounded
-queue, batched export).
+and `parent_based(root)` (the OTel default). The ratio sampler uses the
+rightmost 8 bytes of the trace ID, like the OpenTelemetry SDKs in other
+languages, so a timestamp or other structured prefix does not bias the
+decision. Processors: `SimpleSpanProcessor` (export on end) and
+`BatchSpanProcessor` (bounded queue, batched export).
 
 A recording span keeps its data readable after `end()`: the accessors return a
 snapshot of the recorded attributes, events and links, including when the

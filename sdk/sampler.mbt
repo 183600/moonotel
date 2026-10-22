@@ -46,24 +46,28 @@ fn trace_id_byte(value : Int32) -> UInt64 {
   }
 }
 
-// Compose the trace ID's leading 8 bytes into an unsigned 64-bit integer.
-// This is the value used by ratio-based sampling; the OpenTelemetry
-// specification does not mandate a particular byte range or algorithm, so
-// different SDKs may hash different bytes.
+// Compose the trace ID's rightmost 8 bytes into an unsigned 64-bit integer.
+// This is the value used by ratio-based sampling. W3C Trace Context Level 2
+// only guarantees randomness in the rightmost bytes, so the decision ignores a
+// timestamp or other structured prefix. The OpenTelemetry SDKs in other
+// languages use the same rightmost 8 bytes, so the same trace ID is sampled
+// consistently across services.
 
 ///|
 fn trace_id_fraction(trace_id : Array[Int32]) -> UInt64 {
-  let n = if trace_id.length() < 8 { trace_id.length() } else { 8 }
-  // An 8-byte prefix has a fast path that consumes four bytes per iteration.
+  let len = trace_id.length()
+  let n = if len < 8 { len } else { 8 }
+  // An 8-byte suffix has a fast path that consumes four bytes per iteration.
   if n == 8 {
-    let b0 = trace_id_byte(trace_id.unsafe_get(0))
-    let b1 = trace_id_byte(trace_id.unsafe_get(1))
-    let b2 = trace_id_byte(trace_id.unsafe_get(2))
-    let b3 = trace_id_byte(trace_id.unsafe_get(3))
-    let b4 = trace_id_byte(trace_id.unsafe_get(4))
-    let b5 = trace_id_byte(trace_id.unsafe_get(5))
-    let b6 = trace_id_byte(trace_id.unsafe_get(6))
-    let b7 = trace_id_byte(trace_id.unsafe_get(7))
+    let start = len - 8
+    let b0 = trace_id_byte(trace_id.unsafe_get(start))
+    let b1 = trace_id_byte(trace_id.unsafe_get(start + 1))
+    let b2 = trace_id_byte(trace_id.unsafe_get(start + 2))
+    let b3 = trace_id_byte(trace_id.unsafe_get(start + 3))
+    let b4 = trace_id_byte(trace_id.unsafe_get(start + 4))
+    let b5 = trace_id_byte(trace_id.unsafe_get(start + 5))
+    let b6 = trace_id_byte(trace_id.unsafe_get(start + 6))
+    let b7 = trace_id_byte(trace_id.unsafe_get(start + 7))
     (b0 << 56) |
     (b1 << 48) |
     (b2 << 40) |
@@ -74,18 +78,14 @@ fn trace_id_fraction(trace_id : Array[Int32]) -> UInt64 {
     b7
   } else {
     // A short (malformed) trace ID still has a deterministic decision: its
-    // bytes are the leading bytes of the 8-byte prefix and the missing bytes
-    // are zero, so every length is sampled like the equivalent padded ID.
+    // bytes are the rightmost bytes of the 8-byte suffix and the missing
+    // leading bytes are zero, so every length is sampled like the equivalent
+    // zero-padded ID.
     let mut value : UInt64 = 0
     let mut i = 0
     while i < n {
       value = (value << 8) | trace_id_byte(trace_id.unsafe_get(i))
       i = i + 1
-    }
-    let mut padding = n
-    while padding < 8 {
-      value = value << 8
-      padding = padding + 1
     }
     value
   }
