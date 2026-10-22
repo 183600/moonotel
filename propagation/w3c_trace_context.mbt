@@ -244,6 +244,7 @@ fn nibble_to_hex_byte(value : Int32) -> Byte {
 // Write `byte_count` bytes as hex characters into `out` starting at character
 // index `start`. Each character occupies a UTF-16LE code unit (two bytes, low
 // byte first); the high bytes are left zero by the caller's buffer.
+
 ///|
 fn write_hex(
   out : FixedArray[Byte],
