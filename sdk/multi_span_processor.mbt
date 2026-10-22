@@ -99,13 +99,19 @@ pub impl SpanProcessor for MultiSpanProcessor with fn on_end(self, data) {
 
 ///|
 pub impl SpanProcessor for MultiSpanProcessor with fn force_flush(self) {
-  if !self.shutdown_called.val {
-    for processor in self.processors {
-      // A child's flush may shut this processor down reentrantly; the outer
-      // `shutdown` has already drained and closed the remaining children.
-      if self.shutdown_called.val {
-        break
-      }
+  // A drain or shutdown in progress owns the children; do not re-enter it.
+  if self.draining.val {
+    return
+  }
+  for i, processor in self.processors {
+    // A child's flush may shut this processor down reentrantly; the outer
+    // `shutdown` has already drained and closed the remaining children.
+    if self.draining.val {
+      break
+    }
+    // A child added to a copy starts out unshut-down even when the shared
+    // shutdown marker was set by another copy, so it can still be flushed.
+    if !self.shutdowns[i].val {
       processor.force_flush()
     }
   }
