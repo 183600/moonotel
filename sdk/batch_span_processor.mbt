@@ -269,6 +269,18 @@ pub impl SpanProcessor for BatchSpanProcessor with fn force_flush(self) {
 }
 
 ///|
+pub impl SpanProcessor for BatchSpanProcessor with fn drain_before_shutdown(
+  self,
+) {
+  if !self.shutdown_called && self.count > 0 {
+    let now = @env.now()
+    while self.count > 0 {
+      self.flush_batch_at(now)
+    }
+  }
+}
+
+///|
 pub impl SpanProcessor for BatchSpanProcessor with fn shutdown(self) {
   if !self.shutdown_called {
     if self.count > 0 {
@@ -287,5 +299,6 @@ pub extend BatchSpanProcessor with SpanProcessor::{
   on_end,
   on_start,
   force_flush,
+  drain_before_shutdown,
   shutdown,
 }

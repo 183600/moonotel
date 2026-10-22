@@ -78,6 +78,17 @@ pub impl SpanProcessor for MultiSpanProcessor with fn force_flush(self) {
 }
 
 ///|
+pub impl SpanProcessor for MultiSpanProcessor with fn drain_before_shutdown(
+  self,
+) {
+  if !self.shutdown_called.val {
+    for processor in self.processors {
+      processor.drain_before_shutdown()
+    }
+  }
+}
+
+///|
 pub impl SpanProcessor for MultiSpanProcessor with fn shutdown(self) {
   self.shutdown_called.val = true
   let mut i = 0
@@ -95,5 +106,6 @@ pub extend MultiSpanProcessor with SpanProcessor::{
   on_end,
   on_start,
   force_flush,
+  drain_before_shutdown,
   shutdown,
 }

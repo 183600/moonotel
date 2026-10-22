@@ -132,6 +132,7 @@ pub struct BatchSpanProcessor {
   mut dropped_spans : UInt64
   mut export_failures : UInt64
 }
+pub fn BatchSpanProcessor::drain_before_shutdown(Self) -> Unit
 pub fn BatchSpanProcessor::dropped_spans(Self) -> UInt64
 pub fn BatchSpanProcessor::export_failures(Self) -> UInt64
 pub fn BatchSpanProcessor::flush_batch(Self) -> Unit
@@ -199,6 +200,7 @@ pub struct MultiSpanProcessor {
   shutdowns : Array[@ref.Ref[Bool]]
   shutdown_called : @ref.Ref[Bool]
 }
+pub fn MultiSpanProcessor::drain_before_shutdown(Self) -> Unit
 pub fn MultiSpanProcessor::force_flush(Self) -> Unit
 pub fn MultiSpanProcessor::is_shutdown(Self) -> Bool
 pub fn MultiSpanProcessor::new(processors? : Array[&SpanProcessor]) -> Self
@@ -282,6 +284,7 @@ pub struct SimpleSpanProcessor {
   mut shutdown_called : Bool
   mut export_failures : UInt64
 }
+pub fn SimpleSpanProcessor::drain_before_shutdown(Self) -> Unit
 pub fn SimpleSpanProcessor::export_failures(Self) -> UInt64
 pub fn SimpleSpanProcessor::force_flush(Self) -> Unit
 pub fn SimpleSpanProcessor::is_shutdown(Self) -> Bool
@@ -462,5 +465,6 @@ pub(open) trait SpanProcessor {
   fn on_start(Self, SpanSdk) -> Unit
   fn on_end(Self, SpanData) -> Unit
   fn force_flush(Self) -> Unit
+  fn drain_before_shutdown(Self) -> Unit = _
   fn shutdown(Self) -> Unit
 }

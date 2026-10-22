@@ -44,7 +44,17 @@ pub(open) trait SpanProcessor {
   fn on_start(Self, SpanSdk) -> Unit
   fn on_end(Self, SpanData) -> Unit
   fn force_flush(Self) -> Unit
+  // Drain buffered spans without shutting the exporter down. The provider
+  // calls this for every processor before shutting any of them down, so
+  // processors that share an exporter cannot lose queued spans because an
+  // earlier shutdown closed that exporter. The default is a no-op.
+  fn drain_before_shutdown(Self) -> Unit = _
   fn shutdown(Self) -> Unit
+}
+
+///|
+impl SpanProcessor with drain_before_shutdown(self) {
+  let _ = self
 }
 
 ///|
