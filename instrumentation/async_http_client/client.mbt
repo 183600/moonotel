@@ -532,14 +532,19 @@ pub async fn request(
         span.context(),
         request_context,
       )
-      @http_header_capture.HeaderCapture::from_env(
-        @http_header_capture.ENV_CLIENT_REQUEST_HEADERS,
-      ).record_request(sent_headers, span)
       let outcome = Ok(
         @http.request(url, request_method, sent_headers, request_body),
       ) catch {
         error => Err(error)
       }
+      // Capture after the request attempt: the HTTP client adds headers that
+      // are not in the caller's map (at least `Host` and `User-Agent`) by
+      // mutating it, and the captured attributes must describe the headers
+      // actually sent, including on a failed request.
+      let request_capture = @http_header_capture.HeaderCapture::from_env(
+        @http_header_capture.ENV_CLIENT_REQUEST_HEADERS,
+      )
+      request_capture.record_request(sent_headers, span)
       let (response, response_body) = match outcome {
         Ok(result) => result
         Err(error) => {

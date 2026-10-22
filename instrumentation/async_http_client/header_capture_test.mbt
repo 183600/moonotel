@@ -90,4 +90,17 @@ async test "client header capture follows the configured environment" {
     Some(@sdk.StringArrayValue(values)) => assert_eq(values.length(), 1)
     _ => fail("expected the injected traceparent header to be captured")
   }
+  // The HTTP client adds `Host` and `User-Agent` to the header map itself, so
+  // the wildcard must see those actually-sent headers too.
+  match data.attributes.get("http.request.header.host") {
+    Some(@sdk.StringArrayValue(values)) => {
+      assert_eq(values.length(), 1)
+      assert_true(values[0].contains("127.0.0.1"))
+    }
+    _ => fail("expected the Host header added by the client to be captured")
+  }
+  match data.attributes.get("http.request.header.user-agent") {
+    Some(@sdk.StringArrayValue(values)) => assert_eq(values.length(), 1)
+    _ => fail("expected the User-Agent header added by the client to be captured")
+  }
 }
