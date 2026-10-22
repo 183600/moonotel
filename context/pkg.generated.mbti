@@ -41,6 +41,7 @@ pub struct Context {
   properties : Array[(String, String)]?
   baggage_map : Map[String, String]?
   baggage_list : Array[BaggageEntry]?
+  clear_baggage : Bool
   parent : Context?
 }
 pub fn Context::baggage(Self) -> Map[String, String]
@@ -58,6 +59,7 @@ pub fn Context::with_baggage_from(Self, Self) -> Self
 pub fn Context::with_baggage_owned(Self, Map[String, String]) -> Self
 pub fn Context::with_span(Self, @api.SpanContext) -> Self
 pub fn Context::with_value(Self, String, String) -> Self
+pub fn Context::without_baggage(Self) -> Self
 pub fn Context::without_value(Self, String) -> Self
 
 pub(all) struct ContextStorage {
