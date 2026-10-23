@@ -17,9 +17,17 @@ pub struct MultiSpanProcessor {
   // Guards the drain/shutdown sequence against reentry from a child processor
   // or an exporter it calls.
   draining : Ref[Bool]
-  // Guards `force_flush` against reentry from a child processor. The outer pass
-  // already owns the children, so a nested request must return immediately.
+  // Guards `force_flush` against reentry from a child processor. A nested
+  // request on the same child set is a no-op; a copy only flushes children the
+  // outer pass does not own.
   flushing : Ref[Bool]
+  // Children currently owned by the outer `force_flush`. Shared with copies; a
+  // nested flush on a copy skips those and still reaches children added to that
+  // copy.
+  flushing_owner : Ref[Array[&SpanProcessor]?]
+  // Shutdown requests made by a copy while another copy is already draining.
+  // They run after the outer shutdown has finished.
+  shutdown_waiters : Ref[Array[() -> Unit]]
   // Set by a provider shutdown that arrived while this processor was already
   // draining directly; run once the outer drain has finished.
   mut shutdown_completion : (() -> Unit)?
@@ -46,6 +54,8 @@ pub fn MultiSpanProcessor::new(
     shutdown_called: Ref(false),
     draining: Ref(false),
     flushing: Ref(false),
+    flushing_owner: Ref(None),
+    shutdown_waiters: Ref([]),
     shutdown_completion: None,
   }
 }
@@ -106,14 +116,10 @@ pub impl SpanProcessor for MultiSpanProcessor with fn on_end(self, data) {
 }
 
 ///|
-pub impl SpanProcessor for MultiSpanProcessor with fn force_flush(self) {
-  // A drain, shutdown or another flush in progress owns the children; do not
-  // re-enter it.
-  if self.draining.val || self.flushing.val {
-    return
-  }
-  self.flushing.val = true
-  defer { self.flushing.val = false }
+fn MultiSpanProcessor::force_flush_children(
+  self : MultiSpanProcessor,
+  skip : Array[&SpanProcessor]?,
+) -> Unit {
   for i, processor in self.processors {
     // A child's flush may shut this processor down reentrantly; the outer
     // `shutdown` has already drained and closed the remaining children.
@@ -122,10 +128,45 @@ pub impl SpanProcessor for MultiSpanProcessor with fn force_flush(self) {
     }
     // A child added to a copy starts out unshut-down even when the shared
     // shutdown marker was set by another copy, so it can still be flushed.
-    if !self.shutdowns[i].val {
+    if !self.shutdowns[i].val &&
+      !(match skip {
+        Some(owner) => processor_in_array(owner, processor)
+        None => false
+      }) {
       processor.force_flush()
     }
   }
+}
+
+///|
+pub impl SpanProcessor for MultiSpanProcessor with fn force_flush(self) {
+  // A shutdown in progress owns the children.
+  if self.draining.val {
+    return
+  }
+  // A flush on the same child set is a no-op. A flush on a copy only owns the
+  // children the outer pass does not own, so run those instead of dropping the
+  // request.
+  if self.flushing.val {
+    match self.flushing_owner.val {
+      Some(owner) => {
+        let previous = self.flushing_owner.val
+        self.flushing_owner.val = Some(self.processors)
+        defer { self.flushing_owner.val = previous }
+        self.force_flush_children(Some(owner))
+      }
+      None => ()
+    }
+    return
+  }
+  self.flushing.val = true
+  let previous = self.flushing_owner.val
+  self.flushing_owner.val = Some(self.processors)
+  defer {
+    self.flushing_owner.val = previous
+    self.flushing.val = false
+  }
+  self.force_flush_children(None)
 }
 
 ///|
@@ -182,8 +223,10 @@ pub impl SpanProcessor for MultiSpanProcessor with fn set_shutdown_completion(
 ///|
 pub impl SpanProcessor for MultiSpanProcessor with fn shutdown(self) {
   // A child processor or exporter may call back into `shutdown`; let the outer
-  // call finish the drain and shutdown sequence.
+  // call finish the drain and shutdown sequence. A copy may own children the
+  // outer call does not, so queue its shutdown until the outer one finishes.
   if self.draining.val {
+    self.shutdown_waiters.val.push(() => self.shutdown())
     return
   }
   self.draining.val = true
@@ -199,21 +242,38 @@ pub impl SpanProcessor for MultiSpanProcessor with fn shutdown(self) {
       processor.drain_before_shutdown()
     }
   }
+  // Claim this copy's children before running deferred copy shutdowns. Copies
+  // share these markers, so a copy only handles children it added itself. The
+  // actual shutdown calls happen after deferred copies have drained, allowing
+  // a copy's new child to export through an exporter shared with these
+  // children.
+  let to_shutdown : Array[&SpanProcessor] = Array(
+    capacity=self.processors.length(),
+  )
   let mut i = 0
   while i < self.processors.length() {
     if !self.shutdowns[i].val {
       self.shutdowns[i].val = true
-      self.processors[i].shutdown()
+      to_shutdown.push(self.processors[i])
     }
     i = i + 1
   }
   self.draining.val = false
-  match self.shutdown_completion {
-    Some(completion) => {
-      self.shutdown_completion = None
-      completion()
-    }
+  let waiters = self.shutdown_waiters.val
+  self.shutdown_waiters.val = []
+  let completion = self.shutdown_completion
+  self.shutdown_completion = None
+  // Deferred copies may own children that still need to export through an
+  // exporter shared with this copy's children.
+  for waiter in waiters {
+    waiter()
+  }
+  match completion {
+    Some(callback) => callback()
     None => ()
+  }
+  for processor in to_shutdown {
+    processor.shutdown()
   }
 }
 

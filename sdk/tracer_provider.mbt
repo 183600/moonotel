@@ -15,10 +15,18 @@ pub struct TracerProviderSdk {
   // exporter. Shared with provider copies so a callback cannot start a second
   // concurrent drain of the same processors.
   draining : Ref[Bool]
-  // Guards `force_flush` against reentry from a processor. A processor is
-  // allowed to ask the provider to flush again, but the outer pass already
-  // owns the processors, so the nested request must return immediately.
+  // Guards `force_flush` against reentry from a processor. A nested request on
+  // the same processor set is a no-op; a copy only flushes processors the
+  // outer pass does not own.
   flushing : Ref[Bool]
+  // Processors currently owned by the outer `force_flush`. Shared with copies;
+  // a nested flush on a copy skips those and still reaches processors added to
+  // that copy.
+  flushing_owner : Ref[Array[&SpanProcessor]?]
+  // Shutdown requests made by a provider copy while another copy is already
+  // draining. They run after the outer shutdown has finished, so the copy's
+  // own processors are shut down without racing the outer drain.
+  shutdown_waiters : Ref[Array[() -> Unit]]
   // Per-processor shutdown state, shared with provider copies that contain the
   // same processor. A processor added to a copy starts out unshut-down even
   // when the provider itself was already shut down.
@@ -153,6 +161,8 @@ pub fn TracerProviderSdk::new(service_name? : String) -> TracerProviderSdk {
     shutdown_called: Ref(false),
     draining: Ref(false),
     flushing: Ref(false),
+    flushing_owner: Ref(None),
+    shutdown_waiters: Ref([]),
     processor_shutdowns: [],
   }
 }
@@ -320,18 +330,26 @@ pub fn TracerProviderSdk::get_tracer(
   { provider: self, scope_name: name, scope_version: version.unwrap_or(""), }
 }
 
-// Flush every registered processor.
+// Whether a processor array contains the same processor object.
 
 ///|
-pub fn TracerProviderSdk::force_flush(self : TracerProviderSdk) -> Unit {
-  // A drain, shutdown or another flush in progress owns the processors; do not
-  // re-enter it. Without the flush guard a processor that calls back into
-  // `force_flush` would restart the whole loop from the first processor.
-  if self.draining.val || self.flushing.val {
-    return
+fn processor_in_array(
+  processors : Array[&SpanProcessor],
+  target : &SpanProcessor,
+) -> Bool {
+  for processor in processors {
+    if physical_equal(processor, target) {
+      return true
+    }
   }
-  self.flushing.val = true
-  defer { self.flushing.val = false }
+  false
+}
+
+///|
+fn TracerProviderSdk::force_flush_processors(
+  self : TracerProviderSdk,
+  skip : Array[&SpanProcessor]?,
+) -> Unit {
   for i, processor in self.processors {
     // A reentrant shutdown may have started while an earlier processor was
     // being flushed; the shutdown sequence drains and closes the remaining
@@ -343,10 +361,47 @@ pub fn TracerProviderSdk::force_flush(self : TracerProviderSdk) -> Unit {
     // unshut-down (its own exporter is still open), so it can still be flushed
     // even though the provider's shared shutdown marker is set. Processors that
     // were already shut down must not be called again.
-    if !self.processor_shutdowns[i].val {
+    if !self.processor_shutdowns[i].val &&
+      !(match skip {
+        Some(owner) => processor_in_array(owner, processor)
+        None => false
+      }) {
       processor.force_flush()
     }
   }
+}
+
+// Flush every registered processor.
+
+///|
+pub fn TracerProviderSdk::force_flush(self : TracerProviderSdk) -> Unit {
+  // A shutdown in progress owns the processors.
+  if self.draining.val {
+    return
+  }
+  // A flush on the same processor set is a no-op. A flush on a copy only owns
+  // processors the outer pass does not own, so run those instead of dropping
+  // the request.
+  if self.flushing.val {
+    match self.flushing_owner.val {
+      Some(owner) => {
+        let previous = self.flushing_owner.val
+        self.flushing_owner.val = Some(self.processors)
+        defer { self.flushing_owner.val = previous }
+        self.force_flush_processors(Some(owner))
+      }
+      None => ()
+    }
+    return
+  }
+  self.flushing.val = true
+  let previous = self.flushing_owner.val
+  self.flushing_owner.val = Some(self.processors)
+  defer {
+    self.flushing_owner.val = previous
+    self.flushing.val = false
+  }
+  self.force_flush_processors(None)
 }
 
 // Flush and shut down every registered processor. Idempotent.
@@ -356,8 +411,11 @@ pub fn TracerProviderSdk::shutdown(self : TracerProviderSdk) -> Unit {
   // A processor drain or processor shutdown may call back into `shutdown`
   // (for example an exporter that tears its provider down from `export_spans`).
   // The outer call owns the whole sequence; a reentrant call must not start
-  // draining the same processors again.
+  // draining the same processors again. It may, however, belong to a provider
+  // copy that has processors the outer call does not own, so queue it to run
+  // after the outer shutdown completes.
   if self.draining.val {
+    self.shutdown_waiters.val.push(() => self.shutdown())
     return
   }
   self.draining.val = true
@@ -389,13 +447,30 @@ pub fn TracerProviderSdk::shutdown(self : TracerProviderSdk) -> Unit {
   if draining {
     return
   }
+  // Claim this provider's processors before running deferred copy shutdowns.
+  // Copies share these markers; marking them first means a copy only handles
+  // processors it added itself. The actual shutdown calls wait until after the
+  // copies have drained, so a copy's new processor can still export through an
+  // exporter shared with one of these processors.
+  let to_shutdown : Array[&SpanProcessor] = Array(
+    capacity=self.processors.length(),
+  )
   let mut i = 0
   while i < self.processors.length() {
     if !self.processor_shutdowns[i].val {
       self.processor_shutdowns[i].val = true
-      self.processors[i].shutdown()
+      to_shutdown.push(self.processors[i])
     }
     i = i + 1
+  }
+  self.draining.val = false
+  let waiters = self.shutdown_waiters.val
+  self.shutdown_waiters.val = []
+  for waiter in waiters {
+    waiter()
+  }
+  for processor in to_shutdown {
+    processor.shutdown()
   }
 }
 
@@ -441,6 +516,8 @@ pub fn no_op_tracer_provider() -> TracerProviderSdk {
         shutdown_called: Ref(false),
         draining: Ref(false),
         flushing: Ref(false),
+        flushing_owner: Ref(None),
+        shutdown_waiters: Ref([]),
         processor_shutdowns: [],
       }
       noop_provider.val = Some(provider)

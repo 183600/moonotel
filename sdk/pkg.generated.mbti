@@ -208,6 +208,8 @@ pub struct MultiSpanProcessor {
   shutdown_called : @ref.Ref[Bool]
   draining : @ref.Ref[Bool]
   flushing : @ref.Ref[Bool]
+  flushing_owner : @ref.Ref[Array[&SpanProcessor]?]
+  shutdown_waiters : @ref.Ref[Array[() -> Unit]]
   mut shutdown_completion : (() -> Unit)?
 }
 pub fn MultiSpanProcessor::drain_before_shutdown(Self) -> Unit
@@ -443,6 +445,8 @@ pub struct TracerProviderSdk {
   shutdown_called : @ref.Ref[Bool]
   draining : @ref.Ref[Bool]
   flushing : @ref.Ref[Bool]
+  flushing_owner : @ref.Ref[Array[&SpanProcessor]?]
+  shutdown_waiters : @ref.Ref[Array[() -> Unit]]
   processor_shutdowns : Array[@ref.Ref[Bool]]
 }
 pub fn TracerProviderSdk::force_flush(Self) -> Unit
