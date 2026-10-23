@@ -533,6 +533,112 @@ fn trim_header_ows(value : StringView) -> StringView {
   value.view(start_offset=start, end_offset=end)
 }
 
+// Whether a code unit is an HTTP token character (RFC 9110 `tchar`), matching
+// the validation the async HTTP transport applies to request header names.
+
+///|
+fn is_http_token_code(code : Int32) -> Bool {
+  (code >= 0x30 && code <= 0x39) ||
+  (code >= 0x41 && code <= 0x5A) ||
+  (code >= 0x61 && code <= 0x7A) ||
+  code == 0x21 ||
+  (code >= 0x23 && code <= 0x27) ||
+  code == 0x2A ||
+  code == 0x2B ||
+  code == 0x2D ||
+  code == 0x2E ||
+  code == 0x5E ||
+  code == 0x5F ||
+  code == 0x60 ||
+  code == 0x7C ||
+  code == 0x7E
+}
+
+///|
+fn is_valid_http_header_name(name : String) -> Bool {
+  let len = name.length()
+  if len == 0 {
+    return false
+  }
+  let mut i = 0
+  while i < len {
+    if !is_http_token_code(name.unsafe_get(i).to_int()) {
+      return false
+    }
+    i = i + 1
+  }
+  true
+}
+
+// Remove CR and LF from a header value. This mirrors the sanitization the
+// async HTTP transport performs before writing a field, so a captured value is
+// the value that actually went on the wire rather than the caller's raw input.
+
+///|
+fn sanitize_wire_header_value(value : String) -> String {
+  let len = value.length()
+  let mut i = 0
+  while i < len {
+    let code = value.unsafe_get(i).to_int()
+    if code == 0x0D || code == 0x0A {
+      break
+    }
+    i = i + 1
+  }
+  if i >= len {
+    return value
+  }
+  let sb = StringBuilder(size_hint=len)
+  let mut j = 0
+  while j < len {
+    let code = value.unsafe_get(j).to_int()
+    if code != 0x0D && code != 0x0A {
+      sb.write_char(value.unsafe_get(j).unsafe_to_char())
+    }
+    j = j + 1
+  }
+  sb.to_string()
+}
+
+// Reconstruct the request headers that the async HTTP transport writes. The
+// transport filters invalid or forbidden names, strips CR/LF from values and
+// adds `Accept-Encoding` and request-body framing itself, without updating the
+// caller's map. Header capture must therefore describe this wire form, not the
+// pre-send map.
+
+///|
+fn wire_request_headers(
+  headers : @http.Headers,
+  request_body_size : Int32,
+) -> @http.Headers {
+  let out : @http.Headers = Map(
+    [], capacity=map_capacity_for_entries(headers.length() + 2),
+  )
+  let mut has_accept_encoding = false
+  for key, value in headers {
+    let name = key.to_string()
+    if !is_valid_http_header_name(name) {
+      continue
+    }
+    let lower = name.to_lower()
+    // The transport owns framing and never forwards these fields.
+    if lower == "content-length" || lower == "transfer-encoding" {
+      continue
+    }
+    if lower == "accept-encoding" {
+      has_accept_encoding = true
+    }
+    out.set(key, sanitize_wire_header_value(value))
+  }
+  if !has_accept_encoding {
+    out.set(@http.CaseInsensitiveString("accept-encoding"), "gzip,identity")
+  }
+  if request_body_size > 0 {
+    out.set(@http.CaseInsensitiveString("transfer-encoding"), "chunked")
+  }
+  out
+}
+
 ///|
 fn traced_headers(
   headers : Map[String, String]?,
@@ -591,6 +697,20 @@ fn split_url_for_transport(url : String) -> (String, String) {
 // together with the client that still owns the unread body. On failure the
 // client is closed before the error propagates; on success the caller owns it.
 
+// Authority-form request target of a CONNECT request, as required by RFC 9110
+// (`CONNECT host:port HTTP/1.1`). Returns `None` when the URL has no usable
+// scheme and authority; the caller then keeps the ordinary path-form target
+// so an invalid URL still reaches the HTTP client's normal error handling.
+
+///|
+fn connect_authority_target(url : String) -> String? {
+  let (scheme, host, port) = split_url_parts(url)
+  if scheme == "" || host == "" || port < 0 {
+    return None
+  }
+  Some(host + ":" + port.to_string())
+}
+
 ///|
 async fn open_request(
   url : String,
@@ -598,7 +718,15 @@ async fn open_request(
   headers : @http.Headers,
   body : Bytes,
 ) -> (@http.Response, @http.Client) {
-  let (origin, target) = split_url_for_transport(url)
+  let (origin, path_target) = split_url_for_transport(url)
+  let target = match request_method {
+    Connect =>
+      match connect_authority_target(url) {
+        Some(authority) => authority
+        None => path_target
+      }
+    _ => path_target
+  }
   let client = @http.Client(origin, headers~)
   errdefer client.close()
   client.request(request_method, target)
@@ -700,17 +828,19 @@ pub async fn request(
         error => Err(error)
       }
       // Capture after the request attempt: the HTTP client adds headers that
-      // are not in the caller's map (at least `Host` and `User-Agent`) by
-      // mutating it, and the captured attributes must describe the headers
-      // actually sent, including on a failed request.
+      // are not in the caller's map (`Host` and `User-Agent`) and its transport
+      // filters/sanitizes the map while adding framing headers. Record the
+      // wire form so the wildcard capture and `user_agent.original` describe
+      // what was actually sent, including on a failed request.
+      let wire_headers = wire_request_headers(sent_headers, request_size)
       let request_capture = @http_header_capture.HeaderCapture::from_env(
         @http_header_capture.ENV_CLIENT_REQUEST_HEADERS,
       )
-      request_capture.record_request(sent_headers, span)
+      request_capture.record_request(wire_headers, span)
       // Record the User-Agent actually sent (the HTTP client supplies one when
       // the caller does not). The surrounding optional whitespace is not part
       // of the header value, so `user_agent.original` omits it.
-      match sent_headers.get(@http.CaseInsensitiveString("user-agent")) {
+      match wire_headers.get(@http.CaseInsensitiveString("user-agent")) {
         Some(value) =>
           span.set_attribute(
             @sdk.USER_AGENT_ORIGINAL,

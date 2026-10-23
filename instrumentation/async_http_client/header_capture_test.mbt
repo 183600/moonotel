@@ -77,7 +77,11 @@ async test "client header capture follows the configured environment" {
   @env.set_env_var(@http_header_capture.ENV_CLIENT_REQUEST_HEADERS, "*")
   @env.set_env_var(@http_header_capture.ENV_CLIENT_RESPONSE_HEADERS, "*")
   let (tracer, exporter) = test_tracer("client-header-capture")
-  let data = captured_client_span(tracer, exporter, { "X-One": "1" })
+  let data = captured_client_span(tracer, exporter, {
+    "X-One": "1",
+    "Bad Header": "dropped",
+    "X-CRLF": "a\r\nb",
+  })
   assert_eq(
     data.attributes.get("http.request.header.x-one"),
     Some(@sdk.StringArrayValue(["1"])),
@@ -86,6 +90,21 @@ async test "client header capture follows the configured environment" {
     data.attributes.get("http.response.header.x-reply"),
     Some(@sdk.StringArrayValue(["captured"])),
   )
+  // The transport drops invalid header names and strips CR/LF from values;
+  // the capture must show that sanitized wire form.
+  assert_eq(data.attributes.get("http.request.header.bad header"), None)
+  assert_eq(
+    data.attributes.get("http.request.header.x-crlf"),
+    Some(@sdk.StringArrayValue(["ab"])),
+  )
+  // The transport adds Accept-Encoding to a request that does not set one.
+  match data.attributes.get("http.request.header.accept-encoding") {
+    Some(@sdk.StringArrayValue(values)) => {
+      assert_eq(values.length(), 1)
+      assert_true(values[0].contains("gzip"))
+    }
+    _ => fail("expected the transport Accept-Encoding header to be captured")
+  }
   match data.attributes.get("http.request.header.traceparent") {
     Some(@sdk.StringArrayValue(values)) => assert_eq(values.length(), 1)
     _ => fail("expected the injected traceparent header to be captured")

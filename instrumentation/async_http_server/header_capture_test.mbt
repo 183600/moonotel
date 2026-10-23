@@ -117,7 +117,11 @@ async test "server header capture follows the configured environment" {
     tracer,
     exporter,
     { "X-One": "1", "X-Two": "2" },
-    { "X-Reply": "captured" },
+    {
+      "X-Reply": "captured",
+      "Bad Header": "dropped",
+      "X-CRLF": "a\r\nb",
+    },
   )
   assert_eq(
     data.attributes.get("http.request.header.x-one"),
@@ -130,5 +134,16 @@ async test "server header capture follows the configured environment" {
   assert_eq(
     data.attributes.get("http.response.header.x-reply"),
     Some(@sdk.StringArrayValue(["captured"])),
+  )
+  // The transport drops invalid response header names, strips CR/LF from
+  // values and adds the framing it actually writes.
+  assert_eq(data.attributes.get("http.response.header.bad header"), None)
+  assert_eq(
+    data.attributes.get("http.response.header.x-crlf"),
+    Some(@sdk.StringArrayValue(["ab"])),
+  )
+  assert_eq(
+    data.attributes.get("http.response.header.transfer-encoding"),
+    Some(@sdk.StringArrayValue(["chunked"])),
   )
 }

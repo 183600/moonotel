@@ -224,18 +224,64 @@ fn request_body_size(
   }
 }
 
+// Whether a code unit may start a URI scheme (`ALPHA`).
+
+///|
+fn is_scheme_start(code : Int32) -> Bool {
+  (code >= 0x41 && code <= 0x5A) || (code >= 0x61 && code <= 0x7A)
+}
+
+// Whether a code unit may continue a URI scheme
+// (`ALPHA / DIGIT / "+" / "-" / "."`).
+
+///|
+fn is_scheme_char(code : Int32) -> Bool {
+  is_scheme_start(code) ||
+  (code >= 0x30 && code <= 0x39) ||
+  code == 0x2B ||
+  code == 0x2D ||
+  code == 0x2E
+}
+
+// End of a valid absolute-URI scheme at the start of `path`, just past its
+// `://` separator. An absolute request target may use any registered scheme,
+// not only `http`/`https`; treating an unknown scheme as an ordinary path
+// would leave its userinfo in `url.path` and ignore its authority.
+
+///|
+fn absolute_target_scheme_end(path : String) -> Int32? {
+  let len = path.length()
+  if len == 0 || !is_scheme_start(path.unsafe_get(0).to_int()) {
+    return None
+  }
+  let mut i = 1
+  while i < len {
+    let code = path.unsafe_get(i).to_int()
+    if code == 0x3A {
+      // `:`
+      if i + 2 < len &&
+        path.unsafe_get(i + 1).to_int() == 0x2F &&
+        path.unsafe_get(i + 2).to_int() == 0x2F {
+        return Some(i + 3)
+      }
+      return None
+    }
+    if !is_scheme_char(code) {
+      return None
+    }
+    i = i + 1
+  }
+  None
+}
+
 ///|
 fn split_path_query(path : String) -> (String, String) {
-  let lower = path.to_lower()
-  let has_absolute_uri = lower.has_prefix("http://") || lower.has_prefix("https://")
-  let mut rest : StringView = if lower.has_prefix("http://") {
-    path[7:]
-  } else if lower.has_prefix("https://") {
-    path[8:]
-  } else {
-    path[:]
+  let scheme_end = absolute_target_scheme_end(path)
+  let mut rest : StringView = match scheme_end {
+    Some(index) => path[index:]
+    None => path[:]
   }
-  if has_absolute_uri {
+  if scheme_end is Some(_) {
     let mut authority_end = 0
     while authority_end < rest.length() &&
       rest.unsafe_get(authority_end).to_int() != 0x2F &&
@@ -268,10 +314,29 @@ fn split_path_query(path : String) -> (String, String) {
   }
 }
 
+// End of the `http://` or `https://` prefix of an absolute HTTP request
+// target. Unlike `absolute_target_scheme_end`, this is restricted to the
+// schemes whose default ports and server-attribute semantics are known.
+
+///|
+fn http_absolute_target_scheme_end(path : String) -> Int32? {
+  let lower = path.to_lower()
+  if lower.has_prefix("http://") {
+    Some(7)
+  } else if lower.has_prefix("https://") {
+    Some(8)
+  } else {
+    None
+  }
+}
+
 ///|
 fn request_target_scheme(path : String) -> String {
-  let lower = path.to_lower()
-  if lower.has_prefix("https://") { "https" } else { "http" }
+  if http_absolute_target_scheme_end(path) == Some(8) {
+    "https"
+  } else {
+    "http"
+  }
 }
 
 // Parse the incoming trace context of a request through the process-wide
@@ -327,13 +392,9 @@ fn strip_ipv6_brackets(address : String) -> String {
 
 ///|
 fn absolute_target_authority(path : String) -> String? {
-  let lower = path.to_lower()
-  let rest : StringView = if lower.has_prefix("http://") {
-    path[7:]
-  } else if lower.has_prefix("https://") {
-    path[8:]
-  } else {
-    return None
+  let rest : StringView = match http_absolute_target_scheme_end(path) {
+    Some(index) => path[index:]
+    None => return None
   }
   let mut end = 0
   while end < rest.length() {
@@ -357,8 +418,7 @@ fn absolute_target_authority(path : String) -> String? {
 
 ///|
 fn is_absolute_target(path : String) -> Bool {
-  let lower = path.to_lower()
-  lower.has_prefix("http://") || lower.has_prefix("https://")
+  http_absolute_target_scheme_end(path) is Some(_)
 }
 
 ///|
@@ -734,6 +794,147 @@ fn utf8_byte_length(value : String) -> Int32 {
   total
 }
 
+// Whether the async HTTP transport treats this response as carrying no body.
+// This is slightly narrower than `body_allowed` below: the transport does not
+// suppress a body for 205, while this instrumentation does.
+
+///|
+fn response_body_suppressed(
+  request_method : @http.RequestMethod,
+  status_code : Int32,
+) -> Bool {
+  match (request_method, status_code) {
+    (Head, _) => true
+    (Connect, 200..<300) => true
+    (_, 100..<200 | 204 | 304) => true
+    _ => false
+  }
+}
+
+// Whether this instrumentation writes the optional response body.
+
+///|
+fn response_body_allowed(
+  request_method : @http.RequestMethod,
+  status_code : Int32,
+) -> Bool {
+  match (request_method, status_code) {
+    (Head, _) => false
+    (Connect, 200..<300) => false
+    (_, 100..<200 | 204 | 205 | 304) => false
+    _ => true
+  }
+}
+
+// Whether a code unit is an HTTP token character (RFC 9110 `tchar`), matching
+// the validation the async HTTP transport applies to response header names.
+
+///|
+fn is_http_token_code(code : Int32) -> Bool {
+  (code >= 0x30 && code <= 0x39) ||
+  (code >= 0x41 && code <= 0x5A) ||
+  (code >= 0x61 && code <= 0x7A) ||
+  code == 0x21 ||
+  (code >= 0x23 && code <= 0x27) ||
+  code == 0x2A ||
+  code == 0x2B ||
+  code == 0x2D ||
+  code == 0x2E ||
+  code == 0x5E ||
+  code == 0x5F ||
+  code == 0x60 ||
+  code == 0x7C ||
+  code == 0x7E
+}
+
+///|
+fn is_valid_http_header_name(name : String) -> Bool {
+  let len = name.length()
+  if len == 0 {
+    return false
+  }
+  let mut i = 0
+  while i < len {
+    if !is_http_token_code(name.unsafe_get(i).to_int()) {
+      return false
+    }
+    i = i + 1
+  }
+  true
+}
+
+///|
+fn sanitize_wire_header_value(value : String) -> String {
+  let len = value.length()
+  let mut i = 0
+  while i < len {
+    let code = value.unsafe_get(i).to_int()
+    if code == 0x0D || code == 0x0A {
+      break
+    }
+    i = i + 1
+  }
+  if i >= len {
+    return value
+  }
+  let sb = StringBuilder(size_hint=len)
+  let mut j = 0
+  while j < len {
+    let code = value.unsafe_get(j).to_int()
+    if code != 0x0D && code != 0x0A {
+      sb.write_char(value.unsafe_get(j).unsafe_to_char())
+    }
+    j = j + 1
+  }
+  sb.to_string()
+}
+
+///|
+fn has_valid_content_length(headers : @http.Headers) -> Bool {
+  match headers.get(@http.CaseInsensitiveString("content-length")) {
+    Some(value) => parse_content_length(trim_header_ows(value[:])) is Some(_)
+    None => false
+  }
+}
+
+// Reconstruct the response headers that the async HTTP transport actually
+// writes. It filters invalid names, drops `Transfer-Encoding`, strips CR/LF
+// from values and, when the handler did not give a usable `Content-Length`,
+// adds `Transfer-Encoding: chunked` for a written body or `Content-Length: 0`
+// for an empty one. Header capture must describe this wire form rather than
+// the handler's pre-send map.
+
+///|
+fn wire_response_headers(
+  headers : @http.Headers,
+  request_method : @http.RequestMethod,
+  status_code : Int32,
+  body_written : Bool,
+) -> @http.Headers {
+  let out : @http.Headers = Map(
+    [], capacity=map_capacity_for_entries(headers.length() + 1),
+  )
+  for key, value in headers {
+    let name = key.to_string()
+    if !is_valid_http_header_name(name) {
+      continue
+    }
+    if name.to_lower() == "transfer-encoding" {
+      continue
+    }
+    out.set(key, sanitize_wire_header_value(value))
+  }
+  if !response_body_suppressed(request_method, status_code) &&
+    !has_valid_content_length(headers) {
+    if body_written {
+      out.set(@http.CaseInsensitiveString("transfer-encoding"), "chunked")
+    } else {
+      out.set(@http.CaseInsensitiveString("content-length"), "0")
+    }
+  }
+  out
+}
+
 // Send a response and record `http.response.status_code` and
 // `http.response.body.size` on the SERVER span. 5xx responses set the span
 // status to `Error`. The body, when present, is written before the response
@@ -783,11 +984,24 @@ pub async fn ServerCall::respond(
     // client may try to reuse a connection the server is about to close.
     extra_headers.set(@http.CaseInsensitiveString("connection"), "close")
   }
+  let body_allowed = response_body_allowed(self.request.meth, status_code)
+  let body_written = match body {
+    Some(text) => body_allowed && text.length() > 0
+    None => false
+  }
   match self.span {
     Some(span) =>
       @http_header_capture.HeaderCapture::from_env(
         @http_header_capture.ENV_SERVER_RESPONSE_HEADERS,
-      ).record_response(extra_headers, span)
+      ).record_response(
+        wire_response_headers(
+          extra_headers,
+          self.request.meth,
+          status_code,
+          body_written,
+        ),
+        span,
+      )
     None => ()
   }
   self.connection.send_response(
@@ -811,12 +1025,6 @@ pub async fn ServerCall::respond(
       }
     }
     None => ()
-  }
-  let body_allowed = match (self.request.meth, status_code) {
-    (Head, _) => false
-    (Connect, 200..<300) => false
-    (_, 100..<200 | 204 | 205 | 304) => false
-    _ => true
   }
   match body {
     Some(text) =>

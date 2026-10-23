@@ -110,6 +110,29 @@ async test "trace and connect use the right methods" {
 }
 
 ///|
+async test "connect uses an authority-form request target" {
+  let (tracer, exporter) = methods_test_tracer("client-connect-form")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    let seen_target : Ref[String] = Ref("")
+    group.spawn_bg(no_wait=true) <| () => {
+      server.run_forever() <| ((request, _body, conn) => {
+        if request.meth == @http.RequestMethod::Connect {
+          seen_target.val = request.path
+        }
+        conn.send_response(405, "Method Not Allowed")
+      })
+    }
+    let url = "http://127.0.0.1:\{port}/target"
+    let (response, _) = @async_http_client.connect(url, tracer~)
+    assert_eq(response.code, 405)
+    assert_eq(seen_target.val, "127.0.0.1:\{port}")
+    assert_eq(exporter.spans.val.length(), 1)
+  }
+}
+
+///|
 async test "put sends the request body and records the method" {
   let (tracer, exporter) = methods_test_tracer("client-methods")
   @async.with_task_group() <| group => {
