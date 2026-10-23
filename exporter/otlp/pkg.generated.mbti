@@ -41,6 +41,7 @@ pub(all) struct OtlpHttpConfig {
 pub fn OtlpHttpConfig::effective_timeout_millis(Self) -> Int32
 pub fn OtlpHttpConfig::from_env() -> Self
 pub fn OtlpHttpConfig::new(endpoint? : String, traces_endpoint? : String, headers? : Map[String, String], timeout_millis? : Int32, compression? : String, protocol? : String, max_retries? : Int32) -> Self
+pub fn OtlpHttpConfig::request_url(Self) -> String
 pub fn OtlpHttpConfig::traces_url(Self) -> String
 pub fn OtlpHttpConfig::with_headers(Self, Map[String, String]) -> Self
 

@@ -646,6 +646,89 @@ fn with_root_path(url : String) -> String {
   }
 }
 
+// Whether `c` may start a URI scheme (`ALPHA`).
+
+///|
+fn is_scheme_start_char(code : Int32) -> Bool {
+  (code >= 0x41 && code <= 0x5A) || (code >= 0x61 && code <= 0x7A)
+}
+
+// Whether `c` may continue a URI scheme (`ALPHA / DIGIT / "+" / "-" / "."`).
+
+///|
+fn is_scheme_char(code : Int32) -> Bool {
+  is_scheme_start_char(code) ||
+  (code >= 0x30 && code <= 0x39) ||
+  code == 0x2B ||
+  code == 0x2D ||
+  code == 0x2E
+}
+
+// Index of the `:` in a valid `scheme://` prefix, or `None` when the URL does
+// not start with an absolute URI scheme.
+
+///|
+fn scheme_colon_index(url : String) -> Int32? {
+  let len = url.length()
+  if len == 0 || !is_scheme_start_char(url.unsafe_get(0).to_int()) {
+    return None
+  }
+  let mut i = 1
+  while i < len {
+    let code = url.unsafe_get(i).to_int()
+    if code == 0x3A {
+      if i + 2 < len &&
+        url.unsafe_get(i + 1).to_int() == 0x2F &&
+        url.unsafe_get(i + 2).to_int() == 0x2F {
+        return Some(i)
+      }
+      return None
+    }
+    if !is_scheme_char(code) {
+      return None
+    }
+    i = i + 1
+  }
+  None
+}
+
+// The URL actually handed to the HTTP transport. `traces_url` intentionally
+// preserves fragments for display and configuration inspection, but a
+// fragment is never part of an HTTP request target. A network-path reference
+// is resolved against the default OTLP/HTTP scheme, and the (case-insensitive)
+// URI scheme is normalized to lower case.
+//
+// This does not change `traces_url`, so callers inspecting the configuration
+// still see the endpoint they supplied.
+
+///|
+pub fn OtlpHttpConfig::request_url(self : OtlpHttpConfig) -> String {
+  let configured = self.traces_url()
+  let without_fragment = match configured.find("#") {
+    Some(index) => configured[:index].to_owned()
+    None => configured
+  }
+  let with_scheme = if without_fragment.has_prefix("//") &&
+    without_fragment.length() > 2 &&
+    without_fragment.unsafe_get(2).unsafe_to_char() != '/' {
+    "http:" + without_fragment
+  } else {
+    without_fragment
+  }
+  match scheme_colon_index(with_scheme) {
+    Some(colon) => {
+      let scheme = with_scheme[:colon].to_owned()
+      let lower = scheme.to_lower()
+      if lower == scheme {
+        with_scheme
+      } else {
+        lower + with_scheme[colon:].to_owned()
+      }
+    }
+    None => with_scheme
+  }
+}
+
 ///|
 pub fn OtlpHttpConfig::traces_url(self : OtlpHttpConfig) -> String {
   // A config built directly (rather than with `new` / `from_env`) may carry
@@ -732,7 +815,7 @@ pub fn OtlpHttpExporter::new(
   {
     config,
     transport,
-    url: config.traces_url(),
+    url: config.request_url(),
     headers: exporter_headers(config),
     retry_wait: retry_wait.unwrap_or(fn(_attempt) { () }),
     shutdown_called: false,

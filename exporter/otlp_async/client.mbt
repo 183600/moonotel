@@ -722,7 +722,7 @@ async fn post_trace_request_with_headers(
   headers : Map[@http.CaseInsensitiveString, String],
 ) -> @sdk.ExportResult {
   let json = is_json_protocol(config.protocol)
-  let url = config.traces_url()
+  let url = config.request_url()
   let max_retries = if config.max_retries < 0 {
     0
   } else {
