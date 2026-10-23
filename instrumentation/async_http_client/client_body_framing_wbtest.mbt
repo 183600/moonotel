@@ -1,11 +1,11 @@
 // Header capture must describe the body-framing header the async HTTP client
-// actually writes: an empty request body is sent with `Content-Length: 0`,
-// while a non-empty body is sent with chunked framing. The caller's persistent
-// `Content-Length` is discarded by the transport, so it must not be reported
-// either.
+// actually writes: an empty request body has no framing field (the header
+// block is terminated by a bare CRLF), while a non-empty body is sent with
+// chunked framing. A caller's persistent `Content-Length` is discarded by the
+// transport, so it must not be reported either.
 
 ///|
-test "wire_request_headers_reports_empty_body_framing" {
+test "wire_request_headers_reports_no_framing_for_an_empty_body" {
   let headers : @http.Headers = Map([
     (@http.CaseInsensitiveString("X-Test"), "1"),
     (@http.CaseInsensitiveString("Content-Length"), "3"),
@@ -14,7 +14,7 @@ test "wire_request_headers_reports_empty_body_framing" {
   let wire = wire_request_headers(headers, 0)
   assert_eq(
     wire.get(@http.CaseInsensitiveString("content-length")),
-    Some("0"),
+    None,
   )
   assert_eq(
     wire.get(@http.CaseInsensitiveString("transfer-encoding")),

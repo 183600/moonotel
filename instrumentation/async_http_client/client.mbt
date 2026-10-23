@@ -633,13 +633,12 @@ fn wire_request_headers(
   if !has_accept_encoding {
     out.set(@http.CaseInsensitiveString("accept-encoding"), "gzip,identity")
   }
-  // The transport sends a body with chunked framing when there is one, and a
-  // zero `Content-Length` when the request body is empty. Capture the exact
-  // field it writes instead of omitting the empty-body framing header.
+  // A non-empty request body is sent with chunked framing. An empty request
+  // body has no body-framing field at all: the transport ends the header block
+  // with a bare CRLF rather than adding `Content-Length: 0` (unlike a response
+  // with no body). Capture exactly that wire form.
   if request_body_size > 0 {
     out.set(@http.CaseInsensitiveString("transfer-encoding"), "chunked")
-  } else {
-    out.set(@http.CaseInsensitiveString("content-length"), "0")
   }
   out
 }
