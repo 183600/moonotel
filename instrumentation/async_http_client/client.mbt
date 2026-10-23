@@ -735,6 +735,58 @@ async fn open_request(
   (response, client)
 }
 
+// The attributes known before the client span starts. Passing them at span
+// creation makes them available to samplers, as the HTTP semantic conventions
+// require for `http.request.method`, `url.full` and `server.address`/`port`.
+fn initial_client_attributes(
+  url : String,
+  request_method : @http.RequestMethod,
+  request_size : Int32,
+) -> Map[String, @sdk.AttributeValue] {
+  let attributes : Map[String, @sdk.AttributeValue] = Map([], capacity=10)
+  attributes.set(
+    @sdk.HTTP_REQUEST_METHOD,
+    method_attribute_value(request_method),
+  )
+  if request_size > 0 {
+    attributes.set(
+      @sdk.HTTP_REQUEST_BODY_SIZE,
+      @sdk.IntValue(request_size.to_int64()),
+    )
+  }
+  // `url.full` must not leak credentials: strip the userinfo component.
+  attributes.set(@sdk.URL_FULL, @sdk.StringValue(redact_url(url)))
+  attributes.set(@sdk.NETWORK_PROTOCOL_NAME, protocol_name_http)
+  // `moonbitlang/async/http` speaks HTTP/1.1 only.
+  attributes.set(@sdk.NETWORK_PROTOCOL_VERSION, protocol_version_http_1_1)
+  let (scheme, host, port) = split_url_parts(url)
+  if scheme != "" {
+    attributes.set(@sdk.URL_SCHEME, @sdk.StringValue(scheme))
+    let host = strip_ipv6_brackets(host)
+    // A relative reference has no authority, so it has no known server
+    // address or port. Do not turn its first path segment into fabricated
+    // `server.*` attributes.
+    if host != "" {
+      attributes.set(@sdk.SERVER_ADDRESS, @sdk.StringValue(host))
+      // `-1` marks an invalid explicit port; port 0 is a valid explicit value
+      // and must still be recorded.
+      if port >= 0 {
+        attributes.set(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
+      }
+    }
+  }
+  let (url_path, url_query) = split_url_path_query(url)
+  attributes.set(
+    @sdk.URL_PATH,
+    @sdk.StringValue(if url_path == "" { "/" } else { url_path }),
+  )
+  let url_query = @sdk.redact_sensitive_query_string(url_query)
+  if url_query != "" {
+    attributes.set(@sdk.URL_QUERY, @sdk.StringValue(url_query))
+  }
+  attributes
+}
+
 // Perform a traced HTTP request. The response headers, the fully read
 // response body and the client span are returned; the span is ended before
 // this function returns.
@@ -764,59 +816,19 @@ pub async fn request(
         None => @context.current_context()
       }
       let method_name = http_method_name(request_method)
+      // The request body is in memory, so its size is always known. It is
+      // encoded once and the resulting bytes are passed to the transport. The
+      // request attributes are created before the span so samplers can see
+      // the HTTP method, URL and server attributes.
+      let request_body : Bytes = body.binary()
+      let request_size = request_body.length()
       let span = tracer.start_span(
         span_name.unwrap_or(method_name),
         kind=@api.SpanKind::Client,
         parent?=request_context.span_context(),
+        attributes=initial_client_attributes(url, request_method, request_size),
       )
       defer span.end()
-      span.set_attribute(
-        @sdk.HTTP_REQUEST_METHOD,
-        method_attribute_value(request_method),
-      )
-      // The request body is in memory, so its size is always known. It is
-      // encoded once and the resulting bytes are passed to the transport.
-      let request_body : Bytes = body.binary()
-      let request_size = request_body.length()
-      if request_size > 0 {
-        span.set_attribute(
-          @sdk.HTTP_REQUEST_BODY_SIZE,
-          @sdk.IntValue(request_size.to_int64()),
-        )
-      }
-      // `url.full` must not leak credentials: strip the userinfo component.
-      span.set_attribute(@sdk.URL_FULL, @sdk.StringValue(redact_url(url)))
-      span.set_attribute(@sdk.NETWORK_PROTOCOL_NAME, protocol_name_http)
-      // `moonbitlang/async/http` speaks HTTP/1.1 only.
-      span.set_attribute(
-        @sdk.NETWORK_PROTOCOL_VERSION,
-        protocol_version_http_1_1,
-      )
-      let (scheme, host, port) = split_url_parts(url)
-      if scheme != "" {
-        span.set_attribute(@sdk.URL_SCHEME, @sdk.StringValue(scheme))
-        let host = strip_ipv6_brackets(host)
-        // A relative reference has no authority, so it has no known server
-        // address or port. Do not turn its first path segment into fabricated
-        // `server.*` attributes.
-        if host != "" {
-          span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(host))
-          // `-1` marks an invalid explicit port; port 0 is a valid explicit
-          // value and must still be recorded.
-          if port >= 0 {
-            span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
-          }
-        }
-      }
-      let (url_path, url_query) = split_url_path_query(url)
-      span.set_attribute(
-        @sdk.URL_PATH,
-        @sdk.StringValue(if url_path == "" { "/" } else { url_path }),
-      )
-      let url_query = @sdk.redact_sensitive_query_string(url_query)
-      if url_query != "" {
-        span.set_attribute(@sdk.URL_QUERY, @sdk.StringValue(url_query))
-      }
       let sent_headers = traced_headers(
         headers,
         span.context(),

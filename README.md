@@ -157,7 +157,9 @@ conventions (`X-Amz-Signature`, `X-Amz-Credential`, `X-Amz-Security-Token`,
 values and `user_agent.original` have surrounding HTTP optional whitespace
 removed. The server records the received `User-Agent`, and the client records
 the `User-Agent` it actually sent (including one supplied by the HTTP client
-when the caller did not set it).
+when the caller did not set it). Both wrappers supply the request method and
+the URL/server attributes known before the request at span creation, so a
+custom sampler sees them in `SamplingParameters::attributes`.
 
 ### Server
 

@@ -422,8 +422,8 @@ fn is_absolute_target(path : String) -> Bool {
 }
 
 ///|
-fn record_host_attributes(
-  span : @sdk.SpanSdk,
+fn set_host_attributes(
+  attributes : Map[String, @sdk.AttributeValue],
   headers : Map[@http.CaseInsensitiveString, String],
   path : String,
 ) -> Unit {
@@ -443,24 +443,24 @@ fn record_host_attributes(
         // request may still send it. Discard it exactly like the authority of
         // an absolute-form target so credentials never reach `server.address`.
         match headers.get(@http.CaseInsensitiveString("host")) {
-        Some(value) => {
-          let value = trim_header_ows(value[:])
-          let host = match value.rev_find("@") {
-            Some(index) =>
-              if index + 1 >= value.length() {
-                None
-              } else {
-                Some(value[index + 1:].to_owned())
-              }
-            None => Some(value.to_owned())
+          Some(value) => {
+            let value = trim_header_ows(value[:])
+            let host = match value.rev_find("@") {
+              Some(index) =>
+                if index + 1 >= value.length() {
+                  None
+                } else {
+                  Some(value[index + 1:].to_owned())
+                }
+              None => Some(value.to_owned())
+            }
+            match host {
+              Some(value) => if value == "" { None } else { Some(value) }
+              None => None
+            }
           }
-          match host {
-            Some(value) => if value == "" { None } else { Some(value) }
-            None => None
-          }
+          None => None
         }
-        None => None
-      }
       }
   }
   match host {
@@ -493,16 +493,84 @@ fn record_host_attributes(
       }
       let address = strip_ipv6_brackets(address)
       if address != "" {
-        span.set_attribute(@sdk.SERVER_ADDRESS, @sdk.StringValue(address))
+        attributes.set(@sdk.SERVER_ADDRESS, @sdk.StringValue(address))
         // `-1` marks an invalid explicit port; an absent or empty port uses
         // the scheme default, and an explicit port 0 is valid.
         if port >= 0 {
-          span.set_attribute(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
+          attributes.set(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
         }
       }
     }
     None => ()
   }
+}
+
+///|
+fn record_host_attributes(
+  span : @sdk.SpanSdk,
+  headers : Map[@http.CaseInsensitiveString, String],
+  path : String,
+) -> Unit {
+  let attributes : Map[String, @sdk.AttributeValue] = Map([])
+  set_host_attributes(attributes, headers, path)
+  for key, value in attributes {
+    span.set_attribute(key, value)
+  }
+}
+
+// The attributes known before the server span starts. Passing them at span
+// creation makes them available to samplers, as the HTTP semantic conventions
+// require for `http.request.method` and the request URL/server attributes.
+fn initial_server_attributes(
+  request : @http.Request,
+  path_query : (String, String),
+  client_address : String?,
+  client_port : Int32?,
+) -> Map[String, @sdk.AttributeValue] {
+  let attributes : Map[String, @sdk.AttributeValue] = Map([], capacity=12)
+  attributes.set(
+    @sdk.HTTP_REQUEST_METHOD,
+    method_attribute_value(request.meth),
+  )
+  attributes.set(
+    @sdk.URL_SCHEME,
+    @sdk.StringValue(request_target_scheme(request.path)),
+  )
+  attributes.set(@sdk.NETWORK_PROTOCOL_NAME, protocol_name_http)
+  // `moonbitlang/async/http` speaks HTTP/1.1 only.
+  attributes.set(@sdk.NETWORK_PROTOCOL_VERSION, protocol_version_http_1_1)
+  let (path, query) = path_query
+  attributes.set(@sdk.URL_PATH, @sdk.StringValue(path))
+  let query = @sdk.redact_sensitive_query_string(query)
+  if query != "" {
+    attributes.set(@sdk.URL_QUERY, @sdk.StringValue(query))
+  }
+  set_host_attributes(attributes, request.headers, request.path)
+  match client_address {
+    Some(address) =>
+      attributes.set(@sdk.CLIENT_ADDRESS, @sdk.StringValue(address))
+    None => ()
+  }
+  match client_port {
+    Some(port) => attributes.set(@sdk.CLIENT_PORT, @sdk.IntValue(port.to_int64()))
+    None => ()
+  }
+  match request.headers.get(@http.CaseInsensitiveString("user-agent")) {
+    Some(agent) =>
+      attributes.set(
+        @sdk.USER_AGENT_ORIGINAL,
+        @sdk.StringValue(trim_header_ows(agent[:]).to_owned()),
+      )
+    None => ()
+  }
+  match request_body_size(request.headers) {
+    Some(size) =>
+      if size > 0L {
+        attributes.set(@sdk.HTTP_REQUEST_BODY_SIZE, @sdk.IntValue(size))
+      }
+    None => ()
+  }
+  attributes
 }
 
 ///|
@@ -1131,9 +1199,22 @@ async fn serve_call(
   let parent_context = extract_context(request.headers)
   let parent = parent_context.span_context()
   let method_name = http_method_name(request.meth)
+  let path_query = split_path_query(request.path)
   let span = match active_tracer {
     Some(tracer) =>
-      Some(tracer.start_span(method_name, kind=@api.SpanKind::Server, parent?))
+      Some(
+        tracer.start_span(
+          method_name,
+          kind=@api.SpanKind::Server,
+          parent?,
+          attributes=initial_server_attributes(
+            request,
+            path_query,
+            client_address,
+            client_port,
+          ),
+        ),
+      )
     None => None
   }
   let call : ServerCall = {
@@ -1142,67 +1223,16 @@ async fn serve_call(
     connection,
     span,
     tracer: active_tracer,
-    path_query: None,
+    path_query: Some(path_query),
     responded: false,
     connection_closed: false,
   }
   match span {
     Some(server_span) => {
-      server_span.set_attribute(
-        @sdk.HTTP_REQUEST_METHOD,
-        method_attribute_value(request.meth),
-      )
-      server_span.set_attribute(
-        @sdk.URL_SCHEME,
-        @sdk.StringValue(request_target_scheme(request.path)),
-      )
-      server_span.set_attribute(@sdk.NETWORK_PROTOCOL_NAME, protocol_name_http)
-      // `moonbitlang/async/http` speaks HTTP/1.1 only.
-      server_span.set_attribute(
-        @sdk.NETWORK_PROTOCOL_VERSION,
-        protocol_version_http_1_1,
-      )
-      let path = call.path()
-      let query = @sdk.redact_sensitive_query_string(call.query())
-      server_span.set_attribute(@sdk.URL_PATH, @sdk.StringValue(path))
-      if query != "" {
-        server_span.set_attribute(@sdk.URL_QUERY, @sdk.StringValue(query))
-      }
+      // The host attributes were part of the span-creation map (so a sampler
+      // could inspect them). Re-applying the same values keeps this helper as
+      // the single source of truth for direct span mutations as well.
       record_host_attributes(server_span, request.headers, request.path)
-      match client_address {
-        Some(address) =>
-          server_span.set_attribute(
-            @sdk.CLIENT_ADDRESS,
-            @sdk.StringValue(address),
-          )
-        None => ()
-      }
-      match client_port {
-        Some(port) =>
-          server_span.set_attribute(
-            @sdk.CLIENT_PORT,
-            @sdk.IntValue(port.to_int64()),
-          )
-        None => ()
-      }
-      match request.headers.get(@http.CaseInsensitiveString("user-agent")) {
-        Some(agent) =>
-          server_span.set_attribute(
-            @sdk.USER_AGENT_ORIGINAL,
-            @sdk.StringValue(trim_header_ows(agent[:]).to_owned()),
-          )
-        None => ()
-      }
-      match request_body_size(request.headers) {
-        Some(size) =>
-          if size > 0L {
-            server_span.set_attribute(
-              @sdk.HTTP_REQUEST_BODY_SIZE,
-              @sdk.IntValue(size),
-            )
-          }
-        None => ()
-      }
       @http_header_capture.HeaderCapture::from_env(
         @http_header_capture.ENV_SERVER_REQUEST_HEADERS,
       ).record_request(request.headers, server_span)
