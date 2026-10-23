@@ -153,6 +153,17 @@ pub impl SpanProcessor for MultiSpanProcessor with fn drain_before_shutdown(
       }
     }
   }
+  // See `BatchSpanProcessor::drain_before_shutdown`: a provider shutdown that
+  // arrived during this direct drain left a completion callback behind. Run
+  // it after clearing the drain guard so that shutdown can finish.
+  self.draining.val = false
+  match self.shutdown_completion {
+    Some(completion) => {
+      self.shutdown_completion = None
+      completion()
+    }
+    None => ()
+  }
 }
 
 ///|

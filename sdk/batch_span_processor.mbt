@@ -293,6 +293,19 @@ pub impl SpanProcessor for BatchSpanProcessor with fn drain_before_shutdown(
       self.flush_batch_at(now)
     }
   }
+  // A provider shutdown may have arrived while this direct drain owned the
+  // queue. It installed a completion callback because it could not close the
+  // processor (or a shared exporter) until the drain finished. Run it now,
+  // after clearing the drain guard, so the rest of the provider's processors
+  // are still shut down exactly once.
+  self.draining = false
+  match self.shutdown_completion {
+    Some(completion) => {
+      self.shutdown_completion = None
+      completion()
+    }
+    None => ()
+  }
 }
 
 ///|

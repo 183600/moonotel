@@ -63,3 +63,64 @@ test "provider_shutdown_from_a_direct_batch_drain_closes_other_processors" {
   assert_true(first.is_shutdown())
   assert_true(second.is_shutdown())
 }
+
+///|
+test "provider_shutdown_from_a_direct_drain_before_shutdown_completes" {
+  let exporter : ReentrantProviderExporter = {
+    provider: Ref(None),
+    reenter: true,
+  }
+  let first = @sdk.BatchSpanProcessor::new(
+    exporter,
+    max_queue_size=10,
+    max_export_batch_size=10,
+    flush_interval_millis=1000000,
+  )
+  let second = @sdk.BatchSpanProcessor::new(
+    ProbeExporter::{ names: [] },
+    max_queue_size=10,
+    max_export_batch_size=10,
+    flush_interval_millis=1000000,
+  )
+  let provider = @sdk.TracerProviderSdk::new(
+    service_name="provider-shutdown-direct-drain",
+  ).with_span_processors([first, second]).with_sampler(@sdk.Sampler::always_on())
+  exporter.provider.val = Some(provider)
+  first.on_end(probe_span("s0"))
+  // The exporter calls provider.shutdown while this `drain_before_shutdown`
+  // (not `shutdown`) is running. The provider must finish once the drain ends.
+  first.drain_before_shutdown()
+  assert_true(provider.is_shutdown())
+  assert_true(first.is_shutdown())
+  assert_true(second.is_shutdown())
+}
+
+///|
+test "provider_shutdown_from_a_direct_multi_drain_completes" {
+  let exporter : ReentrantProviderExporter = {
+    provider: Ref(None),
+    reenter: true,
+  }
+  let child = @sdk.BatchSpanProcessor::new(
+    exporter,
+    max_queue_size=10,
+    max_export_batch_size=10,
+    flush_interval_millis=1000000,
+  )
+  let multi = @sdk.MultiSpanProcessor::new(processors=[child])
+  let second = @sdk.BatchSpanProcessor::new(
+    ProbeExporter::{ names: [] },
+    max_queue_size=10,
+    max_export_batch_size=10,
+    flush_interval_millis=1000000,
+  )
+  let provider = @sdk.TracerProviderSdk::new(
+    service_name="provider-shutdown-direct-multi-drain",
+  ).with_span_processors([multi, second]).with_sampler(@sdk.Sampler::always_on())
+  exporter.provider.val = Some(provider)
+  child.on_end(probe_span("s0"))
+  multi.drain_before_shutdown()
+  assert_true(provider.is_shutdown())
+  assert_true(multi.is_shutdown())
+  assert_true(second.is_shutdown())
+}
