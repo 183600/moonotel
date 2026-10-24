@@ -140,6 +140,33 @@ test "json_decode_rejects_plus_sign_and_leading_zero_numbers" {
 }
 
 ///|
+test "json_decode_rejects_non_integer_with_huge_negative_exponent" {
+  let sb = StringBuilder()
+  sb.write_char('1')
+  let mut i = 0
+  while i < 1000000 {
+    sb.write_char('0')
+    i = i + 1
+  }
+  sb.write_string("e-10000000")
+  let body = "{\"partialSuccess\":{\"rejectedSpans\":" +
+    sb.to_string() +
+    "}}"
+  assert_eq(
+    decode_json_body(body),
+    @sdk.ExportFailure("malformed OTLP response body"),
+  )
+}
+
+///|
+test "json_decode_accepts_zero_with_huge_exponent" {
+  assert_eq(
+    decode_json_body("{\"partialSuccess\":{\"rejectedSpans\":0e-10000000}}"),
+    @sdk.ExportSuccess,
+  )
+}
+
+///|
 test "json_decode_empty_member_name_is_unknown" {
   // An empty member name is an unknown field. It must not be mistaken for
   // `errorMessage` inside `partialSuccess` (where the decoder has no second

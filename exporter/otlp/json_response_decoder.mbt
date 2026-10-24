@@ -378,6 +378,7 @@ fn json_normalize_numeric_int64(token : String) -> String? {
     }
   }
   let mut exponent : Int64 = 0L
+  let mut exponent_overflow = false
   if pos < len {
     let marker = token.unsafe_get(pos).to_int()
     if marker == 0x65 || marker == 0x45 {
@@ -404,6 +405,8 @@ fn json_normalize_numeric_int64(token : String) -> String? {
         }
         if value < 1000000L {
           value = value * 10L + (code - 0x30).to_int64()
+        } else {
+          exponent_overflow = true
         }
         pos = pos + 1
       }
@@ -424,6 +427,9 @@ fn json_normalize_numeric_int64(token : String) -> String? {
   }
   if start == digit_length {
     return Some("0")
+  }
+  if exponent_overflow {
+    return None
   }
   let mut end = digit_length
   let mut exponent_10 = exponent - fraction_digits.to_int64()
