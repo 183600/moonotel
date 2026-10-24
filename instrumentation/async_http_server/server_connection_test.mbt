@@ -72,6 +72,29 @@ async test "response Connection: close closes the socket" {
 }
 
 ///|
+async test "response Connection: close with CR closes the socket" {
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    let headers : Map[String, String] = Map([("Connection", "close\r")])
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_on(server, call => {
+        call.respond(200, body="closing-cr", headers=headers)
+      })
+    }
+    let connection = @socket.Tcp::connect(
+      @socket.Addr::parse("127.0.0.1:\{port}"),
+    )
+    connection.write("GET /close-cr HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+    let response = @async.with_timeout(5000, () => connection.read_all().text())
+    connection.close()
+    assert_true(response.contains("200 OK"))
+    assert_true(response.to_lower().contains("connection: close"))
+    assert_true(response.contains("closing-cr"))
+  }
+}
+
+///|
 async test "keep-alive connections serve a second request" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))

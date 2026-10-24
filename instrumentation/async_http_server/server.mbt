@@ -1040,7 +1040,7 @@ pub async fn ServerCall::respond(
   let mut close_after_response = close_requested || self.connection_closed
   match extra_headers.get(@http.CaseInsensitiveString("connection")) {
     Some(value) =>
-      if has_close_token(value) {
+      if has_close_token(sanitize_wire_header_value(value)) {
         close_after_response = true
       }
     None => ()
