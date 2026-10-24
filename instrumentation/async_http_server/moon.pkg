@@ -2,6 +2,7 @@ import {
   "moonbitlang/async/http",
   "moonbitlang/async/io",
   "moonbitlang/async/socket",
+  "moonbitlang/core/string",
   "183600/moonotel/api",
   "183600/moonotel/context",
   "183600/moonotel/propagation",

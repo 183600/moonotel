@@ -960,7 +960,13 @@ fn sanitize_wire_header_value(value : String) -> String {
 ///|
 fn has_valid_content_length(headers : @http.Headers) -> Bool {
   match headers.get(@http.CaseInsensitiveString("content-length")) {
-    Some(value) => parse_content_length(trim_header_ows(value[:])) is Some(_)
+    Some(value) =>
+      try {
+        let _ = @string.parse_int64(value.trim(), base=10)
+        true
+      } catch {
+        _ => false
+      }
     None => false
   }
 }
