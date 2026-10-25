@@ -1,5 +1,9 @@
-fn zz_span(name : String, res : Map[String, @sdk.AttributeValue], scope : String) -> @sdk.SpanData {
-  let base = @sdk.SpanData::{
+fn grouping_test_span(
+  name : String,
+  res : Map[String, @sdk.AttributeValue],
+  scope : String
+) -> @sdk.SpanData {
+  @sdk.SpanData::{
     name,
     span_context: @api.span_context(
       @api.bytes_from_hex("4bf92f359d1e75b7618a2d1f3c4e5a6b").unwrap(),
@@ -22,20 +26,24 @@ fn zz_span(name : String, res : Map[String, @sdk.AttributeValue], scope : String
     scope_name: scope,
     scope_version: "",
   }
-  base
 }
 
-test "zz_interleaved_resources_and_scopes" {
-  let ra : Map[String, @sdk.AttributeValue] = Map([("service.name", @sdk.StringValue("a")), ("x", @sdk.IntValue(1))])
-  let rb : Map[String, @sdk.AttributeValue] = Map([("service.name", @sdk.StringValue("b"))])
+test "grouping keeps interleaved resources and scopes separate" {
+  let ra : Map[String, @sdk.AttributeValue] = Map([
+    ("service.name", @sdk.StringValue("a")),
+    ("x", @sdk.IntValue(1)),
+  ])
+  let rb : Map[String, @sdk.AttributeValue] = Map([
+    ("service.name", @sdk.StringValue("b")),
+  ])
   let spans = [
-    zz_span("a1", ra, "s1"),
-    zz_span("b1", rb, "s1"),
-    zz_span("a2", ra, "s2"),
-    zz_span("a1b", ra, "s1"),
-    zz_span("b2", rb, "s2"),
-    zz_span("a2b", ra, "s2"),
-    zz_span("b1b", rb, "s1"),
+    grouping_test_span("a1", ra, "s1"),
+    grouping_test_span("b1", rb, "s1"),
+    grouping_test_span("a2", ra, "s2"),
+    grouping_test_span("a1b", ra, "s1"),
+    grouping_test_span("b2", rb, "s2"),
+    grouping_test_span("a2b", ra, "s2"),
+    grouping_test_span("b1b", rb, "s1"),
   ]
   let groups = group_spans(spans)
   assert_eq(groups.length(), 2)
@@ -49,9 +57,21 @@ test "zz_interleaved_resources_and_scopes" {
     for scope in group.scopes {
       for span in scope.spans {
         let n = span.name
-        let first = if n == "a1" || n == "a1b" { "a1" } else if n == "a2" || n == "a2b" { "a2" } else if n == "b1" || n == "b1b" { "b1" } else { "b2" }
+        let first = if n == "a1" || n == "a1b" {
+          "a1"
+        } else if n == "a2" || n == "a2b" {
+          "a2"
+        } else if n == "b1" || n == "b1b" {
+          "b1"
+        } else {
+          "b2"
+        }
         let want_svc = if first.has_prefix("a") { "a" } else { "b" }
-        let want_scope = if first == "a1" || first == "b1" { "s1" } else { "s2" }
+        let want_scope = if first == "a1" || first == "b1" {
+          "s1"
+        } else {
+          "s2"
+        }
         assert_eq(svc, want_svc)
         assert_eq(scope.scope_name, want_scope)
         total = total + 1
@@ -61,10 +81,16 @@ test "zz_interleaved_resources_and_scopes" {
   assert_eq(total, 7)
 }
 
-test "zz_resource_key_types_do_not_collide" {
+test "resource keys distinguish attribute value types" {
   let values : Array[@sdk.AttributeValue] = [
-    @sdk.StringValue("1"), @sdk.BoolValue(true), @sdk.IntValue(1), @sdk.DoubleValue(1.0),
-    @sdk.StringArrayValue(["1"]), @sdk.BoolArrayValue([true]), @sdk.IntArrayValue([1L]), @sdk.DoubleArrayValue([1.0]),
+    @sdk.StringValue("1"),
+    @sdk.BoolValue(true),
+    @sdk.IntValue(1),
+    @sdk.DoubleValue(1.0),
+    @sdk.StringArrayValue(["1"]),
+    @sdk.BoolArrayValue([true]),
+    @sdk.IntArrayValue([1L]),
+    @sdk.DoubleArrayValue([1.0]),
   ]
   let keys : Array[String] = []
   for v in values {
