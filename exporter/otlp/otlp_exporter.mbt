@@ -454,11 +454,17 @@ fn parse_headers(value : String) -> Map[String, String] {
     match pair.trim().split_once("=") {
       Some((key, header_value)) => {
         let trimmed_key = key.trim()
-        let value = decode_header_value(header_value.trim())
+        let trimmed_value = header_value.trim()
+        // Validate the raw value before decoding: lossy decoding must not turn
+        // an unpaired surrogate into a valid replacement character.
+        let raw_value_is_valid = is_valid_http_header_value(
+          trimmed_value.to_owned(),
+        )
+        let value = decode_header_value(trimmed_value)
         // Malformed names and values are not representable as HTTP fields
         // (and a CR/LF in a value would split the request into extra fields),
         // so drop the pair instead of forwarding it to the transport.
-        if is_valid_http_header_name(trimmed_key) &&
+        if raw_value_is_valid && is_valid_http_header_name(trimmed_key) &&
           is_valid_http_header_value(value) {
           set_header(headers, trimmed_key.to_owned(), value)
         }
