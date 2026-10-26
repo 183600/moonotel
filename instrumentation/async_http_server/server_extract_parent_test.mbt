@@ -20,6 +20,20 @@ test "extract_parent returns the remote span context" {
 }
 
 ///|
+test "extract_parent restarts on a combined duplicate future traceparent" {
+  let future = "01-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01-"
+  let second = "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-00"
+  let no_space : @http.Headers = Map([
+    (@http.CaseInsensitiveString("traceparent"), future + "," + second),
+  ])
+  assert_true(@async_http_server.extract_parent(no_space) is None)
+  let with_space : @http.Headers = Map([
+    (@http.CaseInsensitiveString("traceparent"), future + ", " + second),
+  ])
+  assert_true(@async_http_server.extract_parent(with_space) is None)
+}
+
+///|
 test "extract_parent ignores missing or invalid traceparent headers" {
   let empty_headers : @http.Headers = Map([])
   assert_true(@async_http_server.extract_parent(empty_headers) is None)

@@ -445,6 +445,71 @@ pub fn format_traceparent(sc : @api.SpanContext) -> String {
   out.unsafe_reinterpret_as_bytes().to_unchecked_string()
 }
 
+// Whether `count` code units starting at `start` are all ASCII hex digits.
+
+///|
+fn is_hex_run(value : String, start : Int32, count : Int32) -> Bool {
+  let end = start + count
+  let mut i = start
+  while i < end {
+    if hex_digit_value(value.unsafe_get(i).unsafe_to_char()) < 0 {
+      return false
+    }
+    i = i + 1
+  }
+  true
+}
+
+// Whether a `traceparent` starts at `start`. This is a structural check used
+// to recognize a second field after header combining; all-zero or otherwise
+// invalid IDs still count because the duplicate header itself is ambiguous.
+
+///|
+fn looks_like_traceparent_at(value : String, start : Int32) -> Bool {
+  if value.length() - start < 55 {
+    return false
+  }
+  if value.unsafe_get(start + 2).unsafe_to_char() != '-' ||
+    value.unsafe_get(start + 35).unsafe_to_char() != '-' ||
+    value.unsafe_get(start + 52).unsafe_to_char() != '-' {
+    return false
+  }
+  let version_hi = hex_digit_value(value.unsafe_get(start).unsafe_to_char())
+  let version_lo = hex_digit_value(value.unsafe_get(start + 1).unsafe_to_char())
+  if version_hi < 0 || version_lo < 0 || (version_hi == 15 && version_lo == 15) {
+    return false
+  }
+  is_hex_run(value, start + 3, 32) &&
+  is_hex_run(value, start + 36, 16) &&
+  is_hex_run(value, start + 53, 2)
+}
+
+// Whether a future-version `traceparent` extension contains another
+// `traceparent` after a comma. HTTP intermediaries combine duplicate fields
+// with a comma, so this means the original request sent a duplicated
+// `traceparent`; its first value must not swallow the second as an opaque
+// future extension. A comma followed by other opaque text is left alone.
+
+///|
+fn has_combined_traceparent(value : String, extension_start : Int32) -> Bool {
+  let len = value.length()
+  let mut i = extension_start
+  while i < len {
+    if value.unsafe_get(i).unsafe_to_char() == ',' {
+      let mut candidate = i + 1
+      while candidate < len &&
+            is_trim_char(value.unsafe_get(candidate).unsafe_to_char()) {
+        candidate = candidate + 1
+      }
+      if looks_like_traceparent_at(value, candidate) {
+        return true
+      }
+    }
+    i = i + 1
+  }
+  false
+}
+
 // Parse a `traceparent` header value into a SpanContext.
 // Leading and trailing optional whitespace (RFC 9110 OWS) is allowed.
 // Returns None when the value is malformed, uses `ff` as version, contains
@@ -509,6 +574,12 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
     // The version 00 ABNF spells every field `HEXDIGLC`; a header holding an
     // uppercase hex character is invalid and must be ignored. Higher
     // versions accept hex in either case.
+    return None
+  }
+  if !(version_hi == '0' && version_lo == '0') &&
+    has_combined_traceparent(value, 56) {
+    // The input came from combined duplicate HTTP fields: restart the trace
+    // instead of interpreting the second `traceparent` as an extension.
     return None
   }
   let trace_id = match decode_hex_nonzero(value, 3, 16) {

@@ -18,6 +18,24 @@ test "from_entries_duplicate_future_traceparent_restarts" {
 }
 
 ///|
+test "combined_future_duplicate_traceparent_restarts" {
+  let combined = future_traceparent + "," + version_00_traceparent
+  assert_true(@propagation.parse_traceparent(combined) is None)
+  assert_true(
+    @propagation.parse_traceparent(
+      future_traceparent + ", " + version_00_traceparent,
+    )
+    is None,
+  )
+}
+
+///|
+test "opaque_future_extension_with_a_comma_still_parses" {
+  let value = future_traceparent + "opaque,value"
+  assert_true(@propagation.parse_traceparent(value) is Some(_))
+}
+
+///|
 test "from_entries_duplicate_traceparent_clears_after_a_single_write" {
   let carrier = @propagation.TextMapCarrier::from_entries([
     ("traceparent", future_traceparent),
