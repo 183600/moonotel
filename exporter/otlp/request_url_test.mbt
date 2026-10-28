@@ -66,3 +66,43 @@ test "exporter_passes_the_request_url_to_the_transport" {
   assert_true(exporter.export_spans([test_span()]).is_success())
   assert_eq(mock.urls, ["http://collector:4318/custom"])
 }
+
+///|
+test "request_url_removes_an_empty_port" {
+  assert_eq(
+    @otlp.OtlpHttpConfig::new(
+      traces_endpoint="HTTP://collector:/custom",
+    ).request_url(),
+    "http://collector/custom",
+  )
+  assert_eq(
+    @otlp.OtlpHttpConfig::new(traces_endpoint="//collector:").request_url(),
+    "http://collector/",
+  )
+  assert_eq(
+    @otlp.OtlpHttpConfig::new(endpoint="http://collector:").request_url(),
+    "http://collector/v1/traces",
+  )
+  assert_eq(
+    @otlp.OtlpHttpConfig::new(
+      traces_endpoint="https://[::1]:/custom",
+    ).request_url(),
+    "https://[::1]/custom",
+  )
+}
+
+///|
+test "request_url_leaves_non_empty_and_malformed_ports" {
+  for traces_endpoint in [
+    "http://collector:4318/custom",
+    "http://collector:80:/custom",
+    "http://collector::/custom",
+    "http://[::1]:4318/custom",
+    "http://[::1]:80:/custom",
+  ] {
+    assert_eq(
+      @otlp.OtlpHttpConfig::new(traces_endpoint~).request_url(),
+      traces_endpoint,
+    )
+  }
+}

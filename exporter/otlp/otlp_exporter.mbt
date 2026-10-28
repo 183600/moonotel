@@ -698,11 +698,79 @@ fn scheme_colon_index(url : String) -> Int32? {
   None
 }
 
+// The authority of a URL ends at the first `/` (path), `?` (query) or `#`
+// (fragment), or at the end of the string.
+
+///|
+fn url_authority_end(text : StringView) -> Int32 {
+  let len = text.length()
+  let mut i = 0
+  while i < len {
+    let c = text.unsafe_get(i).unsafe_to_char()
+    if c == '/' || c == '?' || c == '#' {
+      return i
+    }
+    i = i + 1
+  }
+  len
+}
+
+///|
+fn url_authority_has_empty_port(authority : StringView) -> Bool {
+  let host_port = match authority.rev_find("@") {
+    Some(index) => authority[index + 1:]
+    None => authority
+  }
+  if host_port.has_prefix("[") {
+    match host_port.find("]") {
+      Some(close) => {
+        let rest = host_port[close + 1:]
+        rest.length() == 1 && rest.unsafe_get(0).unsafe_to_char() == ':'
+      }
+      None => false
+    }
+  } else {
+    match host_port.find(":") {
+      Some(colon) => colon + 1 == host_port.length()
+      None => false
+    }
+  }
+}
+
+// The async HTTP transport treats a trailing colon as part of the hostname,
+// so remove an RFC 3986 empty port (which denotes the scheme default) before
+// handing the URL over. Other schemes are left untouched so their existing
+// transport errors do not change.
+
+///|
+fn strip_empty_port(url : String) -> String {
+  let colon = match scheme_colon_index(url) {
+    Some(value) => value
+    None => return url
+  }
+  let scheme = url[:colon].to_lower()
+  if scheme != "http" && scheme != "https" {
+    return url
+  }
+  let authority_start = colon + 3
+  let rest = url[authority_start:]
+  let authority_end = url_authority_end(rest)
+  let authority = rest[:authority_end]
+  if !url_authority_has_empty_port(authority) {
+    return url
+  }
+  let sb = StringBuilder(size_hint=url.length())
+  sb.write_stringview(url[:authority_start])
+  sb.write_stringview(authority[:authority.length() - 1])
+  sb.write_stringview(rest[authority_end:])
+  sb.to_string()
+}
+
 // The URL actually handed to the HTTP transport. `traces_url` intentionally
 // preserves fragments for display and configuration inspection, but a
 // fragment is never part of an HTTP request target. A network-path reference
-// is resolved against the default OTLP/HTTP scheme, and the (case-insensitive)
-// URI scheme is normalized to lower case.
+// is resolved against the default OTLP/HTTP scheme, the (case-insensitive)
+// URI scheme is normalized to lower case, and an empty port is removed.
 //
 // This does not change `traces_url`, so callers inspecting the configuration
 // still see the endpoint they supplied.
@@ -721,7 +789,7 @@ pub fn OtlpHttpConfig::request_url(self : OtlpHttpConfig) -> String {
   } else {
     without_fragment
   }
-  match scheme_colon_index(with_scheme) {
+  let normalized = match scheme_colon_index(with_scheme) {
     Some(colon) => {
       let scheme = with_scheme[:colon].to_owned()
       let lower = scheme.to_lower()
@@ -733,6 +801,7 @@ pub fn OtlpHttpConfig::request_url(self : OtlpHttpConfig) -> String {
     }
     None => with_scheme
   }
+  strip_empty_port(normalized)
 }
 
 ///|
