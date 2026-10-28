@@ -665,6 +665,81 @@ fn traced_headers(
   out
 }
 
+// Whether the authority has an explicit but empty port, which RFC 3986
+// defines as the scheme's default port. The HTTP transport treats a trailing
+// colon as part of the hostname, so remove it before handing the URL over.
+
+///|
+fn authority_has_empty_port(authority : StringView) -> Bool {
+  let host_port = match authority.rev_find("@") {
+    Some(index) => authority[index + 1:]
+    None => authority
+  }
+  if host_port.has_prefix("[") {
+    match host_port.find("]") {
+      Some(close) => {
+        let rest = host_port[close + 1:]
+        rest.length() == 1 && rest.unsafe_get(0).unsafe_to_char() == ':'
+      }
+      None => false
+    }
+  } else {
+    match host_port.find(":") {
+      Some(colon) => colon + 1 == host_port.length()
+      None => false
+    }
+  }
+}
+
+///|
+fn scheme_has_uppercase(url : String, scheme_end : Int32) -> Bool {
+  let len = scheme_end - 3
+  let mut i = 0
+  while i < len {
+    let code = url.unsafe_get(i).to_int()
+    if code >= 65 && code <= 90 {
+      return true
+    }
+    i = i + 1
+  }
+  false
+}
+
+// The async HTTP client only accepts lower-case `http` and `https` schemes
+// and does not understand an empty port. Normalize those two RFC 3986 forms
+// before either the traced or the untraced request path reaches the
+// transport. Other schemes are left untouched so their existing transport
+// errors do not change.
+
+///|
+fn normalize_url_for_transport(url : String) -> String {
+  let (scheme, scheme_end) = parse_url_scheme(url)
+  let scheme_end = match scheme_end {
+    Some(value) => value
+    None => return url
+  }
+  if scheme != "http" && scheme != "https" {
+    return url
+  }
+  let after_scheme = url[scheme_end:]
+  let authority_end = find_authority_end(after_scheme)
+  let authority = after_scheme[:authority_end]
+  let empty_port = authority_has_empty_port(authority)
+  if !empty_port && !scheme_has_uppercase(url, scheme_end) {
+    return url
+  }
+  let sb = StringBuilder(size_hint=url.length())
+  sb.write_string(scheme)
+  sb.write_string("://")
+  if empty_port {
+    sb.write_stringview(authority[:authority.length() - 1])
+  } else {
+    sb.write_stringview(authority)
+  }
+  sb.write_stringview(after_scheme[authority_end:])
+  sb.to_string()
+}
+
 // Split an absolute URL into the origin (`scheme://authority`) and the
 // request target (path and query). The fragment is not sent on the wire.
 // Values that do not have a valid `scheme://` prefix are passed to the HTTP
@@ -672,6 +747,7 @@ fn traced_headers(
 
 ///|
 fn split_url_for_transport(url : String) -> (String, String) {
+  let url = normalize_url_for_transport(url)
   match parse_url_scheme(url).1 {
     Some(scheme_end) => {
       let after_scheme = url[scheme_end:]
@@ -813,7 +889,13 @@ pub async fn request(
     None => default_tracer()
   }
   match active_tracer {
-    None => @http.request(url, request_method, plain_headers(headers), body)
+    None =>
+      @http.request(
+        normalize_url_for_transport(url),
+        request_method,
+        plain_headers(headers),
+        body,
+      )
     Some(tracer) => {
       let request_context : @context.Context = match context {
         Some(value) => value
