@@ -1063,6 +1063,13 @@ pub async fn ServerCall::respond(
     Some(text) => body_allowed && text.length() > 0
     None => false
   }
+  if !body_allowed && !response_body_suppressed(self.request.meth, status_code) {
+    // The transport does not suppress the body of a 205 response, while this
+    // instrumentation does. Force a zero length so the transport does not
+    // wait for bytes that will never be written, and so header capture
+    // describes the response that is actually sent.
+    extra_headers.set(@http.CaseInsensitiveString("content-length"), "0")
+  }
   match self.span {
     Some(span) =>
       @http_header_capture.HeaderCapture::from_env(
