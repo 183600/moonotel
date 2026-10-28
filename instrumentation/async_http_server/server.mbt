@@ -1107,13 +1107,16 @@ pub async fn ServerCall::respond(
         // substitute U+FFFD instead of aborting the connection task.
         let response_body = sanitize_utf16_surrogates(text)
         self.connection.write(response_body)
-        match self.span {
-          Some(span) =>
-            span.set_attribute(
-              @sdk.HTTP_RESPONSE_BODY_SIZE,
-              @sdk.IntValue(utf8_byte_length(response_body).to_int64()),
-            )
-          None => ()
+        let response_size = utf8_byte_length(response_body)
+        if response_size > 0 {
+          match self.span {
+            Some(span) =>
+              span.set_attribute(
+                @sdk.HTTP_RESPONSE_BODY_SIZE,
+                @sdk.IntValue(response_size.to_int64()),
+              )
+            None => ()
+          }
         }
       }
     None => ()
