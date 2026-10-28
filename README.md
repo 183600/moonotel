@@ -4,10 +4,10 @@ An OpenTelemetry **Tracing MVP for MoonBit**:
 
 - **Trace API + SDK** – `SpanContext`, `TracerProvider`, `Tracer`, recording
   spans, attributes, events, status, samplers and span processors.
-- **W3C Trace Context** – `traceparent` / `tracestate` injection and
-  extraction, plus an in-memory `TextMapCarrier`.
-- **OTLP/HTTP exporter** – encodes spans as
-  `ExportTraceServiceRequest` protobuf and POSTs them to
+- **W3C Trace Context and Baggage** – `traceparent` / `tracestate` and
+  `baggage` injection and extraction, plus an in-memory `TextMapCarrier`.
+- **OTLP/HTTP exporter** – encodes spans as an
+  `ExportTraceServiceRequest` (protobuf or JSON) and POSTs it to
   `<endpoint>/v1/traces`, including `partial_success` handling and retries.
 - **`moonbitlang/async/http` instrumentation** – one-call server wrapper and
   traced client helpers that create spans and propagate context
@@ -46,10 +46,10 @@ moon work use ./moonotel
 moon work use ./path/to/your-app
 ```
 
-Then import the packages you need (for example the root facade plus the
-SDK):
+Then add the packages you need to your own `moon.pkg` (for example the root
+facade plus the SDK):
 
-```moonbit
+```text
 import {
   "183600/moonotel",
   "183600/moonotel/sdk",
@@ -61,16 +61,21 @@ import {
 | Package | Purpose | Targets |
 | --- | --- | --- |
 | `183600/moonotel/api` | Trace API data types (`SpanContext`, `SpanKind`, `StatusCode`) | all |
-| `183600/moonotel/context` | Immutable `Context` and current-context storage | all |
-| `183600/moonotel/propagation` | W3C Trace Context propagator | all |
+| `183600/moonotel/context` | Immutable `Context` (current span + baggage) and current-context storage | all |
+| `183600/moonotel/propagation` | W3C Trace Context and Baggage propagators | all |
 | `183600/moonotel/sdk` | Tracer provider, spans, samplers, processors, semconv keys | all |
 | `183600/moonotel/exporter/otlp` | OTLP/HTTP encoder/exporter with an injectable transport | all |
 | `183600/moonotel/exporter/otlp_async` | OTLP/HTTP exporter over the real async HTTP client | native+wasm |
-| `183600/moonotel/async_runtime` | Async batching exporter with `moonbitlang/async` | native+wasm |
-| `183600/moonotel/instrumentation/async_http_client` | Traced `get`/`post`/`put`/`delete` for `moonbitlang/async/http` | native+wasm |
+| `183600/moonotel/async_runtime` | Async setup, batching exporter and context-aware task helpers built on `moonbitlang/async` | native+wasm |
+| `183600/moonotel/instrumentation/async_http_client` | Traced `request` plus `get`/`post`/`put`/`delete`/`head`/`patch`/`options`/`trace`/`connect` helpers for `moonbitlang/async/http` | native+wasm |
 | `183600/moonotel/instrumentation/async_http_server` | `run_server` wrapper that traces every request | native+wasm |
 | `183600/moonotel/instrumentation/http_header_capture` | Request/response header capture into span attributes | native+wasm |
 | `183600/moonotel` | Re-exports, `setup`, global provider helpers | all |
+
+The examples below use the conventional aliases (`@api`, `@context`, `@sdk`,
+`@propagation`, `@client`, `@server`, `@otlp`, `@otlp_async`, `@moonotel`).
+Declare the corresponding imports, with aliases where needed, in your
+`moon.pkg`.
 
 ## Getting started (SDK only)
 
@@ -138,6 +143,11 @@ The process-wide provider can be installed once and used from anywhere:
 let tracer = @sdk.global_tracer("checkout")    // or @moonotel.global_tracer(...)
 ```
 
+`setup` needs a transport to send OTLP. When OTLP is selected without one, it
+installs a console exporter instead (unless `console` is already selected), so
+finished spans are still visible rather than silently dropped. Selecting
+`none` installs no exporter.
+
 Native applications that want the OTLP exporter to send from a background task
 can call `@async_runtime.setup(group, ...)` inside a
 `moonbitlang/async` task group instead. It accepts the same `service_name`,
@@ -196,9 +206,10 @@ let (response, body) = @client.get("http://127.0.0.1:8080/hello", tracer=tracer)
 let (response, body) = @client.post(url, "payload", tracer=tracer)
 ```
 
-Each call starts a `Client` span, injects `traceparent`, records the method,
-URL, resolved server address/port and response status, and marks the span as
-`Error` for 4xx/5xx responses. Only URLs with an explicit scheme and authority
+Each call starts a `Client` span, injects the current trace context and baggage
+through the global propagator, records the method, URL, resolved server
+address/port and response status, and marks the span as `Error` for 4xx/5xx
+responses. Only URLs with an explicit scheme and authority
 record `server.address`/`server.port`; a relative reference cannot contribute
 those attributes. The `url.full` attribute strips credentials from both
 absolute URLs and network-path references (`//user:pass@host/path`), and
@@ -226,7 +237,8 @@ Supported environment variables:
 - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` is used **verbatim** (a URL with no path
   part is sent to the root path `/`) and takes precedence over the generic
   endpoint; do not append `/v1/traces` yourself.
-- `OTEL_EXPORTER_OTLP_HEADERS` (`key=value,key2=value2`)
+- `OTEL_EXPORTER_OTLP_HEADERS` (`key=value,key2=value2`; values are
+  percent-decoded)
 - `OTEL_EXPORTER_OTLP_COMPRESSION` (`none` or `gzip`; any other value is
   rejected with a clear error). `gzip` is implemented by the async exporter;
   the synchronous `exporter/otlp` exporter rejects it rather than sending an
@@ -249,10 +261,11 @@ into the headers read from the environment: same-named entries are replaced
 case-insensitively, while unrelated environment headers are still sent.
 
 Configured headers are validated before they are sent. A name must be a
-non-empty HTTP token, and a value must not contain CR, LF, NUL or any control
-character other than HTAB; malformed entries are dropped both when the
-`OTEL_EXPORTER_OTLP_*_HEADERS` variables are parsed and when the request
-headers are built from a directly assembled `OtlpHttpConfig`. Transport-managed
+non-empty HTTP token, and a value must not contain CR, LF, NUL, any control
+character other than HTAB, or an unpaired UTF-16 surrogate; malformed entries
+are dropped both when the `OTEL_EXPORTER_OTLP_*_HEADERS` variables are parsed
+and when the request headers are built from a directly assembled
+`OtlpHttpConfig`. Transport-managed
 body-framing headers (`Content-Length` and `Transfer-Encoding`) are not
 forwarded, so a configured value cannot contradict the bytes actually sent;
 `Content-Type`, `Accept` and `Content-Encoding` are likewise set by the
@@ -326,8 +339,8 @@ environment configuration:
   `OTEL_LINK_ATTRIBUTE_COUNT_LIMIT` and
   `OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT` configure span collection limits,
   with the generic `OTEL_ATTRIBUTE_*` variables as fallbacks.
-- `OTEL_RESOURCE_ATTRIBUTES` (`key=value,key2=value2`, percent-encoded) and
-  `OTEL_SERVICE_NAME` configure the resource.
+- `OTEL_RESOURCE_ATTRIBUTES` (`key=value,key2=value2`; keys and values are
+  percent-decoded) and `OTEL_SERVICE_NAME` configure the resource.
 - `OTEL_PROPAGATORS` selects the global propagators (default
   `tracecontext,baggage`; `none` disables propagation).
 - `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST`,
@@ -349,14 +362,16 @@ moon check
 moon test
 moon check --target native
 moon test --target native
+bash scripts/check-hygiene.sh
 ```
 
 The async instrumentation/exporter packages target native and wasm. The
 default wasm-gc target skips their bodies, while `moon check --target native`
 and `moon test --target native` compile and run them (`moon check --target
 wasm` also compiles them). The push/PR workflow `.github/workflows/ci.yml`
-runs both the default and native checks so a green CI means the native code
-was actually compiled and tested.
+runs both the default and native checks plus `scripts/check-hygiene.sh`, so a
+green CI means the native code was actually compiled and tested and the
+repository hygiene checks passed.
 
 ## W3C Trace Context
 

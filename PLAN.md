@@ -2,8 +2,11 @@
 > historical reference. The implementation has since diverged in details (for
 > example the OTLP encoder is hand-written rather than generated from proto,
 > and additional packages such as `async_runtime` and header-capture
-> instrumentation were added). Treat it as background reading; the README and
-> the code are the source of truth.
+> instrumentation were added). The current module uses `moon.mod` / `moon.pkg`
+> files, and the OTLP code lives in `exporter/otlp` plus `exporter/otlp_async`
+> rather than a single `exporter/otlp_http` package; the directory tree below
+> is the original draft. Treat it as background reading; the README and the
+> code are the source of truth.
 
 下面给你一份**可以直接开干的“MoonBit OpenTelemetry Tracing + OTLP/HTTP exporter + async/http 自动埋点”项目实现方案**（按“两个人能做完、还能做得像样”来裁剪范围），目标是做出一个在生产里“能用、好用、好集成”的 **Tracing MVP**。
 
@@ -18,7 +21,7 @@
 **首发自动埋点：** `moonbitlang/async/http` 的 HTTP Client + Server（最能立刻产生生态影响）  
 **多后端策略：** Native 先做到“很好用”，同时用 **virtual package** 给 JS/Wasm 留好替换点 
 
-MoonBit 包发布结构上：一个模块 `moon.mod.json`，内部多个 package（每个 package 一个 `moon.pkg.json`），符合 MoonBit 官方的包管理/发布方式。
+MoonBit 包发布结构上：一个模块 `moon.mod`，内部多个 package（每个 package 一个 `moon.pkg`），符合 MoonBit 官方的包管理/发布方式。
 
 ---
 
@@ -43,7 +46,7 @@ OTel 规范里对 `SpanContext` 的要求：TraceId 16 bytes、SpanId 8 bytes、
 采样与 SpanProcessor 的关系、`IsRecording` / `Sampled` 的语义、内置 sampler 行为等，都在 SDK 规范里定义得很清楚。
 
 ### C. Exporter 层（OTLP/HTTP + protobuf）
-- `183600/moonotel/exporter/otlp_http`
+- `183600/moonotel/exporter/otlp`（同步编码器/可注入 transport）和 `183600/moonotel/exporter/otlp_async`（真实 async HTTP 传输）
   - OTLP 配置（endpoint、headers、compression、timeout）
   - OTLP TraceService 请求：HTTP POST 到 `/v1/traces`，body 是 `ExportTraceServiceRequest` protobuf 
 
@@ -60,7 +63,7 @@ MoonBit 侧 protobuf 编码就用 `moonbitlang/protobuf`：社区实践里已经
 
 ---
 
-## 2) 目录结构（可以直接照抄开仓）
+## 2) 目录结构（原始草案；当前实际结构见 README）
 
 ```text
 yourname-otel/
@@ -228,7 +231,7 @@ SDK 里你要维护两个概念：
 - AlwaysOn：永远 RECORD_AND_SAMPLE   
 - AlwaysOff：永远 DROP   
 - ParentBased(root=AlwaysOn)：如果 parent sampled -> sampled，否则按 root 策略（MVP 先写死 root=AlwaysOn/Ratio）   
-- TraceIdRatioBased(p)：用 traceId 的前 8 bytes 转成整数做阈值比较（跨语言一致）
+- TraceIdRatioBased(p)：用 traceId 的最右 8 bytes 转成整数做阈值比较（跨语言一致）
 
 ### 5.2 SpanProcessor
 做两个：
