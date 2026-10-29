@@ -177,29 +177,20 @@ fn trim_header_ows(value : StringView) -> StringView {
   }
 }
 
-// Parse a non-negative decimal `Content-Length` value. Values that do not fit
-// in an `Int64` are rejected so a hostile header cannot overflow the attribute.
+// Parse a non-negative decimal `Content-Length` value the same way the async
+// HTTP transport does. Values that do not fit in an `Int64` are rejected so a
+// hostile header cannot overflow the attribute.
 
 ///|
 fn parse_content_length(text : StringView) -> Int64? {
-  let len = text.length()
-  if len == 0 {
-    return None
+  let value = try {
+    @string.parse_uint64(text, base=10)
+  } catch {
+    _ => return None
   }
   let max = 9223372036854775807UL
-  let mut value : UInt64 = 0
-  let mut i = 0
-  while i < len {
-    let code = text.unsafe_get(i).to_int()
-    if code < 0x30 || code > 0x39 {
-      return None
-    }
-    let digit = (code - 0x30).to_uint64()
-    if value > (max - digit) / 10UL {
-      return None
-    }
-    value = value * 10UL + digit
-    i = i + 1
+  if value > max {
+    return None
   }
   Some(value.reinterpret_as_int64())
 }
