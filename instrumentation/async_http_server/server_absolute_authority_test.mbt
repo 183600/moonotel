@@ -149,6 +149,7 @@ async test "server strips userinfo from a non-http absolute-form target" {
       data.attributes.get(@sdk.URL_QUERY),
       Some(@sdk.StringValue("q=1")),
     )
+    assert_eq(data.attributes.get(@sdk.URL_SCHEME), Some(@sdk.StringValue("ftp")))
     // Server attributes keep their existing http(s)-absolute-form contract,
     // so the Host header remains the fallback for an unknown scheme.
     assert_eq(

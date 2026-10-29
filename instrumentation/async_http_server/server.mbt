@@ -321,12 +321,14 @@ fn http_absolute_target_scheme_end(path : String) -> Int32? {
   }
 }
 
+// The scheme of the request target. An absolute-form target may carry any URI
+// scheme; origin-form and other targets use the server's HTTP default.
+
 ///|
 fn request_target_scheme(path : String) -> String {
-  if http_absolute_target_scheme_end(path) == Some(8) {
-    "https"
-  } else {
-    "http"
+  match absolute_target_scheme_end(path) {
+    Some(end) => path[:end - 3].to_lower().to_owned()
+    None => "http"
   }
 }
 
