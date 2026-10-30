@@ -137,6 +137,34 @@ test "parse_tracestate_accepts_max_length_member_value" {
 }
 
 ///|
+test "parse_tracestate_accepts_max_length_member_key" {
+  let sb = StringBuilder()
+  sb.write_char('k')
+  for i = 0; i < 255; i = i + 1 {
+    sb.write_char('x')
+  }
+  let key = sb.to_string()
+  let value = key + "=v"
+  assert_eq(@propagation.parse_tracestate(value), Some(value))
+  assert_true(@propagation.Tracestate::parse(value) is Some(_))
+}
+
+///|
+test "parse_tracestate_rejects_overlong_member_key" {
+  let sb = StringBuilder()
+  for i = 0; i < 257; i = i + 1 {
+    sb.write_char('k')
+  }
+  let key = sb.to_string()
+  let value = key + "=v"
+  assert_true(@propagation.parse_tracestate(value) is None)
+  assert_true(@propagation.Tracestate::parse(value) is None)
+  // A mutation with the same overlong key leaves the list unchanged.
+  let parsed = @propagation.Tracestate::parse("a=1").unwrap()
+  assert_eq(parsed.add(key, "v").to_header(), "a=1")
+}
+
+///|
 test "inject_with_tracestate_normalizes_a_valid_override" {
   let carrier = @propagation.TextMapCarrier::new()
   @propagation.inject_with_tracestate(
