@@ -842,25 +842,82 @@ fn build_tracestate_value_char_table() -> FixedArray[Bool] {
   table
 }
 
+// Whether `c` may appear after the first character of a multi-tenant
+// `tenant-id` or `system-id`: the `keychar` set without `@`.
+
+///|
+fn is_tracestate_segment_tail(c : Char) -> Bool {
+  is_tracestate_key_tail(c) && c != '@'
+}
+
 // Validate a `tracestate` key using the Trace Context Level 2 grammar:
-// `key = (lcalpha / DIGIT) 0*255 keychar`, where `keychar` also includes `@`.
+//
+//   key = simple-key / multi-tenant-key
+//   simple-key = (lcalpha / DIGIT) 0*255 keychar
+//   multi-tenant-key = tenant-id "@" system-id
+//   tenant-id = (lcalpha / DIGIT) 0*240 tenant-tail
+//   system-id = lcalpha 0*255 tenant-tail
+//
+// `keychar` includes `@`, so every key up to 256 characters is a simple key.
+// Only a longer key has to be a multi-tenant key, which may be up to 498
+// characters (241-character tenant, `@`, 256-character system).
 
 ///|
 fn is_valid_tracestate_key(key : StringView) -> Bool {
   let len = key.length()
-  if len == 0 || len > 256 {
+  if len == 0 || len > 498 {
     return false
   }
   let first = key.unsafe_get(0).unsafe_to_char()
   if !is_lcalpha(first) && !is_digit_char(first) {
     return false
   }
+  if len <= 256 {
+    let mut i = 1
+    while i < len {
+      if !is_tracestate_key_tail(key.unsafe_get(i).unsafe_to_char()) {
+        return false
+      }
+      i = i + 1
+    }
+    return true
+  }
+  // Longer keys must be multi-tenant keys: exactly one `@`, a tenant-id of at
+  // most 241 characters and a system-id of at most 256 characters.
+  let mut at = -1
   let mut i = 1
   while i < len {
-    if !is_tracestate_key_tail(key.unsafe_get(i).unsafe_to_char()) {
-      return false
+    if key.unsafe_get(i).unsafe_to_char() == '@' {
+      if at >= 0 {
+        return false
+      }
+      at = i
     }
     i = i + 1
+  }
+  if at < 1 || at > 241 {
+    return false
+  }
+  let mut j = 1
+  while j < at {
+    if !is_tracestate_segment_tail(key.unsafe_get(j).unsafe_to_char()) {
+      return false
+    }
+    j = j + 1
+  }
+  let system_len = len - at - 1
+  if system_len < 1 || system_len > 256 {
+    return false
+  }
+  if !is_lcalpha(key.unsafe_get(at + 1).unsafe_to_char()) {
+    return false
+  }
+  let mut k = at + 2
+  while k < len {
+    if !is_tracestate_segment_tail(key.unsafe_get(k).unsafe_to_char()) {
+      return false
+    }
+    k = k + 1
   }
   true
 }
