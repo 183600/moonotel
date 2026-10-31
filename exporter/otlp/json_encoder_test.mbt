@@ -377,6 +377,52 @@ test "json_encoder_groups_by_resource_and_scope" {
 }
 
 ///|
+test "json_encoder_writes_multiple_spans_in_one_scope" {
+  let first : @sdk.SpanData = { ..json_test_span(), name: "one", }
+  let second : @sdk.SpanData = { ..json_test_span(), name: "two", }
+  let root = encode_json([first, second])
+  let resource_spans = json_array_value(json_member(root, "resourceSpans"))
+  assert_eq(resource_spans.length(), 1)
+  let scopes = json_array_value(json_member(resource_spans[0], "scopeSpans"))
+  assert_eq(scopes.length(), 1)
+  let spans = json_array_value(json_member(scopes[0], "spans"))
+  assert_eq(spans.length(), 2)
+  assert_eq(json_string_value(json_member(spans[0], "name")), "one")
+  assert_eq(json_string_value(json_member(spans[1], "name")), "two")
+}
+
+///|
+test "json_encoder_groups_multiple_spans_in_one_scope" {
+  let other_resource : Map[String, @sdk.AttributeValue] = Map([])
+  other_resource.set(@sdk.SERVICE_NAME, @sdk.StringValue("other-service"))
+  let first : @sdk.SpanData = { ..json_test_span(), name: "one", }
+  let second : @sdk.SpanData = { ..json_test_span(), name: "two", }
+  let third : @sdk.SpanData = {
+    ..json_test_span(),
+    name: "three",
+    resource: @sdk.ResourceAttributes::new(other_resource),
+  }
+  let root = encode_json([first, second, third])
+  let resource_spans = json_array_value(json_member(root, "resourceSpans"))
+  assert_eq(resource_spans.length(), 2)
+  let first_scopes = json_array_value(
+    json_member(resource_spans[0], "scopeSpans"),
+  )
+  assert_eq(first_scopes.length(), 1)
+  let first_spans = json_array_value(json_member(first_scopes[0], "spans"))
+  assert_eq(first_spans.length(), 2)
+  assert_eq(json_string_value(json_member(first_spans[0], "name")), "one")
+  assert_eq(json_string_value(json_member(first_spans[1], "name")), "two")
+  let second_scopes = json_array_value(
+    json_member(resource_spans[1], "scopeSpans"),
+  )
+  assert_eq(second_scopes.length(), 1)
+  let second_spans = json_array_value(json_member(second_scopes[0], "spans"))
+  assert_eq(second_spans.length(), 1)
+  assert_eq(json_string_value(json_member(second_spans[0], "name")), "three")
+}
+
+///|
 test "json_encoder_replaces_unpaired_surrogates" {
   let lone_high = String::from_array([(0xD800).unsafe_to_char()])
   let lone_low = String::from_array([(0xDC00).unsafe_to_char()])
