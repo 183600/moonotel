@@ -34,7 +34,7 @@ fn methods_test_tracer(
 }
 
 ///|
-async test "head patch and options use the right methods" {
+async test "head patch options and delete use the right methods" {
   let (tracer, exporter) = methods_test_tracer("client-methods")
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -53,17 +53,24 @@ async test "head patch and options use the right methods" {
     let (head_response, _) = @async_http_client.head(url, tracer~)
     let (patch_response, _) = @async_http_client.patch(url, "payload", tracer~)
     let (options_response, _) = @async_http_client.options(url, tracer~)
+    let (delete_response, _) = @async_http_client.delete(url, tracer~)
     assert_eq(head_response.code, 200)
     assert_eq(patch_response.code, 200)
     assert_eq(options_response.code, 200)
-    assert_eq(methods.val, ["HEAD", "PATCH", "OPTIONS"])
-    assert_eq(exporter.spans.val.length(), 3)
+    assert_eq(delete_response.code, 200)
+    assert_eq(methods.val, ["HEAD", "PATCH", "OPTIONS", "DELETE"])
+    assert_eq(exporter.spans.val.length(), 4)
     assert_eq(exporter.spans.val[0].name, "HEAD")
     assert_eq(exporter.spans.val[1].name, "PATCH")
     assert_eq(exporter.spans.val[2].name, "OPTIONS")
+    assert_eq(exporter.spans.val[3].name, "DELETE")
     assert_eq(
       exporter.spans.val[1].attributes.get(@sdk.HTTP_REQUEST_METHOD),
       Some(@sdk.StringValue("PATCH")),
+    )
+    assert_eq(
+      exporter.spans.val[3].attributes.get(@sdk.HTTP_REQUEST_METHOD),
+      Some(@sdk.StringValue("DELETE")),
     )
   }
 }
