@@ -50,3 +50,23 @@ test "removing_a_key_from_a_baggage_list_hides_outer_values" {
   assert_eq(context.baggage().get("outer"), None)
   assert_eq(context.baggage().get("inner"), Some("2"))
 }
+
+///|
+test "removal_marker_hides_a_key_in_an_outer_baggage_list" {
+  let context = @context.Context::root()
+    .with_baggage_entries([
+      @context.BaggageEntry::new("a", "1"),
+      @context.BaggageEntry::new("b", "2"),
+    ])
+    .without_value("b")
+  assert_eq(context.value("b"), None)
+  assert_eq(context.baggage_entry("b"), None)
+  assert_true(context.has_baggage())
+  let baggage = context.baggage()
+  assert_eq(baggage.length(), 1)
+  assert_eq(baggage.get("a"), Some("1"))
+  assert_eq(baggage.get("b"), None)
+  let entries = context.baggage_entries()
+  assert_eq(entries.length(), 1)
+  assert_eq(entries[0].key, "a")
+}
