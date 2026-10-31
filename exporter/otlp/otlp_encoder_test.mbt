@@ -274,6 +274,84 @@ test "encode_trace_request_groups_scopes" {
 }
 
 ///|
+test "encode_trace_request_groups_interleaved_scopes" {
+  let a1 : @sdk.SpanData = {
+    ..sample_span(),
+    name: "a1",
+    scope_name: "scope-a",
+  }
+  let b1 : @sdk.SpanData = {
+    ..sample_span(),
+    name: "b1",
+    scope_name: "scope-b",
+  }
+  let a2 : @sdk.SpanData = {
+    ..sample_span(),
+    name: "a2",
+    scope_name: "scope-a",
+  }
+  let b2 : @sdk.SpanData = {
+    ..sample_span(),
+    name: "b2",
+    scope_name: "scope-b",
+  }
+  let encoded = @otlp.encode_trace_request([a1, b1, a2, b2])
+  let request = parse_fields(encoded.exact_view())
+  let resource_spans = fields_of(request, 1)
+  assert_eq(resource_spans.length(), 1)
+  let scopes = fields_of(parse_fields(resource_spans[0].payload), 2)
+  assert_eq(scopes.length(), 2)
+  let scope_a = parse_fields(scopes[0].payload)
+  assert_eq(
+    first_of(first_of(scope_a, 1).unwrap().payload |> parse_fields, 1)
+      .unwrap()
+      .payload
+    |> @utf8.decode_lossy,
+    "scope-a",
+  )
+  let scope_a_spans = fields_of(scope_a, 2)
+  assert_eq(scope_a_spans.length(), 2)
+  assert_eq(
+    first_of(parse_fields(scope_a_spans[0].payload), 5)
+      .unwrap()
+      .payload
+    |> @utf8.decode_lossy,
+    "a1",
+  )
+  assert_eq(
+    first_of(parse_fields(scope_a_spans[1].payload), 5)
+      .unwrap()
+      .payload
+    |> @utf8.decode_lossy,
+    "a2",
+  )
+  let scope_b = parse_fields(scopes[1].payload)
+  assert_eq(
+    first_of(first_of(scope_b, 1).unwrap().payload |> parse_fields, 1)
+      .unwrap()
+      .payload
+    |> @utf8.decode_lossy,
+    "scope-b",
+  )
+  let scope_b_spans = fields_of(scope_b, 2)
+  assert_eq(scope_b_spans.length(), 2)
+  assert_eq(
+    first_of(parse_fields(scope_b_spans[0].payload), 5)
+      .unwrap()
+      .payload
+    |> @utf8.decode_lossy,
+    "b1",
+  )
+  assert_eq(
+    first_of(parse_fields(scope_b_spans[1].payload), 5)
+      .unwrap()
+      .payload
+    |> @utf8.decode_lossy,
+    "b2",
+  )
+}
+
+///|
 test "encode_root_span_omits_parent" {
   let span = sample_span()
   let root : @sdk.SpanData = { ..span, parent_span_id: [], }
