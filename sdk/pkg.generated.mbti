@@ -96,6 +96,7 @@ pub fn traces_exporter_enabled(String) -> Bool
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum AttributeValue {
   StringValue(String)
   BoolValue(Bool)
@@ -105,7 +106,7 @@ pub(all) enum AttributeValue {
   BoolArrayValue(Array[Bool])
   IntArrayValue(Array[Int64])
   DoubleArrayValue(Array[Double])
-} derive(Eq, @debug.Debug)
+}
 pub fn AttributeValue::equal(Self, Self) -> Bool
 pub fn AttributeValue::not_equal(Self, Self) -> Bool
 pub fn AttributeValue::to_repr(Self) -> @debug.Repr
@@ -163,10 +164,11 @@ pub fn ConsoleSpanExporter::new() -> Self
 pub fn ConsoleSpanExporter::shutdown(Self) -> Unit
 pub impl SpanExporter for ConsoleSpanExporter
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ExportResult {
   ExportSuccess
   ExportFailure(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn ExportResult::equal(Self, Self) -> Bool
 pub fn ExportResult::is_success(Self) -> Bool
 pub fn ExportResult::not_equal(Self, Self) -> Bool
@@ -277,10 +279,11 @@ pub fn Sampler::should_sample(Self, @api.SpanContext?, Array[Int32]) -> Sampling
 pub fn Sampler::should_sample_parameters(Self, SamplingParameters) -> SamplingDecision
 pub fn Sampler::trace_id_ratio_based(Double) -> Self
 
+#derive(Eq, @debug.Debug)
 pub(all) struct SamplingDecision {
   is_recorded : Bool
   is_sampled : Bool
-} derive(Eq, @debug.Debug)
+}
 pub fn SamplingDecision::equal(Self, Self) -> Bool
 pub fn SamplingDecision::not_equal(Self, Self) -> Bool
 pub fn SamplingDecision::to_repr(Self) -> @debug.Repr

@@ -50,24 +50,26 @@ pub fn SpanContext::tracestate(Self) -> String
 pub fn SpanContext::with_remote(Self, Bool) -> Self
 pub fn SpanContext::with_tracestate(Self, String) -> Self
 
+#derive(Eq, @debug.Debug)
 pub(all) enum SpanKind {
   Internal
   Server
   Client
   Producer
   Consumer
-} derive(Eq, @debug.Debug)
+}
 pub fn SpanKind::equal(Self, Self) -> Bool
 pub fn SpanKind::not_equal(Self, Self) -> Bool
 pub fn SpanKind::otlp_value(Self) -> Int32
 pub fn SpanKind::to_repr(Self) -> @debug.Repr
 pub fn SpanKind::to_string(Self) -> String
 
+#derive(Eq, @debug.Debug)
 pub(all) enum StatusCode {
   Unset
   Ok
   Error
-} derive(Eq, @debug.Debug)
+}
 pub fn StatusCode::equal(Self, Self) -> Bool
 pub fn StatusCode::not_equal(Self, Self) -> Bool
 pub fn StatusCode::otlp_value(Self) -> Int32
