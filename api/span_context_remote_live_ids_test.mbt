@@ -3,12 +3,7 @@
 
 ///|
 fn remote_context_for_live_ids() -> @api.SpanContext {
-  @api.span_context(
-    Array::make(16, 1),
-    Array::make(8, 2),
-    1,
-    is_remote=true,
-  )
+  @api.span_context(Array::make(16, 1), Array::make(8, 2), 1, is_remote=true)
 }
 
 ///|

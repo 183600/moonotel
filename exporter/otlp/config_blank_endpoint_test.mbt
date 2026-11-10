@@ -29,8 +29,5 @@ test "programmatic_endpoints_are_trimmed" {
     traces_endpoint=" http://specific:4318/custom/traces ",
   )
   assert_eq(config.endpoint, "http://generic:4318")
-  assert_eq(
-    config.traces_url(),
-    "http://specific:4318/custom/traces",
-  )
+  assert_eq(config.traces_url(), "http://specific:4318/custom/traces")
 }

@@ -33,28 +33,17 @@ test "http_date_parser_accepts_asctime_dates" {
 test "http_date_parser_rejects_malformed_obsolete_dates" {
   let cases : Array[String] = [
     // Invalid day in the month.
-    "Sunday, 31-Feb-24 00:00:00 GMT",
-    "Sun Nov 32 08:49:37 1994",
-    "Sun Nov  0 08:49:37 1994",
+    "Sunday, 31-Feb-24 00:00:00 GMT", "Sun Nov 32 08:49:37 1994", "Sun Nov  0 08:49:37 1994",
     // Invalid time of day.
-    "Sunday, 06-Nov-94 24:00:00 GMT",
-    "Sun Nov  6 00:60:00 1994",
+     "Sunday, 06-Nov-94 24:00:00 GMT", "Sun Nov  6 00:60:00 1994",
     // Unknown weekday or month.
-    "Xxx, 06-Nov-94 08:49:37 GMT",
-    "Sunday, 06-Xxx-94 08:49:37 GMT",
-    "Xxx Nov  6 08:49:37 1994",
+     "Xxx, 06-Nov-94 08:49:37 GMT", "Sunday, 06-Xxx-94 08:49:37 GMT", "Xxx Nov  6 08:49:37 1994",
     // Wrong zone or separators.
-    "Sunday, 06-Nov-94 08:49:37 UTC",
-    "Sunday, 06-Nov-94 08:49:37 GMT ",
-    "Sunday 06-Nov-94 08:49:37 GMT",
+     "Sunday, 06-Nov-94 08:49:37 UTC", "Sunday, 06-Nov-94 08:49:37 GMT ", "Sunday 06-Nov-94 08:49:37 GMT",
     // RFC 850 requires a space after the comma, not any other character.
-    "Sunday,X06-Nov-94 08:49:37 GMT",
-    "Sunday,\t06-Nov-94 08:49:37 GMT",
-    "Sun Nov  6 08:49:37 1994 ",
+     "Sunday,X06-Nov-94 08:49:37 GMT", "Sunday,\t06-Nov-94 08:49:37 GMT", "Sun Nov  6 08:49:37 1994 ",
     // Truncated forms must not be accepted.
-    "Sunday, 06-Nov-94 08:49:37",
-    "Sun Nov 6 08:49:37 1994",
-    "Sun Nov  6 08:49:37 194",
+     "Sunday, 06-Nov-94 08:49:37", "Sun Nov 6 08:49:37 1994", "Sun Nov  6 08:49:37 194",
   ]
   for value in cases {
     assert_eq(parse_retry_after_date_seconds(value[:]), None)
@@ -67,17 +56,11 @@ test "retry_after_millis_accepts_obsolete_http_dates" {
   assert_eq(retry_after_millis("Sunday, 06-Nov-94 08:49:37 GMT"), Some(0))
   assert_eq(retry_after_millis("Sun Nov  6 08:49:37 1994"), Some(0))
   // A far-future date is capped like an oversized delta-seconds value.
-  assert_eq(
-    retry_after_millis("Friday, 31-Dec-69 23:59:59 GMT"),
-    Some(60000),
-  )
+  assert_eq(retry_after_millis("Friday, 31-Dec-69 23:59:59 GMT"), Some(60000))
   assert_eq(retry_after_millis("Fri Dec 31 23:59:59 9999"), Some(60000))
   assert_eq(retry_after_millis("Sunday, 31-Feb-24 00:00:00 GMT"), None)
   // A malformed RFC 850 separator must fall back to the retry backoff.
-  assert_eq(
-    retry_after_millis("Sunday,X06-Nov-94 08:49:37 GMT"),
-    None,
-  )
+  assert_eq(retry_after_millis("Sunday,X06-Nov-94 08:49:37 GMT"), None)
 }
 
 ///|
@@ -114,8 +97,6 @@ test "rfc850_compares_the_full_timestamp_to_the_fifty_year_window" {
   // year than today, so the timestamp is more than 50 years in the future and
   // RFC 9110 requires resolving it to the most recent past year.
   let future_year = current_utc_year() + 50
-  let value = "Sunday, 31-Dec-" +
-    two_digit_year(future_year) +
-    " 23:59:59 GMT"
+  let value = "Sunday, 31-Dec-" + two_digit_year(future_year) + " 23:59:59 GMT"
   assert_eq(retry_after_millis(value), Some(0))
 }

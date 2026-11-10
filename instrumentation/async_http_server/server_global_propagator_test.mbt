@@ -13,8 +13,7 @@ fn server_global_propagator_parent() -> @api.SpanContext {
 test "extract_context honors an installed global propagator" {
   @propagation.reset_global_propagator()
   defer @propagation.reset_global_propagator()
-  let none : &@propagation.TextMapPropagator = @propagation.CompositePropagator::new(
-    [],
+  let none : &@propagation.TextMapPropagator = @propagation.CompositePropagator::new([],
   )
   @propagation.set_global_propagator(none)
   let headers : Map[@http.CaseInsensitiveString, String] = Map([])

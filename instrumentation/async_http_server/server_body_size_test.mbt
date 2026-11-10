@@ -86,7 +86,9 @@ async test "server span omits the response body size without a body" {
 
 ///|
 async test "server span omits the response body size for an explicitly empty body" {
-  let (tracer, exporter) = body_size_server_tracer("server-body-size-empty-string")
+  let (tracer, exporter) = body_size_server_tracer(
+    "server-body-size-empty-string",
+  )
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
@@ -126,7 +128,10 @@ async test "server suppresses a response body for reset-content responses" {
     @async.sleep(50)
     assert_eq(exporter.spans.val.length(), 1)
     let data = exporter.spans.val[0]
-    assert_eq(data.attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE), Some(@sdk.IntValue(205)))
+    assert_eq(
+      data.attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE),
+      Some(@sdk.IntValue(205)),
+    )
     assert_eq(data.attributes.get(@sdk.HTTP_RESPONSE_BODY_SIZE), None)
   }
 }
@@ -152,7 +157,10 @@ async test "server suppresses a response body for HEAD requests" {
     @async.sleep(50)
     assert_eq(exporter.spans.val.length(), 1)
     let data = exporter.spans.val[0]
-    assert_eq(data.attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE), Some(@sdk.IntValue(200)))
+    assert_eq(
+      data.attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE),
+      Some(@sdk.IntValue(200)),
+    )
     assert_eq(data.attributes.get(@sdk.HTTP_RESPONSE_BODY_SIZE), None)
     assert_eq(data.status, @api.StatusCode::Unset)
   }
@@ -177,7 +185,10 @@ async test "server suppresses a response body for no-content responses" {
     @async.sleep(50)
     assert_eq(exporter.spans.val.length(), 1)
     let data = exporter.spans.val[0]
-    assert_eq(data.attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE), Some(@sdk.IntValue(204)))
+    assert_eq(
+      data.attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE),
+      Some(@sdk.IntValue(204)),
+    )
     assert_eq(data.attributes.get(@sdk.HTTP_RESPONSE_BODY_SIZE), None)
     assert_eq(data.status, @api.StatusCode::Unset)
   }
@@ -221,18 +232,18 @@ async test "server records the status when the client aborts the response body" 
 
 ///|
 async test "server suppresses a 205 body even with an explicit content-length" {
-  let (tracer, exporter) = body_size_server_tracer("server-reset-content-explicit-length")
+  let (tracer, exporter) = body_size_server_tracer(
+    "server-reset-content-explicit-length",
+  )
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
       @async_http_server.run_server_on(
         server,
-        call => call.respond(
-          205,
-          body="ignored",
-          headers={ "Content-Length": "7" },
-        ),
+        call => {
+          call.respond(205, body="ignored", headers={ "Content-Length": "7" })
+        },
         tracer~,
       )
     }
@@ -242,7 +253,10 @@ async test "server suppresses a 205 body even with an explicit content-length" {
     @async.sleep(50)
     assert_eq(exporter.spans.val.length(), 1)
     let data = exporter.spans.val[0]
-    assert_eq(data.attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE), Some(@sdk.IntValue(205)))
+    assert_eq(
+      data.attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE),
+      Some(@sdk.IntValue(205)),
+    )
     assert_eq(data.attributes.get(@sdk.HTTP_RESPONSE_BODY_SIZE), None)
   }
 }

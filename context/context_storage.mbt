@@ -42,6 +42,8 @@ let storage : Ref[ContextStorage] = Ref({
 // distinguishable tokens; remembering the backend here lets `detach` restore
 // through that backend even if `set_context_storage` swapped the process-wide
 // backend in between (the same hazard `with_context` guards against).
+
+///|
 let pending_attachments : Array[(Context, ContextStorage)] = []
 
 // Replace the storage backend and return the previous one (pass it back to
@@ -75,7 +77,7 @@ pub fn attach(context : Context) -> Context {
   // that both currently hold `Context::root()`), so matching on the value
   // alone would route `detach` through the wrong backend. `physical_equal`
   // identifies the exact attachment returned by this call.
-  let token = { ..previous }
+  let token = { ..previous, }
   pending_attachments.push((token, backend))
   token
 }

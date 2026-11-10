@@ -136,11 +136,9 @@ test "format_baggage_entries_emits_at_most_64_members" {
   let mut i = 0
   while i < 100 {
     entries.push(
-      @propagation.BaggageEntry::new(
-        "k" + i.to_string(),
-        i.to_string(),
-        properties=[("p", "v")],
-      ),
+      @propagation.BaggageEntry::new("k" + i.to_string(), i.to_string(), properties=[
+        ("p", "v"),
+      ]),
     )
     i = i + 1
   }

@@ -5,7 +5,9 @@
 ///|
 test "attribute_truncation_drops_an_unpaired_low_surrogate" {
   let exporter = @sdk.InMemorySpanExporter::new()
-  let provider = @sdk.TracerProviderSdk::new(service_name="surrogate-truncation")
+  let provider = @sdk.TracerProviderSdk::new(
+      service_name="surrogate-truncation",
+    )
     .with_span_limits(@sdk.SpanLimits::new(attribute_value_length_limit=2))
     .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
     .with_sampler(@sdk.Sampler::always_on())

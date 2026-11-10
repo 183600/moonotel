@@ -19,9 +19,7 @@ pub impl @sdk.SpanExporter for BodyErrorStatusExporter with fn export_spans(
 }
 
 ///|
-pub impl @sdk.SpanExporter for BodyErrorStatusExporter with fn shutdown(
-  self,
-) {
+pub impl @sdk.SpanExporter for BodyErrorStatusExporter with fn shutdown(self) {
   let _ = self
 }
 

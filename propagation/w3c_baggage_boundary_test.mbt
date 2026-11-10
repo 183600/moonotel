@@ -64,11 +64,9 @@ test "general_baggage_formatter_respects_the_byte_budget_with_properties" {
   let mut i = 0
   while i < 40 {
     entries.push(
-      @propagation.BaggageEntry::new(
-        "k" + i.to_string(),
-        value,
-        properties=[("p", "v")],
-      ),
+      @propagation.BaggageEntry::new("k" + i.to_string(), value, properties=[
+        ("p", "v"),
+      ]),
     )
     i = i + 1
   }
@@ -99,13 +97,10 @@ test "future_traceparent_rejects_a_non_ascii_id" {
 test "trace_context_propagator_inject_clears_stale_headers_for_an_invalid_span" {
   let carrier = @propagation.TextMapCarrier::new()
   carrier.set(
-    "traceparent",
-    "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01",
+    "traceparent", "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01",
   )
   carrier.set("tracestate", "vendor=value")
-  let context = @context.Context::root().with_span(
-    @api.invalid_span_context(),
-  )
+  let context = @context.Context::root().with_span(@api.invalid_span_context())
   @propagation.TraceContextPropagator::new().inject(context, carrier)
   assert_true(carrier.get("traceparent") is None)
   assert_true(carrier.get("tracestate") is None)

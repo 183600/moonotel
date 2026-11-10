@@ -14,8 +14,5 @@ test "request_headers_drop_configured_body_framing" {
   let headers = request_headers(config, false)
   assert_eq(headers.get(@http.CaseInsensitiveString("content-length")), None)
   assert_eq(headers.get(@http.CaseInsensitiveString("transfer-encoding")), None)
-  assert_eq(
-    headers.get(@http.CaseInsensitiveString("x-custom")),
-    Some("kept"),
-  )
+  assert_eq(headers.get(@http.CaseInsensitiveString("x-custom")), Some("kept"))
 }

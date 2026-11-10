@@ -54,9 +54,9 @@ test "a_removal_hides_an_outer_entry_with_the_same_key" {
   let base = @context.Context::root().with_baggage_entries([
     @context.BaggageEntry::new("a", "outer"),
   ])
-  let context = base.without_value("a").with_baggage_entries([
-    @context.BaggageEntry::new("b", "inner"),
-  ])
+  let context = base
+    .without_value("a")
+    .with_baggage_entries([@context.BaggageEntry::new("b", "inner")])
   let entries = context.baggage_entries()
   assert_eq(entries.length(), 1)
   assert_eq(entries[0].key, "b")

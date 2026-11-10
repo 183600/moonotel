@@ -7,7 +7,7 @@ enum ProbeOp {
 }
 
 ///|
-fn probe_props(seed : Int) -> Array[(String, String)] {
+fn probe_props(seed : Int32) -> Array[(String, String)] {
   if seed % 3 == 0 {
     [("p", "1")]
   } else if seed % 3 == 1 {
@@ -43,8 +43,8 @@ test "context baggage semantics" {
   while step < 4000 {
     seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
     let kind = seed % 4
-    let key = keys[(seed / 7) % 4]
-    let value = values[(seed / 13) % 4]
+    let key = keys[seed / 7 % 4]
+    let value = values[seed / 13 % 4]
     if kind == 0 {
       ctx = ctx.with_value(key, value)
       model.push(V(key, value))
@@ -59,7 +59,7 @@ test "context baggage semantics" {
       let pairs : Array[(String, String)] = []
       let map : Map[String, String] = Map([])
       for k in keys {
-        if (seed / (11 + k.length())) % 2 == 0 {
+        if seed / (11 + k.length()) % 2 == 0 {
           map.set(k, "m" + k)
           pairs.push((k, "m" + k))
         }

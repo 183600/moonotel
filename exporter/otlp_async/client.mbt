@@ -22,7 +22,7 @@ fn is_retryable_status(status_code : Int32) -> Bool {
 }
 
 ///|
-fn map_capacity_for_entries(entries : Int) -> Int {
+fn map_capacity_for_entries(entries : Int32) -> Int32 {
   let capacity = entries.next_power_of_two()
   if entries > capacity * 13 / 16 {
     capacity * 2
@@ -61,6 +61,8 @@ fn is_gzip_compression(compression : String) -> Bool {
 // back to `http/protobuf`, matching `OtlpHttpConfig::new` and the sync
 // exporter even when the config was built directly instead of with the
 // constructor.
+
+///|
 fn effective_protocol(protocol : String) -> String {
   let normalized = normalize_enum(protocol)
   if normalized == "" {
@@ -72,6 +74,8 @@ fn effective_protocol(protocol : String) -> String {
 
 // The compression actually used for an export. A blank programmatic value
 // means `none`; any other unsupported value is rejected by the caller.
+
+///|
 fn effective_compression(compression : String) -> String {
   let normalized = normalize_enum(compression)
   if normalized == "" {
@@ -215,6 +219,8 @@ fn days_in_month(year : Int32, month : Int32) -> Int32 {
 }
 
 // Whether the three-letter weekday abbreviation at `name` is a valid day name.
+
+///|
 fn is_short_weekday(name : StringView) -> Bool {
   name == "Mon" ||
   name == "Tue" ||
@@ -318,8 +324,7 @@ fn is_more_than_fifty_years_future(
   minute : Int32,
   second : Int32,
 ) -> Bool {
-  let (now_year, now_month, now_day, now_hour, now_minute, now_second) =
-    current_utc_datetime()
+  let (now_year, now_month, now_day, now_hour, now_minute, now_second) = current_utc_datetime()
   let cutoff_year = now_year + 50
   if year > cutoff_year {
     return true
@@ -432,8 +437,7 @@ fn parse_rfc850_date_seconds(value : StringView) -> Int64? {
     None => return None
   }
   // RFC 850 requires exactly `", "` between the weekday and the date.
-  if comma + 1 >= value.length() ||
-    value.unsafe_get(comma + 1).to_int() != 0x20 {
+  if comma + 1 >= value.length() || value.unsafe_get(comma + 1).to_int() != 0x20 {
     return None
   }
   if !is_full_weekday(value.clamped_view(start=0, end=comma)) &&
@@ -647,15 +651,21 @@ fn retry_after_millis(value : String) -> Int32? {
 // jittered backoff is used otherwise.
 
 // Base delay of the exponential retry backoff, in milliseconds.
+
+///|
 const RETRY_BASE_DELAY_MILLIS : Int32 = 100
 
 // Upper bound of the fallback retry delay, in milliseconds. A cap keeps a
 // server that stays unavailable from stalling shutdown for an unbounded time.
+
+///|
 const RETRY_MAX_DELAY_MILLIS : Int32 = 5000
 
 // Milliseconds left before an overall export deadline. The result is clamped
 // to zero once the deadline has passed and to the `Int32` range accepted by
 // `@async.with_timeout` if the wall clock jumps backwards.
+
+///|
 fn remaining_timeout_millis(deadline : UInt64) -> Int32 {
   let now = @env.now()
   if now >= deadline {
@@ -674,11 +684,15 @@ fn remaining_timeout_millis(deadline : UInt64) -> Int32 {
 // (or before an attempt can start). The last attempt error, when there is one,
 // is kept so the caller can see whether the budget was consumed by a timeout
 // or by a retryable HTTP response.
+
+///|
 fn export_timeout_failure(last_failure : String) -> @sdk.ExportResult {
   if last_failure == "" {
     @sdk.ExportFailure("OTLP export timed out")
   } else {
-    @sdk.ExportFailure("OTLP export timed out (last error: " + last_failure + ")")
+    @sdk.ExportFailure(
+      "OTLP export timed out (last error: " + last_failure + ")",
+    )
   }
 }
 
@@ -687,6 +701,8 @@ fn export_timeout_failure(last_failure : String) -> @sdk.ExportResult {
 // exponential backoff with jitter, so the delay doubles from 100ms up to a 5s
 // cap. The deterministic +/-20% jitter avoids a synchronized retry wave from
 // many exporters while keeping tests reproducible.
+
+///|
 fn retry_backoff_millis(attempt : Int32) -> Int32 {
   let attempt = if attempt < 1 { 1 } else { attempt }
   let mut base = RETRY_BASE_DELAY_MILLIS
@@ -701,7 +717,7 @@ fn retry_backoff_millis(attempt : Int32) -> Int32 {
   // Clamp the jitter input as well: a very large retry count must not overflow
   // the multiplication used to derive the deterministic jitter.
   let jitter_attempt = if attempt > 1000 { 1000 } else { attempt }
-  let jitter_percent = (jitter_attempt * 37) % 41 - 20
+  let jitter_percent = jitter_attempt * 37 % 41 - 20
   let delay = base + base * jitter_percent / 100
   let delay = if delay > RETRY_MAX_DELAY_MILLIS {
     RETRY_MAX_DELAY_MILLIS
@@ -723,11 +739,7 @@ async fn post_trace_request_with_headers(
 ) -> @sdk.ExportResult {
   let json = is_json_protocol(config.protocol)
   let url = config.request_url()
-  let max_retries = if config.max_retries < 0 {
-    0
-  } else {
-    config.max_retries
-  }
+  let max_retries = if config.max_retries < 0 { 0 } else { config.max_retries }
   let timeout = config.effective_timeout_millis()
   // The OTLP exporter timeout is one overall budget for the whole export: it
   // covers every request attempt and every wait between retries and is never
@@ -787,10 +799,9 @@ async fn post_trace_request_with_headers(
     let outcome = try {
       if attempt_timeout > 0 {
         Some(
-          @async.with_timeout(
-            attempt_timeout,
-            () => @http.post(url, body, headers=request_headers),
-          ),
+          @async.with_timeout(attempt_timeout, () => {
+            @http.post(url, body, headers=request_headers)
+          }),
         )
       } else {
         Some(@http.post(url, body, headers=request_headers))
@@ -869,7 +880,9 @@ pub async fn post_trace_request(
 
 ///|
 async fn gzip_body(body : Bytes) -> Bytes? {
-  Some(gzip_compress(body)) catch { _ => None }
+  Some(gzip_compress(body)) catch {
+    _ => None
+  }
 }
 
 // Encode and export the given spans over OTLP/HTTP, using the encoding
@@ -927,13 +940,10 @@ pub fn OtlpHttpAsyncExporter::new(
   // Snapshot the header map so that mutating the caller's config after
   // construction cannot change the exporter's configuration or its cached
   // request headers.
-  let config = { ..config, headers: config.headers.copy() }
+  let config = { ..config, headers: config.headers.copy(), }
   {
     config,
-    headers: request_headers(
-      config,
-      is_gzip_compression(config.compression),
-    ),
+    headers: request_headers(config, is_gzip_compression(config.compression)),
   }
 }
 
@@ -944,7 +954,7 @@ pub fn OtlpHttpAsyncExporter::new(
 pub fn OtlpHttpAsyncExporter::config(
   self : OtlpHttpAsyncExporter,
 ) -> @otlp.OtlpHttpConfig {
-  { ..self.config, headers: self.config.headers.copy() }
+  { ..self.config, headers: self.config.headers.copy(), }
 }
 
 // Export a batch of finished spans.

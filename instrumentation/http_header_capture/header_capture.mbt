@@ -46,7 +46,7 @@ pub fn HeaderCapture::parse(spec : String) -> HeaderCapture {
       names.set(name, true)
     }
   }
-  { capture_all, names }
+  { capture_all, names, }
 }
 
 // Last parsed configuration per environment variable. The raw value is
@@ -128,7 +128,7 @@ fn trim_header_ows(value : StringView) -> StringView {
     }
     end = end - 1
   }
-  value.clamped_view(start=start, end=end)
+  value.clamped_view(start~, end~)
 }
 
 ///|

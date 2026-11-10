@@ -42,10 +42,7 @@ test "direct_config_blank_protocol_and_compression_use_defaults" {
   assert_true(result.is_success())
   assert_eq(mock.urls.length(), 1)
   assert_eq(mock.urls[0], "http://collector:4318/v1/traces")
-  assert_eq(
-    mock.headers[0].get("content-type"),
-    Some("application/x-protobuf"),
-  )
+  assert_eq(mock.headers[0].get("content-type"), Some("application/x-protobuf"))
   assert_eq(mock.headers[0].get("accept"), Some("application/x-protobuf"))
 }
 

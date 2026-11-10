@@ -50,7 +50,7 @@ fn failure_test_span(name : String) -> @sdk.SpanData {
 
 ///|
 test "simple_span_processor_counts_failed_exports" {
-  let exporter : FailingExportCounter = { calls: 0 }
+  let exporter : FailingExportCounter = { calls: 0, }
   let processor = @sdk.SimpleSpanProcessor::new(exporter)
   processor.on_end(failure_test_span("first"))
   assert_eq(exporter.calls, 1)
@@ -67,7 +67,7 @@ test "simple_span_processor_counts_failed_exports" {
 
 ///|
 test "batch_span_processor_counts_failed_exports" {
-  let exporter : FailingExportCounter = { calls: 0 }
+  let exporter : FailingExportCounter = { calls: 0, }
   let processor = @sdk.BatchSpanProcessor::new(
     exporter,
     max_queue_size=4,

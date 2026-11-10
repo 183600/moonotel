@@ -4,10 +4,7 @@
 
 ///|
 test "general_baggage_parser_trims_ows_after_equals" {
-  assert_eq(@propagation.parse_baggage("a= 1 , b = 2"), [
-    ("a", "1"),
-    ("b", "2"),
-  ])
+  assert_eq(@propagation.parse_baggage("a= 1 , b = 2"), [("a", "1"), ("b", "2")])
   let entries = @propagation.parse_baggage_entries("a= v ; p = q ")
   assert_eq(entries.length(), 1)
   assert_eq(entries[0].value, "v")

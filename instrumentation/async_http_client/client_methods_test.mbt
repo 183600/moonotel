@@ -109,10 +109,7 @@ async test "trace and connect use the right methods" {
       exporter.spans.val[1].attributes.get(@sdk.HTTP_REQUEST_METHOD),
       Some(@sdk.StringValue("CONNECT")),
     )
-    assert_eq(
-      exporter.spans.val[1].status,
-      @api.StatusCode::Error,
-    )
+    assert_eq(exporter.spans.val[1].status, @api.StatusCode::Error)
   }
 }
 

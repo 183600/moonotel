@@ -9,7 +9,7 @@ fn short_id_context() -> @api.SpanContext {
 
 ///|
 fn short_id_span(name : String) -> @sdk.SpanData {
-  { ..sample_span(), name, span_context: short_id_context() }
+  { ..sample_span(), name, span_context: short_id_context(), }
 }
 
 ///|
@@ -41,7 +41,7 @@ test "encoders_skip_spans_whose_ids_were_zeroed_after_construction" {
     trace_id[i] = 0
   }
   assert_true(context.is_valid())
-  let span = { ..sample_span(), name: "zeroed", span_context: context }
+  let span = { ..sample_span(), name: "zeroed", span_context: context, }
   assert_eq(@otlp.encode_trace_request([span]), b"")
   assert_eq(@otlp.encode_trace_request_json([span]), b"")
 }
@@ -52,7 +52,7 @@ test "encoders_skip_spans_whose_ids_were_shortened_after_construction" {
   context.trace_id_view().clear()
   context.trace_id_view().push(1)
   assert_false(context.is_valid())
-  let span = { ..sample_span(), name: "shortened", span_context: context }
+  let span = { ..sample_span(), name: "shortened", span_context: context, }
   assert_eq(@otlp.encode_trace_request([span]), b"")
   assert_eq(@otlp.encode_trace_request_json([span]), b"")
 }

@@ -3,7 +3,7 @@
 // of whether they contain `@`.
 
 ///|
-fn repeated_char(c : Char, count : Int) -> String {
+fn repeated_char(c : Char, count : Int32) -> String {
   let sb = StringBuilder(size_hint=count * 2)
   for i = 0; i < count; i = i + 1 {
     sb.write_char(c)

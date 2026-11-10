@@ -69,10 +69,7 @@ test "ended_span_collection_accessors_read_the_export_snapshot" {
   span.end()
   // The mutable collections were moved into the export snapshot; the public
   // accessors must keep reporting them.
-  assert_eq(
-    span.attributes().get("attr"),
-    Some(@sdk.StringValue("value")),
-  )
+  assert_eq(span.attributes().get("attr"), Some(@sdk.StringValue("value")))
   assert_eq(span.events().length(), 1)
   assert_eq(span.events()[0].name, "event")
   assert_eq(span.links().length(), 1)
@@ -88,9 +85,7 @@ test "negative_value_length_limit_keeps_values_intact" {
     .with_sampler(@sdk.Sampler::always_on())
     .with_span_limits(@sdk.SpanLimits::new(attribute_value_length_limit=-1))
     .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
-  let span = provider
-    .get_tracer("negative-value-limit")
-    .start_root_span("op")
+  let span = provider.get_tracer("negative-value-limit").start_root_span("op")
   span.set_attribute("long", @sdk.StringValue("abcdef"))
   span.end()
   assert_eq(
@@ -109,9 +104,7 @@ test "truncation_drops_a_trailing_unpaired_high_surrogate" {
     .with_span_limits(@sdk.SpanLimits::new(attribute_value_length_limit=2))
     .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
   let high = String::from_array([(0xD800).unsafe_to_char()])
-  let span = provider
-    .get_tracer("surrogate-truncation")
-    .start_root_span("op")
+  let span = provider.get_tracer("surrogate-truncation").start_root_span("op")
   // The cut would land right after the lone high surrogate; it is dropped so
   // the recorded value never contains half of a surrogate pair.
   span.set_attribute("value", @sdk.StringValue("a" + high + "b"))

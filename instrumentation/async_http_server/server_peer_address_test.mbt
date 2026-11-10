@@ -25,15 +25,12 @@ pub impl @sdk.SpanExporter for PeerAddressRecordingExporter with fn shutdown(
 }
 
 ///|
-fn peer_address_setup() -> (
-  PeerAddressRecordingExporter,
-  @sdk.Tracer
-) {
+fn peer_address_setup() -> (PeerAddressRecordingExporter, @sdk.Tracer) {
   let exporter : PeerAddressRecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
-  let provider = @sdk.TracerProviderSdk::new(
-    service_name="peer-address-test",
-  ).with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="peer-address-test").with_span_processor(
+    processor,
+  )
   (exporter, provider.get_tracer("peer-address-test"))
 }
 
@@ -46,9 +43,7 @@ async test "run_server_with_client_address records client.address and client.por
     group.spawn_bg(no_wait=true) <| () => {
       @async_http_server.run_server_with_client_address_on(
         server,
-        call => {
-          call.respond(200, body="ok")
-        },
+        call => call.respond(200, body="ok"),
         tracer~,
       )
     }
@@ -95,9 +90,7 @@ async test "run_server_with_client_address keeps the connection for a second req
     group.spawn_bg(no_wait=true) <| () => {
       @async_http_server.run_server_with_client_address_on(
         server,
-        call => {
-          call.respond(200, body="ok")
-        },
+        call => call.respond(200, body="ok"),
         tracer~,
       )
     }
@@ -125,9 +118,7 @@ async test "run_server_with_client_address keeps the connection for a second req
 ///|
 async test "run_server_with_client_address records IPv6 client addresses" {
   // IPv6 loopback may be unavailable; skip the test in that case.
-  let server_opt = try {
-    Some(@socket.TcpServer(@socket.Addr::parse("[::1]:0")))
-  } catch {
+  let server_opt = Some(@socket.TcpServer(@socket.Addr::parse("[::1]:0"))) catch {
     _ => None
   }
   match server_opt {
@@ -139,9 +130,7 @@ async test "run_server_with_client_address records IPv6 client addresses" {
         group.spawn_bg(no_wait=true) <| () => {
           @async_http_server.run_server_with_client_address_on(
             server,
-            call => {
-              call.respond(200, body="ok")
-            },
+            call => call.respond(200, body="ok"),
             tracer~,
           )
         }
@@ -183,7 +172,9 @@ async test "run_server_with_client_address closes connections left unanswered" {
     let connection = @socket.Tcp::connect(
       @socket.Addr::parse("127.0.0.1:\{port}"),
     )
-    connection.write("GET /unanswered HTTP/1.1\r\nHost: 127.0.0.1:\{port}\r\n\r\n")
+    connection.write(
+      "GET /unanswered HTTP/1.1\r\nHost: 127.0.0.1:\{port}\r\n\r\n",
+    )
     // The server closes the connection because the handler sent no response.
     let _ = connection.read_all()
     connection.close()

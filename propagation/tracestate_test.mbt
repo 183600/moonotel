@@ -116,8 +116,8 @@ test "parse_preserves_blanks_after_equals" {
   assert_eq(ts.add("z", " v").to_header(), "z= v,b= v")
   assert_eq(
     @propagation.Tracestate::parse(ts.add("z", " v").to_header())
-      .unwrap()
-      .get("z"),
+    .unwrap()
+    .get("z"),
     Some(" v"),
   )
 }

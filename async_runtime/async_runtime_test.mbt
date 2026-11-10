@@ -111,10 +111,12 @@ async test "queue overflow evicts real batches and ignores empty batches" {
       group,
       max_queue_size=1,
     )
-    let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
-    let provider = @sdk.TracerProviderSdk::new(
-      service_name="queue-overflow",
-    ).with_span_processor(processor)
+    let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
+      exporter,
+    )
+    let provider = @sdk.TracerProviderSdk::new(service_name="queue-overflow").with_span_processor(
+      processor,
+    )
     let tracer = provider.get_tracer("queue-overflow")
     // An empty export is a successful no-op and never takes the only slot.
     assert_true(exporter.export_spans([]).is_success())

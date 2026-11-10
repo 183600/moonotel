@@ -18,13 +18,14 @@ test "parse_rejects_non_hex_version" {
 ///|
 test "parse_traceparent_trims_ows" {
   let inner = "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01"
-  for padded in [
-    " " + inner,
-    "\t" + inner,
-    inner + " ",
-    inner + "\t",
-    "\t " + inner + " \t",
-  ] {
+  for
+    padded in [
+      " " + inner,
+      "\t" + inner,
+      inner + " ",
+      inner + "\t",
+      "\t " + inner + " \t",
+    ] {
     let parsed = @propagation.parse_traceparent(padded)
     assert_true(parsed is Some(_))
     let sc = parsed.unwrap()
@@ -34,7 +35,9 @@ test "parse_traceparent_trims_ows" {
   }
   // OWS only trims at the edges; internal whitespace stays invalid.
   assert_true(
-    @propagation.parse_traceparent("00 -4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01")
+    @propagation.parse_traceparent(
+      "00 -4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01",
+    )
     is None,
   )
 }
@@ -78,7 +81,9 @@ test "inject_without_tracestate_writes_no_tracestate_header" {
 test "inject_with_tracestate_skips_invalid_span_context" {
   let carrier = @propagation.TextMapCarrier::new()
   @propagation.inject_with_tracestate(
-    @api.invalid_span_context(), Some("a=1"), carrier,
+    @api.invalid_span_context(),
+    Some("a=1"),
+    carrier,
   )
   assert_eq(carrier.length(), 0)
 }
@@ -168,7 +173,9 @@ test "parse_tracestate_rejects_overlong_member_key" {
 test "inject_with_tracestate_normalizes_a_valid_override" {
   let carrier = @propagation.TextMapCarrier::new()
   @propagation.inject_with_tracestate(
-    w3c_edge_context(), Some(" a=1 , b=2 "), carrier,
+    w3c_edge_context(),
+    Some(" a=1 , b=2 "),
+    carrier,
   )
   assert_eq(@propagation.extract_tracestate(carrier), Some("a=1,b=2"))
 }
@@ -177,7 +184,9 @@ test "inject_with_tracestate_normalizes_a_valid_override" {
 test "inject_with_tracestate_drops_an_invalid_override" {
   let carrier = @propagation.TextMapCarrier::new()
   @propagation.inject_with_tracestate(
-    w3c_edge_context(), Some("not a valid state"), carrier,
+    w3c_edge_context(),
+    Some("not a valid state"),
+    carrier,
   )
   assert_true(carrier.get(@propagation.traceparent_header_name()) is Some(_))
   assert_eq(@propagation.extract_tracestate(carrier), None)

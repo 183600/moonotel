@@ -62,21 +62,16 @@ pub impl @sdk.SpanProcessor for StartAttributeProcessor with fn force_flush(
 }
 
 ///|
-pub impl @sdk.SpanProcessor for StartAttributeProcessor with fn shutdown(
-  self,
-) {
+pub impl @sdk.SpanProcessor for StartAttributeProcessor with fn shutdown(self) {
   let _ = self
 }
 
 ///|
 test "on_start_sees_initial_attributes" {
-  let processor : StartAttributeProcessor = {
-    seen: false,
-    saw_initial: false,
-  }
-  let provider = @sdk.TracerProviderSdk::new(
-    service_name="svc",
-  ).with_span_processor(processor)
+  let processor : StartAttributeProcessor = { seen: false, saw_initial: false, }
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc").with_span_processor(
+    processor,
+  )
   let attributes : Map[String, @sdk.AttributeValue] = Map([
     ("initial", @sdk.StringValue("yes")),
   ])

@@ -58,12 +58,7 @@ fn multi_drain_once_processor(
   log : Ref[Array[String]],
   reenter? : Bool,
 ) -> MultiDrainOnceProcessor {
-  {
-    name,
-    log,
-    multi: Ref(None),
-    reenter: reenter.unwrap_or(false),
-  }
+  { name, log, multi: Ref(None), reenter: reenter.unwrap_or(false), }
 }
 
 ///|
@@ -73,13 +68,11 @@ test "provider shutdown drains multi children once before shutting them down" {
     multi_drain_once_processor("a", log),
     multi_drain_once_processor("b", log),
   ])
-  let provider = @sdk.TracerProviderSdk::new(
-    service_name="multi-drain-once",
-  ).with_span_processor(multi)
+  let provider = @sdk.TracerProviderSdk::new(service_name="multi-drain-once").with_span_processor(
+    multi,
+  )
   provider.shutdown()
-  assert_eq(log.val, [
-    "a:drain", "b:drain", "a:shutdown", "b:shutdown",
-  ])
+  assert_eq(log.val, ["a:drain", "b:drain", "a:shutdown", "b:shutdown"])
 }
 
 ///|
@@ -93,22 +86,20 @@ test "reentrant shutdown during a child drain keeps remaining children ordered" 
     service_name="multi-drain-reentrant",
   ).with_span_processor(multi)
   provider.shutdown()
-  assert_eq(log.val, [
-    "a:drain", "b:drain", "a:shutdown", "b:shutdown",
-  ])
+  assert_eq(log.val, ["a:drain", "b:drain", "a:shutdown", "b:shutdown"])
 }
 
 ///|
 test "copy shutdown does not drain a child that a shared copy already drained" {
   let log : Ref[Array[String]] = Ref([])
-  let multi = @sdk.MultiSpanProcessor::new(processors=[multi_drain_once_processor("a", log)])
+  let multi = @sdk.MultiSpanProcessor::new(processors=[
+    multi_drain_once_processor("a", log),
+  ])
   let copy = multi.with_processor(multi_drain_once_processor("b", log))
   multi.drain_before_shutdown()
   assert_eq(log.val, ["a:drain"])
   copy.shutdown()
-  assert_eq(log.val, [
-    "a:drain", "b:drain", "a:shutdown", "b:shutdown",
-  ])
+  assert_eq(log.val, ["a:drain", "b:drain", "a:shutdown", "b:shutdown"])
 }
 
 ///|
@@ -155,7 +146,9 @@ pub impl @sdk.SpanProcessor for MultiDrainOnceEventProcessor with fn force_flush
 }
 
 ///|
-pub impl @sdk.SpanProcessor for MultiDrainOnceEventProcessor with fn shutdown(self) {
+pub impl @sdk.SpanProcessor for MultiDrainOnceEventProcessor with fn shutdown(
+  self,
+) {
   self.log.val.push(self.name + ":shutdown")
 }
 
@@ -188,7 +181,5 @@ test "span events stop at a child that shuts the multi processor down" {
   // `a` shuts the processor down while handling `on_start`, so `b` must not
   // see the start or the end event, and `a` itself is no longer active when
   // the span ends.
-  assert_eq(log.val, [
-    "a:start:op", "a:shutdown", "b:shutdown",
-  ])
+  assert_eq(log.val, ["a:start:op", "a:shutdown", "b:shutdown"])
 }

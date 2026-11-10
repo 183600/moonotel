@@ -50,9 +50,7 @@ pub extend ReentrantFlushProcessor with @sdk.SpanProcessor::{
 }
 
 ///|
-fn reentrant_flush_processor(
-  on_flush? : () -> Unit,
-) -> ReentrantFlushProcessor {
+fn reentrant_flush_processor(on_flush? : () -> Unit) -> ReentrantFlushProcessor {
   {
     flushes: Ref(0),
     shutdowns: Ref(0),
@@ -73,8 +71,10 @@ test "provider_force_flush_stops_after_a_reentrant_shutdown" {
     }
   })
   let second = reentrant_flush_processor()
-  let provider = @sdk.TracerProviderSdk::new(service_name="flush-reentrant")
-    .with_span_processors([first, second])
+  let provider = @sdk.TracerProviderSdk::new(service_name="flush-reentrant").with_span_processors([
+      first, second,
+    ],
+  )
   provider_ref.val = Some(provider)
   provider.force_flush()
   assert_eq(first.flushes.val, 1)
@@ -124,8 +124,10 @@ test "provider_force_flush_is_not_reentered_by_a_processor" {
     }
   })
   let second = reentrant_flush_processor()
-  let provider = @sdk.TracerProviderSdk::new(service_name="flush-nested")
-    .with_span_processors([first, second])
+  let provider = @sdk.TracerProviderSdk::new(service_name="flush-nested").with_span_processors([
+      first, second,
+    ],
+  )
   provider_ref.val = Some(provider)
   provider.force_flush()
   assert_eq(nested.val, 1)

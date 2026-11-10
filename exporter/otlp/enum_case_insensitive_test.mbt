@@ -40,10 +40,7 @@ test "protocol helpers are case-insensitive" {
   assert_true(@otlp.is_supported_protocol("HTTP/PROTOBUF"))
   assert_true(@otlp.is_supported_protocol(" http/json "))
   assert_false(@otlp.is_supported_protocol("GRPC"))
-  assert_eq(
-    @otlp.content_type_for_protocol("HTTP/JSON"),
-    "application/json",
-  )
+  assert_eq(@otlp.content_type_for_protocol("HTTP/JSON"), "application/json")
   assert_eq(
     @otlp.content_type_for_protocol("HTTP/PROTOBUF"),
     "application/x-protobuf",
@@ -53,9 +50,7 @@ test "protocol helpers are case-insensitive" {
 ///|
 test "traces headers override generic headers case-insensitively" {
   clear_enum_case_env()
-  @env.set_env_var(
-    "OTEL_EXPORTER_OTLP_HEADERS", "X-Token=generic,shared=1",
-  )
+  @env.set_env_var("OTEL_EXPORTER_OTLP_HEADERS", "X-Token=generic,shared=1")
   @env.set_env_var(
     "OTEL_EXPORTER_OTLP_TRACES_HEADERS", "x-token=specific,SHARED=2",
   )

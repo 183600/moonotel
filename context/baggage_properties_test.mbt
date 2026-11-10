@@ -2,11 +2,10 @@
 
 ///|
 test "with_baggage_entry_preserves_properties" {
-  let context = @context.Context::root().with_baggage_entry(
-    "tenant",
-    "acme",
-    properties=[("priority", "high"), ("region", "eu")],
-  )
+  let context = @context.Context::root().with_baggage_entry("tenant", "acme", properties=[
+    ("priority", "high"),
+    ("region", "eu"),
+  ])
   assert_eq(context.value("tenant"), Some("acme"))
   match context.baggage_entry("tenant") {
     Some(entry) => {

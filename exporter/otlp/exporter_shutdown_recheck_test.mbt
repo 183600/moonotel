@@ -14,10 +14,7 @@ test "retry_loop_stops_after_reentrant_shutdown" {
     { status_code: 503, body: b"", }
   }
   let exporter = @otlp.OtlpHttpExporter::new(
-    @otlp.OtlpHttpConfig::new(
-      endpoint="http://collector:4318",
-      max_retries=3,
-    ),
+    @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318", max_retries=3),
     transport,
   )
   holder.val = Some(exporter)

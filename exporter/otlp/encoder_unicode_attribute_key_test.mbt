@@ -1,6 +1,7 @@
 // Non-ASCII attribute keys and values take the generic UTF-8 encoding path
 // after the ASCII fast path rolls back.
 
+///|
 test "encode_attributes_falls_back_for_non_ascii_keys" {
   let template = sample_span()
   let attributes : Map[String, @sdk.AttributeValue] = Map([])

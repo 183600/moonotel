@@ -422,7 +422,7 @@ pub fn redact_url(url : String) -> String {
 }
 
 ///|
-fn map_capacity_for_entries(entries : Int) -> Int {
+fn map_capacity_for_entries(entries : Int32) -> Int32 {
   let capacity = entries.next_power_of_two()
   if entries > capacity * 13 / 16 {
     capacity * 2
@@ -530,7 +530,7 @@ fn trim_header_ows(value : StringView) -> StringView {
     }
     end = end - 1
   }
-  value.clamped_view(start=start, end=end)
+  value.clamped_view(start~, end~)
 }
 
 // Whether a code unit is an HTTP token character (RFC 9110 `tchar`), matching
@@ -612,7 +612,8 @@ fn wire_request_headers(
   request_body_size : Int32,
 ) -> @http.Headers {
   let out : @http.Headers = Map(
-    [], capacity=map_capacity_for_entries(headers.length() + 2),
+    [],
+    capacity=map_capacity_for_entries(headers.length() + 2),
   )
   let mut has_accept_encoding = false
   for key, value in headers {
@@ -818,6 +819,8 @@ async fn open_request(
 // The attributes known before the client span starts. Passing them at span
 // creation makes them available to samplers, as the HTTP semantic conventions
 // require for `http.request.method`, `url.full` and `server.address`/`port`.
+
+///|
 fn initial_client_attributes(
   url : String,
   request_method : @http.RequestMethod,
@@ -920,9 +923,9 @@ pub async fn request(
         span.context(),
         request_context,
       )
-      let outcome = try {
-        Ok(open_request(url, request_method, sent_headers, request_body))
-      } catch {
+      let outcome = Ok(
+        open_request(url, request_method, sent_headers, request_body),
+      ) catch {
         error => Err(error)
       }
       // Capture after the request attempt: the HTTP client adds headers that
@@ -972,11 +975,7 @@ pub async fn request(
         span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(status_text))
         span.set_status(@api.StatusCode::Error)
       }
-      let body_outcome = try {
-        Ok(client.read_all())
-      } catch {
-        error => Err(error)
-      }
+      let body_outcome = Ok(client.read_all()) catch { error => Err(error) }
       let response_body = match body_outcome {
         Ok(body) => body
         Err(error) => {

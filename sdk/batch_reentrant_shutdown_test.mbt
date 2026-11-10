@@ -3,7 +3,7 @@
 
 ///|
 struct ReentrantShutdownExporter {
-  processor : Ref[(&@sdk.SpanProcessor)?]
+  processor : Ref[&@sdk.SpanProcessor?]
   batches : Ref[Int32]
   shutdowns : Ref[Int32]
 }
@@ -23,9 +23,7 @@ pub impl @sdk.SpanExporter for ReentrantShutdownExporter with fn export_spans(
 }
 
 ///|
-pub impl @sdk.SpanExporter for ReentrantShutdownExporter with fn shutdown(
-  self,
-) {
+pub impl @sdk.SpanExporter for ReentrantShutdownExporter with fn shutdown(self) {
   self.shutdowns.val = self.shutdowns.val + 1
 }
 

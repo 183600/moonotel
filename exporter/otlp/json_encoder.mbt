@@ -173,9 +173,7 @@ fn JsonBuf::write_view(self : JsonBuf, value : StringView) -> Unit {
       run_end = run_end + 1
     }
     self.write_bytes(
-      encode_utf8_lossy(
-        value.clamped_view(start=ascii_end, end=run_end),
-      ),
+      encode_utf8_lossy(value.clamped_view(start=ascii_end, end=run_end)),
     )
     i = run_end
   }
@@ -226,11 +224,7 @@ fn json_write_hex_quoted(sb : JsonBuf, bytes : Array[Int32]) -> Unit {
     let b1 = bytes.unsafe_get(i + 1)
     let b2 = bytes.unsafe_get(i + 2)
     let b3 = bytes.unsafe_get(i + 3)
-    if (b0 | b1 | b2 | b3) >= 0 &&
-      b0 < 256 &&
-      b1 < 256 &&
-      b2 < 256 &&
-      b3 < 256 {
+    if (b0 | b1 | b2 | b3) >= 0 && b0 < 256 && b1 < 256 && b2 < 256 && b3 < 256 {
       buf.unsafe_write_uint64_le(
         pos,
         json_hex_pairs.unsafe_get(b0).to_uint64() |
@@ -328,10 +322,7 @@ fn build_json_two_digits() -> FixedArray[UInt16] {
   let table : FixedArray[UInt16] = FixedArray::make(100, (0 : UInt16))
   let mut i = 0
   while i < 100 {
-    table.unsafe_set(
-      i,
-      ((0x30 + i / 10) | ((0x30 + i % 10) << 8)).to_uint16(),
-    )
+    table.unsafe_set(i, ((0x30 + i / 10) | ((0x30 + i % 10) << 8)).to_uint16())
     i = i + 1
   }
   table
@@ -390,10 +381,7 @@ fn json_write_decimal_digits(sb : JsonBuf, value : UInt64) -> Unit {
   while v >= 10000 {
     let remainder = (v % 10000).to_int()
     pos = pos - 4
-    buf.unsafe_write_uint16_le(
-      pos,
-      json_two_digits.unsafe_get(remainder / 100),
-    )
+    buf.unsafe_write_uint16_le(pos, json_two_digits.unsafe_get(remainder / 100))
     buf.unsafe_write_uint16_le(
       pos + 2,
       json_two_digits.unsafe_get(remainder % 100),
@@ -408,10 +396,7 @@ fn json_write_decimal_digits(sb : JsonBuf, value : UInt64) -> Unit {
   } else if tail >= 100 {
     pos = pos - 3
     buf.unsafe_set(pos, (0x30 + tail / 100).to_byte())
-    buf.unsafe_write_uint16_le(
-      pos + 1,
-      json_two_digits.unsafe_get(tail % 100),
-    )
+    buf.unsafe_write_uint16_le(pos + 1, json_two_digits.unsafe_get(tail % 100))
   } else if tail >= 10 {
     pos = pos - 2
     buf.unsafe_write_uint16_le(pos, json_two_digits.unsafe_get(tail))
@@ -502,10 +487,7 @@ fn json_write_double(sb : JsonBuf, value : Double) -> Unit {
 // Append one `AnyValue` message.
 
 ///|
-fn json_write_any_value(
-  sb : JsonBuf,
-  value : @sdk.AttributeValue,
-) -> Unit {
+fn json_write_any_value(sb : JsonBuf, value : @sdk.AttributeValue) -> Unit {
   sb.write_char('{')
   match value {
     @sdk.StringValue(text) => {
@@ -630,11 +612,7 @@ fn json_write_resource(
 // Append the `instrumentation_scope` message.
 
 ///|
-fn json_write_scope(
-  sb : JsonBuf,
-  name : String,
-  version : String,
-) -> Unit {
+fn json_write_scope(sb : JsonBuf, name : String, version : String) -> Unit {
   sb.write_bytes(b"{\"name\":")
   json_write_escaped(sb, name)
   if version != "" {
@@ -758,7 +736,10 @@ fn json_write_span(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
   sb.write_bytes(b",\"kind\":")
   json_write_int32(sb, data.kind.otlp_value())
   sb.write_bytes(b",\"startTimeUnixNano\":")
-  json_write_uint64_string(sb, data.start_time_unix_nano.reinterpret_as_uint64())
+  json_write_uint64_string(
+    sb,
+    data.start_time_unix_nano.reinterpret_as_uint64(),
+  )
   sb.write_bytes(b",\"endTimeUnixNano\":")
   json_write_uint64_string(sb, data.end_time_unix_nano.reinterpret_as_uint64())
   if data.attributes.length() > 0 {
@@ -837,10 +818,12 @@ pub fn encode_trace_request_json(spans : Array[@sdk.SpanData]) -> Bytes {
     }
     let size_hint = 64 +
       resource_size_hint(shared_resource) * 2 +
-      (32 +
+      (
+        32 +
         first.scope_name.length() +
         first.scope_version.length() +
-        spans_hint) *
+        spans_hint
+      ) *
       2
     let sb = JsonBuf::new(size_hint)
     sb.write_bytes(b"{\"resourceSpans\":[{\"resource\":")

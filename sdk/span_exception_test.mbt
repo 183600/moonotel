@@ -147,10 +147,7 @@ test "record_exception omits a missing stacktrace" {
   span.record_exception(TestError("boom"))
   span.end()
   let data = exporter.spans[0]
-  assert_eq(
-    data.events[0].attributes.get(@sdk.EXCEPTION_STACKTRACE),
-    None,
-  )
+  assert_eq(data.events[0].attributes.get(@sdk.EXCEPTION_STACKTRACE), None)
 }
 
 ///|

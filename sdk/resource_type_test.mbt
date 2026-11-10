@@ -271,10 +271,7 @@ test "resource_attributes_iterators_do_not_expose_array_payloads" {
 ///|
 test "resource_attributes_as_map_is_an_isolated_deep_copy" {
   let snapshot = @sdk.ResourceAttributes::new(
-    Map([
-      ("k", @sdk.StringArrayValue(["a"])),
-      ("plain", @sdk.StringValue("v")),
-    ]),
+    Map([("k", @sdk.StringArrayValue(["a"])), ("plain", @sdk.StringValue("v"))]),
   )
   let exported = snapshot.as_map()
   exported.set("plain", @sdk.StringValue("changed"))
@@ -313,15 +310,13 @@ pub impl @sdk.SpanExporter for ResourceMutatingExporter with fn export_spans(
 }
 
 ///|
-pub impl @sdk.SpanExporter for ResourceMutatingExporter with fn shutdown(
-  self,
-) {
+pub impl @sdk.SpanExporter for ResourceMutatingExporter with fn shutdown(self) {
   let _ = self
 }
 
 ///|
 test "span_resource_snapshot_cannot_mutate_the_provider_resource" {
-  let exporter : ResourceMutatingExporter = ResourceMutatingExporter::{}
+  let exporter : ResourceMutatingExporter = ResourceMutatingExporter::{ }
   let resource = @sdk.Resource::new(
     attributes=Map([("arr", @sdk.StringArrayValue(["a"]))]),
   )
@@ -331,8 +326,5 @@ test "span_resource_snapshot_cannot_mutate_the_provider_resource" {
   let tracer = provider.get_tracer("resource-isolation")
   tracer.start_root_span("one").end()
   assert_eq(provider.resource().get("injected"), None)
-  assert_eq(
-    provider.resource().get("arr"),
-    Some(@sdk.StringArrayValue(["a"])),
-  )
+  assert_eq(provider.resource().get("arr"), Some(@sdk.StringArrayValue(["a"])))
 }

@@ -9,7 +9,9 @@ test "decode_export_response_rejects_field_number_zero" {
   // tag = field 0, wire type 2; length = 0
   assert_false(@otlp.decode_export_response(b"\x02\x00").is_success())
   // tag = field 0, wire type 5; four payload bytes
-  assert_false(@otlp.decode_export_response(b"\x05\x01\x02\x03\x04").is_success())
+  assert_false(
+    @otlp.decode_export_response(b"\x05\x01\x02\x03\x04").is_success(),
+  )
 }
 
 ///|

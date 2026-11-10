@@ -38,9 +38,7 @@ test "baggage_list_members_are_visible_in_flattened_views" {
 test "removing_a_key_from_a_baggage_list_hides_outer_values" {
   let context = @context.Context::root()
     .with_value("outer", "1")
-    .with_baggage_entries([
-      @context.BaggageEntry::new("inner", "2"),
-    ])
+    .with_baggage_entries([@context.BaggageEntry::new("inner", "2")])
     .without_value("outer")
   assert_eq(context.value("outer"), None)
   assert_eq(context.baggage_entry("outer"), None)

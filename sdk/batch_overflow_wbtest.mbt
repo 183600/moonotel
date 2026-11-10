@@ -55,10 +55,7 @@ test "overflow_overwrites_the_oldest_buffered_span" {
   assert_eq(processor.dropped_spans(), 1UL)
   processor.force_flush()
   assert_eq(processor.queue_size(), 0)
-  assert_eq(
-    overflow_probe_names(exporter.exported_spans()),
-    ["s1", "s2"],
-  )
+  assert_eq(overflow_probe_names(exporter.exported_spans()), ["s1", "s2"])
 }
 
 ///|
@@ -80,8 +77,7 @@ test "overflow_wraps_the_ring_after_a_partial_flush" {
   assert_eq(processor.queue_size(), 2)
   assert_eq(processor.dropped_spans(), 1UL)
   processor.force_flush()
-  assert_eq(
-    overflow_probe_names(exporter.exported_spans()),
-    ["s0", "s1", "s3", "s4"],
-  )
+  assert_eq(overflow_probe_names(exporter.exported_spans()), [
+    "s0", "s1", "s3", "s4",
+  ])
 }

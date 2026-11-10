@@ -124,9 +124,7 @@ pub fn BatchSpanProcessor::dropped_spans(self : BatchSpanProcessor) -> UInt64 {
 // value lets callers react (for example by logging or backing off).
 
 ///|
-pub fn BatchSpanProcessor::export_failures(
-  self : BatchSpanProcessor,
-) -> UInt64 {
+pub fn BatchSpanProcessor::export_failures(self : BatchSpanProcessor) -> UInt64 {
   self.export_failures
 }
 
@@ -286,7 +284,9 @@ pub impl SpanProcessor for BatchSpanProcessor with fn drain_before_shutdown(
     return
   }
   self.draining = true
-  defer { self.draining = false }
+  defer {
+    self.draining = false
+  }
   if self.count > 0 {
     let now = @env.now()
     while self.count > 0 {
@@ -314,6 +314,7 @@ pub impl SpanProcessor for BatchSpanProcessor with fn is_draining(self) {
 }
 
 ///|
+
 ///|
 pub impl SpanProcessor for BatchSpanProcessor with fn set_shutdown_completion(
   self,
@@ -337,7 +338,9 @@ pub impl SpanProcessor for BatchSpanProcessor with fn shutdown(self) {
     // exporter can see that this processor still owns the queue.
     self.shutdown_called = true
     self.draining = true
-    defer { self.draining = false }
+    defer {
+      self.draining = false
+    }
     if self.count > 0 {
       let now = @env.now()
       while self.count > 0 {

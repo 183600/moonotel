@@ -146,9 +146,12 @@ fn format_attribute_value(value : AttributeValue) -> String {
     DoubleValue(number) => number.to_string()
     StringArrayValue(items) =>
       format_array(items.map(fn(item) { escape_console_text(item) }))
-    BoolArrayValue(items) => format_array(items.map(fn(item) { item.to_string() }))
-    IntArrayValue(items) => format_array(items.map(fn(item) { item.to_string() }))
-    DoubleArrayValue(items) => format_array(items.map(fn(item) { item.to_string() }))
+    BoolArrayValue(items) =>
+      format_array(items.map(fn(item) { item.to_string() }))
+    IntArrayValue(items) =>
+      format_array(items.map(fn(item) { item.to_string() }))
+    DoubleArrayValue(items) =>
+      format_array(items.map(fn(item) { item.to_string() }))
   }
 }
 
@@ -245,4 +248,8 @@ pub impl SpanExporter for ConsoleSpanExporter with fn shutdown(self) {
 }
 
 ///|
-pub extend ConsoleSpanExporter with SpanExporter::{export_spans, export_span, shutdown}
+pub extend ConsoleSpanExporter with SpanExporter::{
+  export_spans,
+  export_span,
+  shutdown,
+}

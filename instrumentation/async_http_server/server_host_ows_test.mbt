@@ -18,9 +18,7 @@ pub impl @sdk.SpanExporter for HostOwsRecordingExporter with fn export_spans(
 }
 
 ///|
-pub impl @sdk.SpanExporter for HostOwsRecordingExporter with fn shutdown(
-  self,
-) {
+pub impl @sdk.SpanExporter for HostOwsRecordingExporter with fn shutdown(self) {
   let _ = self
 }
 
@@ -28,9 +26,9 @@ pub impl @sdk.SpanExporter for HostOwsRecordingExporter with fn shutdown(
 async test "server span parses a host header with trailing whitespace" {
   let exporter : HostOwsRecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
-  let provider = @sdk.TracerProviderSdk::new(
-    service_name="host-ows-test",
-  ).with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="host-ows-test").with_span_processor(
+    processor,
+  )
   let tracer = provider.get_tracer("host-ows-test")
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -57,9 +55,6 @@ async test "server span parses a host header with trailing whitespace" {
       data.attributes.get(@sdk.SERVER_ADDRESS),
       Some(@sdk.StringValue("example.com")),
     )
-    assert_eq(
-      data.attributes.get(@sdk.SERVER_PORT),
-      Some(@sdk.IntValue(8080)),
-    )
+    assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(8080)))
   }
 }

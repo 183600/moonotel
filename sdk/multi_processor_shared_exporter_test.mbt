@@ -44,10 +44,7 @@ pub impl @sdk.SpanProcessor for ReentrantDrainChild with fn on_start(
 }
 
 ///|
-pub impl @sdk.SpanProcessor for ReentrantDrainChild with fn on_end(
-  self,
-  _data,
-) {
+pub impl @sdk.SpanProcessor for ReentrantDrainChild with fn on_end(self, _data) {
   let _ = self
 }
 
@@ -81,11 +78,7 @@ test "child drain cannot close an exporter needed by a later provider drain" {
     shutdown_called: false,
   }
   let events : Ref[Array[String]] = Ref([])
-  let child : ReentrantDrainChild = {
-    exporter,
-    multi: Ref(None),
-    events,
-  }
+  let child : ReentrantDrainChild = { exporter, multi: Ref(None), events, }
   let multi = @sdk.MultiSpanProcessor::new(processors=[child])
   child.multi.val = Some(multi)
   let batch = @sdk.BatchSpanProcessor::new(
@@ -94,14 +87,12 @@ test "child drain cannot close an exporter needed by a later provider drain" {
     flush_interval_millis=1000000,
   )
   let provider = @sdk.TracerProviderSdk::new(
-    service_name="shared-drain-exporter",
-  ).with_span_processors([multi, batch]).with_sampler(
-    @sdk.Sampler::always_on(),
-  )
+      service_name="shared-drain-exporter",
+    )
+    .with_span_processors([multi, batch])
+    .with_sampler(@sdk.Sampler::always_on())
   provider.get_tracer("shared-drain-exporter").start_root_span("kept").end()
   provider.shutdown()
   assert_eq(exporter.exported.val, ["kept"])
-  assert_eq(events.val, [
-    "child:drain", "child:drain-end", "child:shutdown",
-  ])
+  assert_eq(events.val, ["child:drain", "child:drain-end", "child:shutdown"])
 }

@@ -13,13 +13,12 @@ test "protobuf_negative_rejected_spans_is_malformed" {
 
 ///|
 test "json_negative_rejected_spans_is_malformed" {
-  for body in [
-    "{\"partialSuccess\":{\"rejectedSpans\":\"-1\"}}",
-    "{\"partialSuccess\":{\"rejectedSpans\":-1}}",
-    "{\"partialSuccess\":{\"rejectedSpans\":-1.0}}",
-    "{\"partialSuccess\":{\"rejectedSpans\":-1e0}}",
-    "{\"partialSuccess\":{\"rejectedSpans\":\"-9223372036854775808\"}}",
-  ] {
+  for
+    body in [
+      "{\"partialSuccess\":{\"rejectedSpans\":\"-1\"}}", "{\"partialSuccess\":{\"rejectedSpans\":-1}}",
+      "{\"partialSuccess\":{\"rejectedSpans\":-1.0}}", "{\"partialSuccess\":{\"rejectedSpans\":-1e0}}",
+      "{\"partialSuccess\":{\"rejectedSpans\":\"-9223372036854775808\"}}",
+    ] {
     assert_eq(
       json_failure_message(decode_json_body(body)),
       "malformed OTLP response body",

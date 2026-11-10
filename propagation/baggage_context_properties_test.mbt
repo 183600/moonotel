@@ -25,11 +25,10 @@ test "extract_baggage_context_preserves_properties" {
 
 ///|
 test "inject_baggage_preserves_properties" {
-  let context = @context.Context::root().with_baggage_entry(
-    "userId",
-    "alice",
-    properties=[("priority", "a b"), ("source", "checkout")],
-  )
+  let context = @context.Context::root().with_baggage_entry("userId", "alice", properties=[
+    ("priority", "a b"),
+    ("source", "checkout"),
+  ])
   let carrier = @propagation.TextMapCarrier::new()
   @propagation.inject_baggage(context, carrier)
   assert_eq(
@@ -61,10 +60,7 @@ test "extract_context_preserves_baggage_properties_with_traceparent" {
     @propagation.traceparent_header_name(),
     "00-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01",
   )
-  carrier.set(
-    @propagation.baggage_header_name(),
-    "tenant=acme;priority=high",
-  )
+  carrier.set(@propagation.baggage_header_name(), "tenant=acme;priority=high")
   let context = @propagation.extract_context(carrier)
   assert_true(context.span_context() is Some(_))
   match context.baggage_entry("tenant") {
@@ -78,19 +74,11 @@ test "extract_context_preserves_baggage_properties_with_traceparent" {
 
 ///|
 test "composite_propagator_preserves_baggage_properties" {
-  let tracecontext : &@propagation.TextMapPropagator =
-    @propagation.TraceContextPropagator::new()
-  let baggage : &@propagation.TextMapPropagator =
-    @propagation.BaggagePropagator::new()
-  let propagator = @propagation.CompositePropagator::new([
-    tracecontext,
-    baggage,
-  ])
+  let tracecontext : &@propagation.TextMapPropagator = @propagation.TraceContextPropagator::new()
+  let baggage : &@propagation.TextMapPropagator = @propagation.BaggagePropagator::new()
+  let propagator = @propagation.CompositePropagator::new([tracecontext, baggage])
   let carrier = @propagation.TextMapCarrier::new()
-  carrier.set(
-    @propagation.baggage_header_name(),
-    "tenant=acme;priority=high",
-  )
+  carrier.set(@propagation.baggage_header_name(), "tenant=acme;priority=high")
   let context = propagator.extract(carrier)
   match context.baggage_entry("tenant") {
     Some(entry) => assert_eq(entry.properties, [("priority", "high")])

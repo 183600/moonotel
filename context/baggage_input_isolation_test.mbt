@@ -41,8 +41,7 @@ test "with_baggage_from_copies_merged_properties" {
   )
   let merged = @context.Context::root().with_baggage_from(source)
   properties[0] = ("priority", "changed")
-  assert_eq(
-    merged.baggage_entry("tenant").unwrap().properties,
-    [("priority", "high")],
-  )
+  assert_eq(merged.baggage_entry("tenant").unwrap().properties, [
+    ("priority", "high"),
+  ])
 }

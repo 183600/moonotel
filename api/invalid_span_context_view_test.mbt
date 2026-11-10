@@ -18,10 +18,7 @@ test "invalid_span_context_views_are_independent" {
   assert_eq(second_span.length(), 8)
   assert_eq(second_trace[0], 0)
   assert_eq(second_span[0], 0)
-  assert_eq(
-    second.trace_id_hex(),
-    "00000000000000000000000000000000",
-  )
+  assert_eq(second.trace_id_hex(), "00000000000000000000000000000000")
   assert_eq(second.span_id_hex(), "0000000000000000")
   assert_false(second.is_valid())
 }

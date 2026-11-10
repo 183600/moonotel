@@ -94,9 +94,9 @@ async test "server omits user_agent.original when the header is absent" {
 async test "server trims optional whitespace around user_agent.original" {
   let exporter : SemconvRecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
-  let provider = @sdk.TracerProviderSdk::new(
-    service_name="semconv-ows-test",
-  ).with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="semconv-ows-test").with_span_processor(
+    processor,
+  )
   let tracer = provider.get_tracer("semconv-ows-test")
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))

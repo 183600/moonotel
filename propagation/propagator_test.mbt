@@ -154,7 +154,7 @@ test "composite_propagator_runs_members_in_order" {
 test "composite_propagator_honors_baggage_removal_from_later_members" {
   let composite = @propagation.CompositePropagator::new([
     MarkerPropagator::{ header: "first", },
-    DeletionPropagator::{},
+    DeletionPropagator::{ },
   ])
   let carrier = @propagation.TextMapCarrier::new()
   carrier.set("first", "from-marker")

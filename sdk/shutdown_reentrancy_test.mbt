@@ -108,9 +108,7 @@ pub impl @sdk.SpanProcessor for MultiReenteringProcessor with fn drain_before_sh
 }
 
 ///|
-pub impl @sdk.SpanProcessor for MultiReenteringProcessor with fn shutdown(
-  self,
-) {
+pub impl @sdk.SpanProcessor for MultiReenteringProcessor with fn shutdown(self) {
   self.shutdowns.val = self.shutdowns.val + 1
 }
 

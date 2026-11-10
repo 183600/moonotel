@@ -17,7 +17,9 @@ async test "batch processor spans reach the async exporter on group exit" {
     }
     let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:\{port}")
     @async.with_task_group() <| group => {
-      let exporter = @async_runtime.OtlpHttpAsyncSpanExporter::new(config, group)
+      let exporter = @async_runtime.OtlpHttpAsyncSpanExporter::new(
+        config, group,
+      )
       let processor = @sdk.BatchSpanProcessor::new(
         exporter,
         max_export_batch_size=1000000,

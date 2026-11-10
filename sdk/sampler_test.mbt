@@ -70,9 +70,7 @@ test "ratio_half_boundaries" {
 test "ratio_out_of_range_is_clamped" {
   let negative = @sdk.Sampler::trace_id_ratio_based(-1.0)
   let large = @sdk.Sampler::trace_id_ratio_based(2.0)
-  assert_false(
-    negative.should_sample(None, trace_id_ending_with(1)).is_sampled,
-  )
+  assert_false(negative.should_sample(None, trace_id_ending_with(1)).is_sampled)
   assert_true(large.should_sample(None, trace_id_ending_with(1)).is_sampled)
 }
 

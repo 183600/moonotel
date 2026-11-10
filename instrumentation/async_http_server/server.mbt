@@ -15,7 +15,7 @@
 const INSTRUMENTATION_SCOPE : String = "183600/moonotel/instrumentation/async_http_server"
 
 ///|
-fn map_capacity_for_entries(entries : Int) -> Int {
+fn map_capacity_for_entries(entries : Int32) -> Int32 {
   let capacity = entries.next_power_of_two()
   if entries > capacity * 13 / 16 {
     capacity * 2
@@ -173,7 +173,7 @@ fn trim_header_ows(value : StringView) -> StringView {
   if start == 0 && end == len {
     value
   } else {
-    value.clamped_view(start=start, end=end)
+    value.clamped_view(start~, end~)
   }
 }
 
@@ -183,11 +183,7 @@ fn trim_header_ows(value : StringView) -> StringView {
 
 ///|
 fn parse_content_length(text : StringView) -> Int64? {
-  let value = try {
-    @string.parse_uint64(text, base=10)
-  } catch {
-    _ => return None
-  }
+  let value = @string.parse_uint64(text, base=10) catch { _ => return None }
   let max = 9223372036854775807UL
   if value > max {
     return None
@@ -275,9 +271,9 @@ fn split_path_query(path : String) -> (String, String) {
   if scheme_end is Some(_) {
     let mut authority_end = 0
     while authority_end < rest.length() &&
-      rest.unsafe_get(authority_end).to_int() != 0x2F &&
-      rest.unsafe_get(authority_end).to_int() != 0x3F &&
-      rest.unsafe_get(authority_end).to_int() != 0x23 {
+          rest.unsafe_get(authority_end).to_int() != 0x2F &&
+          rest.unsafe_get(authority_end).to_int() != 0x3F &&
+          rest.unsafe_get(authority_end).to_int() != 0x23 {
       authority_end = authority_end + 1
     }
     rest = rest[authority_end:]
@@ -292,7 +288,11 @@ fn split_path_query(path : String) -> (String, String) {
     Some(index) => {
       let path_part = without_fragment[:index]
       (
-        if path_part.length() == 0 { "/" } else { path_part.to_owned() },
+        if path_part.length() == 0 {
+          "/"
+        } else {
+          path_part.to_owned()
+        },
         without_fragment[index + 1:].to_owned(),
       )
     }
@@ -514,6 +514,8 @@ fn record_host_attributes(
 // The attributes known before the server span starts. Passing them at span
 // creation makes them available to samplers, as the HTTP semantic conventions
 // require for `http.request.method` and the request URL/server attributes.
+
+///|
 fn initial_server_attributes(
   request : @http.Request,
   path_query : (String, String),
@@ -521,10 +523,7 @@ fn initial_server_attributes(
   client_port : Int32?,
 ) -> Map[String, @sdk.AttributeValue] {
   let attributes : Map[String, @sdk.AttributeValue] = Map([], capacity=12)
-  attributes.set(
-    @sdk.HTTP_REQUEST_METHOD,
-    method_attribute_value(request.meth),
-  )
+  attributes.set(@sdk.HTTP_REQUEST_METHOD, method_attribute_value(request.meth))
   attributes.set(
     @sdk.URL_SCHEME,
     @sdk.StringValue(request_target_scheme(request.path)),
@@ -545,7 +544,8 @@ fn initial_server_attributes(
     None => ()
   }
   match client_port {
-    Some(port) => attributes.set(@sdk.CLIENT_PORT, @sdk.IntValue(port.to_int64()))
+    Some(port) =>
+      attributes.set(@sdk.CLIENT_PORT, @sdk.IntValue(port.to_int64()))
     None => ()
   }
   match request.headers.get(@http.CaseInsensitiveString("user-agent")) {
@@ -979,7 +979,8 @@ fn wire_response_headers(
   body_written : Bool,
 ) -> @http.Headers {
   let out : @http.Headers = Map(
-    [], capacity=map_capacity_for_entries(headers.length() + 1),
+    [],
+    capacity=map_capacity_for_entries(headers.length() + 1),
   )
   for key, value in headers {
     let name = key.to_string()
@@ -1217,10 +1218,7 @@ async fn serve_call(
           kind=@api.SpanKind::Server,
           parent?,
           attributes=initial_server_attributes(
-            request,
-            path_query,
-            client_address,
-            client_port,
+            request, path_query, client_address, client_port,
           ),
         ),
       )
@@ -1251,10 +1249,12 @@ async fn serve_call(
   // Install the extracted request context for the handler even when tracing
   // is disabled: the incoming parent span and baggage remain visible, and the
   // server task's own ambient context cannot leak into the request.
-  let attached = @context.attach(match span {
-    Some(server_span) => parent_context.with_span(server_span.context())
-    None => parent_context
-  })
+  let attached = @context.attach(
+    match span {
+      Some(server_span) => parent_context.with_span(server_span.context())
+      None => parent_context
+    },
+  )
   defer @context.detach(attached)
   defer end_span(span)
   let outcome = Ok(handler(call)) catch { error => Err(error) }
@@ -1270,7 +1270,10 @@ async fn serve_call(
       match span {
         Some(server_span) => {
           let type_name = error.to_string()
-          server_span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(type_name))
+          server_span.set_attribute(
+            @sdk.ERROR_TYPE,
+            @sdk.StringValue(type_name),
+          )
           server_span.set_status(@api.StatusCode::Error, description=type_name)
           server_span.record_exception(error)
         }
@@ -1349,7 +1352,7 @@ pub async fn run_server_with_client_address_on(
     Some(value) => Some(value)
     None => default_tracer()
   }
-  server.run_forever(allow_failure?, max_connections?) <| (tcp, peer_addr) => {
+  server.run_forever(allow_failure?, max_connections?) <| ((tcp, peer_addr) => {
     let connection = @http.ServerConnection::new(tcp)
     let client_address = client_host_string(peer_addr)
     let client_port = peer_addr.port()
@@ -1374,5 +1377,5 @@ pub async fn run_server_with_client_address_on(
         break
       }
     }
-  }
+  })
 }

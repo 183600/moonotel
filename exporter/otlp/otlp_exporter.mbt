@@ -23,6 +23,7 @@ pub(all) struct TransportResponse {
 /// expected to enforce its own timeout/deadline. `timeout_millis` from
 /// `OtlpHttpConfig` is honored by the async exporter
 /// (`183600/moonotel/exporter/otlp_async`), not by this synchronous path.
+
 ///|
 pub type Transport = (String, Map[String, String], Bytes) -> TransportResponse
 
@@ -112,6 +113,8 @@ fn is_json_protocol(protocol : String) -> Bool {
 // The protocol actually used for an export. A blank programmatic value falls
 // back to the OTLP default (`http/protobuf`), matching `OtlpHttpConfig::new`
 // and the environment-variable path even when the config was built directly.
+
+///|
 fn effective_protocol(protocol : String) -> String {
   let normalized = normalize_enum(protocol)
   if normalized == "" {
@@ -123,6 +126,8 @@ fn effective_protocol(protocol : String) -> String {
 
 // The compression actually used for an export. A blank programmatic value
 // means `none`; any other unsupported value is rejected at export time.
+
+///|
 fn effective_compression(compression : String) -> String {
   let normalized = normalize_enum(compression)
   if normalized == "" {
@@ -136,9 +141,9 @@ fn effective_compression(compression : String) -> String {
 // value falls back to the 10s default, matching `OtlpHttpConfig::new`; zero
 // explicitly disables the timeout. This matters for a config built directly
 // from the public fields, which has not passed through the constructor.
-pub fn OtlpHttpConfig::effective_timeout_millis(
-  self : OtlpHttpConfig,
-) -> Int32 {
+
+///|
+pub fn OtlpHttpConfig::effective_timeout_millis(self : OtlpHttpConfig) -> Int32 {
   if self.timeout_millis < 0 {
     DEFAULT_TIMEOUT_MILLIS
   } else {
@@ -464,7 +469,8 @@ fn parse_headers(value : String) -> Map[String, String] {
         // Malformed names and values are not representable as HTTP fields
         // (and a CR/LF in a value would split the request into extra fields),
         // so drop the pair instead of forwarding it to the transport.
-        if raw_value_is_valid && is_valid_http_header_name(trimmed_key) &&
+        if raw_value_is_valid &&
+          is_valid_http_header_name(trimmed_key) &&
           is_valid_http_header_value(value) {
           set_header(headers, trimmed_key.to_owned(), value)
         }
@@ -539,7 +545,9 @@ fn parse_timeout_env(name : String) -> Int32? {
 ///|
 pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
   // An empty (or blank) environment variable is treated as unset.
-  let traces_endpoint = non_blank_env_value("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+  let traces_endpoint = non_blank_env_value(
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+  )
   let generic_endpoint = non_blank_env_value("OTEL_EXPORTER_OTLP_ENDPOINT")
   let endpoint = match generic_endpoint {
     Some(value) => value
@@ -626,6 +634,8 @@ fn path_and_suffix(endpoint : String) -> (String, String) {
 // Add the root path to an absolute URL whose authority has no path part. The
 // OTLP/HTTP specification requires per-signal endpoints without a path to be
 // sent to `/`; the query and fragment components are preserved.
+
+///|
 fn with_root_path(url : String) -> String {
   let (path, suffix) = path_and_suffix(url)
   // A network-path reference (`//host:4318`) also has an authority but no
@@ -886,7 +896,7 @@ pub fn OtlpHttpExporter::new(
   // Snapshot the header map so that mutating the caller's config (or a map it
   // shares with the config) after construction cannot change the exporter's
   // configuration or the headers of a later export.
-  let config = { ..config, headers: config.headers.copy() }
+  let config = { ..config, headers: config.headers.copy(), }
   {
     config,
     transport,
@@ -902,7 +912,7 @@ pub fn OtlpHttpExporter::new(
 
 ///|
 pub fn OtlpHttpExporter::config(self : OtlpHttpExporter) -> OtlpHttpConfig {
-  { ..self.config, headers: self.config.headers.copy() }
+  { ..self.config, headers: self.config.headers.copy(), }
 }
 
 // Whether `shutdown` has been called. A shut-down exporter rejects further
@@ -914,7 +924,7 @@ pub fn OtlpHttpExporter::is_shutdown(self : OtlpHttpExporter) -> Bool {
 }
 
 ///|
-fn map_capacity_for_entries(entries : Int) -> Int {
+fn map_capacity_for_entries(entries : Int32) -> Int32 {
   let capacity = entries.next_power_of_two()
   if entries > capacity * 13 / 16 {
     capacity * 2
@@ -926,7 +936,8 @@ fn map_capacity_for_entries(entries : Int) -> Int {
 ///|
 fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
   let headers = Map(
-    [], capacity=map_capacity_for_entries(config.headers.length() + 3),
+    [],
+    capacity=map_capacity_for_entries(config.headers.length() + 3),
   )
   // Install the default `User-Agent` first: an explicitly configured one is
   // copied below and replaces it case-insensitively.
@@ -1064,4 +1075,8 @@ pub impl @sdk.SpanExporter for OtlpHttpExporter with fn shutdown(self) {
 }
 
 ///|
-pub extend OtlpHttpExporter with @sdk.SpanExporter::{export_spans, export_span, shutdown}
+pub extend OtlpHttpExporter with @sdk.SpanExporter::{
+  export_spans,
+  export_span,
+  shutdown,
+}

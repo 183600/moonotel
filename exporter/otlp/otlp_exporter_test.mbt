@@ -117,10 +117,7 @@ test "configured_content_type_is_replaced_case_insensitively" {
   )
   let exporter = @otlp.OtlpHttpExporter::new(config, mock.as_transport())
   let _ = exporter.export_spans([test_span()])
-  assert_eq(
-    mock.headers[0].get("content-type"),
-    Some("application/x-protobuf"),
-  )
+  assert_eq(mock.headers[0].get("content-type"), Some("application/x-protobuf"))
   assert_eq(mock.headers[0].get("Content-Type"), None)
 }
 
@@ -297,10 +294,7 @@ test "shutdown_rejects_further_exports_without_calling_transport" {
   exporter.shutdown()
   assert_true(exporter.is_shutdown())
   let result = exporter.export_spans([test_span()])
-  assert_eq(
-    result,
-    @sdk.ExportFailure("OTLP exporter is shut down"),
-  )
+  assert_eq(result, @sdk.ExportFailure("OTLP exporter is shut down"))
   assert_eq(mock.urls.length(), 0)
 }
 
@@ -329,7 +323,6 @@ test "shutdown_is_idempotent" {
   assert_true(exporter.is_shutdown())
   assert_eq(mock.urls.length(), 0)
 }
-
 
 ///|
 test "export_retries_a_synchronous_transport_failure" {

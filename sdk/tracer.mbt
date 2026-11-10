@@ -83,7 +83,8 @@ pub fn Tracer::start_span(
   }
   let (trace_id, parent_span_id, tracestate) = match valid_parent {
     Some(ctx) => (ctx.trace_id(), ctx.span_id(), ctx.tracestate())
-    None => (self.provider.id_generator.generate_trace_id(), no_parent_span_id, "")
+    None =>
+      (self.provider.id_generator.generate_trace_id(), no_parent_span_id, "")
   }
   let span_id = self.provider.id_generator.generate_span_id()
   let sampler_attributes : Map[String, AttributeValue] = match attributes {
@@ -241,9 +242,7 @@ pub fn[X] Tracer::with_span(
   let previous = @context.attach(base.with_span(span.context()))
   defer @context.detach(previous)
   defer span.end()
-  try {
-    f(span)
-  } catch {
+  f(span) catch {
     (error : Error) => {
       record_raised_error(span, error)
       raise error

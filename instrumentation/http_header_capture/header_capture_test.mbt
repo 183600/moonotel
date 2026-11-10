@@ -18,9 +18,7 @@ pub impl @sdk.SpanExporter for CaptureRecordingExporter with fn export_spans(
 }
 
 ///|
-pub impl @sdk.SpanExporter for CaptureRecordingExporter with fn shutdown(
-  self,
-) {
+pub impl @sdk.SpanExporter for CaptureRecordingExporter with fn shutdown(self) {
   let _ = self
 }
 
@@ -28,9 +26,9 @@ pub impl @sdk.SpanExporter for CaptureRecordingExporter with fn shutdown(
 fn capture_span() -> (@sdk.SpanSdk, CaptureRecordingExporter) {
   let exporter : CaptureRecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
-  let provider = @sdk.TracerProviderSdk::new(
-    service_name="header-capture-test",
-  ).with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="header-capture-test").with_span_processor(
+    processor,
+  )
   (provider.get_tracer("header-capture-test").start_span("test"), exporter)
 }
 

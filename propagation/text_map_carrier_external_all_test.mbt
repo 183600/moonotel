@@ -18,27 +18,20 @@ test "get_all_combines_external_and_local_values" {
   let carrier = @propagation.TextMapCarrier::from_getter(fn(key) {
     external.get(key)
   })
-  assert_eq(
-    carrier.get_all("traceparent"),
-    [external_duplicate_traceparent],
-  )
+  assert_eq(carrier.get_all("traceparent"), [external_duplicate_traceparent])
   carrier.set("TraceParent", local_duplicate_traceparent)
   carrier.set("TraceState", "local=1")
   carrier.set("Baggage", "local=1")
-  assert_eq(
-    carrier.get_all("traceparent"),
-    [local_duplicate_traceparent, external_duplicate_traceparent],
-  )
+  assert_eq(carrier.get_all("traceparent"), [
+    local_duplicate_traceparent, external_duplicate_traceparent,
+  ])
   // Two traceparent fields under different casings are ambiguous.
   assert_true(@propagation.extract(carrier) is None)
-  assert_eq(
-    @propagation.extract_tracestate(carrier),
-    Some("local=1, env=2"),
-  )
-  assert_eq(
-    @propagation.extract_baggage(carrier),
-    [("local", "1"), ("env", "2")],
-  )
+  assert_eq(@propagation.extract_tracestate(carrier), Some("local=1, env=2"))
+  assert_eq(@propagation.extract_baggage(carrier), [
+    ("local", "1"),
+    ("env", "2"),
+  ])
 }
 
 ///|
@@ -50,9 +43,6 @@ test "get_all_still_returns_the_external_value_for_a_local_miss" {
       None
     }
   })
-  assert_eq(
-    carrier.get_all("traceparent"),
-    [external_duplicate_traceparent],
-  )
+  assert_eq(carrier.get_all("traceparent"), [external_duplicate_traceparent])
   assert_eq(carrier.get_all("tracestate"), [])
 }

@@ -56,9 +56,7 @@ async test "close_connection before respond defers the close until after the res
     @async.sleep(50)
     assert_eq(exporter.spans.val.length(), 1)
     assert_eq(
-      exporter.spans.val[0].attributes.get(
-        @sdk.HTTP_RESPONSE_STATUS_CODE,
-      ),
+      exporter.spans.val[0].attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE),
       Some(@sdk.IntValue(200)),
     )
   }

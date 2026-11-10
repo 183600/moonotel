@@ -18,10 +18,7 @@ test "transport_header_mutation_does_not_leak_between_exports" {
   assert_true(exporter.export_spans([test_span()]).is_success())
   assert_eq(seen.length(), 2)
   for headers in seen {
-    assert_eq(
-      headers.get("content-type"),
-      Some("application/x-protobuf"),
-    )
+    assert_eq(headers.get("content-type"), Some("application/x-protobuf"))
     assert_eq(headers.get("x-transport-mutated"), None)
   }
 }

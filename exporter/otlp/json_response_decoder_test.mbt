@@ -111,30 +111,23 @@ test "json_decode_skips_unknown_fields" {
 
 ///|
 test "json_decode_rejects_malformed_numbers_in_unknown_fields" {
-  for body in [
-    "{\"unknown\":1e}",
-    "{\"unknown\":1e+}",
-    "{\"unknown\":-}",
-    "{\"unknown\":1.}",
-    "{\"unknown\":1.2.3}",
-    "{\"unknown\":--1}",
-    "{\"unknown\":1+2}",
-    "{\"unknown\":01}",
-  ] {
+  for
+    body in [
+      "{\"unknown\":1e}", "{\"unknown\":1e+}", "{\"unknown\":-}", "{\"unknown\":1.}",
+      "{\"unknown\":1.2.3}", "{\"unknown\":--1}", "{\"unknown\":1+2}", "{\"unknown\":01}",
+    ] {
     assert_false(decode_json_body(body).is_success())
   }
 }
 
 ///|
 test "json_decode_rejects_plus_sign_and_leading_zero_numbers" {
-  for body in [
-    "{\"partialSuccess\":{\"rejectedSpans\":\"+5\"}}",
-    "{\"partialSuccess\":{\"rejectedSpans\":+5}}",
-    "{\"partialSuccess\":{\"rejectedSpans\":01}}",
-    "{\"partialSuccess\":{\"rejectedSpans\":-01}}",
-    "{\"partialSuccess\":{\"rejectedSpans\":00}}",
-    "{\"partialSuccess\":{\"rejectedSpans\":+0}}",
-  ] {
+  for
+    body in [
+      "{\"partialSuccess\":{\"rejectedSpans\":\"+5\"}}", "{\"partialSuccess\":{\"rejectedSpans\":+5}}",
+      "{\"partialSuccess\":{\"rejectedSpans\":01}}", "{\"partialSuccess\":{\"rejectedSpans\":-01}}",
+      "{\"partialSuccess\":{\"rejectedSpans\":00}}", "{\"partialSuccess\":{\"rejectedSpans\":+0}}",
+    ] {
     assert_false(decode_json_body(body).is_success())
   }
 }
@@ -149,9 +142,7 @@ test "json_decode_rejects_non_integer_with_huge_negative_exponent" {
     i = i + 1
   }
   sb.write_string("e-10000000")
-  let body = "{\"partialSuccess\":{\"rejectedSpans\":" +
-    sb.to_string() +
-    "}}"
+  let body = "{\"partialSuccess\":{\"rejectedSpans\":" + sb.to_string() + "}}"
   assert_eq(
     decode_json_body(body),
     @sdk.ExportFailure("malformed OTLP response body"),
@@ -222,11 +213,10 @@ test "json_decode_malformed_bodies_fail" {
 test "json_decode_rejects_invalid_utf8" {
   // Lossy decoding would replace the malformed bytes with U+FFFD and accept
   // these otherwise well-formed JSON bodies as unknown fields.
-  for body in [
-    b"{\"unknown\":\"\xff\"}",
-    b"{\"unknown\":\"\xc3\"}",
-    b"{\"unknown\":\"\xed\xa0\x80\"}",
-  ] {
+  for
+    body in [
+      b"{\"unknown\":\"\xff\"}", b"{\"unknown\":\"\xc3\"}", b"{\"unknown\":\"\xed\xa0\x80\"}",
+    ] {
     assert_false(@otlp.decode_export_response_json(body).is_success())
   }
 }

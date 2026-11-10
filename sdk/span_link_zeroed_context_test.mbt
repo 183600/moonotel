@@ -18,8 +18,9 @@ fn zeroed_link_context() -> @api.SpanContext {
 
 ///|
 test "link_with_zeroed_live_ids_is_dropped" {
-  let provider = @sdk.TracerProviderSdk::new(service_name="zeroed-link")
-    .with_sampler(@sdk.Sampler::always_on())
+  let provider = @sdk.TracerProviderSdk::new(service_name="zeroed-link").with_sampler(
+    @sdk.Sampler::always_on(),
+  )
   let span = provider.get_tracer("zeroed-link").start_root_span("op")
   span.add_link(@sdk.SpanLink::new(zeroed_link_context()))
   assert_eq(span.links().length(), 0)
@@ -27,8 +28,9 @@ test "link_with_zeroed_live_ids_is_dropped" {
 
 ///|
 test "link_with_zeroed_live_ids_and_attributes_is_kept" {
-  let provider = @sdk.TracerProviderSdk::new(service_name="zeroed-link")
-    .with_sampler(@sdk.Sampler::always_on())
+  let provider = @sdk.TracerProviderSdk::new(service_name="zeroed-link").with_sampler(
+    @sdk.Sampler::always_on(),
+  )
   let span = provider.get_tracer("zeroed-link").start_root_span("op")
   span.add_link(
     @sdk.SpanLink::new(

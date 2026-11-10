@@ -46,7 +46,9 @@ test "facade_exposes_the_context_storage_hook" {
   let previous = @moonotel.set_context_storage(backend)
   defer @moonotel.set_context_storage(previous) |> ignore
   assert_eq(@moonotel.current_context().value("backend"), Some("root"))
-  let token = @moonotel.attach(@moonotel.Context::root().with_value("backend", "inner"))
+  let token = @moonotel.attach(
+    @moonotel.Context::root().with_value("backend", "inner"),
+  )
   assert_eq(@moonotel.current_context().value("backend"), Some("inner"))
   @moonotel.detach(token)
   assert_eq(@moonotel.current_context().value("backend"), Some("root"))

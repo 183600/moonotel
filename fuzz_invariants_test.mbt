@@ -12,7 +12,7 @@ struct FuzzRng {
 
 ///|
 fn FuzzRng::new(seed : Int64) -> FuzzRng {
-  { state: Ref(seed) }
+  { state: Ref(seed), }
 }
 
 ///|
@@ -27,7 +27,7 @@ fn FuzzRng::next(self : FuzzRng) -> Int64 {
 }
 
 ///|
-fn FuzzRng::below(self : FuzzRng, bound : Int) -> Int {
+fn FuzzRng::below(self : FuzzRng, bound : Int32) -> Int32 {
   let value = self.next() & 0x7FFFFFFFFFFFFFFFL
   (value % bound.to_int64()).to_int()
 }
@@ -38,22 +38,22 @@ fn FuzzRng::below(self : FuzzRng, bound : Int) -> Int {
 
 ///|
 let fuzz_fragments : Array[String] = [
-  "a", "b", "z", "0", "9", "_", "-", ".", "*", "/", "@", "~", "!", "#", "$",
-  "%", "%20", "%2C", "%3B", "%zz", "%", "=", ";", ",", " ", "\t", "\r", "\n",
-  "\"", "\\", "}", "{", "[", "]", ":", "|", "<", ">", "?", "^", "`", "'", "(",
-  ")", "+", "é", "🤣", "\u{7f}", "\u{0}",
+  "a", "b", "z", "0", "9", "_", "-", ".", "*", "/", "@", "~", "!", "#", "$", "%",
+  "%20", "%2C", "%3B", "%zz", "%", "=", ";", ",", " ", "\t", "\r", "\n", "\"", "\\",
+  "}", "{", "[", "]", ":", "|", "<", ">", "?", "^", "`", "'", "(", ")", "+", "é",
+  "🤣", "\u{7f}", "\u{0}",
 ]
 
 // HTTP token characters, the only characters a baggage key may hold.
 
 ///|
 let fuzz_token_fragments : Array[String] = [
-  "a", "b", "z", "A", "Z", "0", "9", "_", "-", ".", "~", "!", "#", "$", "%",
-  "&", "'", "*", "+", "^", "`", "|",
+  "a", "b", "z", "A", "Z", "0", "9", "_", "-", ".", "~", "!", "#", "$", "%", "&",
+  "'", "*", "+", "^", "`", "|",
 ]
 
 ///|
-fn random_text(rng : FuzzRng, max_fragments : Int) -> String {
+fn random_text(rng : FuzzRng, max_fragments : Int32) -> String {
   let sb = StringBuilder()
   let count = rng.below(max_fragments + 1)
   let mut i = 0
@@ -79,7 +79,7 @@ fn random_token(rng : FuzzRng) -> String {
 }
 
 ///|
-fn random_bytes(rng : FuzzRng, count : Int) -> Array[Int32] {
+fn random_bytes(rng : FuzzRng, count : Int32) -> Array[Int32] {
   let bytes : Array[Int32] = Array(capacity=count)
   let mut i = 0
   while i < count {
@@ -178,11 +178,9 @@ test "fuzz_baggage_entries_round_trip" {
     let property_key = random_token(rng)
     let property_value = random_text(rng, 4)
     let entries : Array[@propagation.BaggageEntry] = [
-      @propagation.BaggageEntry::new(
-        key,
-        value,
-        properties=[(property_key, property_value)],
-      ),
+      @propagation.BaggageEntry::new(key, value, properties=[
+        (property_key, property_value),
+      ]),
     ]
     let formatted = @propagation.format_baggage_entries(entries)
     assert_eq(@propagation.parse_baggage_entries(formatted), entries)
@@ -218,10 +216,9 @@ test "fuzz_tracestate_normalization_is_stable" {
   while i < 3000 {
     let text = random_text(rng, 12)
     match @propagation.parse_tracestate(text) {
-      Some(normalized) => {
+      Some(normalized) =>
         // The normalized form is valid and does not change any more.
         assert_eq(@propagation.parse_tracestate(normalized), Some(normalized))
-      }
       None => ()
     }
     i = i + 1

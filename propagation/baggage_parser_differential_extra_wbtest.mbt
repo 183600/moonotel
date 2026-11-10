@@ -1,7 +1,6 @@
+///|
 test "baggage fast path matches general parser longer strings" {
-  let alphabet = [
-    "a", "%", "2", "f", "g", ",", "=", ";", " ", "\t", "\\", "\"",
-  ]
+  let alphabet = ["a", "%", "2", "f", "g", ",", "=", ";", " ", "\t", "\\", "\""]
   let inputs : Array[String] = []
   probe_generate(alphabet, "", 5, inputs)
   for value in inputs {

@@ -200,7 +200,7 @@ fn resolve_service_name(
 ///|
 fn copy_attributes_with_capacity(
   values : Map[String, AttributeValue],
-  capacity : Int,
+  capacity : Int32,
 ) -> Map[String, AttributeValue] {
   let out : Map[String, AttributeValue] = Map([], capacity~)
   for key, value in values {
@@ -309,7 +309,9 @@ pub fn Resource::with_attribute(
 pub fn Resource::merge(self : Resource, other : Resource) -> Resource {
   let attributes = copy_attributes_with_capacity(
     self.attributes,
-    map_capacity_for_entries(self.attributes.length() + other.attributes.length()),
+    map_capacity_for_entries(
+      self.attributes.length() + other.attributes.length(),
+    ),
   )
   for key, value in other.attributes {
     if key != "" {
@@ -369,9 +371,9 @@ pub fn ResourceAttributes::new(
   // Share the map in the common case. Only an invalid empty key forces a
   // filtered copy, so creating a snapshot stays O(1) for SDK-built resources.
   if attributes.contains("") {
-    { shared: copy_attributes(attributes), own: None }
+    { shared: copy_attributes(attributes), own: None, }
   } else {
-    { shared: attributes, own: None }
+    { shared: attributes, own: None, }
   }
 }
 
@@ -439,7 +441,8 @@ pub fn ResourceAttributes::set(
     Some(map) => map
     None => {
       let copied : Map[String, AttributeValue] = Map(
-        [], capacity=map_capacity_for_entries(self.shared.length() + 1),
+        [],
+        capacity=map_capacity_for_entries(self.shared.length() + 1),
       )
       for entry_key, entry_value in self.shared {
         copied.set(entry_key, copy_attribute_value(entry_value))
@@ -471,7 +474,10 @@ pub fn ResourceAttributes::is_empty(self : ResourceAttributes) -> Bool {
 pub fn ResourceAttributes::iter(
   self : ResourceAttributes,
 ) -> Iter[(String, AttributeValue)] {
-  self.raw_map().iter().map(fn(entry) {
+  self
+  .raw_map()
+  .iter()
+  .map(fn(entry) {
     let (key, value) = entry
     (key, copy_attribute_value(value))
   })
@@ -525,9 +531,7 @@ pub fn ResourceAttributes::remove(
     Some(map) => map.remove(key)
     None =>
       if self.shared.contains(key) {
-        let copied : Map[String, AttributeValue] = copy_attributes(
-          self.shared,
-        )
+        let copied : Map[String, AttributeValue] = copy_attributes(self.shared)
         copied.remove(key)
         self.own = Some(copied)
       }
@@ -549,7 +553,7 @@ pub fn ResourceAttributes::clear(self : ResourceAttributes) -> Unit {
 pub fn ResourceAttributes::copy(
   self : ResourceAttributes,
 ) -> ResourceAttributes {
-  { shared: copy_attributes(self.raw_map()), own: None }
+  { shared: copy_attributes(self.raw_map()), own: None, }
 }
 
 // Iterators over the snapshot's keys and values, and its pairs as an array.

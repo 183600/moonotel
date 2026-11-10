@@ -34,7 +34,7 @@ pub(open) trait SpanExporter {
 }
 
 ///|
-impl SpanExporter with export_span(self, data) {
+impl SpanExporter with fn export_span(self, data) {
   self.export_spans([data])
 }
 
@@ -64,19 +64,19 @@ pub(open) trait SpanProcessor {
 }
 
 ///|
-impl SpanProcessor with is_draining(self) {
+impl SpanProcessor with fn is_draining(self) {
   let _ = self
   false
 }
 
 ///|
-impl SpanProcessor with set_shutdown_completion(self, completion) {
+impl SpanProcessor with fn set_shutdown_completion(self, completion) {
   let _ = self
   let _ = completion
 }
 
 ///|
-impl SpanProcessor with drain_before_shutdown(self) {
+impl SpanProcessor with fn drain_before_shutdown(self) {
   let _ = self
 }
 

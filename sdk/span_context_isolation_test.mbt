@@ -28,8 +28,9 @@ test "span_context_accessor_returns_an_independent_copy" {
 
 ///|
 test "child_span_does_not_alias_parent_context_ids" {
-  let provider = @sdk.TracerProviderSdk::new(service_name="isolation")
-    .with_sampler(@sdk.Sampler::always_on())
+  let provider = @sdk.TracerProviderSdk::new(service_name="isolation").with_sampler(
+    @sdk.Sampler::always_on(),
+  )
   let parent = isolation_context(1, 2)
   let parent_trace = parent.trace_id_hex()
   let parent_span = parent.span_id_hex()
@@ -70,10 +71,9 @@ test "start_span_links_are_isolated_from_caller_contexts" {
   let link_context = isolation_context(5, 6)
   let trace_hex = link_context.trace_id_hex()
   let span_hex = link_context.span_id_hex()
-  let span = provider.get_tracer("isolation").start_span(
-    "op",
-    links=[@sdk.SpanLink::new(link_context)],
-  )
+  let span = provider
+    .get_tracer("isolation")
+    .start_span("op", links=[@sdk.SpanLink::new(link_context)])
   link_context.trace_id_view()[0] = 99
   link_context.span_id_view()[0] = 99
   span.end()

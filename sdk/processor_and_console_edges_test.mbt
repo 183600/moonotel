@@ -53,7 +53,7 @@ fn edge_names(exporter : EdgeExporter) -> Array[String] {
 
 ///|
 test "batch_processor_clamps_invalid_construction_values" {
-  let exporter : EdgeExporter = { names: [] }
+  let exporter : EdgeExporter = { names: [], }
   let processor = @sdk.BatchSpanProcessor::new(
     exporter,
     max_queue_size=0,
@@ -72,7 +72,7 @@ test "batch_processor_clamps_invalid_construction_values" {
 
 ///|
 test "batch_processor_flush_batch_is_a_noop_on_an_empty_queue" {
-  let exporter : EdgeExporter = { names: [] }
+  let exporter : EdgeExporter = { names: [], }
   let processor = @sdk.BatchSpanProcessor::new(
     exporter,
     max_queue_size=2,
@@ -88,7 +88,7 @@ test "batch_processor_flush_batch_is_a_noop_on_an_empty_queue" {
 
 ///|
 test "batch_processor_reuses_ring_buffer_slots_after_flushes" {
-  let exporter : EdgeExporter = { names: [] }
+  let exporter : EdgeExporter = { names: [], }
   let processor = @sdk.BatchSpanProcessor::new(
     exporter,
     max_queue_size=2,
@@ -118,13 +118,11 @@ test "console_exporter_exports_batches_and_rejects_after_shutdown" {
   exporter.shutdown()
   assert_true(exporter.is_shutdown())
   match exporter.export_spans([]) {
-    @sdk.ExportFailure(message) =>
-      assert_true(message.contains("shut down"))
+    @sdk.ExportFailure(message) => assert_true(message.contains("shut down"))
     @sdk.ExportSuccess => fail("expected a failure after shutdown")
   }
   match exporter.export_span(edge_span("console-d")) {
-    @sdk.ExportFailure(message) =>
-      assert_true(message.contains("shut down"))
+    @sdk.ExportFailure(message) => assert_true(message.contains("shut down"))
     @sdk.ExportSuccess => fail("expected a failure after shutdown")
   }
 }

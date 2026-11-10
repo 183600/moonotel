@@ -56,7 +56,7 @@ pub fn BaggageEntry::new(
 // rehash, accounting for the map's 13/16 grow threshold.
 
 ///|
-fn map_capacity_for_entries(entries : Int) -> Int {
+fn map_capacity_for_entries(entries : Int32) -> Int32 {
   let capacity = entries.next_power_of_two()
   if entries > capacity * 13 / 16 {
     capacity * 2
@@ -221,7 +221,8 @@ pub fn Context::with_baggage(
     return self.without_baggage()
   }
   let baggage : Map[String, String] = Map(
-    [], capacity=map_capacity_for_entries(values.length()),
+    [],
+    capacity=map_capacity_for_entries(values.length()),
   )
   for key, value in values {
     if key != "" {
@@ -271,7 +272,8 @@ pub fn Context::with_baggage_owned(
     // Taking ownership cannot skip an invalid entry, so filter into a fresh
     // map. This only happens for the invalid-input path.
     let filtered : Map[String, String] = Map(
-      [], capacity=map_capacity_for_entries(values.length()),
+      [],
+      capacity=map_capacity_for_entries(values.length()),
     )
     for key, value in values {
       if key != "" {
@@ -327,7 +329,7 @@ pub fn Context::with_baggage_entries(
       }
     }
     if !duplicate {
-      list.push({ ..entry, properties: entry.properties.copy() })
+      list.push({ ..entry, properties: entry.properties.copy(), })
     }
     i = i - 1
   }
@@ -354,10 +356,7 @@ pub fn Context::with_baggage_entries(
 // ignored; the span of this context is preserved.
 
 ///|
-pub fn Context::with_baggage_from(
-  self : Context,
-  other : Context,
-) -> Context {
+pub fn Context::with_baggage_from(self : Context, other : Context) -> Context {
   // Collect the baggage-bearing nodes of `other` from innermost to outermost,
   // then attach them in the opposite order so that `other`'s innermost node
   // is looked up first after the merge.
@@ -428,7 +427,7 @@ pub fn Context::span_context(self : Context) -> @api.SpanContext? {
 
 ///|
 fn copy_baggage_entry(entry : BaggageEntry) -> BaggageEntry {
-  { ..entry, properties: entry.properties.copy() }
+  { ..entry, properties: entry.properties.copy(), }
 }
 
 // The member of `list` stored under `key`, if any, as a copy.
@@ -525,7 +524,7 @@ pub fn Context::baggage_entry(self : Context, key : String) -> BaggageEntry? {
             let found : BaggageEntry? = match context.baggage_map {
               Some(map) =>
                 match map.get(key) {
-                  Some(value) => Some({ key, value, properties: [] })
+                  Some(value) => Some({ key, value, properties: [], })
                   None => None
                 }
               None => None
@@ -620,7 +619,7 @@ pub fn Context::baggage_entries(self : Context) -> Array[BaggageEntry] {
                 }
               }
               if visible {
-                entries.push({ key, value, properties: [] })
+                entries.push({ key, value, properties: [], })
               }
             }
           None => ()

@@ -45,9 +45,7 @@ test "always_record_describes_the_wrapped_sampler" {
 ///|
 test "always_record_spans_are_readable_but_not_exported" {
   let exporter = @sdk.InMemorySpanExporter::new()
-  let provider = @sdk.TracerProviderSdk::new(
-    service_name="always-record",
-  )
+  let provider = @sdk.TracerProviderSdk::new(service_name="always-record")
     .with_sampler(@sdk.Sampler::always_record(@sdk.Sampler::always_off()))
     .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
   let tracer = provider.get_tracer("always-record")

@@ -59,8 +59,10 @@ test "provider_merges_the_detected_resource_into_its_own" {
       ("service.name", @sdk.StringValue("detected")),
     ]),
   )
-  let provider = @sdk.TracerProviderSdk::new(service_name="configured")
-    .with_resource_detectors([detector])
+  let provider = @sdk.TracerProviderSdk::new(service_name="configured").with_resource_detectors([
+      detector,
+    ],
+  )
   let attributes = provider.resource()
   // The detected attributes override the ones of the provider, the attributes
   // that only the provider carries are kept.
@@ -74,8 +76,11 @@ test "provider_merges_the_detected_resource_into_its_own" {
 
 ///|
 test "provider_without_detectors_keeps_its_resource" {
-  let provider = @sdk.TracerProviderSdk::new(service_name="configured")
-    .with_resource_detectors([])
+  let provider = @sdk.TracerProviderSdk::new(service_name="configured").with_resource_detectors([],
+  )
   let attributes = provider.resource()
-  assert_eq(attributes.get("service.name"), Some(@sdk.StringValue("configured")))
+  assert_eq(
+    attributes.get("service.name"),
+    Some(@sdk.StringValue("configured")),
+  )
 }

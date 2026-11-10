@@ -303,49 +303,37 @@ test "encode_trace_request_groups_interleaved_scopes" {
   assert_eq(scopes.length(), 2)
   let scope_a = parse_fields(scopes[0].payload)
   assert_eq(
-    first_of(first_of(scope_a, 1).unwrap().payload |> parse_fields, 1)
-      .unwrap()
-      .payload
+    first_of(first_of(scope_a, 1).unwrap().payload |> parse_fields, 1).unwrap().payload
     |> @utf8.decode_lossy,
     "scope-a",
   )
   let scope_a_spans = fields_of(scope_a, 2)
   assert_eq(scope_a_spans.length(), 2)
   assert_eq(
-    first_of(parse_fields(scope_a_spans[0].payload), 5)
-      .unwrap()
-      .payload
+    first_of(parse_fields(scope_a_spans[0].payload), 5).unwrap().payload
     |> @utf8.decode_lossy,
     "a1",
   )
   assert_eq(
-    first_of(parse_fields(scope_a_spans[1].payload), 5)
-      .unwrap()
-      .payload
+    first_of(parse_fields(scope_a_spans[1].payload), 5).unwrap().payload
     |> @utf8.decode_lossy,
     "a2",
   )
   let scope_b = parse_fields(scopes[1].payload)
   assert_eq(
-    first_of(first_of(scope_b, 1).unwrap().payload |> parse_fields, 1)
-      .unwrap()
-      .payload
+    first_of(first_of(scope_b, 1).unwrap().payload |> parse_fields, 1).unwrap().payload
     |> @utf8.decode_lossy,
     "scope-b",
   )
   let scope_b_spans = fields_of(scope_b, 2)
   assert_eq(scope_b_spans.length(), 2)
   assert_eq(
-    first_of(parse_fields(scope_b_spans[0].payload), 5)
-      .unwrap()
-      .payload
+    first_of(parse_fields(scope_b_spans[0].payload), 5).unwrap().payload
     |> @utf8.decode_lossy,
     "b1",
   )
   assert_eq(
-    first_of(parse_fields(scope_b_spans[1].payload), 5)
-      .unwrap()
-      .payload
+    first_of(parse_fields(scope_b_spans[1].payload), 5).unwrap().payload
     |> @utf8.decode_lossy,
     "b2",
   )

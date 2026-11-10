@@ -29,9 +29,7 @@ fn invalid_live_link_span() -> @sdk.SpanData {
 ///|
 test "protobuf_omits_ids_from_an_invalid_live_link_context" {
   let span = invalid_live_link_span()
-  let link = parse_fields(
-    fields_of(link_test_span_fields(span), 13)[0].payload,
-  )
+  let link = parse_fields(fields_of(link_test_span_fields(span), 13)[0].payload)
   assert_true(first_of(link, 1) is None)
   assert_true(first_of(link, 2) is None)
   assert_eq(fields_of(link, 4).length(), 1)
@@ -42,7 +40,9 @@ test "json_omits_ids_from_an_invalid_live_link_context" {
   let text = @utf8.decode_lossy(
     @otlp.encode_trace_request_json([invalid_live_link_span()]).exact_view(),
   )
-  assert_false(text.contains("\"traceId\":\"01010101010101010101010101010101\""))
+  assert_false(
+    text.contains("\"traceId\":\"01010101010101010101010101010101\""),
+  )
   assert_false(text.contains("\"spanId\":\"0202020202020202\""))
   assert_true(text.contains("\"link.reason\""))
 }

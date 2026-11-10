@@ -25,9 +25,7 @@ test "json_decode_matches_escaped_partial_success_field_names" {
   )
   assert_true(message.contains("rejected 2 span(s)"))
   let message = escaped_json_failure_message(
-    decode_escaped_json_body(
-      "{\"partialSuccess\":{\"\\u0072ejectedSpans\":3}}",
-    ),
+    decode_escaped_json_body("{\"partialSuccess\":{\"\\u0072ejectedSpans\":3}}"),
   )
   assert_true(message.contains("rejected 3 span(s)"))
   let message = escaped_json_failure_message(
@@ -52,11 +50,11 @@ test "json_decode_skips_unknown_numeric_field_values" {
 
 ///|
 test "json_decode_still_rejects_malformed_escaped_names" {
-  for body in [
-    "{\"partial\\u00\":{\"rejectedSpans\":1}}",
-    "{\"partial\\uZZZZuccess\":{\"rejectedSpans\":1}}",
-    "{\"partialSuccess\":{\"\\u0072ejectedSpans\":1}",
-  ] {
+  for
+    body in [
+      "{\"partial\\u00\":{\"rejectedSpans\":1}}", "{\"partial\\uZZZZuccess\":{\"rejectedSpans\":1}}",
+      "{\"partialSuccess\":{\"\\u0072ejectedSpans\":1}",
+    ] {
     assert_false(decode_escaped_json_body(body).is_success())
   }
 }

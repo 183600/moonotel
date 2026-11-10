@@ -3,10 +3,9 @@
 // HTTP reader strips at most one leading space and keeps trailing whitespace.
 
 ///|
-fn ows_header_map(entries : Array[(String, String)]) -> Map[
-  @http.CaseInsensitiveString,
-  String,
-] {
+fn ows_header_map(
+  entries : Array[(String, String)],
+) -> Map[@http.CaseInsensitiveString, String] {
   let headers : Map[@http.CaseInsensitiveString, String] = Map([])
   for entry in entries {
     headers.set(@http.CaseInsensitiveString(entry.0), entry.1)
@@ -33,9 +32,9 @@ test "request_body_size ignores content-length when transfer-encoding is set" {
 fn host_attribute_span() -> (@sdk.SpanSdk, @sdk.InMemorySpanExporter) {
   let exporter = @sdk.InMemorySpanExporter::new()
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
-  let provider = @sdk.TracerProviderSdk::new(
-    service_name="header-ows-test",
-  ).with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="header-ows-test").with_span_processor(
+    processor,
+  )
   let span = provider.get_tracer("header-ows-test").start_root_span("host")
   (span, exporter)
 }
@@ -54,20 +53,13 @@ test "record_host_attributes trims optional whitespace around the host" {
     data.attributes.get(@sdk.SERVER_ADDRESS),
     Some(@sdk.StringValue("example.com")),
   )
-  assert_eq(
-    data.attributes.get(@sdk.SERVER_PORT),
-    Some(@sdk.IntValue(8080)),
-  )
+  assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(8080)))
 }
 
 ///|
 test "record_host_attributes omits an empty host" {
   let (span, exporter) = host_attribute_span()
-  record_host_attributes(
-    span,
-    ows_header_map([("Host", " \t ")]),
-    "/",
-  )
+  record_host_attributes(span, ows_header_map([("Host", " \t ")]), "/")
   span.end()
   let data = exporter.exported_spans()[0]
   assert_eq(data.attributes.get(@sdk.SERVER_ADDRESS), None)

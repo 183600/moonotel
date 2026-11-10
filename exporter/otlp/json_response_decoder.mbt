@@ -106,20 +106,12 @@ fn json_field_id_at(
     let code = text.unsafe_get(pos).to_int()
     if code == 0x22 {
       let id = if json_name_matches(
-        text,
-        content_start,
-        pos,
-        first_json,
-        first_proto,
-      ) {
+          text, content_start, pos, first_json, first_proto,
+        ) {
         0
       } else if json_name_matches(
-        text,
-        content_start,
-        pos,
-        second_json,
-        second_proto,
-      ) {
+          text, content_start, pos, second_json, second_proto,
+        ) {
         1
       } else {
         -1
@@ -626,8 +618,8 @@ fn json_skip_number(text : String, start : Int32) -> Int32? {
   } else if first >= 0x31 && first <= 0x39 {
     pos = pos + 1
     while pos < len &&
-      text.unsafe_get(pos).to_int() >= 0x30 &&
-      text.unsafe_get(pos).to_int() <= 0x39 {
+          text.unsafe_get(pos).to_int() >= 0x30 &&
+          text.unsafe_get(pos).to_int() <= 0x39 {
       pos = pos + 1
     }
   } else {
@@ -637,8 +629,8 @@ fn json_skip_number(text : String, start : Int32) -> Int32? {
     pos = pos + 1
     let fraction_start = pos
     while pos < len &&
-      text.unsafe_get(pos).to_int() >= 0x30 &&
-      text.unsafe_get(pos).to_int() <= 0x39 {
+          text.unsafe_get(pos).to_int() >= 0x30 &&
+          text.unsafe_get(pos).to_int() <= 0x39 {
       pos = pos + 1
     }
     if pos == fraction_start {
@@ -657,8 +649,8 @@ fn json_skip_number(text : String, start : Int32) -> Int32? {
       }
       let exponent_start = pos
       while pos < len &&
-        text.unsafe_get(pos).to_int() >= 0x30 &&
-        text.unsafe_get(pos).to_int() <= 0x39 {
+            text.unsafe_get(pos).to_int() >= 0x30 &&
+            text.unsafe_get(pos).to_int() <= 0x39 {
         pos = pos + 1
       }
       if pos == exponent_start {
@@ -770,14 +762,10 @@ fn json_parse_partial_success(
     return Some((rejected, message, cursor + 1))
   }
   while true {
-    let (key, after_key) = match json_field_id_at(
-      text,
-      cursor,
-      "rejectedSpans",
-      "rejected_spans",
-      "errorMessage",
-      "error_message",
-    ) {
+    let (key, after_key) = match
+      json_field_id_at(
+        text, cursor, "rejectedSpans", "rejected_spans", "errorMessage", "error_message",
+      ) {
       Some(pair) => pair
       None => return None
     }
@@ -874,14 +862,8 @@ pub fn decode_export_response_json(body : Bytes) -> @sdk.ExportResult {
   let mut rejected : Int64 = 0L
   let mut message = ""
   while true {
-    let (key, after_key) = match json_field_id_at(
-      text,
-      pos,
-      "partialSuccess",
-      "partial_success",
-      "",
-      "",
-    ) {
+    let (key, after_key) = match
+      json_field_id_at(text, pos, "partialSuccess", "partial_success", "", "") {
       Some(pair) => pair
       None => return malformed_json_response()
     }

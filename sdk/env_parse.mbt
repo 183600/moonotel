@@ -28,6 +28,7 @@ fn parse_decimal_int(value : StringView) -> Int32? {
 // Parse an environment value as a decimal floating-point number. `parse_double`
 // accepts digit separators, which are not part of the decimal notation used by
 // the standard OTEL environment variables, so reject them explicitly.
+
 ///|
 fn parse_decimal_double(value : StringView) -> Double? {
   let len = value.length()

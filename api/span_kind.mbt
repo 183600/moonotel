@@ -11,7 +11,6 @@ pub(all) enum SpanKind {
   Consumer
 }
 
-
 // Lower-case name of the span kind, following the OpenTelemetry specification
 
 ///|

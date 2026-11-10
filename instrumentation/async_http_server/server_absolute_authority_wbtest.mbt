@@ -24,7 +24,10 @@ test "absolute_target_authority_extracts_authority" {
     absolute_target_authority("http://example.com#frag"),
     Some("example.com"),
   )
-  assert_eq(absolute_target_authority("http://example.com"), Some("example.com"))
+  assert_eq(
+    absolute_target_authority("http://example.com"),
+    Some("example.com"),
+  )
 }
 
 ///|

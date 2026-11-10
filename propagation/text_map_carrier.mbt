@@ -32,7 +32,13 @@ pub struct TextMapCarrier {
 
 ///|
 pub fn TextMapCarrier::new() -> TextMapCarrier {
-  { entries: Map([]), duplicate_traceparent: false, getter: None, setter: None, remover: None, }
+  {
+    entries: Map([]),
+    duplicate_traceparent: false,
+    getter: None,
+    setter: None,
+    remover: None,
+  }
 }
 
 // Create a carrier backed by an existing map (values are shared, not copied)
@@ -41,7 +47,13 @@ pub fn TextMapCarrier::new() -> TextMapCarrier {
 pub fn TextMapCarrier::from_map(
   entries : Map[String, String],
 ) -> TextMapCarrier {
-  { entries, duplicate_traceparent: false, getter: None, setter: None, remover: None, }
+  {
+    entries,
+    duplicate_traceparent: false,
+    getter: None,
+    setter: None,
+    remover: None,
+  }
 }
 
 // Create a carrier from an array of key/value pairs. A repeated key is
@@ -72,7 +84,10 @@ pub fn TextMapCarrier::from_entries(
         }
         match matched {
           Some((candidate, existing)) => {
-            if ascii_case_insensitive_equal(candidate, traceparent_header_name()) {
+            if ascii_case_insensitive_equal(
+                candidate,
+                traceparent_header_name(),
+              ) {
               duplicate_traceparent = true
             }
             map.set(candidate, existing + ", " + entry.1)
@@ -96,10 +111,14 @@ pub fn TextMapCarrier::from_entries(
 // store with its own case rules (for example HTTP headers) keeps them.
 
 ///|
-pub fn TextMapCarrier::from_getter(
-  get : (String) -> String?,
-) -> TextMapCarrier {
-  { entries: Map([]), duplicate_traceparent: false, getter: Some(get), setter: None, remover: None, }
+pub fn TextMapCarrier::from_getter(get : (String) -> String?) -> TextMapCarrier {
+  {
+    entries: Map([]),
+    duplicate_traceparent: false,
+    getter: Some(get),
+    setter: None,
+    remover: None,
+  }
 }
 
 // Create a write-through carrier: `set` forwards every write to `set`.
@@ -109,7 +128,13 @@ pub fn TextMapCarrier::from_getter(
 pub fn TextMapCarrier::from_setter(
   set : (String, String) -> Unit,
 ) -> TextMapCarrier {
-  { entries: Map([]), duplicate_traceparent: false, getter: None, setter: Some(set), remover: None, }
+  {
+    entries: Map([]),
+    duplicate_traceparent: false,
+    getter: None,
+    setter: Some(set),
+    remover: None,
+  }
 }
 
 // Create a carrier that both reads through `get` and writes through `set`.
@@ -135,7 +160,7 @@ pub fn TextMapCarrier::from_getter_setter(
 // rehash, accounting for the map's 13/16 grow threshold.
 
 ///|
-fn map_capacity_for_entries(entries : Int) -> Int {
+fn map_capacity_for_entries(entries : Int32) -> Int32 {
   let capacity = entries.next_power_of_two()
   if entries > capacity * 13 / 16 {
     capacity * 2
@@ -230,9 +255,7 @@ pub fn TextMapCarrier::get_all(
 // field as an opaque extension.
 
 ///|
-fn TextMapCarrier::has_duplicate_traceparent(
-  self : TextMapCarrier,
-) -> Bool {
+fn TextMapCarrier::has_duplicate_traceparent(self : TextMapCarrier) -> Bool {
   self.duplicate_traceparent
 }
 
@@ -337,7 +360,8 @@ pub fn TextMapCarrier::length(self : TextMapCarrier) -> Int32 {
 ///|
 pub fn TextMapCarrier::to_map(self : TextMapCarrier) -> Map[String, String] {
   let out : Map[String, String] = Map(
-    [], capacity=map_capacity_for_entries(self.entries.length()),
+    [],
+    capacity=map_capacity_for_entries(self.entries.length()),
   )
   for key, value in self.entries {
     out.set(key, value)

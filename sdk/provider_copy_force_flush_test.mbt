@@ -11,8 +11,9 @@ test "force_flush_reaches_a_processor_added_to_a_shut_down_copy" {
     max_export_batch_size=16,
     flush_interval_millis=1000000,
   )
-  let base = @sdk.TracerProviderSdk::new(service_name="copy-flush")
-    .with_sampler(@sdk.Sampler::always_on())
+  let base = @sdk.TracerProviderSdk::new(service_name="copy-flush").with_sampler(
+    @sdk.Sampler::always_on(),
+  )
   let copy = base.with_span_processor(batch)
   copy.get_tracer("copy-flush").start_root_span("queued").end()
   assert_eq(exporter.span_count(), 0)

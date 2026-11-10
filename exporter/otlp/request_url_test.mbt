@@ -27,9 +27,7 @@ test "request_url_strips_fragments_and_keeps_queries" {
 ///|
 test "request_url_normalizes_schemes" {
   assert_eq(
-    @otlp.OtlpHttpConfig::new(
-      traces_endpoint="HTTP://collector:4318/custom",
-    ).request_url(),
+    @otlp.OtlpHttpConfig::new(traces_endpoint="HTTP://collector:4318/custom").request_url(),
     "http://collector:4318/custom",
   )
   assert_eq(
@@ -43,9 +41,7 @@ test "request_url_normalizes_schemes" {
 ///|
 test "request_url_resolves_a_network_path_reference" {
   assert_eq(
-    @otlp.OtlpHttpConfig::new(
-      traces_endpoint="//collector:4318/custom#frag",
-    ).request_url(),
+    @otlp.OtlpHttpConfig::new(traces_endpoint="//collector:4318/custom#frag").request_url(),
     "http://collector:4318/custom",
   )
   assert_eq(
@@ -70,9 +66,7 @@ test "exporter_passes_the_request_url_to_the_transport" {
 ///|
 test "request_url_removes_an_empty_port" {
   assert_eq(
-    @otlp.OtlpHttpConfig::new(
-      traces_endpoint="HTTP://collector:/custom",
-    ).request_url(),
+    @otlp.OtlpHttpConfig::new(traces_endpoint="HTTP://collector:/custom").request_url(),
     "http://collector/custom",
   )
   assert_eq(
@@ -84,22 +78,18 @@ test "request_url_removes_an_empty_port" {
     "http://collector/v1/traces",
   )
   assert_eq(
-    @otlp.OtlpHttpConfig::new(
-      traces_endpoint="https://[::1]:/custom",
-    ).request_url(),
+    @otlp.OtlpHttpConfig::new(traces_endpoint="https://[::1]:/custom").request_url(),
     "https://[::1]/custom",
   )
 }
 
 ///|
 test "request_url_leaves_non_empty_and_malformed_ports" {
-  for traces_endpoint in [
-    "http://collector:4318/custom",
-    "http://collector:80:/custom",
-    "http://collector::/custom",
-    "http://[::1]:4318/custom",
-    "http://[::1]:80:/custom",
-  ] {
+  for
+    traces_endpoint in [
+      "http://collector:4318/custom", "http://collector:80:/custom", "http://collector::/custom",
+      "http://[::1]:4318/custom", "http://[::1]:80:/custom",
+    ] {
     assert_eq(
       @otlp.OtlpHttpConfig::new(traces_endpoint~).request_url(),
       traces_endpoint,

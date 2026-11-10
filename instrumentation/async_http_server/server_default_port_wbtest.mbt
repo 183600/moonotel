@@ -11,10 +11,7 @@ test "record_host_attributes_uses_the_http_default_port" {
     data.attributes.get(@sdk.SERVER_ADDRESS),
     Some(@sdk.StringValue("example.com")),
   )
-  assert_eq(
-    data.attributes.get(@sdk.SERVER_PORT),
-    Some(@sdk.IntValue(80)),
-  )
+  assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(80)))
 }
 
 ///|
@@ -31,10 +28,7 @@ test "record_host_attributes_uses_the_https_default_port" {
     data.attributes.get(@sdk.SERVER_ADDRESS),
     Some(@sdk.StringValue("example.com")),
   )
-  assert_eq(
-    data.attributes.get(@sdk.SERVER_PORT),
-    Some(@sdk.IntValue(443)),
-  )
+  assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(443)))
 }
 
 ///|
@@ -47,10 +41,7 @@ test "record_host_attributes_uses_the_default_for_an_empty_port" {
     data.attributes.get(@sdk.SERVER_ADDRESS),
     Some(@sdk.StringValue("example.com")),
   )
-  assert_eq(
-    data.attributes.get(@sdk.SERVER_PORT),
-    Some(@sdk.IntValue(80)),
-  )
+  assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(80)))
 }
 
 ///|
@@ -63,10 +54,7 @@ test "record_host_attributes_defaults_a_bracketed_ipv6_port" {
     data.attributes.get(@sdk.SERVER_ADDRESS),
     Some(@sdk.StringValue("::1")),
   )
-  assert_eq(
-    data.attributes.get(@sdk.SERVER_PORT),
-    Some(@sdk.IntValue(80)),
-  )
+  assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(80)))
 }
 
 ///|

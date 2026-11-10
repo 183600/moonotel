@@ -60,7 +60,7 @@ pub fn Tracestate::parse(value : String) -> Tracestate? {
   let mut member_count = 0
   while true {
     let end = find_code_unit(view, ',', start)
-    let item = trim_ows(view.clamped_view(start=start, end=end))
+    let item = trim_ows(view.clamped_view(start~, end~))
     if item.length() == 0 {
       // Empty and whitespace-only list-members are allowed and carry no
       // key/value pair.

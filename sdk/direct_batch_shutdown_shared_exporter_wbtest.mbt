@@ -33,9 +33,7 @@ pub impl SpanExporter for DirectShutdownSharedExporter with fn export_spans(
 }
 
 ///|
-pub impl SpanExporter for DirectShutdownSharedExporter with fn shutdown(
-  self,
-) {
+pub impl SpanExporter for DirectShutdownSharedExporter with fn shutdown(self) {
   self.shutdown_called = true
   self.shutdowns = self.shutdowns + 1
 }
@@ -96,10 +94,10 @@ test "direct_batch_shutdown_keeps_a_shared_exporter_open_until_drained" {
     flush_interval_millis=1000000,
   )
   let provider = TracerProviderSdk::new(
-    service_name="direct-shutdown-shared-exporter",
-  ).with_span_processors([first, second]).with_sampler(
-    Sampler::always_on(),
-  )
+      service_name="direct-shutdown-shared-exporter",
+    )
+    .with_span_processors([first, second])
+    .with_sampler(Sampler::always_on())
   exporter.provider.val = Some(provider)
   for i = 0; i < 5; i = i + 1 {
     first.push_span(direct_shutdown_span("s" + i.to_string()))

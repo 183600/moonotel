@@ -16,16 +16,12 @@ test "span_data_snapshot_does_not_alias_span_or_caller_state" {
   let values : Array[String] = ["a"]
   let event_values : Array[String] = ["e"]
   let link_values : Array[String] = ["l"]
-  let span = tracer.start_span(
-    "op",
-    parent=parent_ctx,
-    links=[
-      @sdk.SpanLink::new(
-        parent_ctx,
-        attributes=Map([("k", @sdk.StringArrayValue(link_values))]),
-      ),
-    ],
-  )
+  let span = tracer.start_span("op", parent=parent_ctx, links=[
+    @sdk.SpanLink::new(
+      parent_ctx,
+      attributes=Map([("k", @sdk.StringArrayValue(link_values))]),
+    ),
+  ])
   span.set_string_array_attribute("arr", values)
   span.add_event(
     "ev",

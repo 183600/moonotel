@@ -53,9 +53,7 @@ async test "async exporter accepts mixed-case protocol and compression" {
         conn.send_response(200, "OK")
       })
     }
-    let base = @otlp.OtlpHttpConfig::new(
-      endpoint="http://127.0.0.1:\{port}",
-    )
+    let base = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:\{port}")
     let config : @otlp.OtlpHttpConfig = {
       ..base,
       protocol: "HTTP/JSON",

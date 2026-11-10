@@ -24,13 +24,15 @@ fn ProtoWriter::with_capacity(size_hint : Int32) -> ProtoWriter {
 let encoder_pool : Array[ProtoWriter] = []
 
 // Capacity limits above which recycled buffers are not pooled.
+
+///|
 const MAX_ROOT_BUFFER_BYTES : Int32 = 4 * 1024 * 1024
 
 ///|
 const MAX_SCRATCH_BUFFER_BYTES : Int32 = 1024 * 1024
 
 ///|
-const MAX_ENCODER_POOL_SIZE : Int = 8
+const MAX_ENCODER_POOL_SIZE : Int32 = 8
 
 // Buffers above this size are trimmed before a writer goes back into the pool.
 
@@ -43,7 +45,14 @@ fn take_root_writer(size_hint : Int32) -> ProtoWriter {
     Some(writer) => {
       writer.len = 0
       if writer.buf.length() > MAX_ROOT_BUFFER_BYTES {
-        writer.buf = FixedArray::make(if size_hint < 1 { 1 } else { size_hint }, b'\x00')
+        writer.buf = FixedArray::make(
+          if size_hint < 1 {
+            1
+          } else {
+            size_hint
+          },
+          b'\x00',
+        )
       }
       writer
     }
@@ -383,11 +392,7 @@ fn ProtoWriter::write_bytes_from_int_array(
     let v1 = values.unsafe_get(i + 1)
     let v2 = values.unsafe_get(i + 2)
     let v3 = values.unsafe_get(i + 3)
-    if (v0 | v1 | v2 | v3) >= 0 &&
-      v0 < 256 &&
-      v1 < 256 &&
-      v2 < 256 &&
-      v3 < 256 {
+    if (v0 | v1 | v2 | v3) >= 0 && v0 < 256 && v1 < 256 && v2 < 256 && v3 < 256 {
       buf.unsafe_write_uint32_le(
         pos,
         (v0 | (v1 << 8) | (v2 << 16) | (v3 << 24)).reinterpret_as_uint(),

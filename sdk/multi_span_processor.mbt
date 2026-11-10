@@ -152,7 +152,9 @@ pub impl SpanProcessor for MultiSpanProcessor with fn force_flush(self) {
       Some(owner) => {
         let previous = self.flushing_owner.val
         self.flushing_owner.val = Some(self.processors)
-        defer { self.flushing_owner.val = previous }
+        defer {
+          self.flushing_owner.val = previous
+        }
         self.force_flush_children(Some(owner))
       }
       None => ()
@@ -182,7 +184,9 @@ pub impl SpanProcessor for MultiSpanProcessor with fn drain_before_shutdown(
     return
   }
   self.draining.val = true
-  defer { self.draining.val = false }
+  defer {
+    self.draining.val = false
+  }
   if !self.shutdown_called.val {
     for i, processor in self.processors {
       if self.shutdown_called.val {
@@ -230,7 +234,9 @@ pub impl SpanProcessor for MultiSpanProcessor with fn shutdown(self) {
     return
   }
   self.draining.val = true
-  defer { self.draining.val = false }
+  defer {
+    self.draining.val = false
+  }
   self.shutdown_called.val = true
   // Drain all not-yet-drained children before shutting any of them down,
   // matching the provider's shutdown order when children share an exporter.

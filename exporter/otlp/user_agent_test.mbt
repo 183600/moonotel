@@ -45,10 +45,7 @@ test "configured_user_agent_overrides_the_default_case_insensitively" {
   let headers : Map[String, String] = Map([], capacity=1)
   headers.set("User-Agent", "custom-agent/9.9")
   let exporter = @otlp.OtlpHttpExporter::new(
-    @otlp.OtlpHttpConfig::new(
-      endpoint="http://collector:4318",
-      headers~,
-    ),
+    @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318", headers~),
     mock.as_transport(),
   )
   assert_true(exporter.export_spans([accept_test_span()]).is_success())
@@ -64,10 +61,7 @@ test "configured_user_agent_is_not_duplicated_across_case_variants" {
   headers.set("user-agent", "first/1.0")
   headers.set("USER-AGENT", "second/2.0")
   let exporter = @otlp.OtlpHttpExporter::new(
-    @otlp.OtlpHttpConfig::new(
-      endpoint="http://collector:4318",
-      headers~,
-    ),
+    @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318", headers~),
     mock.as_transport(),
   )
   assert_true(exporter.export_spans([accept_test_span()]).is_success())

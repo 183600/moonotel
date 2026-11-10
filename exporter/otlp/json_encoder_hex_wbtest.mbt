@@ -1,3 +1,4 @@
+///|
 test "JSON hex encoding matches bytes_to_hex for every length" {
   let mut len = 0
   while len <= 17 {

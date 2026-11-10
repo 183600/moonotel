@@ -15,10 +15,7 @@ test "console format escapes unpaired surrogates in all text fields" {
   let high = String::from_array([(0xD800).unsafe_to_char()])
   let low = String::from_array([(0xDC00).unsafe_to_char()])
   let attributes : Map[String, AttributeValue] = Map([])
-  attributes.set(
-    "key" + high,
-    StringValue("value" + low),
-  )
+  attributes.set("key" + high, StringValue("value" + low))
   let data : SpanData = {
     name: "span" + high,
     span_context: @api.span_context(

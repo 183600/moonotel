@@ -74,8 +74,9 @@ pub impl @sdk.SpanExporter for CopyShutdownCallingExporter with fn shutdown(
 ///|
 test "provider_copy_shutdown_during_another_shutdown_reaches_the_copy" {
   let exporter : CopyShutdownCallingExporter = { copy: Ref(None), }
-  let base = @sdk.TracerProviderSdk::new(service_name="copy-shutdown-during")
-    .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+  let base = @sdk.TracerProviderSdk::new(service_name="copy-shutdown-during").with_span_processor(
+    @sdk.SimpleSpanProcessor::new(exporter),
+  )
   let extra : CopyShutdownCountingProcessor = {
     shutdowns: Ref(0),
     flushes: Ref(0),
@@ -97,8 +98,9 @@ test "provider_copy_force_flush_during_another_flush_reaches_the_copy" {
     }
   })
   let second = reentrant_flush_processor()
-  let base = @sdk.TracerProviderSdk::new(service_name="copy-flush-during")
-    .with_span_processor(first)
+  let base = @sdk.TracerProviderSdk::new(service_name="copy-flush-during").with_span_processor(
+    first,
+  )
   let copy = base.with_span_processor(second)
   copy_ref.val = Some(copy)
   base.force_flush()
@@ -153,9 +155,7 @@ pub impl @sdk.SpanProcessor for CopyShutdownTriggerChild with fn force_flush(
 }
 
 ///|
-pub impl @sdk.SpanProcessor for CopyShutdownTriggerChild with fn shutdown(
-  self,
-) {
+pub impl @sdk.SpanProcessor for CopyShutdownTriggerChild with fn shutdown(self) {
   match self.copy.val {
     Some(copy) => copy.shutdown()
     None => ()

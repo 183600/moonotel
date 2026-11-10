@@ -19,9 +19,7 @@ pub impl @sdk.SpanExporter for AbsoluteAuthorityExporter with fn export_spans(
 }
 
 ///|
-pub impl @sdk.SpanExporter for AbsoluteAuthorityExporter with fn shutdown(
-  self,
-) {
+pub impl @sdk.SpanExporter for AbsoluteAuthorityExporter with fn shutdown(self) {
   let _ = self
 }
 
@@ -67,10 +65,7 @@ async test "server host attributes follow the absolute-form authority" {
       data.attributes.get(@sdk.SERVER_ADDRESS),
       Some(@sdk.StringValue("backend.internal")),
     )
-    assert_eq(
-      data.attributes.get(@sdk.SERVER_PORT),
-      Some(@sdk.IntValue(8080)),
-    )
+    assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(8080)))
     assert_eq(
       data.attributes.get(@sdk.URL_PATH),
       Some(@sdk.StringValue("/items")),
@@ -108,10 +103,7 @@ async test "server host attributes ignore userinfo in the absolute-form authorit
       data.attributes.get(@sdk.SERVER_ADDRESS),
       Some(@sdk.StringValue("backend.internal")),
     )
-    assert_eq(
-      data.attributes.get(@sdk.SERVER_PORT),
-      Some(@sdk.IntValue(8080)),
-    )
+    assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(8080)))
   }
 }
 
@@ -149,7 +141,10 @@ async test "server strips userinfo from a non-http absolute-form target" {
       data.attributes.get(@sdk.URL_QUERY),
       Some(@sdk.StringValue("q=1")),
     )
-    assert_eq(data.attributes.get(@sdk.URL_SCHEME), Some(@sdk.StringValue("ftp")))
+    assert_eq(
+      data.attributes.get(@sdk.URL_SCHEME),
+      Some(@sdk.StringValue("ftp")),
+    )
     // Server attributes keep their existing http(s)-absolute-form contract,
     // so the Host header remains the fallback for an unknown scheme.
     assert_eq(
@@ -189,10 +184,7 @@ async test "server host attributes keep the Host header for origin form" {
       data.attributes.get(@sdk.SERVER_ADDRESS),
       Some(@sdk.StringValue("example.com")),
     )
-    assert_eq(
-      data.attributes.get(@sdk.SERVER_PORT),
-      Some(@sdk.IntValue(9090)),
-    )
+    assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(9090)))
   }
 }
 
@@ -226,9 +218,6 @@ async test "server host attributes ignore userinfo in the Host header" {
       data.attributes.get(@sdk.SERVER_ADDRESS),
       Some(@sdk.StringValue("example.com")),
     )
-    assert_eq(
-      data.attributes.get(@sdk.SERVER_PORT),
-      Some(@sdk.IntValue(9090)),
-    )
+    assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(9090)))
   }
 }

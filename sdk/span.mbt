@@ -342,7 +342,8 @@ fn limited_attributes(
     count_limit
   }
   let kept : Map[String, AttributeValue] = Map(
-    [], capacity=map_capacity_for_entries(capacity),
+    [],
+    capacity=map_capacity_for_entries(capacity),
   )
   let mut dropped = 0
   for key, value in attributes {
@@ -627,7 +628,9 @@ pub fn SpanSdk::set_attributes(
       let limit = self.limits.attribute_count_limit
       let budget = if limit >= 0 && limit < count { limit } else { count }
       if budget > 0 {
-        self.attributes = Some(Map([], capacity=map_capacity_for_entries(budget)))
+        self.attributes = Some(
+          Map([], capacity=map_capacity_for_entries(budget)),
+        )
       }
     }
     for key, value in attributes {
@@ -927,7 +930,7 @@ fn copy_attribute_value(value : AttributeValue) -> AttributeValue {
 // rehash, accounting for the map's 13/16 grow threshold.
 
 ///|
-fn map_capacity_for_entries(entries : Int) -> Int {
+fn map_capacity_for_entries(entries : Int32) -> Int32 {
   let capacity = entries.next_power_of_two()
   if entries > capacity * 13 / 16 {
     capacity * 2
@@ -951,7 +954,9 @@ fn copy_attribute_map(
   let out = attributes.copy()
   for key, value in attributes {
     match value {
-      StringArrayValue(_) | BoolArrayValue(_) | IntArrayValue(_)
+      StringArrayValue(_)
+      | BoolArrayValue(_)
+      | IntArrayValue(_)
       | DoubleArrayValue(_) => out.set(key, copy_attribute_value(value))
       _ => ()
     }
@@ -971,7 +976,9 @@ fn snapshot_attribute_map(
 ) -> Map[String, AttributeValue] {
   for _, value in attributes {
     match value {
-      StringArrayValue(_) | BoolArrayValue(_) | IntArrayValue(_)
+      StringArrayValue(_)
+      | BoolArrayValue(_)
+      | IntArrayValue(_)
       | DoubleArrayValue(_) => return copy_attribute_map(attributes)
       _ => ()
     }

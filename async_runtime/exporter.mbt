@@ -23,7 +23,7 @@ pub struct OtlpHttpAsyncSpanExporter {
   mut shutdown_called : Bool
   mut dropped : UInt64
   mut failures : UInt64
-  mut active_sends : Int
+  mut active_sends : Int32
   // Number of batches accepted by `enqueue` and number of those batches whose
   // export attempt has finished (including batches discarded on overflow).
   // `flush` uses the difference to wait for a batch that was handed directly to
@@ -118,8 +118,7 @@ pub async fn OtlpHttpAsyncSpanExporter::flush(
 ) -> Unit {
   while true {
     self.drain()
-    if self.completed_batches >= self.accepted_batches &&
-      self.active_sends == 0 {
+    if self.completed_batches >= self.accepted_batches && self.active_sends == 0 {
       return
     }
     self.send_finished.wait()
@@ -201,7 +200,9 @@ async fn OtlpHttpAsyncSpanExporter::export_available(
     let batch = pending
     batch.reserve_capacity(MAX_EXPORT_SPANS)
     while batch.length() < MAX_EXPORT_SPANS {
-      let next : Array[@sdk.SpanData]? = self.queue.try_get() catch { _ => None }
+      let next : Array[@sdk.SpanData]? = self.queue.try_get() catch {
+        _ => None
+      }
       match next {
         Some(items) => {
           processed = processed + 1
@@ -251,9 +252,7 @@ async fn OtlpHttpAsyncSpanExporter::send(
   let _ = @async.protect_from_cancel(() => {
     let outcome : @sdk.ExportResult? = if timeout > 0 {
       Some(
-        @async.with_timeout(timeout, () => {
-          self.exporter.export_batch(batch)
-        }),
+        @async.with_timeout(timeout, () => self.exporter.export_batch(batch)),
       ) catch {
         _ => None
       }

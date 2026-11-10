@@ -32,10 +32,7 @@ struct CountingProcessor {
 }
 
 ///|
-pub impl @sdk.SpanProcessor for CountingProcessor with fn on_start(
-  self,
-  _span,
-) {
+pub impl @sdk.SpanProcessor for CountingProcessor with fn on_start(self, _span) {
   let _ = self
 }
 
@@ -56,12 +53,12 @@ pub impl @sdk.SpanProcessor for CountingProcessor with fn shutdown(self) {
 
 ///|
 fn counting_processor() -> CountingProcessor {
-  { flushes: Ref(0), shutdowns: Ref(0) }
+  { flushes: Ref(0), shutdowns: Ref(0), }
 }
 
 ///|
 fn lifecycle_provider() -> (@sdk.TracerProviderSdk, LifecycleExporter) {
-  let exporter : LifecycleExporter = { spans: [] }
+  let exporter : LifecycleExporter = { spans: [], }
   let provider = @sdk.TracerProviderSdk::new(service_name="svc")
     .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
     .with_sampler(@sdk.Sampler::always_on())
@@ -79,8 +76,9 @@ test "tracer_enabled_reflects_processors_and_shutdown" {
 
 ///|
 test "tracer_without_processors_is_not_enabled" {
-  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
-    .with_sampler(@sdk.Sampler::always_on())
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc").with_sampler(
+    @sdk.Sampler::always_on(),
+  )
   let tracer = provider.get_tracer("lifecycle")
   assert_false(tracer.enabled())
 }
@@ -144,8 +142,9 @@ test "shutdown_is_visible_across_provider_copies" {
 ///|
 test "copy_shutdown_flushes_processors_added_to_the_copy" {
   let exporter = @sdk.InMemorySpanExporter::new()
-  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
-    .with_sampler(@sdk.Sampler::always_on())
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc").with_sampler(
+    @sdk.Sampler::always_on(),
+  )
   let copy = provider.with_span_processor(
     @sdk.BatchSpanProcessor::new(exporter, max_export_batch_size=100),
   )
@@ -164,8 +163,9 @@ test "copy_shutdown_flushes_processors_added_to_the_copy" {
 test "copy_shutdown_does_not_shut_a_shared_processor_twice" {
   let first = counting_processor()
   let second = counting_processor()
-  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
-    .with_span_processor(first)
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc").with_span_processor(
+    first,
+  )
   let copy = provider.with_span_processor(second)
   provider.shutdown()
   assert_eq(first.shutdowns.val, 1)
@@ -178,8 +178,9 @@ test "copy_shutdown_does_not_shut_a_shared_processor_twice" {
 ///|
 test "force_flush_after_shutdown_is_ignored" {
   let processor = counting_processor()
-  let provider = @sdk.TracerProviderSdk::new(service_name="svc")
-    .with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc").with_span_processor(
+    processor,
+  )
   provider.shutdown()
   assert_eq(processor.flushes.val, 0)
   provider.force_flush()

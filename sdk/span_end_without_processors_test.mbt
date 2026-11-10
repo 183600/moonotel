@@ -5,8 +5,9 @@
 
 ///|
 fn no_processor_span() -> @sdk.SpanSdk {
-  let provider = @sdk.TracerProviderSdk::new(service_name="no-processors")
-    .with_sampler(@sdk.Sampler::always_on())
+  let provider = @sdk.TracerProviderSdk::new(service_name="no-processors").with_sampler(
+    @sdk.Sampler::always_on(),
+  )
   provider.get_tracer("no-processors").start_span("op")
 }
 
@@ -33,10 +34,7 @@ test "ended span keeps events without processors" {
   let events = span.events()
   assert_eq(events.length(), 1)
   assert_eq(events[0].name, "event")
-  assert_eq(
-    events[0].attributes.get("detail"),
-    Some(@sdk.StringValue("kept")),
-  )
+  assert_eq(events[0].attributes.get("detail"), Some(@sdk.StringValue("kept")))
 }
 
 ///|
@@ -57,16 +55,14 @@ test "ended span keeps links without processors" {
   let links = span.links()
   assert_eq(links.length(), 1)
   assert_eq(links[0].span_context.span_id_hex(), "00f067aa0ba902b7")
-  assert_eq(
-    links[0].attributes.get("kind"),
-    Some(@sdk.StringValue("follows")),
-  )
+  assert_eq(links[0].attributes.get("kind"), Some(@sdk.StringValue("follows")))
 }
 
 ///|
 test "ending a non-recording span still keeps the no-op state" {
-  let provider = @sdk.TracerProviderSdk::new(service_name="no-processors")
-    .with_sampler(@sdk.Sampler::always_off())
+  let provider = @sdk.TracerProviderSdk::new(service_name="no-processors").with_sampler(
+    @sdk.Sampler::always_off(),
+  )
   let span = provider.get_tracer("no-processors").start_span("dropped")
   assert_false(span.is_recording())
   span.set_attribute("dropped", @sdk.StringValue("value"))

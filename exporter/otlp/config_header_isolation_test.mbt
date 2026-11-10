@@ -20,7 +20,10 @@ test "exporter_config_accessor_returns_an_isolated_header_snapshot" {
     endpoint="http://collector:4318",
     headers=Map([("authorization", "Bearer token")]),
   )
-  let exporter = @otlp.OtlpHttpExporter::new(config, mock_transport(200).as_transport())
+  let exporter = @otlp.OtlpHttpExporter::new(
+    config,
+    mock_transport(200).as_transport(),
+  )
   let returned = exporter.config()
   returned.headers.set("authorization", "changed")
   returned.headers.set("x-added-later", "1")
@@ -43,9 +46,6 @@ test "exporter_built_from_config_keeps_the_header_snapshot" {
   headers.set("authorization", "changed")
   headers.set("x-added-later", "1")
   assert_true(exporter.export_spans([test_span()]).is_success())
-  assert_eq(
-    mock.headers[0].get("authorization"),
-    Some("Bearer token"),
-  )
+  assert_eq(mock.headers[0].get("authorization"), Some("Bearer token"))
   assert_eq(mock.headers[0].get("x-added-later"), None)
 }

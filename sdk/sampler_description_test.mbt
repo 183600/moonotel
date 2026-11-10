@@ -40,10 +40,9 @@ test "ratio_sampler_keeps_identity_at_boundaries" {
 ///|
 test "ratio_nan_behaves_like_always_on" {
   let sampler = @sdk.Sampler::trace_id_ratio_based(0.0 / 0.0)
-  let decision = sampler.should_sample(
-    None,
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  )
+  let decision = sampler.should_sample(None, [
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  ])
   assert_true(decision.is_recorded)
   assert_true(decision.is_sampled)
 }
@@ -53,13 +52,13 @@ test "ratio_infinity_is_clamped" {
   let positive = @sdk.Sampler::trace_id_ratio_based(1.0 / 0.0)
   let negative = @sdk.Sampler::trace_id_ratio_based(-1.0 / 0.0)
   assert_true(
-    positive
-    .should_sample(None, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255])
-    .is_sampled,
+    positive.should_sample(None, [
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255,
+    ]).is_sampled,
   )
   assert_false(
-    negative
-    .should_sample(None, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-    .is_sampled,
+    negative.should_sample(None, [
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]).is_sampled,
   )
 }

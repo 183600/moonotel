@@ -75,10 +75,7 @@ test "redacts AWS access key id and CloudFront signature parameters" {
 test "unmatchable parameter names are left unchanged" {
   // A truncated escape and a non-ASCII literal cannot name a sensitive
   // parameter, so their values are not redacted.
-  assert_eq(
-    @sdk.redact_sensitive_query_string("sig%2=secret"),
-    "sig%2=secret",
-  )
+  assert_eq(@sdk.redact_sensitive_query_string("sig%2=secret"), "sig%2=secret")
   assert_eq(
     @sdk.redact_sensitive_query_string("é%73ig=secret"),
     "é%73ig=secret",

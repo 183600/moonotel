@@ -23,8 +23,9 @@ fn all_zero(bytes : Array[Int32]) -> Bool {
 
 ///|
 test "zeroed_parent_trace_id_starts_a_new_root_trace" {
-  let provider = @sdk.TracerProviderSdk::new(service_name="live-parent")
-    .with_sampler(@sdk.Sampler::always_on())
+  let provider = @sdk.TracerProviderSdk::new(service_name="live-parent").with_sampler(
+    @sdk.Sampler::always_on(),
+  )
   let tracer = provider.get_tracer("live-parent")
   let parent = live_parent_context()
   let trace = parent.trace_id_view()
@@ -39,8 +40,9 @@ test "zeroed_parent_trace_id_starts_a_new_root_trace" {
 
 ///|
 test "zeroed_parent_span_id_starts_a_new_root_trace" {
-  let provider = @sdk.TracerProviderSdk::new(service_name="live-parent")
-    .with_sampler(@sdk.Sampler::always_on())
+  let provider = @sdk.TracerProviderSdk::new(service_name="live-parent").with_sampler(
+    @sdk.Sampler::always_on(),
+  )
   let tracer = provider.get_tracer("live-parent")
   let parent = live_parent_context()
   let span = parent.span_id_view()
@@ -68,8 +70,9 @@ test "parent_based_sampler_ignores_zeroed_live_parent_ids" {
 
 ///|
 test "parent_ids_that_serialize_to_zero_start_a_new_root_trace" {
-  let provider = @sdk.TracerProviderSdk::new(service_name="serialized-parent")
-    .with_sampler(@sdk.Sampler::always_on())
+  let provider = @sdk.TracerProviderSdk::new(service_name="serialized-parent").with_sampler(
+    @sdk.Sampler::always_on(),
+  )
   let tracer = provider.get_tracer("serialized-parent")
   // Out-of-range values serialize with their low nibble only, so 256 becomes
   // the zero wire byte. Such a context must not be used as a parent.

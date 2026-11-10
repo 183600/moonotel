@@ -112,7 +112,6 @@ test "traces_endpoint_env_custom_path_kept" {
   assert_eq(config.traces_url(), "http://collector:4318/custom/traces")
 }
 
-
 ///|
 test "decode_does_not_merge_a_field_after_partial_success_into_it" {
   // partial_success {} followed by an unknown field 2. Field 2 also exists
@@ -127,9 +126,8 @@ test "decode_keeps_the_partial_success_boundary_before_unknown_fields" {
   // partial_success { rejected_spans = 3 } followed by an unknown field 4.
   let body : Bytes = b"\x0a\x02\x08\x03\x20\x01"
   match @otlp.decode_export_response(body) {
-    @sdk.ExportFailure(message) => {
+    @sdk.ExportFailure(message) =>
       assert_true(message.contains("rejected 3 span(s)"))
-    }
     @sdk.ExportSuccess => abort("expected an export failure")
   }
 }

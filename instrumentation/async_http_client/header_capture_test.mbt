@@ -46,25 +46,18 @@ async test "client header capture follows the configured environment" {
   }
   // Header capture is disabled by default.
   let (tracer, exporter) = test_tracer("client-header-capture")
-  let data = captured_client_span(
-    tracer,
-    exporter,
-    { "X-Custom": "request-value" },
-  )
+  let data = captured_client_span(tracer, exporter, {
+    "X-Custom": "request-value",
+  })
   assert_eq(data.attributes.get("http.request.header.x-custom"), None)
   assert_eq(data.attributes.get("http.response.header.x-reply"), None)
   // Configured request and response headers are captured.
-  @env.set_env_var(
-    @http_header_capture.ENV_CLIENT_REQUEST_HEADERS,
-    "X-Custom",
-  )
+  @env.set_env_var(@http_header_capture.ENV_CLIENT_REQUEST_HEADERS, "X-Custom")
   @env.set_env_var(@http_header_capture.ENV_CLIENT_RESPONSE_HEADERS, "X-Reply")
   let (tracer, exporter) = test_tracer("client-header-capture")
-  let data = captured_client_span(
-    tracer,
-    exporter,
-    { "X-Custom": "request-value" },
-  )
+  let data = captured_client_span(tracer, exporter, {
+    "X-Custom": "request-value",
+  })
   assert_eq(
     data.attributes.get("http.request.header.x-custom"),
     Some(@sdk.StringArrayValue(["request-value"])),
@@ -120,6 +113,7 @@ async test "client header capture follows the configured environment" {
   }
   match data.attributes.get("http.request.header.user-agent") {
     Some(@sdk.StringArrayValue(values)) => assert_eq(values.length(), 1)
-    _ => fail("expected the User-Agent header added by the client to be captured")
+    _ =>
+      fail("expected the User-Agent header added by the client to be captured")
   }
 }

@@ -158,6 +158,8 @@ fn is_baggage_value_char(code : Int32) -> Bool {
 
 // Sentinel encoded length returned for invalid baggage values. A real encoded
 // length is never negative (the empty value has length 0).
+
+///|
 const INVALID_BAGGAGE_LENGTH : Int32 = -1
 
 // Decode the body of a baggage value that contains at least one `%`.
@@ -771,8 +773,8 @@ fn parse_baggage_plain(value : String) -> Array[(String, String)]? {
       return None
     }
     // No trimming was needed because whitespace was rejected above.
-    let key = view.clamped_view(start=start, end=eq).to_owned()
-    let member_value = view.clamped_view(start=eq + 1, end=end)
+    let key = view.clamped_view(start~, end=eq).to_owned()
+    let member_value = view.clamped_view(start=eq + 1, end~)
     let separator = if pairs.length() > 0 { 1 } else { 0 }
     let size = key.length() + 1 + member_value.length() + separator
     if bytes + size > BAGGAGE_MAX_BYTES {
@@ -1019,7 +1021,8 @@ pub fn format_baggage_entries(entries : Array[BaggageEntry]) -> String {
         separator +
         percent_encoded_length(entry.value)
       for property in properties {
-        member_size = member_size + baggage_property_size(property.0, property.1)
+        member_size = member_size +
+          baggage_property_size(property.0, property.1)
       }
       if bytes + member_size > BAGGAGE_MAX_BYTES {
         break
@@ -1237,9 +1240,7 @@ pub fn extract_baggage(carrier : TextMapCarrier) -> Array[(String, String)] {
 // comma-separated value first.
 
 ///|
-pub fn extract_baggage_entries(
-  carrier : TextMapCarrier,
-) -> Array[BaggageEntry] {
+pub fn extract_baggage_entries(carrier : TextMapCarrier) -> Array[BaggageEntry] {
   match carrier.get_combined(baggage_header_name()) {
     Some(value) => parse_baggage_entries(value)
     None => []

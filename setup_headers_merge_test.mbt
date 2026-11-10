@@ -7,22 +7,17 @@
 test "setup_merges_programmatic_headers_with_environment_headers" {
   @moonotel.shutdown_global_tracer_provider()
   @env.set_env_var(
-    "OTEL_EXPORTER_OTLP_HEADERS",
-    "env-only=1,shared=environment",
+    "OTEL_EXPORTER_OTLP_HEADERS", "env-only=1,shared=environment",
   )
   @env.set_env_var(
-    "OTEL_EXPORTER_OTLP_TRACES_HEADERS",
-    "signal-only=2,shared=signal",
+    "OTEL_EXPORTER_OTLP_TRACES_HEADERS", "signal-only=2,shared=signal",
   )
   let capture = capturing_transport()
   let provider = @moonotel.setup(
     service_name="header-merge-facade",
     endpoint="http://collector:4318",
     transport=capture.send(),
-    headers=Map([
-      ("Shared", "programmatic"),
-      ("programmatic", "3"),
-    ]),
+    headers=Map([("Shared", "programmatic"), ("programmatic", "3")]),
     use_batch=false,
   )
   let tracer = provider.get_tracer("header-merge-scope")

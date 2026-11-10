@@ -75,10 +75,7 @@ test "event_and_link_ignore_empty_attribute_keys" {
   assert_eq(data.links.length(), 1)
   assert_eq(data.links[0].attributes.length(), 1)
   assert_eq(data.links[0].attributes.get(""), None)
-  assert_eq(
-    data.links[0].attributes.get("link-kept"),
-    Some(@sdk.IntValue(3L)),
-  )
+  assert_eq(data.links[0].attributes.get("link-kept"), Some(@sdk.IntValue(3L)))
   assert_eq(data.links[0].dropped_attributes_count, 0)
 }
 
@@ -92,10 +89,7 @@ test "resource_ignores_empty_attribute_keys" {
   )
   assert_eq(resource.length(), 1)
   assert_eq(resource.get(""), None)
-  assert_eq(
-    resource.get("service.name"),
-    Some(@sdk.StringValue("checkout")),
-  )
+  assert_eq(resource.get("service.name"), Some(@sdk.StringValue("checkout")))
   // Updating with an invalid key leaves the resource unchanged.
   let unchanged = resource.with_attribute("", @sdk.StringValue("ignored"))
   assert_eq(unchanged.length(), 1)
@@ -111,10 +105,7 @@ test "resource_ignores_empty_attribute_keys" {
 ///|
 test "resource_snapshot_ignores_empty_attribute_keys" {
   let snapshot = @sdk.ResourceAttributes::new(
-    Map([
-      ("", @sdk.StringValue("ignored")),
-      ("k", @sdk.StringValue("v")),
-    ]),
+    Map([("", @sdk.StringValue("ignored")), ("k", @sdk.StringValue("v"))]),
   )
   assert_eq(snapshot.length(), 1)
   assert_eq(snapshot.get(""), None)

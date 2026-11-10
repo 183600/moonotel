@@ -46,6 +46,8 @@ fn serialized_byte(value : Int32) -> Int32 {
 // Whether the serialized form of a byte array contains a nonzero byte. A
 // context whose decimal IDs serialize to all zeros is not valid even if the
 // raw `Int32` elements are nonzero.
+
+///|
 fn has_nonzero_byte(bytes : Array[Int32]) -> Bool {
   let len = bytes.length()
   let mut i = 0
@@ -123,9 +125,9 @@ pub fn SpanContext::with_remote(
   {
     ..self.copy(),
     is_remote: is_remote &&
-      self.is_valid() &&
-      has_nonzero_byte(self.trace_id) &&
-      has_nonzero_byte(self.span_id),
+    self.is_valid() &&
+    has_nonzero_byte(self.trace_id) &&
+    has_nonzero_byte(self.span_id),
   }
 }
 
@@ -269,11 +271,7 @@ pub fn bytes_to_hex(bytes : Array[Int32]) -> String {
     let b2 = bytes.unsafe_get(i + 2)
     let b3 = bytes.unsafe_get(i + 3)
     let pos = i * 4
-    if (b0 | b1 | b2 | b3) >= 0 &&
-      b0 < 256 &&
-      b1 < 256 &&
-      b2 < 256 &&
-      b3 < 256 {
+    if (b0 | b1 | b2 | b3) >= 0 && b0 < 256 && b1 < 256 && b2 < 256 && b3 < 256 {
       let w0 = hex_pairs.unsafe_get(b0).to_uint64() |
         (hex_pairs.unsafe_get(b1).to_uint64() << 32)
       let w1 = hex_pairs.unsafe_get(b2).to_uint64() |
@@ -438,7 +436,7 @@ pub fn SpanContext::span_id(self : SpanContext) -> Array[Int32] {
 
 ///|
 pub fn SpanContext::copy(self : SpanContext) -> SpanContext {
-  { ..self, trace_id: self.trace_id.copy(), span_id: self.span_id.copy() }
+  { ..self, trace_id: self.trace_id.copy(), span_id: self.span_id.copy(), }
 }
 
 // The trace ID bytes backing this context. The returned array is shared with
@@ -523,7 +521,11 @@ fn hex_to_bytes(hex : String, out : Array[Int32]) -> Bool {
 // is accumulated over the same pass.
 
 ///|
-fn hex_to_nonzero_bytes(hex : String, start : Int32, out : Array[Int32]) -> Bool {
+fn hex_to_nonzero_bytes(
+  hex : String,
+  start : Int32,
+  out : Array[Int32],
+) -> Bool {
   let n = out.length()
   let mut bad = 0
   let mut acc = 0

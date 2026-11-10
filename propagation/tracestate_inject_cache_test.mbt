@@ -4,9 +4,7 @@
 
 ///|
 fn cache_test_context(state : String) -> @api.SpanContext {
-  let trace_id = @api.bytes_from_hex(
-    "4bf92f359d1e75b7618a2d1f3c4e5a6b",
-  ).unwrap()
+  let trace_id = @api.bytes_from_hex("4bf92f359d1e75b7618a2d1f3c4e5a6b").unwrap()
   let span_id = @api.bytes_from_hex("00f067aa0ba902b7").unwrap()
   @api.span_context(trace_id, span_id, 1).with_tracestate(state)
 }

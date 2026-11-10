@@ -39,6 +39,8 @@ pub fn sampling_decision_drop() -> SamplingDecision {
 // with the low nibble only (the high nibble becomes "0"). The sampler must use
 // the same value so that a trace ID is sampled identically before and after it
 // crosses a wire boundary.
+
+///|
 fn trace_id_byte(value : Int32) -> UInt64 {
   if value >= 0 && value < 256 {
     value.to_uint64()
@@ -208,7 +210,9 @@ pub fn Sampler::trace_id_ratio_based(ratio : Double) -> Sampler {
     ratio
   }
   let threshold = ratio_threshold(clamped)
-  Sampler::new("TraceIdRatioBased{" + clamped.to_string() + "}", fn(parameters) {
+  Sampler::new("TraceIdRatioBased{" + clamped.to_string() + "}", fn(
+    parameters,
+  ) {
     if trace_id_fraction(parameters.trace_id) >> 1 < threshold {
       sampling_decision_record_and_sample()
     } else {
@@ -263,9 +267,7 @@ pub fn Sampler::parent_based(
           } else {
             local_not_sampled
           }
-          delegate.should_sample_parameters(
-            { ..parameters, parent: Some(ctx), },
-          )
+          delegate.should_sample_parameters({ ..parameters, parent: Some(ctx), })
         } else {
           root.should_sample_parameters({ ..parameters, parent: None, })
         }

@@ -24,8 +24,9 @@ test "empty_with_value does not hide an outer value" {
 
 ///|
 test "with_baggage_entry ignores an empty name" {
-  let context = @context.Context::root()
-    .with_baggage_entry("", "value", properties=[("p", "1")])
+  let context = @context.Context::root().with_baggage_entry("", "value", properties=[
+    ("p", "1"),
+  ])
   assert_false(context.has_baggage())
   assert_eq(context.baggage_entries().length(), 0)
 }
@@ -70,10 +71,7 @@ test "with_baggage with only empty names does not clear outer baggage" {
 
 ///|
 test "with_baggage_owned skips empty names" {
-  let values : Map[String, String] = Map([
-    ("", "ignored"),
-    ("user.id", "42"),
-  ])
+  let values : Map[String, String] = Map([("", "ignored"), ("user.id", "42")])
   let context = @context.Context::root().with_baggage_owned(values)
   assert_eq(context.value("user.id"), Some("42"))
   assert_eq(context.value(""), None)

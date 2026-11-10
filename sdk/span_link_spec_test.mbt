@@ -8,9 +8,7 @@ fn link_spec_exporter() -> @sdk.InMemorySpanExporter {
 }
 
 ///|
-fn link_spec_tracer(
-  exporter : @sdk.InMemorySpanExporter,
-) -> @sdk.Tracer {
+fn link_spec_tracer(exporter : @sdk.InMemorySpanExporter) -> @sdk.Tracer {
   @sdk.TracerProviderSdk::new(service_name="svc")
   .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
   .with_sampler(@sdk.Sampler::always_on())
@@ -109,9 +107,7 @@ test "invalid_context_link_survives_a_zero_link_attribute_limit" {
   let provider = @sdk.TracerProviderSdk::new(service_name="svc")
     .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
     .with_sampler(@sdk.Sampler::always_on())
-    .with_span_limits(
-      @sdk.SpanLimits::new(link_attribute_count_limit=0),
-    )
+    .with_span_limits(@sdk.SpanLimits::new(link_attribute_count_limit=0))
   let tracer = provider.get_tracer("links")
   let span = tracer.start_span("op")
   let attributes : Map[String, @sdk.AttributeValue] = Map([])

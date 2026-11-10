@@ -15,9 +15,7 @@ fn override_context() -> @api.SpanContext {
 ///|
 test "explicit_empty_tracestate_suppresses_the_context_state" {
   let carrier = @propagation.TextMapCarrier::new()
-  @propagation.inject_with_tracestate(
-    override_context(), Some(""), carrier,
-  )
+  @propagation.inject_with_tracestate(override_context(), Some(""), carrier)
   assert_true(carrier.get(@propagation.traceparent_header_name()) is Some(_))
   assert_eq(@propagation.extract_tracestate(carrier), None)
 }
@@ -26,7 +24,9 @@ test "explicit_empty_tracestate_suppresses_the_context_state" {
 test "explicit_tracestate_replaces_the_context_state" {
   let carrier = @propagation.TextMapCarrier::new()
   @propagation.inject_with_tracestate(
-    override_context(), Some("vendor=value"), carrier,
+    override_context(),
+    Some("vendor=value"),
+    carrier,
   )
   assert_eq(@propagation.extract_tracestate(carrier), Some("vendor=value"))
 }
@@ -35,7 +35,9 @@ test "explicit_tracestate_replaces_the_context_state" {
 test "invalid_explicit_tracestate_drops_even_the_context_state" {
   let carrier = @propagation.TextMapCarrier::new()
   @propagation.inject_with_tracestate(
-    override_context(), Some("not a valid state"), carrier,
+    override_context(),
+    Some("not a valid state"),
+    carrier,
   )
   assert_true(carrier.get(@propagation.traceparent_header_name()) is Some(_))
   assert_eq(@propagation.extract_tracestate(carrier), None)
@@ -44,13 +46,8 @@ test "invalid_explicit_tracestate_drops_even_the_context_state" {
 ///|
 test "explicit_empty_tracestate_removes_a_previously_written_header" {
   let carrier = @propagation.TextMapCarrier::new()
-  carrier.set(
-    @propagation.tracestate_header_name(),
-    "stale=value",
-  )
-  @propagation.inject_with_tracestate(
-    override_context(), Some(""), carrier,
-  )
+  carrier.set(@propagation.tracestate_header_name(), "stale=value")
+  @propagation.inject_with_tracestate(override_context(), Some(""), carrier)
   assert_eq(@propagation.extract_tracestate(carrier), None)
 }
 
@@ -58,10 +55,7 @@ test "explicit_empty_tracestate_removes_a_previously_written_header" {
 test "omitted_tracestate_keeps_the_context_state" {
   let carrier = @propagation.TextMapCarrier::new()
   @propagation.inject_with_tracestate(override_context(), None, carrier)
-  assert_eq(
-    @propagation.extract_tracestate(carrier),
-    Some("congo=t61rcWkgMzE"),
-  )
+  assert_eq(@propagation.extract_tracestate(carrier), Some("congo=t61rcWkgMzE"))
 }
 
 ///|

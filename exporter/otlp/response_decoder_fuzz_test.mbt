@@ -12,7 +12,7 @@ struct RdRng {
 
 ///|
 fn RdRng::new(seed : Int64) -> RdRng {
-  { state: Ref(seed) }
+  { state: Ref(seed), }
 }
 
 ///|
@@ -27,7 +27,7 @@ fn RdRng::next(self : RdRng) -> Int64 {
 }
 
 ///|
-fn RdRng::below(self : RdRng, bound : Int) -> Int {
+fn RdRng::below(self : RdRng, bound : Int32) -> Int32 {
   let value = self.next() & 0x7FFFFFFFFFFFFFFFL
   (value % bound.to_int64()).to_int()
 }
@@ -36,14 +36,14 @@ fn RdRng::below(self : RdRng, bound : Int) -> Int {
 
 ///|
 let rd_json_fragments : Array[String] = [
-  "{", "}", "[", "]", "\"", ":", ",", " ", "\n", "\t", "partialSuccess",
-  "partial_success", "rejectedSpans", "rejected_spans", "errorMessage",
-  "error_message", "0", "1", "-1", "1e5", "\"0\"", "true", "false", "null",
-  "\\", "\\u0041", "\"", "e", "+", ".", "\u{0}", "é", "9999999999999999999",
+  "{", "}", "[", "]", "\"", ":", ",", " ", "\n", "\t", "partialSuccess", "partial_success",
+  "rejectedSpans", "rejected_spans", "errorMessage", "error_message", "0", "1", "-1",
+  "1e5", "\"0\"", "true", "false", "null", "\\", "\\u0041", "\"", "e", "+", ".",
+  "\u{0}", "é", "9999999999999999999",
 ]
 
 ///|
-fn rd_random_text(rng : RdRng, max_fragments : Int) -> String {
+fn rd_random_text(rng : RdRng, max_fragments : Int32) -> String {
   let sb = StringBuilder()
   let count = rng.below(max_fragments + 1)
   let mut i = 0
@@ -56,7 +56,7 @@ fn rd_random_text(rng : RdRng, max_fragments : Int) -> String {
 }
 
 ///|
-fn rd_random_bytes(rng : RdRng, count : Int) -> Bytes {
+fn rd_random_bytes(rng : RdRng, count : Int32) -> Bytes {
   let bytes : Array[Byte] = Array(capacity=count)
   let mut i = 0
   while i < count {
@@ -151,11 +151,10 @@ test "fuzz_json_response_decoder_reports_partial_success" {
       match result {
         @sdk.ExportSuccess =>
           abort("a partial success was reported as a success: " + body)
-        @sdk.ExportFailure(text) => {
-          if !(text.contains("rejected " + rejected.to_string())) {
+        @sdk.ExportFailure(text) =>
+          if !text.contains("rejected " + rejected.to_string()) {
             assert_true(text.contains("rejected " + rejected.to_string()))
           }
-        }
       }
     } else {
       assert_eq(result, @sdk.ExportSuccess)

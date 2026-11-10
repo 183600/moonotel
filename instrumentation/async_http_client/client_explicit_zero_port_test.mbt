@@ -18,9 +18,7 @@ pub impl @sdk.SpanExporter for ZeroPortRecordingExporter with fn export_spans(
 }
 
 ///|
-pub impl @sdk.SpanExporter for ZeroPortRecordingExporter with fn shutdown(
-  self,
-) {
+pub impl @sdk.SpanExporter for ZeroPortRecordingExporter with fn shutdown(self) {
   let _ = self
 }
 
@@ -50,8 +48,5 @@ async test "client span records an explicit zero server port" {
     data.attributes.get(@sdk.SERVER_ADDRESS),
     Some(@sdk.StringValue("127.0.0.1")),
   )
-  assert_eq(
-    data.attributes.get(@sdk.SERVER_PORT),
-    Some(@sdk.IntValue(0)),
-  )
+  assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(0)))
 }

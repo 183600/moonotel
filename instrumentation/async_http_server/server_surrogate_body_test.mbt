@@ -18,9 +18,7 @@ pub impl @sdk.SpanExporter for SurrogateBodyExporter with fn export_spans(
 }
 
 ///|
-pub impl @sdk.SpanExporter for SurrogateBodyExporter with fn shutdown(
-  self,
-) {
+pub impl @sdk.SpanExporter for SurrogateBodyExporter with fn shutdown(self) {
   let _ = self
 }
 

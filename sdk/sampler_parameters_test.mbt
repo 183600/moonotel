@@ -5,7 +5,7 @@ test "custom sampler sees name kind attributes and links" {
   let seen_name : Ref[String] = Ref("")
   let seen_kind : Ref[@api.SpanKind?] = Ref(None)
   let seen_route : Ref[String?] = Ref(None)
-  let seen_links : Ref[Int] = Ref(0)
+  let seen_links : Ref[Int32] = Ref(0)
   let sampler = @sdk.Sampler::new("ParameterSampler", fn(parameters) {
     seen_name.val = parameters.name
     seen_kind.val = Some(parameters.kind)
@@ -32,7 +32,7 @@ test "custom sampler sees name kind attributes and links" {
   let span = tracer.start_span(
     "GET /health",
     kind=@api.SpanKind::Server,
-    attributes=attributes,
+    attributes~,
     links=[link],
   )
   assert_eq(seen_name.val, "GET /health")
@@ -58,7 +58,7 @@ test "custom sampler decision controls recording and sampling" {
   let tracer = provider.get_tracer("drop-health")
   let attributes : Map[String, @sdk.AttributeValue] = Map([])
   attributes.set("health.check", @sdk.BoolValue(true))
-  let span = tracer.start_span("health", attributes=attributes)
+  let span = tracer.start_span("health", attributes~)
   assert_false(span.is_recording())
   assert_false(span.context().is_sampled())
   span.end()
@@ -68,8 +68,8 @@ test "custom sampler decision controls recording and sampling" {
 test "should_sample supplies empty span-specific parameters" {
   let name : Ref[String?] = Ref(None)
   let kind : Ref[@api.SpanKind?] = Ref(None)
-  let attribute_count : Ref[Int] = Ref(-1)
-  let link_count : Ref[Int] = Ref(-1)
+  let attribute_count : Ref[Int32] = Ref(-1)
+  let link_count : Ref[Int32] = Ref(-1)
   let sampler = @sdk.Sampler::new("LegacySampler", fn(parameters) {
     name.val = Some(parameters.name)
     kind.val = Some(parameters.kind)
@@ -98,10 +98,7 @@ test "parent_based forwards parameters to the selected delegate" {
     sampled_name.val = Some(parameters.name)
     @sdk.sampling_decision_record_only()
   })
-  let sampler = @sdk.Sampler::parent_based(
-    root,
-    remote_parent_sampled=sampled,
-  )
+  let sampler = @sdk.Sampler::parent_based(root, remote_parent_sampled=sampled)
   let parameters : @sdk.SamplingParameters = {
     parent: None,
     trace_id: Array::make(16, 2),

@@ -7,11 +7,7 @@ fn tick_probe_span(name : String) -> SpanData {
   let span_id : Array[Int32] = Array::make(8, 7)
   {
     name,
-    span_context: @api.span_context(
-      trace_id,
-      span_id,
-      @api.TRACE_FLAGS_SAMPLED,
-    ),
+    span_context: @api.span_context(trace_id, span_id, @api.TRACE_FLAGS_SAMPLED),
     parent_span_id: [],
     kind: @api.SpanKind::Internal,
     start_time_unix_nano: 1L,

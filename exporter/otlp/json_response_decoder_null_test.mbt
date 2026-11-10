@@ -4,9 +4,7 @@
 ///|
 test "json_decode_null_partial_success_is_success" {
   assert_eq(
-    @otlp.decode_export_response_json(
-      @utf8.encode("{\"partialSuccess\":null}"),
-    ),
+    @otlp.decode_export_response_json(@utf8.encode("{\"partialSuccess\":null}")),
     @sdk.ExportSuccess,
   )
   assert_eq(

@@ -503,7 +503,7 @@ fn find_scope_group(
         Some(at) => Some(group.scopes[at])
         None => None
       }
-    None => {
+    None =>
       // Use a linear scan for a group with at most one scope.
       if group.scopes.length() < 2 {
         let mut found : ScopeGroup? = None
@@ -529,7 +529,6 @@ fn find_scope_group(
         group.scope_index = Some(index)
         found
       }
-    }
   }
 }
 
@@ -550,9 +549,9 @@ fn estimate_attributes_size(
 
 ///|
 fn estimate_span_size(data : @sdk.SpanData) -> Int32 {
-  let mut size = 96 + data.name.length() + estimate_attributes_size(
-    data.attributes,
-  )
+  let mut size = 96 +
+    data.name.length() +
+    estimate_attributes_size(data.attributes)
   for event in data.events {
     size = size +
       64 +
@@ -622,9 +621,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
             let keys = match known_resource_keys {
               Some(keys) => keys
               None => {
-                let keys : Array[
-                  (Map[String, @sdk.AttributeValue], String),
-                ] = []
+                let keys : Array[(Map[String, @sdk.AttributeValue], String)] = []
                 known_resource_keys = Some(keys)
                 keys
               }

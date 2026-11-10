@@ -41,6 +41,8 @@ fn exception_tracer() -> (@sdk.Tracer, WithSpanExceptionExporter) {
 }
 
 // The `error.type` / status description derived from the raised error.
+
+///|
 fn type_name_from(exporter : WithSpanExceptionExporter) -> String {
   match exporter.spans[0].events[0].attributes.get(@sdk.EXCEPTION_TYPE) {
     Some(@sdk.StringValue(type_name)) => type_name
@@ -119,10 +121,7 @@ test "with_span without an error keeps the span unset" {
   let data = exporter.spans[0]
   assert_eq(data.events.length(), 0)
   assert_eq(data.status, @api.StatusCode::Unset)
-  assert_eq(
-    data.attributes.get("op.stage"),
-    Some(@sdk.StringValue("done")),
-  )
+  assert_eq(data.attributes.get("op.stage"), Some(@sdk.StringValue("done")))
 }
 
 ///|

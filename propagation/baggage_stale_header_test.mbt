@@ -44,9 +44,10 @@ test "inject_baggage_entries_removes_a_stale_header" {
 test "inject_baggage_entries_removes_a_stale_header_for_only_invalid_names" {
   let carrier = @propagation.TextMapCarrier::new()
   carrier.set(@propagation.baggage_header_name(), "stale=value")
-  @propagation.inject_baggage_entries([
-    @propagation.BaggageEntry::new("", "ignored"),
-  ], carrier)
+  @propagation.inject_baggage_entries(
+    [@propagation.BaggageEntry::new("", "ignored")],
+    carrier,
+  )
   assert_eq(carrier.get(@propagation.baggage_header_name()), None)
 }
 

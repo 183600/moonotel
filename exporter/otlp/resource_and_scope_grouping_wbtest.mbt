@@ -1,7 +1,8 @@
+///|
 fn grouping_test_span(
   name : String,
   res : Map[String, @sdk.AttributeValue],
-  scope : String
+  scope : String,
 ) -> @sdk.SpanData {
   @sdk.SpanData::{
     name,
@@ -28,6 +29,7 @@ fn grouping_test_span(
   }
 }
 
+///|
 test "grouping keeps interleaved resources and scopes separate" {
   let ra : Map[String, @sdk.AttributeValue] = Map([
     ("service.name", @sdk.StringValue("a")),
@@ -81,6 +83,7 @@ test "grouping keeps interleaved resources and scopes separate" {
   assert_eq(total, 7)
 }
 
+///|
 test "resource keys distinguish attribute value types" {
   let values : Array[@sdk.AttributeValue] = [
     @sdk.StringValue("1"),

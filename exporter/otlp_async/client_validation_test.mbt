@@ -60,18 +60,20 @@ async test "async_exports_treat_an_empty_batch_as_success" {
 
 ///|
 async test "post_trace_request_validates_protocol_and_compression_first" {
-  match @otlp_async.post_trace_request(
-    @otlp.OtlpHttpConfig::new(protocol="grpc"),
-    b"",
-  ) {
+  match
+    @otlp_async.post_trace_request(
+      @otlp.OtlpHttpConfig::new(protocol="grpc"),
+      b"",
+    ) {
     @sdk.ExportFailure(message) =>
       assert_true(message.contains("unsupported OTLP protocol"))
     @sdk.ExportSuccess => fail("expected an unsupported-protocol failure")
   }
-  match @otlp_async.post_trace_request(
-    @otlp.OtlpHttpConfig::new(compression="deflate"),
-    b"",
-  ) {
+  match
+    @otlp_async.post_trace_request(
+      @otlp.OtlpHttpConfig::new(compression="deflate"),
+      b"",
+    ) {
     @sdk.ExportFailure(message) =>
       assert_true(message.contains("unsupported OTLP compression"))
     @sdk.ExportSuccess => fail("expected an unsupported-compression failure")
@@ -83,22 +85,26 @@ async test "all_malformed_batches_still_validate_the_configuration" {
   // Encoding an all-malformed batch yields no request body. That short-circuit
   // must not hide an unusable protocol or compression setting: those are
   // configuration errors and must be reported exactly like a normal export.
-  let malformed = [{
-    ..validation_span_data(),
-    span_context: @api.span_context([7], [9], @api.TRACE_FLAGS_SAMPLED),
-  }]
-  match @otlp_async.export_spans(
-    @otlp.OtlpHttpConfig::new(protocol="grpc"),
-    malformed,
-  ) {
+  let malformed = [
+    {
+      ..validation_span_data(),
+      span_context: @api.span_context([7], [9], @api.TRACE_FLAGS_SAMPLED),
+    },
+  ]
+  match
+    @otlp_async.export_spans(
+      @otlp.OtlpHttpConfig::new(protocol="grpc"),
+      malformed,
+    ) {
     @sdk.ExportFailure(message) =>
       assert_true(message.contains("unsupported OTLP protocol"))
     @sdk.ExportSuccess => fail("expected an unsupported-protocol failure")
   }
-  match @otlp_async.export_spans(
-    @otlp.OtlpHttpConfig::new(compression="deflate"),
-    malformed,
-  ) {
+  match
+    @otlp_async.export_spans(
+      @otlp.OtlpHttpConfig::new(compression="deflate"),
+      malformed,
+    ) {
     @sdk.ExportFailure(message) =>
       assert_true(message.contains("unsupported OTLP compression"))
     @sdk.ExportSuccess => fail("expected an unsupported-compression failure")

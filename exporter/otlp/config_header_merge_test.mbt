@@ -12,11 +12,13 @@ test "with_headers_overrides_case_insensitively_and_preserves_others" {
       ("shared", "environment"),
     ]),
   )
-  let merged = config.with_headers(Map([
-    ("x-token", "programmatic"),
-    ("Shared", "programmatic"),
-    ("x-programmatic", "new"),
-  ]))
+  let merged = config.with_headers(
+    Map([
+      ("x-token", "programmatic"),
+      ("Shared", "programmatic"),
+      ("x-programmatic", "new"),
+    ]),
+  )
   assert_eq(merged.headers.get("x-token"), Some("programmatic"))
   assert_eq(merged.headers.get("X-Token"), None)
   assert_eq(merged.headers.get("Shared"), Some("programmatic"))

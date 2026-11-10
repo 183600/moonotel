@@ -52,7 +52,7 @@ fn trim_ows(value : StringView) -> StringView {
   while end > start && is_trim_char(value.unsafe_get(end - 1).unsafe_to_char()) {
     end = end - 1
   }
-  value.clamped_view(start=start, end=end)
+  value.clamped_view(start~, end~)
 }
 
 // Index of the first occurrence of `needle` at or after `start`, or the view
@@ -259,11 +259,7 @@ fn write_hex(
     let b2 = bytes.unsafe_get(i + 2)
     let b3 = bytes.unsafe_get(i + 3)
     let pos = (start + i * 2) * 2
-    if (b0 | b1 | b2 | b3) >= 0 &&
-      b0 < 256 &&
-      b1 < 256 &&
-      b2 < 256 &&
-      b3 < 256 {
+    if (b0 | b1 | b2 | b3) >= 0 && b0 < 256 && b1 < 256 && b2 < 256 && b3 < 256 {
       out.unsafe_write_uint64_le(
         pos,
         hex_pairs.unsafe_get(b0).to_uint64() |
@@ -567,10 +563,11 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
     // Version 00 does not allow additional fields.
     return None
   }
-  if version_hi == '0' && version_lo == '0' &&
+  if version_hi == '0' &&
+    version_lo == '0' &&
     !(has_lowercase_hex(value, 3, 32) &&
-      has_lowercase_hex(value, 36, 16) &&
-      has_lowercase_hex(value, 53, 2)) {
+    has_lowercase_hex(value, 36, 16) &&
+    has_lowercase_hex(value, 53, 2)) {
     // The version 00 ABNF spells every field `HEXDIGLC`; a header holding an
     // uppercase hex character is invalid and must be ignored. Higher
     // versions accept hex in either case.
@@ -900,7 +897,7 @@ fn write_normalized_tracestate(view : StringView, len : Int32) -> String {
   let mut start = 0
   while true {
     let end = find_code_unit(view, ',', start)
-    let item = trim_ows(view.clamped_view(start=start, end=end))
+    let item = trim_ows(view.clamped_view(start~, end~))
     let mut duplicate = false
     if item.length() > 0 {
       let eq = find_code_unit(item, '=', 0)

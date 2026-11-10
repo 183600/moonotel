@@ -23,10 +23,7 @@ test "event_attribute_with_an_empty_key_is_ignored_without_a_drop" {
   )
   span.add_event(
     "event",
-    attributes=Map([
-      ("", StringValue("invalid")),
-      ("kept", IntValue(7L)),
-    ]),
+    attributes=Map([("", StringValue("invalid")), ("kept", IntValue(7L))]),
   )
   span.end()
   let data = exporter.exported_spans()[0]
@@ -50,10 +47,7 @@ test "link_attribute_with_an_empty_key_is_ignored_without_a_drop" {
   span.add_link(
     SpanLink::new(
       linked,
-      attributes=Map([
-        ("", StringValue("invalid")),
-        ("kept", IntValue(9L)),
-      ]),
+      attributes=Map([("", StringValue("invalid")), ("kept", IntValue(9L))]),
     ),
   )
   span.end()
@@ -70,10 +64,9 @@ test "set_attributes_ignores_empty_keys_without_consuming_the_count_limit" {
     SpanLimits::new(attribute_count_limit=1),
     "span-empty-key",
   )
-  span.set_attributes(Map([
-    ("", StringValue("invalid")),
-    ("kept", IntValue(1L)),
-  ]))
+  span.set_attributes(
+    Map([("", StringValue("invalid")), ("kept", IntValue(1L))]),
+  )
   span.end()
   let data = exporter.exported_spans()[0]
   assert_eq(data.attributes.length(), 1)

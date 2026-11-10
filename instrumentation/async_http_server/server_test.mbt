@@ -429,12 +429,18 @@ async test "server records absolute-form request target components" {
     @async.sleep(50)
     assert_eq(exporter.spans.val.length(), 1)
     let data = exporter.spans.val[0]
-    assert_eq(data.attributes.get(@sdk.URL_PATH), Some(@sdk.StringValue("/items")))
+    assert_eq(
+      data.attributes.get(@sdk.URL_PATH),
+      Some(@sdk.StringValue("/items")),
+    )
     assert_eq(
       data.attributes.get(@sdk.URL_QUERY),
       Some(@sdk.StringValue("q=1&X-Amz-Signature=REDACTED")),
     )
-    assert_eq(data.attributes.get(@sdk.URL_SCHEME), Some(@sdk.StringValue("https")))
+    assert_eq(
+      data.attributes.get(@sdk.URL_SCHEME),
+      Some(@sdk.StringValue("https")),
+    )
   }
 }
 

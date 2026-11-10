@@ -7,11 +7,7 @@ test "request_headers_drops_invalid_headers_from_a_direct_config" {
   let base = @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318")
   let config : @otlp.OtlpHttpConfig = {
     ..base,
-    headers: Map([
-      ("bad name", "v"),
-      ("x-evil", "a\r\nb"),
-      ("x-ok", "v"),
-    ]),
+    headers: Map([("bad name", "v"), ("x-evil", "a\r\nb"), ("x-ok", "v")]),
   }
   let headers = request_headers(config, false)
   assert_eq(headers.get(@http.CaseInsensitiveString("bad name")), None)

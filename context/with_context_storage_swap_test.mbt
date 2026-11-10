@@ -3,10 +3,7 @@
 // process-wide storage backend.
 
 ///|
-fn audit_backend(
-  slot : Ref[String],
-  root : String,
-) -> @context.ContextStorage {
+fn audit_backend(slot : Ref[String], root : String) -> @context.ContextStorage {
   {
     current: () => @context.Context::root().with_value("backend", slot.val),
     set: context => {

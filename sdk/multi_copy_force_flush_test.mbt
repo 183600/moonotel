@@ -13,7 +13,7 @@ fn multi_copy_flush_child(
   name : String,
   log : Ref[Array[String]],
 ) -> MultiCopyFlushChild {
-  { name, log }
+  { name, log, }
 }
 
 ///|

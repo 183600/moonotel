@@ -1,7 +1,8 @@
+///|
 fn probe_generate(
   alphabet : Array[String],
   prefix : String,
-  remaining : Int,
+  remaining : Int32,
   out : Array[String],
 ) -> Unit {
   out.push(prefix)
@@ -16,8 +17,8 @@ fn probe_generate(
 ///|
 test "baggage fast path matches general parser" {
   let alphabet = [
-    "a", "b", "A", "0", "9", "%", "2", "f", "g", ",", "=", ";", " ", "\t",
-    "\\", "\"", "\u{7f}", "\u{80}",
+    "a", "b", "A", "0", "9", "%", "2", "f", "g", ",", "=", ";", " ", "\t", "\\",
+    "\"", "\u{7f}", "\u{80}",
   ]
   let inputs : Array[String] = []
   probe_generate(alphabet, "", 3, inputs)

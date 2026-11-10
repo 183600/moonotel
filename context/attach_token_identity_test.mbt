@@ -4,7 +4,10 @@
 // current when the token is detached.
 
 ///|
-fn root_token_backend(slot : Ref[String], root : String) -> @context.ContextStorage {
+fn root_token_backend(
+  slot : Ref[String],
+  root : String,
+) -> @context.ContextStorage {
   {
     current: () => @context.Context::root(),
     set: context => {

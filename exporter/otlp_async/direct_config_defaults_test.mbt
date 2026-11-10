@@ -59,9 +59,7 @@ async test "blank direct protocol and compression use the OTLP defaults" {
       protocol: " ",
       max_retries: 0,
     }
-    let result = @otlp_async.export_spans(config, [
-      blank_config_span_data(),
-    ])
+    let result = @otlp_async.export_spans(config, [blank_config_span_data()])
     assert_true(result.is_success())
     assert_eq(requests.val, 1)
     assert_eq(content_type.val, "application/x-protobuf")

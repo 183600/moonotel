@@ -18,8 +18,7 @@ fn wbtest_span_context() -> @api.SpanContext {
 test "traced_headers injects the trace context and baggage by default" {
   @propagation.reset_global_propagator()
   defer @propagation.reset_global_propagator()
-  let defaults : &@propagation.TextMapPropagator = @propagation.CompositePropagator::new(
-    [
+  let defaults : &@propagation.TextMapPropagator = @propagation.CompositePropagator::new([
       @propagation.TraceContextPropagator::new(),
       @propagation.BaggagePropagator::new(),
     ],
@@ -41,8 +40,7 @@ test "traced_headers injects the trace context and baggage by default" {
 test "traced_headers injects nothing when the global propagator is empty" {
   @propagation.reset_global_propagator()
   defer @propagation.reset_global_propagator()
-  let empty : &@propagation.TextMapPropagator = @propagation.CompositePropagator::new(
-    [],
+  let empty : &@propagation.TextMapPropagator = @propagation.CompositePropagator::new([],
   )
   @propagation.set_global_propagator(empty)
   let context = @context.Context::root().with_value("user.id", "42")
@@ -69,8 +67,7 @@ test "traced_headers follows a baggage-only global propagator" {
 test "traced_headers keeps caller headers alongside the injected ones" {
   @propagation.reset_global_propagator()
   defer @propagation.reset_global_propagator()
-  let empty : &@propagation.TextMapPropagator = @propagation.CompositePropagator::new(
-    [],
+  let empty : &@propagation.TextMapPropagator = @propagation.CompositePropagator::new([],
   )
   @propagation.set_global_propagator(empty)
   let caller : Map[String, String] = Map([("x-request-id", "abc")])

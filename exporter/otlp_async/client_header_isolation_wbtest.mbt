@@ -40,19 +40,13 @@ async test "async exporter does not mutate its cached request headers" {
         conn.send_response(200, "OK")
       })
     }
-    let config = @otlp.OtlpHttpConfig::new(
-      endpoint="http://127.0.0.1:\{port}",
-    )
+    let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:\{port}")
     let exporter = OtlpHttpAsyncExporter::new(config)
     let result = exporter.export_batch([header_isolation_span()])
     assert_true(result.is_success())
-    assert_false(
-      exporter.headers.contains(@http.CaseInsensitiveString("host")),
-    )
+    assert_false(exporter.headers.contains(@http.CaseInsensitiveString("host")))
     assert_eq(
-      exporter.headers.get(
-        @http.CaseInsensitiveString("content-type"),
-      ),
+      exporter.headers.get(@http.CaseInsensitiveString("content-type")),
       Some("application/x-protobuf"),
     )
   }

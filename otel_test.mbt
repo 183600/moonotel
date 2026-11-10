@@ -189,10 +189,7 @@ test "facade_baggage_entries_round_trip" {
   assert_eq(restored.length(), 1)
   assert_eq(restored[0].key, "user.id")
   assert_eq(restored[0].properties, [("ttl", "1")])
-  assert_eq(
-    @moonotel.format_baggage_entries(restored),
-    "user.id=42;ttl=1",
-  )
+  assert_eq(@moonotel.format_baggage_entries(restored), "user.id=42;ttl=1")
   assert_eq(@moonotel.parse_baggage_entries("a=1;p=2")[0].properties, [
     ("p", "2"),
   ])

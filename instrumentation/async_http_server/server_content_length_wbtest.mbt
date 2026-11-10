@@ -8,14 +8,8 @@ test "wire_response_headers mirrors lenient content-length parsing" {
     (@http.CaseInsensitiveString("Content-Length"), "+5"),
   ])
   let wire = wire_response_headers(headers, @http.Get, 200, true)
-  assert_eq(
-    wire.get(@http.CaseInsensitiveString("content-length")),
-    Some("+5"),
-  )
-  assert_eq(
-    wire.get(@http.CaseInsensitiveString("transfer-encoding")),
-    None,
-  )
+  assert_eq(wire.get(@http.CaseInsensitiveString("content-length")), Some("+5"))
+  assert_eq(wire.get(@http.CaseInsensitiveString("transfer-encoding")), None)
 }
 
 ///|
@@ -24,12 +18,6 @@ test "wire_response_headers accepts content-length trimmed by the transport" {
     (@http.CaseInsensitiveString("Content-Length"), "5\r\n"),
   ])
   let wire = wire_response_headers(headers, @http.Get, 200, true)
-  assert_eq(
-    wire.get(@http.CaseInsensitiveString("content-length")),
-    Some("5"),
-  )
-  assert_eq(
-    wire.get(@http.CaseInsensitiveString("transfer-encoding")),
-    None,
-  )
+  assert_eq(wire.get(@http.CaseInsensitiveString("content-length")), Some("5"))
+  assert_eq(wire.get(@http.CaseInsensitiveString("transfer-encoding")), None)
 }

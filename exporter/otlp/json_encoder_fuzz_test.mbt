@@ -12,7 +12,7 @@ struct JfRng {
 
 ///|
 fn JfRng::new(seed : Int64) -> JfRng {
-  { state: Ref(seed) }
+  { state: Ref(seed), }
 }
 
 ///|
@@ -27,7 +27,7 @@ fn JfRng::next(self : JfRng) -> Int64 {
 }
 
 ///|
-fn JfRng::below(self : JfRng, bound : Int) -> Int {
+fn JfRng::below(self : JfRng, bound : Int32) -> Int32 {
   let value = self.next() & 0x7FFFFFFFFFFFFFFFL
   (value % bound.to_int64()).to_int()
 }
@@ -36,25 +36,25 @@ fn JfRng::below(self : JfRng, bound : Int) -> Int {
 
 ///|
 let jf_fragments : Array[String] = [
-  "a", "b", "0", " ", "\"", "\\", "\n", "\r", "\t", "\u{0}", "\u{1f}", "/",
-  "é", "🤣", "=", ",", ":", "{", "}", "[", "]", " ", "", "#", "'",
+  "a", "b", "0", " ", "\"", "\\", "\n", "\r", "\t", "\u{0}", "\u{1f}", "/", "é",
+  "🤣", "=", ",", ":", "{", "}", "[", "]", " ", "", "#", "'",
 ]
 
 // Interesting double values, including the non-finite ones.
 
 ///|
 let jf_doubles : Array[Double] = [
-  0.0, -0.0, 1.0, -1.0, 0.5, 1.5, 3.14159265358979, 1.0e21, 1.0e-7, 1.0e300,
-  1.0e-300, 1.7976931348623157e308, -1.7976931348623157e308, 5.0e-324,
-  9007199254740992.0, 1.0e16, 1.0e17, 0.1, 0.2, 0.3,
+  0.0, -0.0, 1.0, -1.0, 0.5, 1.5, 3.14159265358979, 1.0e21, 1.0e-7, 1.0e300, 1.0e-300,
+  1.7976931348623157e308, -1.7976931348623157e308, 5.0e-324, 9007199254740992.0,
+  1.0e16, 1.0e17, 0.1, 0.2, 0.3,
 ]
 
 // Interesting 64-bit integers.
 
 ///|
 let jf_ints : Array[Int64] = [
-  0L, 1L, -1L, 2L, -2L, 1000000L, -1000000L, 9223372036854775807L,
-  -9223372036854775808L, 4294967296L, -4294967296L,
+  0L, 1L, -1L, 2L, -2L, 1000000L, -1000000L, 9223372036854775807L, -9223372036854775808L,
+  4294967296L, -4294967296L,
 ]
 
 ///|
@@ -68,7 +68,7 @@ fn jf_uint64_string(value : Int64) -> String {
 }
 
 ///|
-fn jf_random_text(rng : JfRng, max_fragments : Int) -> String {
+fn jf_random_text(rng : JfRng, max_fragments : Int32) -> String {
   let sb = StringBuilder()
   let count = rng.below(max_fragments + 1)
   let mut i = 0
@@ -81,7 +81,7 @@ fn jf_random_text(rng : JfRng, max_fragments : Int) -> String {
 }
 
 ///|
-fn jf_random_bytes(rng : JfRng, count : Int) -> Array[Int32] {
+fn jf_random_bytes(rng : JfRng, count : Int32) -> Array[Int32] {
   let bytes : Array[Int32] = Array(capacity=count)
   let mut i = 0
   while i < count {
@@ -142,7 +142,10 @@ fn jf_random_attribute_value(rng : JfRng) -> @sdk.AttributeValue {
 }
 
 ///|
-fn jf_random_attributes(rng : JfRng, max_entries : Int) -> Map[String, @sdk.AttributeValue] {
+fn jf_random_attributes(
+  rng : JfRng,
+  max_entries : Int32,
+) -> Map[String, @sdk.AttributeValue] {
   let attributes : Map[String, @sdk.AttributeValue] = Map([])
   let count = rng.below(max_entries + 1)
   let mut i = 0
@@ -284,11 +287,14 @@ fn jf_check_any_value(
         _ => abort("expected a JSON boolean")
       }
     @sdk.IntValue(number) =>
-      assert_eq(jf_string(jf_member(json_value, "intValue")), number.to_string())
+      assert_eq(
+        jf_string(jf_member(json_value, "intValue")),
+        number.to_string(),
+      )
     @sdk.DoubleValue(number) => {
       let encoded = jf_member(json_value, "doubleValue")
       match encoded {
-        String(text) => {
+        String(text) =>
           if number.is_nan() {
             assert_eq(text, "NaN")
           } else if number > 1.7976931348623157e308 {
@@ -298,12 +304,13 @@ fn jf_check_any_value(
           } else {
             abort("unexpected string encoding for a finite double")
           }
-        }
         _ => assert_eq(jf_number(encoded), number)
       }
     }
     @sdk.StringArrayValue(items) => {
-      let values = jf_array(jf_member(jf_member(json_value, "arrayValue"), "values"))
+      let values = jf_array(
+        jf_member(jf_member(json_value, "arrayValue"), "values"),
+      )
       assert_eq(values.length(), items.length())
       let mut i = 0
       while i < items.length() {
@@ -312,7 +319,9 @@ fn jf_check_any_value(
       }
     }
     @sdk.BoolArrayValue(items) => {
-      let values = jf_array(jf_member(jf_member(json_value, "arrayValue"), "values"))
+      let values = jf_array(
+        jf_member(jf_member(json_value, "arrayValue"), "values"),
+      )
       assert_eq(values.length(), items.length())
       let mut i = 0
       while i < items.length() {
@@ -325,16 +334,23 @@ fn jf_check_any_value(
       }
     }
     @sdk.IntArrayValue(items) => {
-      let values = jf_array(jf_member(jf_member(json_value, "arrayValue"), "values"))
+      let values = jf_array(
+        jf_member(jf_member(json_value, "arrayValue"), "values"),
+      )
       assert_eq(values.length(), items.length())
       let mut i = 0
       while i < items.length() {
-        assert_eq(jf_string(jf_member(values[i], "intValue")), items[i].to_string())
+        assert_eq(
+          jf_string(jf_member(values[i], "intValue")),
+          items[i].to_string(),
+        )
         i = i + 1
       }
     }
     @sdk.DoubleArrayValue(items) => {
-      let values = jf_array(jf_member(jf_member(json_value, "arrayValue"), "values"))
+      let values = jf_array(
+        jf_member(jf_member(json_value, "arrayValue"), "values"),
+      )
       assert_eq(values.length(), items.length())
       let mut i = 0
       while i < items.length() {
@@ -455,10 +471,7 @@ fn jf_check_span(json_span : Json, data : @sdk.SpanData) -> Unit raise {
     // An empty message is not written.
     assert_false(jf_has_member(status, "message"))
   } else {
-    assert_eq(
-      jf_string(jf_member(status, "message")),
-      data.status_description,
-    )
+    assert_eq(jf_string(jf_member(status, "message")), data.status_description)
   }
   assert_eq(
     jf_number(jf_member(status, "code")),
@@ -471,7 +484,8 @@ fn jf_encode(spans : Array[@sdk.SpanData]) -> Json {
   let bytes = @otlp.encode_trace_request_json(spans)
   let text = @utf8.decode_lossy(bytes.exact_view())
   @json.parse(text) catch {
-    err => abort("encoder produced invalid JSON: " + err.to_string() + " in " + text)
+    err =>
+      abort("encoder produced invalid JSON: " + err.to_string() + " in " + text)
   }
 }
 

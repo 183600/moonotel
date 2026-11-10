@@ -24,14 +24,15 @@ pub impl @sdk.SpanExporter for ReentrantProviderExporter with fn export_spans(
 }
 
 ///|
-pub impl @sdk.SpanExporter for ReentrantProviderExporter with fn shutdown(
-  self,
-) {
+pub impl @sdk.SpanExporter for ReentrantProviderExporter with fn shutdown(self) {
   let _ = self
 }
 
 ///|
-pub extend ReentrantProviderExporter with @sdk.SpanExporter::{export_spans, shutdown}
+pub extend ReentrantProviderExporter with @sdk.SpanExporter::{
+  export_spans,
+  shutdown,
+}
 
 ///|
 test "provider_shutdown_from_a_direct_batch_drain_closes_other_processors" {
@@ -46,14 +47,16 @@ test "provider_shutdown_from_a_direct_batch_drain_closes_other_processors" {
     flush_interval_millis=1000000,
   )
   let second = @sdk.BatchSpanProcessor::new(
-    ProbeExporter::{ names: [] },
+    ProbeExporter::{ names: [], },
     max_queue_size=10,
     max_export_batch_size=10,
     flush_interval_millis=1000000,
   )
   let provider = @sdk.TracerProviderSdk::new(
-    service_name="provider-shutdown-direct-batch",
-  ).with_span_processors([first, second]).with_sampler(@sdk.Sampler::always_on())
+      service_name="provider-shutdown-direct-batch",
+    )
+    .with_span_processors([first, second])
+    .with_sampler(@sdk.Sampler::always_on())
   exporter.provider.val = Some(provider)
   first.on_end(probe_span("s0"))
   first.on_end(probe_span("s1"))
@@ -77,14 +80,16 @@ test "provider_shutdown_from_a_direct_drain_before_shutdown_completes" {
     flush_interval_millis=1000000,
   )
   let second = @sdk.BatchSpanProcessor::new(
-    ProbeExporter::{ names: [] },
+    ProbeExporter::{ names: [], },
     max_queue_size=10,
     max_export_batch_size=10,
     flush_interval_millis=1000000,
   )
   let provider = @sdk.TracerProviderSdk::new(
-    service_name="provider-shutdown-direct-drain",
-  ).with_span_processors([first, second]).with_sampler(@sdk.Sampler::always_on())
+      service_name="provider-shutdown-direct-drain",
+    )
+    .with_span_processors([first, second])
+    .with_sampler(@sdk.Sampler::always_on())
   exporter.provider.val = Some(provider)
   first.on_end(probe_span("s0"))
   // The exporter calls provider.shutdown while this `drain_before_shutdown`
@@ -109,14 +114,16 @@ test "provider_shutdown_from_a_direct_multi_drain_completes" {
   )
   let multi = @sdk.MultiSpanProcessor::new(processors=[child])
   let second = @sdk.BatchSpanProcessor::new(
-    ProbeExporter::{ names: [] },
+    ProbeExporter::{ names: [], },
     max_queue_size=10,
     max_export_batch_size=10,
     flush_interval_millis=1000000,
   )
   let provider = @sdk.TracerProviderSdk::new(
-    service_name="provider-shutdown-direct-multi-drain",
-  ).with_span_processors([multi, second]).with_sampler(@sdk.Sampler::always_on())
+      service_name="provider-shutdown-direct-multi-drain",
+    )
+    .with_span_processors([multi, second])
+    .with_sampler(@sdk.Sampler::always_on())
   exporter.provider.val = Some(provider)
   child.on_end(probe_span("s0"))
   multi.drain_before_shutdown()

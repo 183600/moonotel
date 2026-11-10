@@ -10,10 +10,7 @@ test "retry_wait_can_stop_the_retry_loop_by_shutting_down" {
     { status_code: 503, body: b"", }
   }
   let exporter = @otlp.OtlpHttpExporter::new(
-    @otlp.OtlpHttpConfig::new(
-      endpoint="http://collector:4318",
-      max_retries=3,
-    ),
+    @otlp.OtlpHttpConfig::new(endpoint="http://collector:4318", max_retries=3),
     transport,
     retry_wait=fn(_attempt) {
       match holder.val {

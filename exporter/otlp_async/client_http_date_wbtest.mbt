@@ -28,20 +28,13 @@ test "http_date_parser_handles_every_month_and_leap_years" {
 test "http_date_parser_rejects_invalid_dates_and_times" {
   let cases : Array[String] = [
     // Day outside the month (2024 is a leap year, 1900 is not).
-    "Mon, 31 Feb 2024 00:00:00 GMT",
-    "Mon, 29 Feb 1900 00:00:00 GMT",
-    "Mon, 01 Jan 2024 24:00:00 GMT",
-    "Mon, 01 Jan 2024 00:60:00 GMT",
-    "Mon, 01 Jan 2024 00:00:61 GMT",
+    "Mon, 31 Feb 2024 00:00:00 GMT", "Mon, 29 Feb 1900 00:00:00 GMT", "Mon, 01 Jan 2024 24:00:00 GMT",
+    "Mon, 01 Jan 2024 00:60:00 GMT", "Mon, 01 Jan 2024 00:00:61 GMT",
     // Unknown weekday, wrong length and wrong timezone suffix.
-    "Xxx, 01 Jan 2024 00:00:00 GMT",
-    "Mon 01 Jan 2024 00:00:00 GMT",
-    "Mon, 01 Jan 2024 00:00:00 UTC",
+     "Xxx, 01 Jan 2024 00:00:00 GMT", "Mon 01 Jan 2024 00:00:00 GMT", "Mon, 01 Jan 2024 00:00:00 UTC",
     "Mon, 01 Jan 2024 00:00:00 GMT ",
     // Non-digit components.
-    "Mon, 0x Jan 2024 00:00:00 GMT",
-    "Mon, 01 Xxx 2024 00:00:00 GMT",
-    "Mon, 01 Jan 20x4 00:00:00 GMT",
+     "Mon, 0x Jan 2024 00:00:00 GMT", "Mon, 01 Xxx 2024 00:00:00 GMT", "Mon, 01 Jan 20x4 00:00:00 GMT",
     "Mon, 01 Jan 2024 0x:00:00 GMT",
   ]
   for value in cases {

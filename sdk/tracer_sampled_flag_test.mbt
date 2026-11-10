@@ -3,12 +3,11 @@
 
 ///|
 test "drop_decision_never_sets_the_sampled_flag" {
-  let provider = @sdk.TracerProviderSdk::new(service_name="flag-probe")
-    .with_sampler(
-      @sdk.Sampler::new("IllegalSampledWithoutRecord", fn(_parameters) {
-        { is_recorded: false, is_sampled: true, }
-      }),
-    )
+  let provider = @sdk.TracerProviderSdk::new(service_name="flag-probe").with_sampler(
+    @sdk.Sampler::new("IllegalSampledWithoutRecord", fn(_parameters) {
+      { is_recorded: false, is_sampled: true, }
+    }),
+  )
   let span = provider.get_tracer("flag-probe").start_root_span("span")
   assert_false(span.is_recording())
   assert_false(span.context().is_sampled())
@@ -19,8 +18,9 @@ test "drop_decision_never_sets_the_sampled_flag" {
 
 ///|
 test "record_and_sample_decision_sets_the_sampled_flag" {
-  let provider = @sdk.TracerProviderSdk::new(service_name="flag-probe")
-    .with_sampler(@sdk.Sampler::always_on())
+  let provider = @sdk.TracerProviderSdk::new(service_name="flag-probe").with_sampler(
+    @sdk.Sampler::always_on(),
+  )
   let span = provider.get_tracer("flag-probe").start_root_span("span")
   assert_true(span.is_recording())
   assert_true(span.context().is_sampled())

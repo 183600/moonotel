@@ -29,17 +29,14 @@ pub impl @sdk.SpanExporter for RelativeUrlRecordingExporter with fn shutdown(
 async test "client span omits server attributes for a relative URL" {
   let exporter : RelativeUrlRecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
-  let provider = @sdk.TracerProviderSdk::new(
-    service_name="relative-url-test",
-  ).with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="relative-url-test").with_span_processor(
+    processor,
+  )
   let tracer = provider.get_tracer("relative-url-test")
   // The HTTP client rejects a relative reference immediately, before any
   // network access; the span attributes are still recorded.
   let failed = try {
-    let (_response, _body) = @async_http_client.get(
-      "example.com/path",
-      tracer~,
-    )
+    let (_response, _body) = @async_http_client.get("example.com/path", tracer~)
     false
   } catch {
     _ => true

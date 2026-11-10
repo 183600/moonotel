@@ -2,7 +2,10 @@
 // ID arrays or exposing them through accessors.
 
 ///|
-fn isolation_span_context(trace_byte : Int32, span_byte : Int32) -> @api.SpanContext {
+fn isolation_span_context(
+  trace_byte : Int32,
+  span_byte : Int32,
+) -> @api.SpanContext {
   @api.span_context(Array::make(16, trace_byte), Array::make(8, span_byte), 1)
 }
 

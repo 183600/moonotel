@@ -5,7 +5,7 @@
 ///|
 test "json_encoder_writes_timestamps_as_unsigned_fixed64_strings" {
   let base = json_test_span()
-  let event = { ..base.events[0], time_unix_nano: -3L }
+  let event = { ..base.events[0], time_unix_nano: -3L, }
   let span : @sdk.SpanData = {
     ..base,
     start_time_unix_nano: -1L,

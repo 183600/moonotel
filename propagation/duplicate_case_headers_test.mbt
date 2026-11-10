@@ -84,10 +84,10 @@ test "extract_combines_baggage_fields_with_different_casing" {
   let carrier = @propagation.TextMapCarrier::new()
   carrier.set("baggage", "first=1")
   carrier.set("Baggage", "second=2")
-  assert_eq(
-    @propagation.extract_baggage(carrier),
-    [("first", "1"), ("second", "2")],
-  )
+  assert_eq(@propagation.extract_baggage(carrier), [
+    ("first", "1"),
+    ("second", "2"),
+  ])
   let entries = @propagation.extract_baggage_entries(carrier)
   assert_eq(entries.length(), 2)
   assert_eq(entries[0].key, "first")
@@ -99,8 +99,5 @@ test "extract_single_traceparent_still_works" {
   let carrier = @propagation.TextMapCarrier::new()
   carrier.set("TraceParent", duplicate_traceparent_a)
   let context = @propagation.extract(carrier).unwrap()
-  assert_eq(
-    context.trace_id_hex(),
-    "4bf92f359d1e75b7618a2d1f3c4e5a6b",
-  )
+  assert_eq(context.trace_id_hex(), "4bf92f359d1e75b7618a2d1f3c4e5a6b")
 }

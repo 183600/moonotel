@@ -387,7 +387,9 @@ pub fn TracerProviderSdk::force_flush(self : TracerProviderSdk) -> Unit {
       Some(owner) => {
         let previous = self.flushing_owner.val
         self.flushing_owner.val = Some(self.processors)
-        defer { self.flushing_owner.val = previous }
+        defer {
+          self.flushing_owner.val = previous
+        }
         self.force_flush_processors(Some(owner))
       }
       None => ()
@@ -419,7 +421,9 @@ pub fn TracerProviderSdk::shutdown(self : TracerProviderSdk) -> Unit {
     return
   }
   self.draining.val = true
-  defer { self.draining.val = false }
+  defer {
+    self.draining.val = false
+  }
   self.shutdown_called.val = true
   // Drain every not-yet-shut-down processor before shutting any exporter down.
   // Processors may share an exporter, and a simple processor registered before

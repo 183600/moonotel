@@ -51,10 +51,7 @@ test "resource_attributes_remove_copies_the_shared_map" {
   snapshot.remove("a")
   assert_eq(snapshot.get("a"), None)
   assert_eq(snapshot.get("b"), Some(@sdk.AttributeValue::BoolValue(true)))
-  assert_eq(
-    shared.get("a"),
-    Some(@sdk.AttributeValue::StringValue("1")),
-  )
+  assert_eq(shared.get("a"), Some(@sdk.AttributeValue::StringValue("1")))
   assert_false(snapshot.is_empty())
   snapshot.remove("b")
   assert_true(snapshot.is_empty())
@@ -69,10 +66,7 @@ test "resource_attributes_clear_copies_the_shared_map" {
   let snapshot = @sdk.ResourceAttributes::new(shared)
   snapshot.clear()
   assert_true(snapshot.is_empty())
-  assert_eq(
-    shared.get("a"),
-    Some(@sdk.AttributeValue::StringValue("1")),
-  )
+  assert_eq(shared.get("a"), Some(@sdk.AttributeValue::StringValue("1")))
 }
 
 ///|
@@ -83,20 +77,11 @@ test "resource_attributes_own_map_wins_over_shared_values" {
   let snapshot = @sdk.ResourceAttributes::new(shared)
   snapshot.set("a", @sdk.AttributeValue::StringValue("own"))
   snapshot.set("b", @sdk.AttributeValue::IntValue(3L))
-  assert_eq(
-    snapshot.get("a"),
-    Some(@sdk.AttributeValue::StringValue("own")),
-  )
+  assert_eq(snapshot.get("a"), Some(@sdk.AttributeValue::StringValue("own")))
   assert_eq(snapshot.get("b"), Some(@sdk.AttributeValue::IntValue(3L)))
-  assert_eq(
-    shared.get("a"),
-    Some(@sdk.AttributeValue::StringValue("shared")),
-  )
+  assert_eq(shared.get("a"), Some(@sdk.AttributeValue::StringValue("shared")))
   assert_false(shared.contains("b"))
   snapshot.remove("a")
   assert_eq(snapshot.get("a"), None)
-  assert_eq(
-    shared.get("a"),
-    Some(@sdk.AttributeValue::StringValue("shared")),
-  )
+  assert_eq(shared.get("a"), Some(@sdk.AttributeValue::StringValue("shared")))
 }

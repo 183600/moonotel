@@ -18,9 +18,7 @@ pub impl @sdk.SpanExporter for EmptyHostRecordingExporter with fn export_spans(
 }
 
 ///|
-pub impl @sdk.SpanExporter for EmptyHostRecordingExporter with fn shutdown(
-  self,
-) {
+pub impl @sdk.SpanExporter for EmptyHostRecordingExporter with fn shutdown(self) {
   let _ = self
 }
 
@@ -28,9 +26,9 @@ pub impl @sdk.SpanExporter for EmptyHostRecordingExporter with fn shutdown(
 async test "client span omits server attributes for a URL without a host" {
   let exporter : EmptyHostRecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
-  let provider = @sdk.TracerProviderSdk::new(
-    service_name="empty-host-test",
-  ).with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="empty-host-test").with_span_processor(
+    processor,
+  )
   let tracer = provider.get_tracer("empty-host-test")
   let failed = try {
     let (_response, _body) = @async_http_client.get(

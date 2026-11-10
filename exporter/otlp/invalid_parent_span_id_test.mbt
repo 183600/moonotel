@@ -25,14 +25,24 @@ fn json_parent_text(span : @sdk.SpanData) -> String {
 test "protobuf_omits_malformed_parent_span_ids" {
   assert_eq(protobuf_parent_field(parent_id_span([])).length(), 0)
   assert_eq(protobuf_parent_field(parent_id_span([1])).length(), 0)
-  assert_eq(protobuf_parent_field(parent_id_span(Array::make(8, 0))).length(), 0)
-  assert_eq(protobuf_parent_field(parent_id_span([1, 2, 3, 4, 5, 6, 7, 8])).length(), 1)
+  assert_eq(
+    protobuf_parent_field(parent_id_span(Array::make(8, 0))).length(),
+    0,
+  )
+  assert_eq(
+    protobuf_parent_field(parent_id_span([1, 2, 3, 4, 5, 6, 7, 8])).length(),
+    1,
+  )
 }
 
 ///|
 test "json_omits_malformed_parent_span_ids" {
-  assert_false(json_parent_text(parent_id_span([])).contains("\"parentSpanId\""))
-  assert_false(json_parent_text(parent_id_span([1])).contains("\"parentSpanId\""))
+  assert_false(
+    json_parent_text(parent_id_span([])).contains("\"parentSpanId\""),
+  )
+  assert_false(
+    json_parent_text(parent_id_span([1])).contains("\"parentSpanId\""),
+  )
   assert_false(
     json_parent_text(parent_id_span(Array::make(8, 0))).contains(
       "\"parentSpanId\"",

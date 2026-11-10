@@ -94,7 +94,10 @@ test "reset_global_propagator_rereads_the_environment" {
   @env.unset_env_var("OTEL_PROPAGATORS")
   // Trigger the lazy default (`tracecontext,baggage`) so that it is cached.
   let first_carrier = @propagation.TextMapCarrier::new()
-  @propagation.global_propagator().inject(global_propagator_context(), first_carrier)
+  @propagation.global_propagator().inject(
+    global_propagator_context(),
+    first_carrier,
+  )
   assert_true(first_carrier.get("traceparent") is Some(_))
   @env.set_env_var("OTEL_PROPAGATORS", "none")
   defer @env.unset_env_var("OTEL_PROPAGATORS")

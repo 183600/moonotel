@@ -29,9 +29,9 @@ pub impl @sdk.SpanExporter for HeaderCaptureExporter with fn shutdown(self) {
 fn header_capture_tracer() -> (@sdk.Tracer, HeaderCaptureExporter) {
   let exporter : HeaderCaptureExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
-  let provider = @sdk.TracerProviderSdk::new(
-    service_name="header-capture-test",
-  ).with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="header-capture-test").with_span_processor(
+    processor,
+  )
   (provider.get_tracer("header-capture-test"), exporter)
 }
 
@@ -117,11 +117,7 @@ async test "server header capture follows the configured environment" {
     tracer,
     exporter,
     { "X-One": "1", "X-Two": "2" },
-    {
-      "X-Reply": "captured",
-      "Bad Header": "dropped",
-      "X-CRLF": "a\r\nb",
-    },
+    { "X-Reply": "captured", "Bad Header": "dropped", "X-CRLF": "a\r\nb" },
   )
   assert_eq(
     data.attributes.get("http.request.header.x-one"),

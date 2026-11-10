@@ -181,15 +181,19 @@ pub fn IdGenerator::random() -> IdGenerator {
     @env.now() ^ (sequence * 11400714819323198485) ^ 88172645463325252,
   )
   if @env.rand(0) is None {
-    IdGenerator::new(fn() { pseudo_random_bytes(16, state) }, fn() {
-      pseudo_random_bytes(8, state)
-    }, trace_id_is_random=true)
+    IdGenerator::new(
+      fn() { pseudo_random_bytes(16, state) },
+      fn() { pseudo_random_bytes(8, state) },
+      trace_id_is_random=true,
+    )
   } else {
     let pending : Ref[Bytes] = Ref(b"")
     let offset : Ref[Int32] = Ref(0)
-    IdGenerator::new(fn() { random_bytes(16, state, pending, offset) }, fn() {
-      random_bytes(8, state, pending, offset)
-    }, trace_id_is_random=true)
+    IdGenerator::new(
+      fn() { random_bytes(16, state, pending, offset) },
+      fn() { random_bytes(8, state, pending, offset) },
+      trace_id_is_random=true,
+    )
   }
 }
 

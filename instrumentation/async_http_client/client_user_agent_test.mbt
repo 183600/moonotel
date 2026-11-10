@@ -19,9 +19,7 @@ pub impl @sdk.SpanExporter for UserAgentRecordingExporter with fn export_spans(
 }
 
 ///|
-pub impl @sdk.SpanExporter for UserAgentRecordingExporter with fn shutdown(
-  self,
-) {
+pub impl @sdk.SpanExporter for UserAgentRecordingExporter with fn shutdown(self) {
   let _ = self
 }
 
@@ -29,8 +27,9 @@ pub impl @sdk.SpanExporter for UserAgentRecordingExporter with fn shutdown(
 async test "client span records the trimmed user agent" {
   let exporter : UserAgentRecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
-  let provider = @sdk.TracerProviderSdk::new(service_name="client-user-agent")
-    .with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="client-user-agent").with_span_processor(
+    processor,
+  )
   let tracer = provider.get_tracer("client-user-agent")
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))

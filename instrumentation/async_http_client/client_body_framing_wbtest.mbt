@@ -12,14 +12,8 @@ test "wire_request_headers_reports_no_framing_for_an_empty_body" {
     (@http.CaseInsensitiveString("Transfer-Encoding"), "chunked"),
   ])
   let wire = wire_request_headers(headers, 0)
-  assert_eq(
-    wire.get(@http.CaseInsensitiveString("content-length")),
-    None,
-  )
-  assert_eq(
-    wire.get(@http.CaseInsensitiveString("transfer-encoding")),
-    None,
-  )
+  assert_eq(wire.get(@http.CaseInsensitiveString("content-length")), None)
+  assert_eq(wire.get(@http.CaseInsensitiveString("transfer-encoding")), None)
   assert_eq(wire.get(@http.CaseInsensitiveString("x-test")), Some("1"))
 }
 
@@ -29,10 +23,7 @@ test "wire_request_headers_reports_chunked_body_framing" {
     (@http.CaseInsensitiveString("Content-Length"), "3"),
   ])
   let wire = wire_request_headers(headers, 3)
-  assert_eq(
-    wire.get(@http.CaseInsensitiveString("content-length")),
-    None,
-  )
+  assert_eq(wire.get(@http.CaseInsensitiveString("content-length")), None)
   assert_eq(
     wire.get(@http.CaseInsensitiveString("transfer-encoding")),
     Some("chunked"),

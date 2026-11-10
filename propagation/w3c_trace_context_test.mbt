@@ -193,10 +193,7 @@ test "carrier_from_entries_combines_duplicate_keys" {
   ])
   assert_eq(carrier.length(), 1)
   assert_eq(carrier.get("tracestate"), Some("foo=1, bar=2"))
-  assert_eq(
-    @propagation.extract_tracestate(carrier),
-    Some("foo=1, bar=2"),
-  )
+  assert_eq(@propagation.extract_tracestate(carrier), Some("foo=1, bar=2"))
   assert_eq(
     @propagation.parse_tracestate(carrier.get("tracestate").unwrap()),
     Some("foo=1,bar=2"),

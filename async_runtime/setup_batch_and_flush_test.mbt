@@ -104,9 +104,9 @@ async test "async exporter flush waits for queued spans to be sent" {
       let exporter = @async_runtime.OtlpHttpAsyncSpanExporter::new(
         config, group,
       )
-      let provider = @sdk.TracerProviderSdk::new(
-        service_name="async-flush",
-      ).with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+      let provider = @sdk.TracerProviderSdk::new(service_name="async-flush").with_span_processor(
+        @sdk.SimpleSpanProcessor::new(exporter),
+      )
       let tracer = provider.get_tracer("async-flush")
       tracer.start_root_span("flushed").end()
       exporter.flush()

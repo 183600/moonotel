@@ -125,17 +125,16 @@ test "console format renders parent ids like bytes_to_hex" {
   let rendered = format_span(data)
   assert_true(rendered.contains(" parent_span_id=070f00ab"))
   assert_true(
-    rendered.contains(" parent_span_id=" + @api.bytes_to_hex(data.parent_span_id)),
+    rendered.contains(
+      " parent_span_id=" + @api.bytes_to_hex(data.parent_span_id),
+    ),
   )
 }
 
 ///|
 test "console escaping keeps control characters out of the raw output" {
   assert_eq(escape_console_text("plain text"), "plain text")
-  assert_eq(
-    escape_console_text("a\nb\rc\td\\e"),
-    "a\\nb\\rc\\td\\\\e",
-  )
+  assert_eq(escape_console_text("a\nb\rc\td\\e"), "a\\nb\\rc\\td\\\\e")
   let controls = String::from_array([
     (0x01).unsafe_to_char(),
     (0x1F).unsafe_to_char(),
@@ -189,9 +188,7 @@ test "console format escapes newlines in names attributes and events" {
   assert_false(rendered.contains("\t"))
   assert_true(rendered.contains("name=span\\nname"))
   assert_true(rendered.contains("status_description=bad\\r\\nstatus"))
-  assert_true(
-    rendered.contains("key\\nline=value\\twith\\\\slash"),
-  )
+  assert_true(rendered.contains("key\\nline=value\\twith\\\\slash"))
   assert_true(rendered.contains("event\\nname"))
 }
 

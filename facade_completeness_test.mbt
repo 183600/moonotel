@@ -18,9 +18,7 @@ test "facade_reexports_resource_attributes" {
 ///|
 test "facade_reexports_query_redaction" {
   assert_eq(
-    @moonotel.redact_sensitive_query_string(
-      "a=1&X-Amz-Signature=secret&b=2",
-    ),
+    @moonotel.redact_sensitive_query_string("a=1&X-Amz-Signature=secret&b=2"),
     "a=1&X-Amz-Signature=REDACTED&b=2",
   )
 }

@@ -5,12 +5,10 @@
 ///|
 async test "async setup merges programmatic and environment headers" {
   @env.set_env_var(
-    "OTEL_EXPORTER_OTLP_HEADERS",
-    "async-env-only=1,async-shared=environment",
+    "OTEL_EXPORTER_OTLP_HEADERS", "async-env-only=1,async-shared=environment",
   )
   @env.set_env_var(
-    "OTEL_EXPORTER_OTLP_TRACES_HEADERS",
-    "async-signal-only=2,async-shared=signal",
+    "OTEL_EXPORTER_OTLP_TRACES_HEADERS", "async-signal-only=2,async-shared=signal",
   )
   defer {
     @env.unset_env_var("OTEL_EXPORTER_OTLP_HEADERS")

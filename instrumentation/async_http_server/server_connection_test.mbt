@@ -56,7 +56,7 @@ async test "response Connection: close closes the socket" {
     let headers : Map[String, String] = Map([("Connection", "close")])
     group.spawn_bg(no_wait=true) <| () => {
       @async_http_server.run_server_on(server, call => {
-        call.respond(200, body="closing", headers=headers)
+        call.respond(200, body="closing", headers~)
       })
     }
     let connection = @socket.Tcp::connect(
@@ -79,7 +79,7 @@ async test "response Connection: close with CR closes the socket" {
     let headers : Map[String, String] = Map([("Connection", "close\r")])
     group.spawn_bg(no_wait=true) <| () => {
       @async_http_server.run_server_on(server, call => {
-        call.respond(200, body="closing-cr", headers=headers)
+        call.respond(200, body="closing-cr", headers~)
       })
     }
     let connection = @socket.Tcp::connect(

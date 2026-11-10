@@ -47,9 +47,9 @@ async test "spawn_flush_loop_with_zero_interval_flushes_on_group_exit" {
     max_export_batch_size=100,
     flush_interval_millis=600000,
   )
-  let provider = @sdk.TracerProviderSdk::new(
-    service_name="zero-interval",
-  ).with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="zero-interval").with_span_processor(
+    processor,
+  )
   let tracer = provider.get_tracer("zero-interval")
   @async.with_task_group() <| group => {
     // Explicit zero disables the timed loop; the group defer still flushes.
@@ -80,10 +80,12 @@ async test "async_span_exporter_sends_with_a_zero_timeout" {
         timeout_millis=0,
         max_retries=0,
       )
-      let exporter = @async_runtime.OtlpHttpAsyncSpanExporter::new(config, group)
-      let provider = @sdk.TracerProviderSdk::new(
-        service_name="zero-timeout",
-      ).with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+      let exporter = @async_runtime.OtlpHttpAsyncSpanExporter::new(
+        config, group,
+      )
+      let provider = @sdk.TracerProviderSdk::new(service_name="zero-timeout").with_span_processor(
+        @sdk.SimpleSpanProcessor::new(exporter),
+      )
       provider.get_tracer("zero-timeout").start_root_span("sent").end()
       let mut waited = 0
       while waited < 3000 && received.val == 0 {
