@@ -112,7 +112,8 @@ A recording span keeps its data readable after `end()`: the accessors return a
 snapshot of the recorded attributes, events and links, including when the
 provider has no processors registered.
 
-`Tracer::with_span` records an error raised by its callback before re-raising
+`Tracer::with_span` (and its async counterpart `Tracer::with_span_async`)
+records an error raised by its callback before re-raising
 it (the same triple the HTTP instrumentation records): an `exception` event
 with `exception.type` / `exception.message`, an `error.type` attribute and an
 `Error` status — except when the callback already set the span to `Ok`,

@@ -254,7 +254,9 @@ pub fn[X] Tracer::with_span(
 // becomes the current span until `f` returns or raises, so spans started
 // inside `f` (including ones started after an await) link to it
 // automatically. The span is ended and the previous context restored
-// afterwards. Argument semantics are identical to `with_span`.
+// afterwards. An error raised by `f` is recorded on the span exactly like
+// `with_span` (exception event, `error.type`, `Error` status unless `Ok` was
+// already set) before being re-raised.
 
 ///|
 fn record_raised_error(span : SpanSdk, error : Error) -> Unit {
@@ -307,7 +309,12 @@ pub async fn[X] Tracer::with_span_async(
   let previous = @context.attach(base.with_span(span.context()))
   defer @context.detach(previous)
   defer span.end()
-  f(span)
+  f(span) catch {
+    (error : Error) => {
+      record_raised_error(span, error)
+      raise error
+    }
+  }
 }
 
 // Start a new root span with no parent.

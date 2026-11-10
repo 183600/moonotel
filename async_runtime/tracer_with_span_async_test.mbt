@@ -131,6 +131,59 @@ async test "with_span_async ends the span when the closure raises" {
 }
 
 ///|
+async test "with_span_async records an error raised after an await" {
+  let (provider, exporter) = async_scope_provider()
+  let tracer = provider.get_tracer("with-span-async")
+  let caught : Ref[Bool] = Ref(false)
+  tracer.with_span_async("failing", _span => {
+    @async.sleep(10)
+    raise Failure("boom")
+  }) catch {
+    _ => caught.val = true
+  }
+  assert_true(caught.val)
+  assert_eq(exporter.spans.val.length(), 1)
+  let data = exporter.spans.val[0]
+  assert_eq(data.name, "failing")
+  assert_eq(data.events.length(), 1)
+  assert_eq(data.events[0].name, "exception")
+  match data.events[0].attributes.get(@sdk.EXCEPTION_MESSAGE) {
+    Some(@sdk.StringValue(message)) => assert_true(message.contains("boom"))
+    _ => fail("exception.message attribute is missing")
+  }
+  match data.attributes.get(@sdk.ERROR_TYPE) {
+    Some(@sdk.StringValue(_)) => ()
+    _ => fail("error.type attribute is missing")
+  }
+  assert_eq(data.status, @api.StatusCode::Error)
+}
+
+///|
+async test "with_span_async keeps an Ok status set by the callback" {
+  let (provider, exporter) = async_scope_provider()
+  let tracer = provider.get_tracer("with-span-async")
+  let caught : Ref[Bool] = Ref(false)
+  tracer.with_span_async("late-failure", span => {
+    span.set_status(@api.StatusCode::Ok)
+    raise Failure("boom")
+  }) catch {
+    _ => caught.val = true
+  }
+  assert_true(caught.val)
+  assert_eq(exporter.spans.val.length(), 1)
+  let data = exporter.spans.val[0]
+  // `Ok` is final per the OpenTelemetry status rules; the exception event and
+  // `error.type` are still recorded.
+  assert_eq(data.status, @api.StatusCode::Ok)
+  assert_eq(data.events.length(), 1)
+  assert_eq(data.events[0].name, "exception")
+  match data.attributes.get(@sdk.ERROR_TYPE) {
+    Some(@sdk.StringValue(_)) => ()
+    _ => fail("error.type attribute is missing")
+  }
+}
+
+///|
 async test "with_span_async without a parent starts a root span" {
   let (provider, exporter) = async_scope_provider()
   let tracer = provider.get_tracer("with-span-async")
