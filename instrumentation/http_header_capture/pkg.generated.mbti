@@ -11,6 +11,8 @@ pub const ENV_CLIENT_REQUEST_HEADERS : String = "OTEL_INSTRUMENTATION_HTTP_CAPTU
 
 pub const ENV_CLIENT_RESPONSE_HEADERS : String = "OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_RESPONSE"
 
+pub const ENV_SANITIZE_FIELDS : String = "OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SANITIZE_FIELDS"
+
 pub const ENV_SERVER_REQUEST_HEADERS : String = "OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST"
 
 pub const ENV_SERVER_RESPONSE_HEADERS : String = "OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_RESPONSE"
@@ -21,6 +23,8 @@ pub const ENV_SERVER_RESPONSE_HEADERS : String = "OTEL_INSTRUMENTATION_HTTP_CAPT
 pub struct HeaderCapture {
   capture_all : Bool
   names : Map[String, Bool]
+  sanitize_all : Bool
+  sanitize_names : Map[String, Bool]
 }
 pub fn HeaderCapture::captures(Self, String) -> Bool
 pub fn HeaderCapture::from_env(String) -> Self
@@ -28,6 +32,8 @@ pub fn HeaderCapture::is_enabled(Self) -> Bool
 pub fn HeaderCapture::parse(String) -> Self
 pub fn HeaderCapture::record_request(Self, Map[@http.CaseInsensitiveString, String], @sdk.SpanSdk) -> Unit
 pub fn HeaderCapture::record_response(Self, Map[@http.CaseInsensitiveString, String], @sdk.SpanSdk) -> Unit
+pub fn HeaderCapture::sanitizes(Self, String) -> Bool
+pub fn HeaderCapture::with_sanitize(Self, String) -> Self
 
 // Type aliases
 

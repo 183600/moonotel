@@ -356,11 +356,16 @@ environment configuration:
   `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_REQUEST` and
   `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_RESPONSE` opt into
   header capture as span attributes.
+- `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SANITIZE_FIELDS` selects captured
+  headers whose value is replaced with `[REDACTED]`.
 
 Header-capture values are comma-separated lists of header names matched
-case-insensitively; `*` captures every header. Prefer explicit names: a
-wildcard also captures credential-bearing headers such as `Authorization` and
-`Cookie`, so only enable it when those values are safe to record.
+case-insensitively; `*` captures every header. The same name matching applies
+to the sanitize-fields list (`*` sanitizes every captured header), so
+credential-bearing headers can be captured without leaking their values.
+Prefer explicit names: a wildcard also captures headers such as
+`Authorization` and `Cookie`, so only enable it when those values are safe to
+record or sanitized.
 
 ## Testing and CI
 
