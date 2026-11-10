@@ -6,7 +6,7 @@ readme = "README.md"
 
 repository = "https://github.com/183600/moonotel"
 
-license = "Apache-2.0"
+license = "MIT"
 
 description = "OpenTelemetry tracing SDK and OTLP/HTTP exporter for MoonBit"
 

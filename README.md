@@ -455,4 +455,4 @@ behavior, and run both default and native checks before committing.
 
 ## License
 
-Apache-2.0
+MIT
