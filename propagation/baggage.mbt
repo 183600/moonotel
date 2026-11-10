@@ -557,7 +557,7 @@ fn parse_baggage_properties(
       while key_end > item_start && is_ows_code(view.unsafe_get(key_end - 1)) {
         key_end = key_end - 1
       }
-      let key_view = view.view(start_offset=item_start, end_offset=key_end)
+      let key_view = view.clamped_view(start=item_start, end=key_end)
       let mut value_start = eq + 1
       while value_start < property_end &&
             is_ows_code(view.unsafe_get(value_start)) {
@@ -570,7 +570,7 @@ fn parse_baggage_properties(
       }
       if is_valid_baggage_key(key_view) {
         let (decoded, encoded_len) = percent_decode_view_with_length(
-          view.view(start_offset=value_start, end_offset=value_end),
+          view.clamped_view(start=value_start, end=value_end),
         )
         if encoded_len >= 0 {
           let key = key_view.to_owned()
@@ -588,7 +588,7 @@ fn parse_baggage_properties(
       }
     } else {
       // A key-only property is a valid flag (W3C `property =/ key OWS`).
-      let key_view = view.view(start_offset=item_start, end_offset=property_end)
+      let key_view = view.clamped_view(start=item_start, end=property_end)
       if is_valid_baggage_key(key_view) {
         let key = key_view.to_owned()
         let mut duplicate = false
@@ -685,7 +685,7 @@ fn parse_baggage_entries_general(value : String) -> Array[BaggageEntry] {
       while key_end > item_start && is_ows_code(view.unsafe_get(key_end - 1)) {
         key_end = key_end - 1
       }
-      let key_view = view.view(start_offset=item_start, end_offset=key_end)
+      let key_view = view.clamped_view(start=item_start, end=key_end)
       if is_valid_baggage_key(key_view) {
         let value_limit = if semi >= 0 { semi } else { item_end }
         let mut value_start = eq + 1
@@ -699,7 +699,7 @@ fn parse_baggage_entries_general(value : String) -> Array[BaggageEntry] {
           value_end = value_end - 1
         }
         let (decoded, encoded_len) = percent_decode_view_with_length(
-          view.view(start_offset=value_start, end_offset=value_end),
+          view.clamped_view(start=value_start, end=value_end),
         )
         if encoded_len >= 0 {
           let properties = parse_baggage_properties(view, semi, item_end)
@@ -771,8 +771,8 @@ fn parse_baggage_plain(value : String) -> Array[(String, String)]? {
       return None
     }
     // No trimming was needed because whitespace was rejected above.
-    let key = view.view(start_offset=start, end_offset=eq).to_owned()
-    let member_value = view.view(start_offset=eq + 1, end_offset=end)
+    let key = view.clamped_view(start=start, end=eq).to_owned()
+    let member_value = view.clamped_view(start=eq + 1, end=end)
     let separator = if pairs.length() > 0 { 1 } else { 0 }
     let size = key.length() + 1 + member_value.length() + separator
     if bytes + size > BAGGAGE_MAX_BYTES {
@@ -855,7 +855,7 @@ fn parse_baggage_general(value : String) -> Array[(String, String)] {
       while key_end > item_start && is_ows_code(view.unsafe_get(key_end - 1)) {
         key_end = key_end - 1
       }
-      let key_view = view.view(start_offset=item_start, end_offset=key_end)
+      let key_view = view.clamped_view(start=item_start, end=key_end)
       if is_valid_baggage_key(key_view) {
         let value_limit = if semi >= 0 { semi } else { item_end }
         let mut value_start = eq + 1
@@ -869,7 +869,7 @@ fn parse_baggage_general(value : String) -> Array[(String, String)] {
           value_end = value_end - 1
         }
         let (decoded, encoded_len) = percent_decode_view_with_length(
-          view.view(start_offset=value_start, end_offset=value_end),
+          view.clamped_view(start=value_start, end=value_end),
         )
         if encoded_len >= 0 {
           // Properties are dropped from the result, but they still occupy the

@@ -52,7 +52,7 @@ fn trim_ows(value : StringView) -> StringView {
   while end > start && is_trim_char(value.unsafe_get(end - 1).unsafe_to_char()) {
     end = end - 1
   }
-  value.view(start_offset=start, end_offset=end)
+  value.clamped_view(start=start, end=end)
 }
 
 // Index of the first occurrence of `needle` at or after `start`, or the view
@@ -900,7 +900,7 @@ fn write_normalized_tracestate(view : StringView, len : Int32) -> String {
   let mut start = 0
   while true {
     let end = find_code_unit(view, ',', start)
-    let item = trim_ows(view.view(start_offset=start, end_offset=end))
+    let item = trim_ows(view.clamped_view(start=start, end=end))
     let mut duplicate = false
     if item.length() > 0 {
       let eq = find_code_unit(item, '=', 0)
@@ -1011,7 +1011,7 @@ pub fn parse_tracestate(value : String) -> String? {
     if key_end != eq {
       unchanged = false
     }
-    let key = view.view(start_offset=item_start, end_offset=key_end)
+    let key = view.clamped_view(start=item_start, end=key_end)
     // Blanks after the `=` belong to the value; they are trimmed only when the
     // member also has whitespace before `=` (`key = value`). Trailing
     // whitespace was already removed by the member trim above.
@@ -1021,7 +1021,7 @@ pub fn parse_tracestate(value : String) -> String? {
         value_start = value_start + 1
       }
     }
-    let member_value = view.view(start_offset=value_start, end_offset=item_end)
+    let member_value = view.clamped_view(start=value_start, end=item_end)
     if !is_valid_tracestate_key(key) || !is_valid_tracestate_value(member_value) {
       return None
     }

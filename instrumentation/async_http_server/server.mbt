@@ -173,7 +173,7 @@ fn trim_header_ows(value : StringView) -> StringView {
   if start == 0 && end == len {
     value
   } else {
-    value.view(start_offset=start, end_offset=end)
+    value.clamped_view(start=start, end=end)
   }
 }
 

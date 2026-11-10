@@ -374,7 +374,7 @@ fn parse_imf_fixdate_seconds(value : StringView) -> Int64? {
   if value.length() != 29 {
     return None
   }
-  if !is_short_weekday(value.view(start_offset=0, end_offset=3)) ||
+  if !is_short_weekday(value.clamped_view(start=0, end=3)) ||
     value.unsafe_get(3).to_int() != 0x2C ||
     value.unsafe_get(4).to_int() != 0x20 ||
     value.unsafe_get(7).to_int() != 0x20 ||
@@ -392,7 +392,7 @@ fn parse_imf_fixdate_seconds(value : StringView) -> Int64? {
     Some(value) => value
     None => return None
   }
-  let month = match http_date_month(value.view(start_offset=8, end_offset=11)) {
+  let month = match http_date_month(value.clamped_view(start=8, end=11)) {
     Some(value) => value
     None => return None
   }
@@ -436,8 +436,8 @@ fn parse_rfc850_date_seconds(value : StringView) -> Int64? {
     value.unsafe_get(comma + 1).to_int() != 0x20 {
     return None
   }
-  if !is_full_weekday(value.view(start_offset=0, end_offset=comma)) &&
-    !is_short_weekday(value.view(start_offset=0, end_offset=comma)) {
+  if !is_full_weekday(value.clamped_view(start=0, end=comma)) &&
+    !is_short_weekday(value.clamped_view(start=0, end=comma)) {
     return None
   }
   // `", "` + `dd-Mmm-yy HH:MM:SS GMT` is 24 characters.
@@ -461,7 +461,7 @@ fn parse_rfc850_date_seconds(value : StringView) -> Int64? {
     None => return None
   }
   let month = match
-    http_date_month(value.view(start_offset=start + 3, end_offset=start + 6)) {
+    http_date_month(value.clamped_view(start=start + 3, end=start + 6)) {
     Some(value) => value
     None => return None
   }
@@ -500,7 +500,7 @@ fn parse_asctime_date_seconds(value : StringView) -> Int64? {
   if value.length() != 24 {
     return None
   }
-  if !is_short_weekday(value.view(start_offset=0, end_offset=3)) ||
+  if !is_short_weekday(value.clamped_view(start=0, end=3)) ||
     value.unsafe_get(3).to_int() != 0x20 ||
     value.unsafe_get(7).to_int() != 0x20 ||
     value.unsafe_get(10).to_int() != 0x20 ||
@@ -509,7 +509,7 @@ fn parse_asctime_date_seconds(value : StringView) -> Int64? {
     value.unsafe_get(19).to_int() != 0x20 {
     return None
   }
-  let month = match http_date_month(value.view(start_offset=4, end_offset=7)) {
+  let month = match http_date_month(value.clamped_view(start=4, end=7)) {
     Some(value) => value
     None => return None
   }

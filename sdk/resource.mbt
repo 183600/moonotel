@@ -140,7 +140,7 @@ fn decode_percent(value : StringView) -> String {
         }
         j = j + 1
       }
-      for byte in encode_utf8_lossy(value.view(start_offset=run_start, end_offset=j)) {
+      for byte in encode_utf8_lossy(value.clamped_view(start=run_start, end=j)) {
         bytes.push(byte)
       }
       i = j

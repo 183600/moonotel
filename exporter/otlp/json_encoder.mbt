@@ -174,7 +174,7 @@ fn JsonBuf::write_view(self : JsonBuf, value : StringView) -> Unit {
     }
     self.write_bytes(
       encode_utf8_lossy(
-        value.view(start_offset=ascii_end, end_offset=run_end),
+        value.clamped_view(start=ascii_end, end=run_end),
       ),
     )
     i = run_end
@@ -287,7 +287,7 @@ fn json_write_escaped(sb : JsonBuf, value : String) -> Unit {
       continue
     }
     if run_start < i {
-      sb.write_view(value.view(start_offset=run_start, end_offset=i))
+      sb.write_view(value.clamped_view(start=run_start, end=i))
     }
     if code == 0x22 {
       sb.write_bytes(b"\\\"")
@@ -312,7 +312,7 @@ fn json_write_escaped(sb : JsonBuf, value : String) -> Unit {
     run_start = i
   }
   if run_start < len {
-    sb.write_view(value.view(start_offset=run_start, end_offset=len))
+    sb.write_view(value.clamped_view(start=run_start, end=len))
   }
   sb.write_char('"')
 }

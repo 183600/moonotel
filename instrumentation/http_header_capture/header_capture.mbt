@@ -128,7 +128,7 @@ fn trim_header_ows(value : StringView) -> StringView {
     }
     end = end - 1
   }
-  value.view(start_offset=start, end_offset=end)
+  value.clamped_view(start=start, end=end)
 }
 
 ///|

@@ -205,7 +205,7 @@ fn json_parse_string_at(text : String, start : Int32) -> (String, Int32)? {
     return None
   }
   let sb = StringBuilder()
-  sb.write_stringview(text.view(start_offset=start + 1, end_offset=pos))
+  sb.write_stringview(text.clamped_view(start=start + 1, end=pos))
   while pos < len {
     let code = text.unsafe_get(pos).to_int()
     if code == 0x22 {
