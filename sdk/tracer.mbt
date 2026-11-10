@@ -192,6 +192,49 @@ pub fn Tracer::start_span_with_context(
   )
 }
 
+// Start the span used by `with_span` and `with_span_async`: an explicit
+// parent wins, otherwise the span is parented through the base context.
+fn Tracer::start_scoped_span(
+  self : Tracer,
+  name : String,
+  context? : @context.Context,
+  kind? : @api.SpanKind,
+  parent? : @api.SpanContext,
+  attributes? : Map[String, AttributeValue],
+  links? : Array[SpanLink],
+  start_time_unix_nano? : Int64,
+) -> SpanSdk {
+  match parent {
+    Some(_) =>
+      self.start_span(
+        name,
+        kind?,
+        parent?,
+        attributes?,
+        links?,
+        start_time_unix_nano?,
+      )
+    None =>
+      self.start_span_with_context(
+        name,
+        context?,
+        kind?,
+        attributes?,
+        links?,
+        start_time_unix_nano?,
+      )
+  }
+}
+
+// The ambient base context for a scoped span: the explicit context when one
+// was supplied, otherwise the current context.
+fn scoped_base_context(context? : @context.Context) -> @context.Context {
+  match context {
+    Some(value) => value
+    None => @context.current_context()
+  }
+}
+
 // Run `f` with a new span that becomes the current span for the duration of
 // the call, so spans started inside `f` link to it automatically. When
 // `parent` is omitted the span is a child of the current context's span (or a
@@ -215,30 +258,16 @@ pub fn[X] Tracer::with_span(
   links? : Array[SpanLink],
   start_time_unix_nano? : Int64,
 ) -> X raise {
-  let span = match parent {
-    Some(_) =>
-      self.start_span(
-        name,
-        kind?,
-        parent?,
-        attributes?,
-        links?,
-        start_time_unix_nano?,
-      )
-    None =>
-      self.start_span_with_context(
-        name,
-        context?,
-        kind?,
-        attributes?,
-        links?,
-        start_time_unix_nano?,
-      )
-  }
-  let base = match context {
-    Some(value) => value
-    None => @context.current_context()
-  }
+  let span = self.start_scoped_span(
+    name,
+    context?,
+    kind?,
+    parent?,
+    attributes?,
+    links?,
+    start_time_unix_nano?,
+  )
+  let base = scoped_base_context(context?)
   let previous = @context.attach(base.with_span(span.context()))
   defer @context.detach(previous)
   defer span.end()
@@ -282,30 +311,16 @@ pub async fn[X] Tracer::with_span_async(
   links? : Array[SpanLink],
   start_time_unix_nano? : Int64,
 ) -> X {
-  let span = match parent {
-    Some(_) =>
-      self.start_span(
-        name,
-        kind?,
-        parent?,
-        attributes?,
-        links?,
-        start_time_unix_nano?,
-      )
-    None =>
-      self.start_span_with_context(
-        name,
-        context?,
-        kind?,
-        attributes?,
-        links?,
-        start_time_unix_nano?,
-      )
-  }
-  let base = match context {
-    Some(value) => value
-    None => @context.current_context()
-  }
+  let span = self.start_scoped_span(
+    name,
+    context?,
+    kind?,
+    parent?,
+    attributes?,
+    links?,
+    start_time_unix_nano?,
+  )
+  let base = scoped_base_context(context?)
   let previous = @context.attach(base.with_span(span.context()))
   defer @context.detach(previous)
   defer span.end()

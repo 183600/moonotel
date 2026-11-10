@@ -245,6 +245,23 @@ pub fn TracerProviderSdk::with_span_limits(
   { ..self, span_limits, }
 }
 
+// Append processors to a provider copy, keeping the per-processor shutdown
+// state in sync with the processor array.
+
+///|
+fn TracerProviderSdk::with_added_processors(
+  self : TracerProviderSdk,
+  processors : Array[&SpanProcessor],
+) -> TracerProviderSdk {
+  let merged = self.processors.copy()
+  let processor_shutdowns = self.processor_shutdowns.copy()
+  for processor in processors {
+    merged.push(processor)
+    processor_shutdowns.push(Ref(false))
+  }
+  { ..self, processors: merged, processor_shutdowns, }
+}
+
 // Register a span processor (called in registration order).
 
 ///|
@@ -252,11 +269,7 @@ pub fn TracerProviderSdk::with_span_processor(
   self : TracerProviderSdk,
   processor : &SpanProcessor,
 ) -> TracerProviderSdk {
-  let processors = self.processors.copy()
-  processors.push(processor)
-  let processor_shutdowns = self.processor_shutdowns.copy()
-  processor_shutdowns.push(Ref(false))
-  { ..self, processors, processor_shutdowns, }
+  self.with_added_processors([processor])
 }
 
 ///|
@@ -264,15 +277,7 @@ pub fn TracerProviderSdk::with_span_processors(
   self : TracerProviderSdk,
   processors : Array[&SpanProcessor],
 ) -> TracerProviderSdk {
-  let merged = self.processors.copy()
-  for processor in processors {
-    merged.push(processor)
-  }
-  let processor_shutdowns = self.processor_shutdowns.copy()
-  for _ in processors {
-    processor_shutdowns.push(Ref(false))
-  }
-  { ..self, processors: merged, processor_shutdowns, }
+  self.with_added_processors(processors)
 }
 
 // The resource attributes of this provider, as a fresh copy.

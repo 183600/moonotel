@@ -481,50 +481,17 @@ fn hex_unit_value(unit : UInt16) -> Int32 {
   }
 }
 
-// Decode one byte per two hex code units of `hex` into `out` (whose length is
-// the number of bytes to decode). Invalid digits are accumulated across the
-// loop. Returns false on a non-hex code unit.
+// Decode one byte per two hex code units of `hex`, starting at code unit
+// `start`, into `out` (whose length is the number of bytes to decode).
+// Validation and the all-zero check are accumulated over the same pass. When
+// `require_nonzero` is true, an all-zero result is rejected as well.
 
 ///|
-fn hex_to_bytes(hex : String, out : Array[Int32]) -> Bool {
-  let n = out.length()
-  let mut bad = 0
-  let mut i = 0
-  // Process four bytes per iteration.
-  while i + 4 <= n {
-    let h0 = hex_unit_value(hex.unsafe_get(i * 2))
-    let l0 = hex_unit_value(hex.unsafe_get(i * 2 + 1))
-    let h1 = hex_unit_value(hex.unsafe_get(i * 2 + 2))
-    let l1 = hex_unit_value(hex.unsafe_get(i * 2 + 3))
-    let h2 = hex_unit_value(hex.unsafe_get(i * 2 + 4))
-    let l2 = hex_unit_value(hex.unsafe_get(i * 2 + 5))
-    let h3 = hex_unit_value(hex.unsafe_get(i * 2 + 6))
-    let l3 = hex_unit_value(hex.unsafe_get(i * 2 + 7))
-    bad = bad | h0 | l0 | h1 | l1 | h2 | l2 | h3 | l3
-    out.unsafe_set(i, h0 * 16 + l0)
-    out.unsafe_set(i + 1, h1 * 16 + l1)
-    out.unsafe_set(i + 2, h2 * 16 + l2)
-    out.unsafe_set(i + 3, h3 * 16 + l3)
-    i = i + 4
-  }
-  while i < n {
-    let hi = hex_unit_value(hex.unsafe_get(i * 2))
-    let lo = hex_unit_value(hex.unsafe_get(i * 2 + 1))
-    bad = bad | hi | lo
-    out.unsafe_set(i, hi * 16 + lo)
-    i = i + 1
-  }
-  bad >= 0
-}
-
-// Like `hex_to_bytes`, but rejects an all-zero result as well. The zero check
-// is accumulated over the same pass.
-
-///|
-fn hex_to_nonzero_bytes(
+fn decode_hex_bytes(
   hex : String,
   start : Int32,
   out : Array[Int32],
+  require_nonzero : Bool,
 ) -> Bool {
   let n = out.length()
   let mut bad = 0
@@ -561,7 +528,7 @@ fn hex_to_nonzero_bytes(
     out.unsafe_set(i, byte)
     i = i + 1
   }
-  bad >= 0 && acc != 0
+  bad >= 0 && (!require_nonzero || acc != 0)
 }
 
 // Parse a hex string into a byte array; returns None on odd length or invalid chars
@@ -574,7 +541,7 @@ pub fn bytes_from_hex(hex : String) -> Array[Int32]? {
   }
   // Every element is written before the function returns.
   let out : Array[Int32] = Array::unsafe_make_uninit(len / 2)
-  if hex_to_bytes(hex, out) {
+  if decode_hex_bytes(hex, 0, out, false) {
     Some(out)
   } else {
     None
@@ -596,8 +563,8 @@ pub fn span_context_from_hex(
   // rule of `span_context`.
   let trace_id : Array[Int32] = Array::unsafe_make_uninit(16)
   let span_id : Array[Int32] = Array::unsafe_make_uninit(8)
-  if !hex_to_nonzero_bytes(trace_id_hex, 0, trace_id) ||
-    !hex_to_nonzero_bytes(span_id_hex, 0, span_id) {
+  if !decode_hex_bytes(trace_id_hex, 0, trace_id, true) ||
+    !decode_hex_bytes(span_id_hex, 0, span_id, true) {
     return invalid_span_context()
   }
   {

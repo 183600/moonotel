@@ -430,6 +430,31 @@ fn copy_baggage_entry(entry : BaggageEntry) -> BaggageEntry {
   { ..entry, properties: entry.properties.copy(), }
 }
 
+// Whether `entries` already contains a member for `key`.
+
+///|
+fn contains_baggage_key(entries : Array[BaggageEntry], key : String) -> Bool {
+  for entry in entries {
+    if entry.key == key {
+      return true
+    }
+  }
+  false
+}
+
+// Whether `key` was removed by a `without_value` marker encountered earlier in
+// the chain.
+
+///|
+fn is_deleted_baggage_key(deleted : Array[String], key : String) -> Bool {
+  for removed in deleted {
+    if removed == key {
+      return true
+    }
+  }
+  false
+}
+
 // The member of `list` stored under `key`, if any, as a copy.
 
 ///|
@@ -567,23 +592,9 @@ pub fn Context::baggage_entries(self : Context) -> Array[BaggageEntry] {
           break
         }
         match context.key {
-          Some(key) => {
-            let mut visible = true
-            for existing in entries {
-              if existing.key == key {
-                visible = false
-                break
-              }
-            }
-            if visible {
-              for removed in deleted {
-                if removed == key {
-                  visible = false
-                  break
-                }
-              }
-            }
-            if visible {
+          Some(key) =>
+            if !contains_baggage_key(entries, key) &&
+              !is_deleted_baggage_key(deleted, key) {
               match context.value {
                 Some(value) =>
                   entries.push({
@@ -597,28 +608,13 @@ pub fn Context::baggage_entries(self : Context) -> Array[BaggageEntry] {
                 None => deleted.push(key)
               }
             }
-          }
           None => ()
         }
         match context.baggage_map {
           Some(map) =>
             for key, value in map {
-              let mut visible = true
-              for existing in entries {
-                if existing.key == key {
-                  visible = false
-                  break
-                }
-              }
-              if visible {
-                for removed in deleted {
-                  if removed == key {
-                    visible = false
-                    break
-                  }
-                }
-              }
-              if visible {
+              if !contains_baggage_key(entries, key) &&
+                !is_deleted_baggage_key(deleted, key) {
                 entries.push({ key, value, properties: [], })
               }
             }
@@ -627,22 +623,8 @@ pub fn Context::baggage_entries(self : Context) -> Array[BaggageEntry] {
         match context.baggage_list {
           Some(list) =>
             for entry in list {
-              let mut visible = true
-              for existing in entries {
-                if existing.key == entry.key {
-                  visible = false
-                  break
-                }
-              }
-              if visible {
-                for removed in deleted {
-                  if removed == entry.key {
-                    visible = false
-                    break
-                  }
-                }
-              }
-              if visible {
+              if !contains_baggage_key(entries, entry.key) &&
+                !is_deleted_baggage_key(deleted, entry.key) {
                 entries.push(copy_baggage_entry(entry))
               }
             }
@@ -670,34 +652,19 @@ pub fn Context::has_baggage(self : Context) -> Bool {
           return false
         }
         match context.key {
-          Some(key) => {
-            let mut removed = false
-            for candidate in deleted {
-              if candidate == key {
-                removed = true
-                break
-              }
-            }
-            if !removed {
+          Some(key) =>
+            if !is_deleted_baggage_key(deleted, key) {
               match context.value {
                 Some(_) => return true
                 None => deleted.push(key)
               }
             }
-          }
           None => ()
         }
         match context.baggage_map {
           Some(map) =>
             for key, _ in map {
-              let mut removed = false
-              for candidate in deleted {
-                if candidate == key {
-                  removed = true
-                  break
-                }
-              }
-              if !removed {
+              if !is_deleted_baggage_key(deleted, key) {
                 return true
               }
             }
@@ -706,14 +673,7 @@ pub fn Context::has_baggage(self : Context) -> Bool {
         match context.baggage_list {
           Some(list) =>
             for entry in list {
-              let mut removed = false
-              for candidate in deleted {
-                if candidate == entry.key {
-                  removed = true
-                  break
-                }
-              }
-              if !removed {
+              if !is_deleted_baggage_key(deleted, entry.key) {
                 return true
               }
             }
@@ -743,19 +703,11 @@ pub fn Context::baggage(self : Context) -> Map[String, String] {
         }
         match context.key {
           Some(key) =>
-            if values.get(key) is None {
-              let mut removed = false
-              for candidate in deleted {
-                if candidate == key {
-                  removed = true
-                  break
-                }
-              }
-              if !removed {
-                match context.value {
-                  Some(value) => values.set(key, value)
-                  None => deleted.push(key)
-                }
+            if values.get(key) is None &&
+              !is_deleted_baggage_key(deleted, key) {
+              match context.value {
+                Some(value) => values.set(key, value)
+                None => deleted.push(key)
               }
             }
           None => ()
@@ -763,17 +715,9 @@ pub fn Context::baggage(self : Context) -> Map[String, String] {
         match context.baggage_map {
           Some(map) =>
             for key, value in map {
-              if values.get(key) is None {
-                let mut removed = false
-                for candidate in deleted {
-                  if candidate == key {
-                    removed = true
-                    break
-                  }
-                }
-                if !removed {
-                  values.set(key, value)
-                }
+              if values.get(key) is None &&
+                !is_deleted_baggage_key(deleted, key) {
+                values.set(key, value)
               }
             }
           None => ()
@@ -781,17 +725,9 @@ pub fn Context::baggage(self : Context) -> Map[String, String] {
         match context.baggage_list {
           Some(list) =>
             for entry in list {
-              if values.get(entry.key) is None {
-                let mut removed = false
-                for candidate in deleted {
-                  if candidate == entry.key {
-                    removed = true
-                    break
-                  }
-                }
-                if !removed {
-                  values.set(entry.key, entry.value)
-                }
+              if values.get(entry.key) is None &&
+                !is_deleted_baggage_key(deleted, entry.key) {
+                values.set(entry.key, entry.value)
               }
             }
           None => ()

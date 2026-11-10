@@ -382,7 +382,10 @@ fn SpanSdk::set_attribute_limited(
     return
   }
   let attributes = self.mutable_attributes()
-  if within_limit(attributes.length(), self.limits.attribute_count_limit) {
+  // Overwriting an existing attribute never consumes additional budget, so it
+  // is allowed even once the count limit is reached.
+  if within_limit(attributes.length(), self.limits.attribute_count_limit) ||
+    attributes.contains(key) {
     attributes.set(
       key,
       copy_attribute_value(
@@ -393,19 +396,7 @@ fn SpanSdk::set_attribute_limited(
       ),
     )
   } else {
-    match attributes.get(key) {
-      Some(_) =>
-        attributes.set(
-          key,
-          copy_attribute_value(
-            truncate_attribute_value(
-              value,
-              self.limits.attribute_value_length_limit,
-            ),
-          ),
-        )
-      None => self.dropped_attributes = self.dropped_attributes + 1
-    }
+    self.dropped_attributes = self.dropped_attributes + 1
   }
 }
 

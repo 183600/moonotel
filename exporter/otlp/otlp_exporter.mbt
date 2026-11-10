@@ -137,6 +137,19 @@ fn effective_compression(compression : String) -> String {
   }
 }
 
+// A trimmed copy of `value`, or `None` when the value is blank. Programmatic
+// and environment-provided strings are normalized the same way.
+
+///|
+fn non_blank_trimmed(value : StringView) -> String? {
+  let trimmed = value.trim()
+  if trimmed == "" {
+    None
+  } else {
+    Some(trimmed.to_owned())
+  }
+}
+
 // The request timeout actually used for an export. A negative programmatic
 // value falls back to the 10s default, matching `OtlpHttpConfig::new`; zero
 // explicitly disables the timeout. This matters for a config built directly
@@ -264,28 +277,14 @@ pub fn OtlpHttpConfig::new(
 ) -> OtlpHttpConfig {
   let retries = max_retries.unwrap_or(DEFAULT_MAX_RETRIES)
   let timeout = timeout_millis.unwrap_or(DEFAULT_TIMEOUT_MILLIS)
-  let compression = normalize_enum(compression.unwrap_or("none"))
-  let protocol = normalize_enum(protocol.unwrap_or(OTLP_HTTP_PROTOBUF_PROTOCOL))
-  let endpoint = match endpoint {
-    Some(value) => {
-      let value = value.trim().to_owned()
-      if value == "" {
-        "http://localhost:4318"
-      } else {
-        value
-      }
-    }
+  let compression = effective_compression(compression.unwrap_or(""))
+  let protocol = effective_protocol(protocol.unwrap_or(""))
+  let endpoint = match non_blank_trimmed(endpoint.unwrap_or("")) {
+    Some(value) => value
     None => "http://localhost:4318"
   }
   let traces_endpoint = match traces_endpoint {
-    Some(value) => {
-      let value = value.trim().to_owned()
-      if value == "" {
-        None
-      } else {
-        Some(value)
-      }
-    }
+    Some(value) => non_blank_trimmed(value)
     None => None
   }
   {
@@ -311,16 +310,8 @@ pub fn OtlpHttpConfig::new(
     } else {
       timeout
     },
-    compression: if compression == "" {
-      "none"
-    } else {
-      compression
-    },
-    protocol: if protocol == "" {
-      OTLP_HTTP_PROTOBUF_PROTOCOL
-    } else {
-      protocol
-    },
+    compression,
+    protocol,
     max_retries: if retries < 0 {
       0
     } else {
@@ -487,12 +478,7 @@ fn parse_headers(value : String) -> Map[String, String] {
 ///|
 fn non_blank_env_value(name : String) -> String? {
   match @env.get_env_var(name) {
-    Some(value) =>
-      if value.trim() != "" {
-        Some(value.trim().to_owned())
-      } else {
-        None
-      }
+    Some(value) => non_blank_trimmed(value)
     None => None
   }
 }
@@ -821,24 +807,15 @@ pub fn OtlpHttpConfig::traces_url(self : OtlpHttpConfig) -> String {
   // and blank values like unset, so a direct config behaves like the same
   // values passed through the constructor.
   let traces_endpoint = match self.traces_endpoint {
-    Some(full_url) => {
-      let trimmed = full_url.trim().to_owned()
-      if trimmed == "" {
-        None
-      } else {
-        Some(trimmed)
-      }
-    }
+    Some(full_url) => non_blank_trimmed(full_url)
     None => None
   }
   match traces_endpoint {
     Some(full_url) => with_root_path(full_url)
     None => {
-      let endpoint = self.endpoint.trim().to_owned()
-      let endpoint = if endpoint == "" {
-        "http://localhost:4318"
-      } else {
-        endpoint
+      let endpoint = match non_blank_trimmed(self.endpoint) {
+        Some(value) => value
+        None => "http://localhost:4318"
       }
       let (path, suffix) = path_and_suffix(endpoint)
       if path.has_suffix("/v1/traces") || path.has_suffix("/v1/traces/") {
