@@ -435,7 +435,7 @@ pub fn Tracer::scope_version(Self) -> String
 pub fn Tracer::start_root_span(Self, String, kind? : @api.SpanKind, attributes? : Map[String, AttributeValue], links? : Array[SpanLink], start_time_unix_nano? : Int64) -> SpanSdk
 pub fn Tracer::start_span(Self, String, kind? : @api.SpanKind, parent? : @api.SpanContext, attributes? : Map[String, AttributeValue], links? : Array[SpanLink], start_time_unix_nano? : Int64) -> SpanSdk
 pub fn Tracer::start_span_with_context(Self, String, context? : @context.Context, kind? : @api.SpanKind, attributes? : Map[String, AttributeValue], links? : Array[SpanLink], start_time_unix_nano? : Int64) -> SpanSdk
-pub fn[X] Tracer::with_span(Self, String, (SpanSdk) -> X raise?, context? : @context.Context, kind? : @api.SpanKind, parent? : @api.SpanContext, attributes? : Map[String, AttributeValue], links? : Array[SpanLink], start_time_unix_nano? : Int64) -> X raise?
+pub fn[X] Tracer::with_span(Self, String, (SpanSdk) -> X raise, context? : @context.Context, kind? : @api.SpanKind, parent? : @api.SpanContext, attributes? : Map[String, AttributeValue], links? : Array[SpanLink], start_time_unix_nano? : Int64) -> X raise
 pub async fn[X] Tracer::with_span_async(Self, String, async (SpanSdk) -> X, context? : @context.Context, kind? : @api.SpanKind, parent? : @api.SpanContext, attributes? : Map[String, AttributeValue], links? : Array[SpanLink], start_time_unix_nano? : Int64) -> X
 
 pub struct TracerProviderSdk {

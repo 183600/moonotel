@@ -9,6 +9,7 @@ import {
 
 import {
   "moonbitlang/core/bench",
+  "moonbitlang/core/ref",
   "183600/moonotel/propagation",
   "183600/moonotel/exporter/otlp",
 } for "test"

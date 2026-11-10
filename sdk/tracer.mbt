@@ -197,20 +197,23 @@ pub fn Tracer::start_span_with_context(
 // root span); an explicit `context` supplies the ambient base context
 // (including baggage) while an explicit `parent` overrides the span parent.
 // The span is ended and the previous context restored when `f` returns or
-// raises.
+// raises. An error raised by `f` is recorded on the span (following the
+// exception semantic conventions: an `exception` event, an `error.type`
+// attribute and an `Error` status) before being re-raised; the span status is
+// only overwritten when it has not already been set to `Ok`.
 
 ///|
 pub fn[X] Tracer::with_span(
   self : Tracer,
   name : String,
-  f : (SpanSdk) -> X raise?,
+  f : (SpanSdk) -> X raise,
   context? : @context.Context,
   kind? : @api.SpanKind,
   parent? : @api.SpanContext,
   attributes? : Map[String, AttributeValue],
   links? : Array[SpanLink],
   start_time_unix_nano? : Int64,
-) -> X raise? {
+) -> X raise {
   let span = match parent {
     Some(_) =>
       self.start_span(
@@ -238,7 +241,14 @@ pub fn[X] Tracer::with_span(
   let previous = @context.attach(base.with_span(span.context()))
   defer @context.detach(previous)
   defer span.end()
-  f(span)
+  try {
+    f(span)
+  } catch {
+    (error : Error) => {
+      record_raised_error(span, error)
+      raise error
+    }
+  }
 }
 
 // Async counterpart of `with_span`: run the async `f` with a new span that
@@ -246,6 +256,18 @@ pub fn[X] Tracer::with_span(
 // inside `f` (including ones started after an await) link to it
 // automatically. The span is ended and the previous context restored
 // afterwards. Argument semantics are identical to `with_span`.
+
+///|
+fn record_raised_error(span : SpanSdk, error : Error) -> Unit {
+  // The HTTP instrumentation records the same triple for failures: an
+  // `error.type` attribute, an `Error` status and the `exception` event. The
+  // SDK honors the `Ok` status being final, so a span the callback already
+  // marked `Ok` keeps it.
+  let type_name = error.to_string()
+  span.set_attribute(ERROR_TYPE, StringValue(type_name))
+  span.set_status(@api.StatusCode::Error, description=type_name)
+  span.record_exception(error)
+}
 
 ///|
 pub async fn[X] Tracer::with_span_async(

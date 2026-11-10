@@ -112,6 +112,13 @@ A recording span keeps its data readable after `end()`: the accessors return a
 snapshot of the recorded attributes, events and links, including when the
 provider has no processors registered.
 
+`Tracer::with_span` records an error raised by its callback before re-raising
+it (the same triple the HTTP instrumentation records): an `exception` event
+with `exception.type` / `exception.message`, an `error.type` attribute and an
+`Error` status — except when the callback already set the span to `Ok`,
+because `Ok` is final by the OpenTelemetry status rules. The deferred `end()`
+and context restore still run afterwards.
+
 A `SpanContext` snapshots its validity when it is constructed. The ID views are
 read-only by contract; if an aliased ID array is shortened or zeroed anyway, the
 context is treated as invalid wherever it is consumed: starting a child creates
