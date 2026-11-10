@@ -36,6 +36,37 @@ test "opaque_future_extension_with_a_comma_still_parses" {
 }
 
 ///|
+test "comma_extension_that_only_resembles_a_traceparent_is_opaque" {
+  // The text after the comma has the version and dash layout of a
+  // traceparent, but its IDs are not hex, so it is extension text and the
+  // first (future-version) field still parses.
+  let extension = "01-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-bbbbbbbbbbbbbbbb-01"
+  match @propagation.parse_traceparent(future_traceparent + ", " + extension) {
+    Some(sc) => assert_eq(sc.span_id_hex(), "00f067aa0ba902b7")
+    None => fail("future traceparent with opaque extension must parse")
+  }
+}
+
+///|
+test "comma_extension_with_an_invalid_version_is_opaque" {
+  let extension = "zz-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01"
+  match @propagation.parse_traceparent(future_traceparent + "," + extension) {
+    Some(sc) => assert_eq(sc.span_id_hex(), "00f067aa0ba902b7")
+    None => fail("future traceparent with a non-version extension must parse")
+  }
+}
+
+///|
+test "comma_extension_with_misplaced_dashes_is_opaque" {
+  let extension = "01-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaXbbbbbbbbbbbbbbbb-01"
+  match @propagation.parse_traceparent(future_traceparent + ", " + extension) {
+    Some(sc) => assert_eq(sc.span_id_hex(), "00f067aa0ba902b7")
+    None =>
+      fail("future traceparent with a non-traceparent extension must parse")
+  }
+}
+
+///|
 test "from_entries_duplicate_traceparent_clears_after_a_single_write" {
   let carrier = @propagation.TextMapCarrier::from_entries([
     ("traceparent", future_traceparent),
