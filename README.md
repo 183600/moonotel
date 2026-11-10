@@ -409,7 +409,11 @@ validates and normalizes its explicit `tracestate` override, dropping a
 malformed value instead of writing an invalid header. `inject` removes a
 `tracestate` left in the carrier by an earlier injection when the context
 carries no valid state, so a stale value is never paired with a new
-`traceparent`. At the context level, `inject_context` and
+`traceparent`. Parsing and formatting keep a combined `tracestate` header at
+or below the W3C-recommended 512 characters: when it would be longer, whole
+entries are dropped, with entries longer than 128 characters removed first and
+then entries from the right, never splitting an entry. At the context level,
+`inject_context` and
 `TraceContextPropagator::inject` also remove both trace headers from a reused
 carrier when the context has no valid span, so an old trace parent cannot leak
 into an outgoing request that only carries baggage. The same rule applies to

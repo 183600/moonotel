@@ -12,6 +12,8 @@ pub const BAGGAGE_MAX_BYTES : Int32 = 8192
 
 pub const BAGGAGE_MAX_MEMBERS : Int32 = 64
 
+pub const TRACESTATE_MAX_LENGTH : Int32 = 512
+
 pub const TRACESTATE_MAX_MEMBERS : Int32 = 32
 
 pub fn baggage_header_name() -> String

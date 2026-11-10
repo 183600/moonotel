@@ -10,6 +10,9 @@
 // - at most 32 members; adding to a full list drops the right-most member;
 // - a key occurs at most once; a modified member moves to the beginning while
 //   the order of the other members is preserved;
+// - the combined header is kept at or below 512 characters; when it would be
+//   longer, whole entries are dropped as recommended by W3C (entries longer
+//   than 128 characters first, then entries from the end);
 // - every mutating operation validates its inputs and returns the unchanged
 //   list when they are invalid.
 //
@@ -19,6 +22,20 @@
 
 ///|
 pub const TRACESTATE_MAX_MEMBERS : Int32 = 32
+
+// Maximum length of a combined `tracestate` header. W3C recommends
+// propagating at least 512 characters; this implementation documents 512 as
+// its propagation limit. Tracestate values are printable ASCII, so characters
+// and bytes coincide.
+
+///|
+pub const TRACESTATE_MAX_LENGTH : Int32 = 512
+
+// Entry length above which the W3C truncation recommendation drops an entry
+// before considering the position of the remaining entries.
+
+///|
+const TRACESTATE_LARGE_MEMBER_LENGTH : Int32 = 128
 
 ///|
 pub struct Tracestate {
@@ -31,6 +48,82 @@ pub struct Tracestate {
 ///|
 pub fn Tracestate::empty() -> Tracestate {
   { members: [], }
+}
+
+// Length of one `key=value` member, excluding its separating comma.
+
+///|
+fn tracestate_member_length(entry : (String, String)) -> Int32 {
+  entry.0.length() + 1 + entry.1.length()
+}
+
+// Length of the combined header rendered from `members`, including the
+// commas between members.
+
+///|
+fn tracestate_total_length(members : Array[(String, String)]) -> Int32 {
+  let mut total = 0
+  let mut first = true
+  for entry in members {
+    if !first {
+      total = total + 1
+    }
+    first = false
+    total = total + tracestate_member_length(entry)
+  }
+  total
+}
+
+// Apply the W3C truncation recommendation to a member list that is longer
+// than `TRACESTATE_MAX_LENGTH`: drop whole entries longer than 128 characters
+// first, then drop whole entries from the end. Returns `members` itself when
+// it already fits.
+
+///|
+fn truncate_tracestate_members(
+  members : Array[(String, String)],
+) -> Array[(String, String)] {
+  let mut total = tracestate_total_length(members)
+  if total <= TRACESTATE_MAX_LENGTH {
+    return members
+  }
+  let count = members.length()
+  let dropped = FixedArray::make(count, false)
+  let mut remaining = count
+  // Pass one: entries longer than 128 characters, from the end.
+  let mut i = count - 1
+  while i >= 0 && total > TRACESTATE_MAX_LENGTH {
+    let entry_length = tracestate_member_length(members[i])
+    if entry_length > TRACESTATE_LARGE_MEMBER_LENGTH {
+      dropped[i] = true
+      remaining = remaining - 1
+      total = total - entry_length
+      if remaining > 0 {
+        total = total - 1
+      }
+    }
+    i = i - 1
+  }
+  // Pass two: any remaining entries, from the end.
+  let mut i = count - 1
+  while i >= 0 && total > TRACESTATE_MAX_LENGTH {
+    if !dropped[i] {
+      dropped[i] = true
+      remaining = remaining - 1
+      total = total - tracestate_member_length(members[i])
+      if remaining > 0 {
+        total = total - 1
+      }
+    }
+    i = i - 1
+  }
+  let kept : Array[(String, String)] = Array(capacity=remaining)
+  for i, entry in members {
+    if !dropped[i] {
+      kept.push(entry)
+    }
+  }
+  kept
 }
 
 // Validate one member with the shared key/value rules; values must not be
@@ -49,7 +142,9 @@ fn is_valid_tracestate_member(key : StringView, value : StringView) -> Bool {
 // W3C Trace Context Level 2. Returns None when the value has more than 32
 // list-members, contains a malformed member, or has an invalid value.
 // Optional whitespace around members is ignored, and `key = value` is
-// accepted; blanks directly after `=` belong to the value.
+// accepted; blanks directly after `=` belong to the value. When the combined
+// header would exceed `TRACESTATE_MAX_LENGTH`, whole members are dropped as
+// described by `truncate_tracestate_members`.
 
 ///|
 pub fn Tracestate::parse(value : String) -> Tracestate? {
@@ -107,7 +202,7 @@ pub fn Tracestate::parse(value : String) -> Tracestate? {
     }
     start = end + 1
   }
-  Some({ members, })
+  Some({ members: truncate_tracestate_members(members), })
 }
 
 // Parse a `tracestate` header value, yielding the empty list when it is
@@ -159,19 +254,23 @@ pub fn Tracestate::entries(self : Tracestate) -> Array[(String, String)] {
 }
 
 // Render the list as a `tracestate` header value. The empty list yields "".
+// The result never exceeds `TRACESTATE_MAX_LENGTH`; when truncation is
+// necessary, whole entries are dropped as described by
+// `truncate_tracestate_members`.
 
 ///|
 pub fn Tracestate::to_header(self : Tracestate) -> String {
-  if self.members.length() == 0 {
+  let members = truncate_tracestate_members(self.members)
+  if members.length() == 0 {
     return ""
   }
   let mut size_hint = 0
-  for entry in self.members {
+  for entry in members {
     size_hint = size_hint + entry.0.length() + entry.1.length() + 2
   }
   let sb = StringBuilder(size_hint=size_hint * 2)
   let mut count = 0
-  for entry in self.members {
+  for entry in members {
     if count > 0 {
       sb.write_char(',')
     }
@@ -204,7 +303,10 @@ fn take_members(
 
 // Add `key=value` at the beginning of the list. When the key is already
 // present its old member is replaced. Adding to a full list drops the
-// right-most member. Invalid keys or values leave the list unchanged.
+// right-most member. When the combined header would exceed
+// `TRACESTATE_MAX_LENGTH`, whole entries are dropped as described by
+// `truncate_tracestate_members`. Invalid keys or values leave the list
+// unchanged.
 
 ///|
 pub fn Tracestate::add(
@@ -224,11 +326,13 @@ pub fn Tracestate::add(
   let members : Array[(String, String)] = Array(capacity~)
   members.push((key, value))
   take_members(members, self.members, key)
-  { members, }
+  { members: truncate_tracestate_members(members), }
 }
 
 // Update the value of `key`, moving the member to the beginning of the list.
-// When the key is absent the list is unchanged. Invalid keys or values leave
+// When the key is absent the list is unchanged. When the combined header
+// would exceed `TRACESTATE_MAX_LENGTH`, whole entries are dropped as
+// described by `truncate_tracestate_members`. Invalid keys or values leave
 // the list unchanged.
 
 ///|
@@ -252,7 +356,7 @@ pub fn Tracestate::update(
       let members : Array[(String, String)] = Array(capacity~)
       members.push((key, value))
       take_members(members, self.members, key)
-      { members, }
+      { members: truncate_tracestate_members(members), }
     }
   }
 }

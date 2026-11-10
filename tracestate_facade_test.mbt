@@ -13,3 +13,8 @@ test "facade_tracestate_round_trip" {
 test "facade_tracestate_max_members_constant" {
   assert_eq(@moonotel.TRACESTATE_MAX_MEMBERS, 32)
 }
+
+///|
+test "facade_tracestate_max_length_constant" {
+  assert_eq(@moonotel.TRACESTATE_MAX_LENGTH, 512)
+}

@@ -119,6 +119,7 @@ pub using @propagation {
   type CompositePropagator,
   type BaggageEntry,
   TRACESTATE_MAX_MEMBERS,
+  TRACESTATE_MAX_LENGTH,
   BAGGAGE_MAX_MEMBERS,
   BAGGAGE_MAX_BYTES,
   inject,

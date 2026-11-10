@@ -936,6 +936,22 @@ fn write_normalized_tracestate(view : StringView, len : Int32) -> String {
   sb.to_string()
 }
 
+// Apply the W3C 512-character propagation limit to an already normalized
+// `tracestate` value. Whole entries are dropped (entries longer than 128
+// characters first, then entries from the end) until the combined header
+// fits; `Tracestate` performs the same truncation on parse and mutation.
+
+///|
+fn limit_tracestate_header(value : String) -> String {
+  if value.length() <= TRACESTATE_MAX_LENGTH {
+    return value
+  }
+  match Tracestate::parse(value) {
+    Some(state) => state.to_header()
+    None => ""
+  }
+}
+
 // Validate and normalize a `tracestate` header value.
 //
 // The result is the list of members joined by `,` with optional whitespace
@@ -943,7 +959,9 @@ fn write_normalized_tracestate(view : StringView, len : Int32) -> String {
 // a duplicated key keeps its first member. An empty or member-less value is
 // accepted as the empty state (`Some("")`), as required by W3C Trace Context
 // Level 2. Returns None when the value has more than 32 members, contains a
-// malformed member or an invalid value.
+// malformed member or an invalid value. A normalized value longer than
+// `TRACESTATE_MAX_LENGTH` is truncated whole-entry by whole-entry, as
+// recommended by the W3C tracestate limits section.
 
 ///|
 pub fn parse_tracestate(value : String) -> String? {
@@ -1066,12 +1084,12 @@ pub fn parse_tracestate(value : String) -> String? {
     start = end + 1
   }
   if unchanged {
-    Some(value)
+    Some(limit_tracestate_header(value))
   } else {
     let normalized = write_normalized_tracestate(view, len)
     // An empty or member-less header carries no state. It is still a valid,
     // accepted header (W3C Trace Context Level 2); callers that write headers
     // skip the empty normalized form.
-    Some(normalized)
+    Some(limit_tracestate_header(normalized))
   }
 }

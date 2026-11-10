@@ -66,6 +66,8 @@ pub const TELEMETRY_SDK_NAME : String = "telemetry.sdk.name"
 
 pub const TELEMETRY_SDK_VERSION : String = "telemetry.sdk.version"
 
+pub const TRACESTATE_MAX_LENGTH : Int32 = 512
+
 pub const TRACESTATE_MAX_MEMBERS : Int32 = 32
 
 pub const TRACE_FLAGS_RANDOM : Int32 = 2
