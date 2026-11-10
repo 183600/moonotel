@@ -685,7 +685,7 @@ fn json_write_link(sb : JsonBuf, link : @sdk.SpanLink) -> Unit {
     sb.write_char(',')
   }
   sb.write_bytes(b"\"flags\":")
-  json_write_uint32(sb, otlp_flags(link.span_context.trace_flags()))
+  json_write_uint32(sb, otlp_link_flags(link.span_context))
   sb.write_char('}')
 }
 

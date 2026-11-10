@@ -1,13 +1,31 @@
 // Encodes SDK SpanData into an OTLP `ExportTraceServiceRequest` protobuf
 // message (opentelemetry-proto v1 trace service).
 
-// Bits 0-7 of the OTLP `flags` field hold the W3C trace flags; the remaining
-// bits are reserved. A runtime SpanContext may carry a wider `Int32` value, so
-// the encoders keep only the documented trace-flag byte.
+// Bits 0-7 of the OTLP `flags` field hold the W3C trace flags. Bits 8 and 9
+// carry the OTLP remote-context state for links whose SpanContext was received
+// from a remote peer; the remaining bits are reserved. A runtime SpanContext
+// may carry a wider `Int32` value, so the encoders keep only the documented
+// trace-flag byte before adding the remote state.
 
 ///|
 fn otlp_flags(trace_flags : Int32) -> Int32 {
   trace_flags & 0xFF
+}
+
+///|
+const OTLP_FLAGS_CONTEXT_HAS_IS_REMOTE : Int32 = 0x100
+
+///|
+const OTLP_FLAGS_CONTEXT_IS_REMOTE : Int32 = 0x200
+
+///|
+fn otlp_link_flags(context : @api.SpanContext) -> Int32 {
+  let flags = otlp_flags(context.trace_flags())
+  if context.is_remote() {
+    flags | OTLP_FLAGS_CONTEXT_HAS_IS_REMOTE | OTLP_FLAGS_CONTEXT_IS_REMOTE
+  } else {
+    flags
+  }
 }
 
 // Encode one typed array element into its `AnyValue` form (field 5 of the
@@ -319,7 +337,7 @@ fn encode_link(writer : ProtoWriter, link : @sdk.SpanLink) -> Unit {
   }
   writer.write_fixed32_field(
     6,
-    otlp_flags(link.span_context.trace_flags()).reinterpret_as_uint(),
+    otlp_link_flags(link.span_context).reinterpret_as_uint(),
   )
   writer.end_message(len_pos)
 }
