@@ -27,11 +27,12 @@ pub struct Context {
 // given; callers must not mutate it afterwards.
 
 ///|
+#derive(Eq, @debug.Debug)
 pub(all) struct BaggageEntry {
   key : String
   value : String
   properties : Array[(String, String)]
-} derive(Eq, @debug.Debug)
+}
 
 // Create a baggage member with optional `key=value` properties.
 

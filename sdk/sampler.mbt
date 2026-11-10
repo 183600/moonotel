@@ -7,10 +7,11 @@
 // Result of a sampling decision.
 
 ///|
+#derive(Eq, @debug.Debug)
 pub(all) struct SamplingDecision {
   is_recorded : Bool
   is_sampled : Bool
-} derive(Eq, @debug.Debug)
+}
 
 // Record and export the span (RECORD_AND_SAMPLE)
 

@@ -42,9 +42,10 @@ fn find_span(spans : Array[@sdk.SpanData], name : String) -> @sdk.SpanData? {
 }
 
 ///|
+#derive(@debug.Debug)
 suberror HandlerBoom {
   HandlerBoom(String)
-} derive(@debug.Debug)
+}
 
 ///|
 async test "server span continues the propagated trace" {

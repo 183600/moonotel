@@ -2,13 +2,15 @@
 // children in a Trace.
 
 ///|
+#derive(Eq, @debug.Debug)
 pub(all) enum SpanKind {
   Internal
   Server
   Client
   Producer
   Consumer
-} derive(Eq, @debug.Debug)
+}
+
 
 // Lower-case name of the span kind, following the OpenTelemetry specification
 

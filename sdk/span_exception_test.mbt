@@ -22,9 +22,10 @@ pub impl @sdk.SpanExporter for ExceptionRecordingExporter with fn shutdown(self)
 }
 
 ///|
+#derive(@debug.Debug)
 suberror TestError {
   TestError(String)
-} derive(@debug.Debug)
+}
 
 ///|
 fn exception_test_setup(

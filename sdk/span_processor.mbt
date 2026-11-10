@@ -7,10 +7,11 @@
 // Result of an export attempt.
 
 ///|
+#derive(Eq, @debug.Debug)
 pub(all) enum ExportResult {
   ExportSuccess
   ExportFailure(String)
-} derive(Eq, @debug.Debug)
+}
 
 // Whether an export result represents success.
 

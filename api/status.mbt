@@ -1,11 +1,12 @@
 // StatusCode represents the canonical status of a Span operation.
 
 ///|
+#derive(Eq, @debug.Debug)
 pub(all) enum StatusCode {
   Unset
   Ok
   Error
-} derive(Eq, @debug.Debug)
+}
 
 // Lower-case name of the status code
 

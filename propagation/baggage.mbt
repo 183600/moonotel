@@ -38,11 +38,12 @@ pub const BAGGAGE_MAX_BYTES : Int32 = 8192
 // `format_baggage_entries`.
 
 ///|
+#derive(Eq, @debug.Debug)
 pub(all) struct BaggageEntry {
   key : String
   value : String
   properties : Array[(String, String)]
-} derive(Eq, @debug.Debug)
+}
 
 // Create a baggage member with optional `key=value` properties. The
 // properties array is stored as given; callers must not mutate it afterwards.

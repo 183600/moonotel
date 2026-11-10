@@ -5,6 +5,7 @@
 // `AnyValue.array_value` field.
 
 ///|
+#derive(Eq, @debug.Debug)
 pub(all) enum AttributeValue {
   StringValue(String)
   BoolValue(Bool)
@@ -14,7 +15,7 @@ pub(all) enum AttributeValue {
   BoolArrayValue(Array[Bool])
   IntArrayValue(Array[Int64])
   DoubleArrayValue(Array[Double])
-} derive(Eq, @debug.Debug)
+}
 
 // A timestamped event attached to a span. `dropped_attributes_count` is the
 // number of attributes discarded because of the event attribute limit.
