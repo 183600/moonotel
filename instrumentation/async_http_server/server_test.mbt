@@ -170,6 +170,33 @@ async test "5xx responses set the server span status to Error" {
 }
 
 ///|
+async test "4xx responses leave the server span status unset" {
+  let (tracer, exporter) = test_tracer("server-test-client-error")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_on(
+        server,
+        call => call.respond(404, body="missing"),
+        tracer~,
+      )
+    }
+    let (response, _body) = @http.get("http://127.0.0.1:\{port}/missing")
+    assert_eq(response.code, 404)
+    @async.sleep(50)
+    let data = exporter.spans.val[0]
+    assert_eq(data.status, @api.StatusCode::Unset)
+    assert_eq(
+      data.attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE),
+      Some(@sdk.IntValue(404)),
+    )
+    assert_eq(data.attributes.get(@sdk.ERROR_TYPE), None)
+    assert_eq(data.status_description, "")
+  }
+}
+
+///|
 async test "handler exceptions are recorded and end the span" {
   let (tracer, exporter) = test_tracer("server-test-exception")
   @async.with_task_group() <| group => {
