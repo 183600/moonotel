@@ -258,6 +258,36 @@ async test "client span is marked as error for 5xx responses" {
 }
 
 ///|
+async test "client span is marked as error for 4xx responses" {
+  let (tracer, exporter) = test_tracer("client-test-client-error")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      server.run_forever() <| ((_request, _body, conn) => {
+        conn.send_response(404, "Not Found")
+      })
+    }
+    let (response, _body) = @async_http_client.get(
+      "http://127.0.0.1:\{port}/missing",
+      tracer~,
+    )
+    assert_eq(response.code, 404)
+    let data = exporter.spans.val[0]
+    assert_eq(data.status, @api.StatusCode::Error)
+    assert_eq(
+      data.attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE),
+      Some(@sdk.IntValue(404)),
+    )
+    assert_eq(
+      data.attributes.get(@sdk.ERROR_TYPE),
+      Some(@sdk.StringValue("404")),
+    )
+    assert_eq(data.status_description, "")
+  }
+}
+
+///|
 async test "post sends the request body" {
   let (tracer, exporter) = test_tracer("client-test-post")
   @async.with_task_group() <| group => {
