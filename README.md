@@ -264,6 +264,9 @@ the handler runs, and ends the span afterwards.
 - `set_route` records `http.route` and renames the span to `METHOD route`; an
   empty or blank route is ignored because no route was matched.
 - `respond` records `http.response.status_code` and marks 5xx spans as `Error`.
+  A negative or malformed response `Content-Length` is dropped so the transport
+  can add valid chunked or zero-length framing instead of aborting the
+  connection task.
 - Handler exceptions are recorded as `exception` events and re-raised.
 - `http_method()`, `header(name)` and `span_context()` expose the request
   method, a header lookup and the server span context to the handler.
