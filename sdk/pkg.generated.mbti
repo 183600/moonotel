@@ -212,7 +212,7 @@ pub struct MultiSpanProcessor {
   flushing : @ref.Ref[Bool]
   flushing_owner : @ref.Ref[Array[&SpanProcessor]?]
   shutdown_waiters : @ref.Ref[Array[() -> Unit]]
-  mut shutdown_completion : (() -> Unit)?
+  shutdown_completion : @ref.Ref[(() -> Unit)?]
 }
 pub fn MultiSpanProcessor::drain_before_shutdown(Self) -> Unit
 pub fn MultiSpanProcessor::force_flush(Self) -> Unit

@@ -29,8 +29,10 @@ pub struct MultiSpanProcessor {
   // They run after the outer shutdown has finished.
   shutdown_waiters : Ref[Array[() -> Unit]]
   // Set by a provider shutdown that arrived while this processor was already
-  // draining directly; run once the outer drain has finished.
-  mut shutdown_completion : (() -> Unit)?
+  // draining directly; run once the outer drain has finished. Shared with
+  // copies, because the copy that owns the drain must run the completion set
+  // on the processor held by the shutting-down provider.
+  shutdown_completion : Ref[(() -> Unit)?]
 }
 
 ///|
@@ -56,7 +58,7 @@ pub fn MultiSpanProcessor::new(
     flushing: Ref(false),
     flushing_owner: Ref(None),
     shutdown_waiters: Ref([]),
-    shutdown_completion: None,
+    shutdown_completion: Ref(None),
   }
 }
 
@@ -202,9 +204,9 @@ pub impl SpanProcessor for MultiSpanProcessor with fn drain_before_shutdown(
   // arrived during this direct drain left a completion callback behind. Run
   // it after clearing the drain guard so that shutdown can finish.
   self.draining.val = false
-  match self.shutdown_completion {
+  match self.shutdown_completion.val {
     Some(completion) => {
-      self.shutdown_completion = None
+      self.shutdown_completion.val = None
       completion()
     }
     None => ()
@@ -221,7 +223,7 @@ pub impl SpanProcessor for MultiSpanProcessor with fn set_shutdown_completion(
   self,
   completion,
 ) {
-  self.shutdown_completion = Some(completion)
+  self.shutdown_completion.val = Some(completion)
 }
 
 ///|
@@ -267,8 +269,8 @@ pub impl SpanProcessor for MultiSpanProcessor with fn shutdown(self) {
   self.draining.val = false
   let waiters = self.shutdown_waiters.val
   self.shutdown_waiters.val = []
-  let completion = self.shutdown_completion
-  self.shutdown_completion = None
+  let completion = self.shutdown_completion.val
+  self.shutdown_completion.val = None
   // Deferred copies may own children that still need to export through an
   // exporter shared with this copy's children.
   for waiter in waiters {
