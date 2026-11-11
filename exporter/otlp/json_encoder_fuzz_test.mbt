@@ -36,8 +36,9 @@ fn JfRng::below(self : JfRng, bound : Int32) -> Int32 {
 
 ///|
 let jf_fragments : Array[String] = [
-  "a", "b", "0", " ", "\"", "\\", "\n", "\r", "\t", "\u{0}", "\u{1f}", "/", "é",
-  "🤣", "=", ",", ":", "{", "}", "[", "]", " ", "", "#", "'",
+  "a", "b", "0", " ", "\"", "\\", "\n", "\r", "\t", "\u{0}", "\u{8}", "\u{c}", "\u{1f}",
+  "/", "é", "🤣", "=", ",", ":", "{", "}", "[", "]", "\u{2028}", "\u{7f}", "#",
+  "'",
 ]
 
 // Interesting double values, including the non-finite ones.

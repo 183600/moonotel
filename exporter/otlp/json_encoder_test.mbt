@@ -297,7 +297,7 @@ test "json_encoder_omits_empty_optional_fields" {
 
 ///|
 test "json_encoder_escapes_strings" {
-  let name = "quote\" back\\ newline\n tab\t ctrl\u{0001} slash/ end"
+  let name = "quote\" back\\ newline\n carriage\r tab\t backspace\u{0008} formfeed\u{000C} ctrl\u{0001} slash/ end"
   let span : @sdk.SpanData = { ..json_test_span(), name, }
   let root = encode_json([span])
   let parsed = json_span_of(
@@ -305,6 +305,10 @@ test "json_encoder_escapes_strings" {
     0,
   )
   assert_eq(json_string_value(json_member(parsed, "name")), name)
+  let encoded = @utf8.decode_lossy(@otlp.encode_trace_request_json([span]))
+  assert_true(encoded.contains("\\b"))
+  assert_true(encoded.contains("\\f"))
+  assert_true(encoded.contains("\\r"))
 }
 
 ///|

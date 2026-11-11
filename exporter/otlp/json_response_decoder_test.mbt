@@ -100,6 +100,26 @@ test "json_decode_partial_success_escaped_message" {
 }
 
 ///|
+test "json_decode_partial_success_handles_all_simple_escapes" {
+  let message = json_failure_message(
+    decode_json_body(
+      "{\"partialSuccess\":{\"errorMessage\":\"a\\b\\f\\/\\r\\tz\"}}",
+    ),
+  )
+  assert_true(message.contains("a\u{0008}\u{000C}/\r\tz"))
+}
+
+///|
+test "json_decode_replaces_lone_surrogates_in_error_message" {
+  let message = json_failure_message(
+    decode_json_body(
+      "{\"partialSuccess\":{\"errorMessage\":\"x\\uD800y\\uDC00z\"}}",
+    ),
+  )
+  assert_true(message.contains("x\u{FFFD}y\u{FFFD}z"))
+}
+
+///|
 test "json_decode_skips_unknown_fields" {
   let message = json_failure_message(
     decode_json_body(
