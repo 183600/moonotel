@@ -239,6 +239,23 @@ test "propagator_from_env_none_disables_propagation" {
 }
 
 ///|
+test "propagator_from_env_none_disables_propagation_alongside_known_names" {
+  clear_propagators_env()
+  defer clear_propagators_env()
+  @env.set_env_var("OTEL_PROPAGATORS", "TraceContext, NONE, baggage")
+  let composite = @propagation.CompositePropagator::from_env()
+  assert_eq(composite.length(), 0)
+  let carrier = @propagation.TextMapCarrier::new()
+  composite.inject(
+    @context.Context::root()
+    .with_span(propagator_span())
+    .with_value("user.id", "42"),
+    carrier,
+  )
+  assert_eq(carrier.length(), 0)
+}
+
+///|
 test "propagator_from_env_ignores_unknown_names" {
   clear_propagators_env()
   @env.set_env_var("OTEL_PROPAGATORS", "b3, xray ,tracecontext")

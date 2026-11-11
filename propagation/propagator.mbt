@@ -158,8 +158,8 @@ pub extend CompositePropagator with TextMapPropagator::{inject, extract}
 // `tracecontext,baggage`; `none` disables propagation; unknown names are
 // ignored. When every provided name is unknown, the default is used as well,
 // so a typo cannot silently disable propagation. Names are matched
-// case-insensitively and duplicates (including `none` alongside other names)
-// are reduced to their first occurrence.
+// case-insensitively and duplicate propagators are registered only once.
+// `none` disables propagation no matter where it appears in the list.
 
 ///|
 pub fn CompositePropagator::from_env() -> CompositePropagator {
