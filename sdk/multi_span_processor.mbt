@@ -28,11 +28,11 @@ pub struct MultiSpanProcessor {
   // Shutdown requests made by a copy while another copy is already draining.
   // They run after the outer shutdown has finished.
   shutdown_waiters : Ref[Array[() -> Unit]]
-  // Set by a provider shutdown that arrived while this processor was already
+  // Set by provider shutdowns that arrived while this processor was already
   // draining directly; run once the outer drain has finished. Shared with
-  // copies, because the copy that owns the drain must run the completion set
-  // on the processor held by the shutting-down provider.
-  shutdown_completion : Ref[(() -> Unit)?]
+  // copies, because the copy that owns the drain must run every completion
+  // registered through another copy.
+  shutdown_completions : Ref[Array[() -> Unit]]
 }
 
 ///|
@@ -58,7 +58,7 @@ pub fn MultiSpanProcessor::new(
     flushing: Ref(false),
     flushing_owner: Ref(None),
     shutdown_waiters: Ref([]),
-    shutdown_completion: Ref(None),
+    shutdown_completions: Ref([]),
   }
 }
 
@@ -174,6 +174,17 @@ pub impl SpanProcessor for MultiSpanProcessor with fn force_flush(self) {
 }
 
 ///|
+fn MultiSpanProcessor::run_shutdown_completions(
+  self : MultiSpanProcessor,
+) -> Unit {
+  let completions = self.shutdown_completions.val
+  self.shutdown_completions.val = []
+  for completion in completions {
+    completion()
+  }
+}
+
+///|
 pub impl SpanProcessor for MultiSpanProcessor with fn drain_before_shutdown(
   self,
 ) {
@@ -200,17 +211,11 @@ pub impl SpanProcessor for MultiSpanProcessor with fn drain_before_shutdown(
       }
     }
   }
-  // See `BatchSpanProcessor::drain_before_shutdown`: a provider shutdown that
-  // arrived during this direct drain left a completion callback behind. Run
-  // it after clearing the drain guard so that shutdown can finish.
+  // See `BatchSpanProcessor::drain_before_shutdown`: provider shutdowns that
+  // arrived during this direct drain left completion callbacks behind. Run
+  // them after clearing the drain guard so that shutdown can finish.
   self.draining.val = false
-  match self.shutdown_completion.val {
-    Some(completion) => {
-      self.shutdown_completion.val = None
-      completion()
-    }
-    None => ()
-  }
+  self.run_shutdown_completions()
 }
 
 ///|
@@ -223,7 +228,7 @@ pub impl SpanProcessor for MultiSpanProcessor with fn set_shutdown_completion(
   self,
   completion,
 ) {
-  self.shutdown_completion.val = Some(completion)
+  self.shutdown_completions.val.push(completion)
 }
 
 ///|
@@ -269,17 +274,12 @@ pub impl SpanProcessor for MultiSpanProcessor with fn shutdown(self) {
   self.draining.val = false
   let waiters = self.shutdown_waiters.val
   self.shutdown_waiters.val = []
-  let completion = self.shutdown_completion.val
-  self.shutdown_completion.val = None
   // Deferred copies may own children that still need to export through an
   // exporter shared with this copy's children.
   for waiter in waiters {
     waiter()
   }
-  match completion {
-    Some(callback) => callback()
-    None => ()
-  }
+  self.run_shutdown_completions()
   for processor in to_shutdown {
     processor.shutdown()
   }

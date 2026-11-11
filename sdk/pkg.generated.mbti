@@ -133,7 +133,7 @@ pub struct BatchSpanProcessor {
   mut draining : Bool
   mut dropped_spans : UInt64
   mut export_failures : UInt64
-  mut shutdown_completion : (() -> Unit)?
+  shutdown_completions : Array[() -> Unit]
 }
 pub fn BatchSpanProcessor::drain_before_shutdown(Self) -> Unit
 pub fn BatchSpanProcessor::dropped_spans(Self) -> UInt64
@@ -212,7 +212,7 @@ pub struct MultiSpanProcessor {
   flushing : @ref.Ref[Bool]
   flushing_owner : @ref.Ref[Array[&SpanProcessor]?]
   shutdown_waiters : @ref.Ref[Array[() -> Unit]]
-  shutdown_completion : @ref.Ref[(() -> Unit)?]
+  shutdown_completions : @ref.Ref[Array[() -> Unit]]
 }
 pub fn MultiSpanProcessor::drain_before_shutdown(Self) -> Unit
 pub fn MultiSpanProcessor::force_flush(Self) -> Unit
