@@ -100,7 +100,7 @@ in your `moon.pkg`.
 The process-wide provider can be installed once and used from anywhere:
 
 ```moonbit
-@moonotel.setup(service_name="checkout")          // installs a global provider
+let _ = @moonotel.setup(service_name="checkout")  // installs a global provider
 let tracer = @sdk.global_tracer("checkout")       // or @moonotel.global_tracer(...)
 ```
 
