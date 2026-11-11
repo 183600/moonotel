@@ -52,3 +52,19 @@ test "wire_response_headers rejects malformed content-length" {
     Some("chunked"),
   )
 }
+
+///|
+test "wire_response_headers drops content-length on 1xx and 204 responses" {
+  let headers : @http.Headers = Map([
+    (@http.CaseInsensitiveString("Content-Length"), "7"),
+  ])
+  for status_code in [199, 204] {
+    let wire = wire_response_headers(headers, @http.Get, status_code, false)
+    assert_eq(wire.get(@http.CaseInsensitiveString("content-length")), None)
+  }
+  let not_modified = wire_response_headers(headers, @http.Get, 304, false)
+  assert_eq(
+    not_modified.get(@http.CaseInsensitiveString("content-length")),
+    Some("7"),
+  )
+}

@@ -963,6 +963,14 @@ fn is_usable_content_length(value : String) -> Bool {
   }
 }
 
+// RFC 9110 section 8.6 forbids `Content-Length` on 1xx and 204 responses,
+// regardless of the request method or the value.
+
+///|
+fn response_forbids_content_length(status_code : Int32) -> Bool {
+  (status_code >= 100 && status_code < 200) || status_code == 204
+}
+
 ///|
 fn has_valid_content_length(headers : @http.Headers) -> Bool {
   match headers.get(@http.CaseInsensitiveString("content-length")) {
@@ -998,7 +1006,11 @@ fn wire_response_headers(
       continue
     }
     let value = sanitize_wire_header_value(value)
-    if name.to_lower() == "content-length" && !is_usable_content_length(value) {
+    if name.to_lower() == "content-length" &&
+      (
+        response_forbids_content_length(status_code) ||
+        !is_usable_content_length(value)
+      ) {
       continue
     }
     out.set(key, value)
@@ -1043,8 +1055,13 @@ pub async fn ServerCall::respond(
         // The transport parses `Content-Length` to choose its framing and
         // aborts the response task when the count is negative or malformed.
         // Drop an unusable value and let the transport add valid framing.
+        // RFC 9110 also forbids the header on 1xx and 204 responses, where
+        // it cannot describe a body.
         if name.to_lower() == "content-length" &&
-          !is_usable_content_length(value) {
+          (
+            response_forbids_content_length(status_code) ||
+            !is_usable_content_length(value)
+          ) {
           continue
         }
         extra_headers.set(@http.CaseInsensitiveString(name), value)
