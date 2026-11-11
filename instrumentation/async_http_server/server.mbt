@@ -950,16 +950,23 @@ fn sanitize_wire_header_value(value : String) -> String {
   sb.to_string()
 }
 
+// Whether the transport can use this `Content-Length` value to frame a
+// response. The transport trims the value and parses it leniently, but a
+// negative count cannot describe a body: passing it through would leave the
+// sender waiting for a negative number of bytes and abort when the response
+// ends.
+
+///|
+fn is_usable_content_length(value : String) -> Bool {
+  try @string.parse_int64(value.trim(), base=10) >= 0L catch {
+    _ => false
+  }
+}
+
 ///|
 fn has_valid_content_length(headers : @http.Headers) -> Bool {
   match headers.get(@http.CaseInsensitiveString("content-length")) {
-    Some(value) =>
-      try {
-        let _ = @string.parse_int64(value.trim(), base=10)
-        true
-      } catch {
-        _ => false
-      }
+    Some(value) => is_usable_content_length(value)
     None => false
   }
 }
@@ -990,7 +997,11 @@ fn wire_response_headers(
     if name.to_lower() == "transfer-encoding" {
       continue
     }
-    out.set(key, sanitize_wire_header_value(value))
+    let value = sanitize_wire_header_value(value)
+    if name.to_lower() == "content-length" && !is_usable_content_length(value) {
+      continue
+    }
+    out.set(key, value)
   }
   if !response_body_suppressed(request_method, status_code) &&
     !has_valid_content_length(headers) {
@@ -1027,10 +1038,16 @@ pub async fn ServerCall::respond(
       for key, value in values {
         // Header strings are written as UTF-8 by the transport; replace
         // unpaired surrogates instead of aborting the connection task.
-        extra_headers.set(
-          @http.CaseInsensitiveString(sanitize_utf16_surrogates(key)),
-          sanitize_utf16_surrogates(value),
-        )
+        let name = sanitize_utf16_surrogates(key)
+        let value = sanitize_utf16_surrogates(value)
+        // The transport parses `Content-Length` to choose its framing and
+        // aborts the response task when the count is negative or malformed.
+        // Drop an unusable value and let the transport add valid framing.
+        if name.to_lower() == "content-length" &&
+          !is_usable_content_length(value) {
+          continue
+        }
+        extra_headers.set(@http.CaseInsensitiveString(name), value)
       }
     None => ()
   }

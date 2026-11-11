@@ -21,3 +21,34 @@ test "wire_response_headers accepts content-length trimmed by the transport" {
   assert_eq(wire.get(@http.CaseInsensitiveString("content-length")), Some("5"))
   assert_eq(wire.get(@http.CaseInsensitiveString("transfer-encoding")), None)
 }
+
+///|
+test "wire_response_headers rejects negative content-length" {
+  let headers : @http.Headers = Map([
+    (@http.CaseInsensitiveString("Content-Length"), "-1"),
+  ])
+  let wire = wire_response_headers(headers, @http.Get, 200, true)
+  assert_eq(wire.get(@http.CaseInsensitiveString("content-length")), None)
+  assert_eq(
+    wire.get(@http.CaseInsensitiveString("transfer-encoding")),
+    Some("chunked"),
+  )
+  let empty_wire = wire_response_headers(headers, @http.Get, 200, false)
+  assert_eq(
+    empty_wire.get(@http.CaseInsensitiveString("content-length")),
+    Some("0"),
+  )
+}
+
+///|
+test "wire_response_headers rejects malformed content-length" {
+  let headers : @http.Headers = Map([
+    (@http.CaseInsensitiveString("Content-Length"), "not-a-number"),
+  ])
+  let wire = wire_response_headers(headers, @http.Get, 200, true)
+  assert_eq(wire.get(@http.CaseInsensitiveString("content-length")), None)
+  assert_eq(
+    wire.get(@http.CaseInsensitiveString("transfer-encoding")),
+    Some("chunked"),
+  )
+}
