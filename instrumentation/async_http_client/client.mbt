@@ -270,6 +270,25 @@ fn split_url_path_query(url : String) -> (String, String) {
   }
 }
 
+// Whether an authority contains a code unit that cannot appear in a URI
+// authority. RFC 3986 excludes whitespace and control characters, and the
+// HTTP transport rejects them as well. Reporting such text as a host would
+// fabricate `server.*` attributes for a URL that was never sent.
+
+///|
+fn has_invalid_authority_char(text : StringView) -> Bool {
+  let len = text.length()
+  let mut i = 0
+  while i < len {
+    let code = text.unsafe_get(i).to_int()
+    if code <= 0x20 || code == 0x7F {
+      return true
+    }
+    i = i + 1
+  }
+  false
+}
+
 // Split a `host[:port]` authority into its host and port. Bracketed IPv6
 // literals keep their brackets because `split_url` exposes the authority
 // spelling; `None` means the authority is malformed. An unbracketed authority
@@ -284,6 +303,9 @@ fn split_url_host_port(
 ) -> (String, Int32)? {
   if host_port.length() == 0 {
     return Some(("", default_port))
+  }
+  if has_invalid_authority_char(host_port) {
+    return None
   }
   if host_port.has_prefix("[") {
     let close = match host_port.find("]") {
@@ -371,6 +393,9 @@ fn split_url_parts(url : String) -> (String, String, Int32) {
   let default_port = if scheme == "https" { 443 } else { 80 }
   let authority_end = find_authority_end(after_scheme)
   let authority = after_scheme[:authority_end]
+  if has_invalid_authority_char(authority) {
+    return (scheme, "", -1)
+  }
   let host_port = match authority.rev_find("@") {
     Some(index) => authority[index + 1:]
     None => authority

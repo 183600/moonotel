@@ -56,6 +56,46 @@ test "split_url_host_port rejects malformed ipv6 literals" {
 }
 
 ///|
+test "split_url_host_port rejects whitespace and control characters" {
+  for host in [
+    "exa mple.com", "example.com:80 80", "example.com\t", "example.com\n",
+    "example.com\r", "example.com\u{7F}", "\u{0}example.com",
+  ] {
+    assert_eq(split_url_host_port(host, 80), None)
+  }
+}
+
+///|
+test "split_url rejects authorities with whitespace or control characters" {
+  for url in [
+    "http://exa mple.com/x", "http://user name@example.com/x",
+    "http://example.com:80 80/x", "http://example.com\t/x",
+    "http://example.com\n/x", "http://example.com\r/x",
+    "http://example.com\u{7F}/x", "//exa mple.com/x",
+  ] {
+    assert_eq(split_url(url), ("", -1))
+  }
+}
+
+///|
+test "initial_client_attributes omits server attributes for invalid authorities" {
+  for url in [
+    "http://exa mple.com/x", "http://user name@example.com/x",
+    "http://example.com:80 80/x", "http://example.com\t/x",
+    "http://example.com\n/x", "http://example.com\r/x",
+    "http://example.com\u{7F}/x", "//exa mple.com/x",
+  ] {
+    let attributes = initial_client_attributes(
+      url,
+      @http.RequestMethod::Get,
+      0,
+    )
+    assert_eq(attributes.get(@sdk.SERVER_ADDRESS), None)
+    assert_eq(attributes.get(@sdk.SERVER_PORT), None)
+  }
+}
+
+///|
 test "initial_client_attributes keeps a valid ipv6 authority" {
   let attributes = initial_client_attributes(
     "http://[::1]:8080/x",
