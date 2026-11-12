@@ -414,6 +414,73 @@ fn is_absolute_target(path : String) -> Bool {
   http_absolute_target_scheme_end(path) is Some(_)
 }
 
+// Split a `host[:port]` authority into its bare address and port. `None`
+// means the authority is malformed and must not contribute `server.*`
+// attributes: a bracketed IPv6 literal needs exactly one closing bracket
+// followed by the end of the authority or a port separator, and an
+// unbracketed authority may contain at most one colon. A syntactically valid
+// host with an invalid explicit port keeps its address and reports `-1`, so
+// the caller can still record `server.address` without a port.
+
+///|
+fn split_host_authority(
+  authority : String,
+  default_port : Int32,
+) -> (String, Int32)? {
+  if authority == "" {
+    return None
+  }
+  if authority.has_prefix("[") {
+    let close = match authority.find("]") {
+      Some(index) => index
+      None => return None
+    }
+    let address = strip_ipv6_brackets(authority[:close + 1].to_owned())
+    if address == "" ||
+      address.find("[") is Some(_) ||
+      address.find("]") is Some(_) {
+      return None
+    }
+    let rest = authority[close + 1:]
+    if rest == "" {
+      return Some((address, default_port))
+    }
+    if !rest.has_prefix(":") {
+      return None
+    }
+    let port_text = rest[1:]
+    Some((
+      address,
+      if port_text.length() == 0 { default_port } else { parse_port(port_text) },
+    ))
+  } else {
+    if authority.find("[") is Some(_) || authority.find("]") is Some(_) {
+      return None
+    }
+    match authority.find(":") {
+      None => Some((authority, default_port))
+      Some(colon) => {
+        let address = authority[:colon].to_owned()
+        if address == "" {
+          return None
+        }
+        let port_text = authority[colon + 1:]
+        if port_text.find(":") is Some(_) {
+          return None
+        }
+        Some((
+          address,
+          if port_text.length() == 0 {
+            default_port
+          } else {
+            parse_port(port_text)
+          },
+        ))
+      }
+    }
+  }
+}
+
 ///|
 fn set_host_attributes(
   attributes : Map[String, @sdk.AttributeValue],
@@ -467,31 +534,18 @@ fn set_host_attributes(
       } else {
         80
       }
-      let (address, port) = match host.rev_find(":") {
-        Some(colon) =>
-          if host[colon + 1:].find("]") is None {
-            let port_text = host[colon + 1:]
-            (
-              host[:colon].to_owned(),
-              if port_text.length() == 0 {
-                default_port
-              } else {
-                parse_port(port_text)
-              },
-            )
-          } else {
-            (host, default_port)
+      match split_host_authority(host, default_port) {
+        Some((address, port)) => {
+          if address != "" {
+            attributes.set(@sdk.SERVER_ADDRESS, @sdk.StringValue(address))
+            // `-1` marks an invalid explicit port; an absent or empty port
+            // uses the scheme default, and an explicit port 0 is valid.
+            if port >= 0 {
+              attributes.set(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
+            }
           }
-        None => (host, default_port)
-      }
-      let address = strip_ipv6_brackets(address)
-      if address != "" {
-        attributes.set(@sdk.SERVER_ADDRESS, @sdk.StringValue(address))
-        // `-1` marks an invalid explicit port; an absent or empty port uses
-        // the scheme default, and an explicit port 0 is valid.
-        if port >= 0 {
-          attributes.set(@sdk.SERVER_PORT, @sdk.IntValue(port.to_int64()))
         }
+        None => ()
       }
     }
     None => ()
