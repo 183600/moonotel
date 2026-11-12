@@ -1,5 +1,5 @@
 // Stable attribute keys from the OpenTelemetry semantic conventions.
-// Only the keys needed by the MVP HTTP instrumentation are listed.
+// Only the keys needed by the SDK and the HTTP instrumentation are listed.
 
 ///|
 pub const HTTP_REQUEST_METHOD : String = "http.request.method"
@@ -63,6 +63,12 @@ pub const SERVICE_NAME : String = "service.name"
 
 ///|
 pub const SERVICE_VERSION : String = "service.version"
+
+///|
+pub const DEPLOYMENT_ENVIRONMENT_NAME : String = "deployment.environment.name"
+
+// Deprecated by the semantic conventions in favor of
+// `DEPLOYMENT_ENVIRONMENT_NAME`; kept for source compatibility.
 
 ///|
 pub const DEPLOYMENT_ENVIRONMENT : String = "deployment.environment"

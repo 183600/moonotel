@@ -15,6 +15,8 @@ pub const CLIENT_PORT : String = "client.port"
 
 pub const DEPLOYMENT_ENVIRONMENT : String = "deployment.environment"
 
+pub const DEPLOYMENT_ENVIRONMENT_NAME : String = "deployment.environment.name"
+
 pub const ERROR_TYPE : String = "error.type"
 
 pub const EXCEPTION_MESSAGE : String = "exception.message"

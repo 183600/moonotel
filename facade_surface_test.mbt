@@ -25,6 +25,10 @@ test "facade_exposes_the_semantic_convention_keys" {
   assert_eq(@moonotel.ERROR_TYPE, "error.type")
   assert_eq(@moonotel.SERVICE_NAME, "service.name")
   assert_eq(@moonotel.SERVICE_VERSION, "service.version")
+  assert_eq(
+    @moonotel.DEPLOYMENT_ENVIRONMENT_NAME,
+    "deployment.environment.name",
+  )
   assert_eq(@moonotel.DEPLOYMENT_ENVIRONMENT, "deployment.environment")
   assert_eq(@moonotel.EXCEPTION_TYPE, "exception.type")
   assert_eq(@moonotel.EXCEPTION_MESSAGE, "exception.message")
