@@ -30,7 +30,7 @@ pub type Transport = (String, Map[String, String], Bytes) -> TransportResponse
 // Exporter configuration, following the OTEL_EXPORTER_OTLP_* environment
 // variables. `endpoint` is a base URL; `traces_endpoint` (when present) is the
 // full signal-specific URL set via OTEL_EXPORTER_OTLP_TRACES_ENDPOINT and is
-// used verbatim.
+// used verbatim, except that a URL without a path part is sent to `/`.
 
 ///|
 pub(all) struct OtlpHttpConfig {
@@ -257,8 +257,8 @@ pub fn is_valid_http_header_value(value : String) -> Bool {
 // Create a configuration with sensible defaults
 // (endpoint `http://localhost:4318`, no compression, `http/protobuf`, 10s
 // timeout, 3 retries for retryable statuses). When `traces_endpoint` is given
-// it is the full trace URL and is used verbatim, taking precedence over
-// `endpoint`.
+// it is the full trace URL and takes precedence over `endpoint`; a URL without
+// a path part is sent to the root path `/`.
 //
 // Invalid boundary values fall back to those defaults: a negative timeout is
 // invalid (0 explicitly means "no timeout"), a negative retry count means no

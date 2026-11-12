@@ -5,7 +5,7 @@
 //   - version: 2 hex chars, `ff` is invalid
 //   - trace-id: 32 hex chars, all-zero is invalid
 //   - parent-id: 16 hex chars, all-zero is invalid
-//   - trace-flags: 2 hex chars, only the sampled bit is kept
+//   - trace-flags: 2 hex chars, the sampled and random bits are kept
 //
 // Parsing is lenient about hex case and about extra fields for versions
 // greater than `00`, as recommended by the specification.

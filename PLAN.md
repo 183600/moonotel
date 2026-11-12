@@ -247,7 +247,8 @@ OTLP 编码器为 protobuf 和 JSON 各自实现，响应解析器分别处理�
 
 - `OTEL_EXPORTER_OTLP_ENDPOINT` 作为 base URL，自动追加 `/v1/traces`；
   已包含 `/v1/traces` 的值不再重复追加。
-- `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` 原样使用，优先级更高。
+- `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` 优先级更高；其值原样使用，但没有 path
+  部分时按 OTLP/HTTP 规范发送到根路径 `/`。
 - `OTEL_EXPORTER_OTLP_PROTOCOL` 支持 `http/protobuf` 与 `http/json`。
 - `OTEL_EXPORTER_OTLP_COMPRESSION` 支持 `none` 与 `gzip`；同步 exporter 拒绝
   gzip，异步 exporter 实现压缩。
