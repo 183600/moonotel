@@ -302,8 +302,8 @@ async fn main {
 
 `run_server` extracts `traceparent` from each request, starts a `Server` span
 with the standard HTTP attributes (`http.request.method`, `url.path`,
-`url.query`, `server.address`, `client.address`, …), installs the context while
-the handler runs, and ends the span afterwards.
+`url.query`, `server.address`, `client.address`, `network.peer.address`, …),
+installs the context while the handler runs, and ends the span afterwards.
 
 - `set_route` records `http.route` and renames the span to `METHOD route`; an
   empty or blank route is ignored because no route was matched.

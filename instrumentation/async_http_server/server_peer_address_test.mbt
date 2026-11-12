@@ -69,6 +69,14 @@ async test "run_server_with_client_address records client.address and client.por
       data.attributes.get(@sdk.CLIENT_PORT),
       Some(@sdk.IntValue(client_port.to_int64())),
     )
+    assert_eq(
+      data.attributes.get(@sdk.NETWORK_PEER_ADDRESS),
+      Some(@sdk.StringValue("127.0.0.1")),
+    )
+    assert_eq(
+      data.attributes.get(@sdk.NETWORK_PEER_PORT),
+      Some(@sdk.IntValue(client_port.to_int64())),
+    )
     // `server.address`/`server.port` still come from the Host header.
     assert_eq(
       data.attributes.get(@sdk.SERVER_ADDRESS),
@@ -147,6 +155,10 @@ async test "run_server_with_client_address records IPv6 client addresses" {
         // The IPv6 brackets are stripped from `client.address`.
         assert_eq(
           exporter.spans.val[0].attributes.get(@sdk.CLIENT_ADDRESS),
+          Some(@sdk.StringValue("::1")),
+        )
+        assert_eq(
+          exporter.spans.val[0].attributes.get(@sdk.NETWORK_PEER_ADDRESS),
           Some(@sdk.StringValue("::1")),
         )
       }

@@ -619,8 +619,18 @@ fn initial_server_attributes(
   }
   set_host_attributes(attributes, request.headers, request.path)
   match client_address {
-    Some(address) =>
+    Some(address) => {
       attributes.set(@sdk.CLIENT_ADDRESS, @sdk.StringValue(address))
+      attributes.set(@sdk.NETWORK_PEER_ADDRESS, @sdk.StringValue(address))
+      match client_port {
+        Some(port) =>
+          attributes.set(
+            @sdk.NETWORK_PEER_PORT,
+            @sdk.IntValue(port.to_int64()),
+          )
+        None => ()
+      }
+    }
     None => ()
   }
   match client_port {

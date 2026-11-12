@@ -316,7 +316,7 @@ HTTP 埋点面向 native+wasm，默认 wasm-gc 目标跳过相关函数体。没
 wrapper 直接转发请求，不改变调用方行为。
 
 服务端 `run_server` 为每个请求提取父上下文，创建 `Server` span，记录方法、路径、
-查询串、服务端地址、客户端地址等属性，并在 handler 执行期间安装上下文。
+查询串、服务端地址、客户端地址、网络对端地址等属性，并在 handler 执行期间安装上下文。
 `set_route` 更新 `http.route` 与 span 名称；`respond` 记录状态码并把 5xx 标为
 `Error`；handler 异常记录后重新抛出。`start_span` 显式以该请求 span 为父，
 适配并发连接。

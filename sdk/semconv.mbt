@@ -56,6 +56,12 @@ pub const NETWORK_PROTOCOL_NAME : String = "network.protocol.name"
 pub const NETWORK_PROTOCOL_VERSION : String = "network.protocol.version"
 
 ///|
+pub const NETWORK_PEER_ADDRESS : String = "network.peer.address"
+
+///|
+pub const NETWORK_PEER_PORT : String = "network.peer.port"
+
+///|
 pub const ERROR_TYPE : String = "error.type"
 
 ///|
