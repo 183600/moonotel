@@ -434,6 +434,15 @@ fn split_host_authority(
     authority.find("#") is Some(_) {
     return None
   }
+  let authority_len = authority.length()
+  let mut i = 0
+  while i < authority_len {
+    let code = authority.unsafe_get(i).to_int()
+    if code <= 0x20 || code == 0x7F {
+      return None
+    }
+    i = i + 1
+  }
   if authority.has_prefix("[") {
     let close = match authority.find("]") {
       Some(index) => index

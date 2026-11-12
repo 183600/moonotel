@@ -62,6 +62,17 @@ test "split_host_authority rejects malformed ipv6 literals" {
 }
 
 ///|
+test "split_host_authority rejects whitespace and control characters" {
+  for authority in [
+    "exa mple.com", "exa\tmple.com", "exa\nmple.com", "exa\rmple.com",
+    "example.com :8080", "[::1] ", "[:: 1]", "example.com:\u{0001}",
+    "\u{007f}example.com",
+  ] {
+    assert_eq(split_host_authority(authority, 80), None)
+  }
+}
+
+///|
 test "split_host_authority rejects URI delimiters" {
   assert_eq(split_host_authority("example.com/path", 80), None)
   assert_eq(split_host_authority("example.com?q=1", 80), None)

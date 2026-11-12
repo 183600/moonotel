@@ -58,3 +58,37 @@ async test "server span parses a host header with trailing whitespace" {
     assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(8080)))
   }
 }
+
+///|
+async test "server span ignores a host header with internal whitespace" {
+  let exporter : HostOwsRecordingExporter = { spans: Ref([]), }
+  let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
+  let provider = @sdk.TracerProviderSdk::new(service_name="host-ows-test").with_span_processor(
+    processor,
+  )
+  let tracer = provider.get_tracer("host-ows-test")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_on(
+        server,
+        call => call.respond(200, body="ok"),
+        tracer~,
+      )
+    }
+    let connection = @socket.Tcp::connect(
+      @socket.Addr::parse("127.0.0.1:\{port}"),
+    )
+    connection.write(
+      "GET /internal-ows HTTP/1.1\r\nHost: exa mple.com:8080\r\nConnection: close\r\n\r\n",
+    )
+    let _ = @async.with_timeout(5000, () => connection.read_all().text())
+    connection.close()
+    @async.sleep(50)
+    assert_eq(exporter.spans.val.length(), 1)
+    let data = exporter.spans.val[0]
+    assert_eq(data.attributes.get(@sdk.SERVER_ADDRESS), None)
+    assert_eq(data.attributes.get(@sdk.SERVER_PORT), None)
+  }
+}
