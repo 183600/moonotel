@@ -176,17 +176,17 @@ pub fn Sampler::record_only() -> Sampler {
 
 // Wrap `root` so that every span it would drop is still recorded. Following the
 // OpenTelemetry `AlwaysRecord` decorator, a `DROP` decision becomes
-// `RECORD_ONLY`, while `RECORD_ONLY` and `RECORD_AND_SAMPLE` are preserved.
-// This lets processors observe all spans without exporting the unsampled ones.
+// `RECORD_ONLY`, while every other decision is returned unchanged. This lets
+// processors observe all spans without exporting the unsampled ones.
 
 ///|
 pub fn Sampler::always_record(root : Sampler) -> Sampler {
   Sampler::new("AlwaysRecord{" + root.description() + "}", fn(parameters) {
     let decision = root.should_sample_parameters(parameters)
-    if decision.is_sampled {
-      sampling_decision_record_and_sample()
-    } else {
+    if !decision.is_recorded && !decision.is_sampled {
       sampling_decision_record_only()
+    } else {
+      decision
     }
   })
 }

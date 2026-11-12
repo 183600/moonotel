@@ -35,6 +35,18 @@ test "always_record_keeps_record_only" {
 }
 
 ///|
+test "always_record_preserves_a_sampled_without_record_decision" {
+  let sampler = @sdk.Sampler::always_record(
+    @sdk.Sampler::new("SampledWithoutRecord", fn(_parameters) {
+      { is_recorded: false, is_sampled: true, }
+    }),
+  )
+  let decision = sampler.should_sample(None, always_record_trace_id(1))
+  assert_false(decision.is_recorded)
+  assert_true(decision.is_sampled)
+}
+
+///|
 test "always_record_describes_the_wrapped_sampler" {
   assert_eq(
     @sdk.Sampler::always_record(@sdk.Sampler::always_off()).description(),
