@@ -83,6 +83,25 @@ test "split_url ignores query and fragment when no path is present" {
 }
 
 ///|
+test "split_url rejects malformed ipv6 authorities" {
+  for url in [
+    "http://[::1/x", "http://[::1]junk/x", "http://[::1]junk:8080/x",
+    "http://[[::1]]/x", "http://::1/x", "http://2001:db8::1/x",
+    "http://example.com:8080:90/x", "http://foo]/x",
+  ] {
+    assert_eq(@async_http_client.split_url(url), ("", -1))
+  }
+}
+
+///|
+test "split_url keeps a valid ipv6 host with an invalid port" {
+  assert_eq(
+    @async_http_client.split_url("http://[::1]:not-a-port/x"),
+    ("[::1]", -1),
+  )
+}
+
+///|
 test "split_url ignores invalid scheme separators" {
   assert_eq(@async_http_client.split_url("/foo://user:pass@host"), ("", 80))
   assert_eq(

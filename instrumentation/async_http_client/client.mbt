@@ -257,9 +257,82 @@ fn split_url_path_query(url : String) -> (String, String) {
   }
 }
 
+// Split a `host[:port]` authority into its host and port. Bracketed IPv6
+// literals keep their brackets because `split_url` exposes the authority
+// spelling; `None` means the authority is malformed. An unbracketed authority
+// may contain at most one colon, and a bracketed literal must end before any
+// path separator. A valid host with an invalid explicit port keeps the host
+// and reports `-1`, matching the best-effort contract of `split_url`.
+
+///|
+fn split_url_host_port(
+  host_port : StringView,
+  default_port : Int32,
+) -> (String, Int32)? {
+  if host_port.length() == 0 {
+    return Some(("", default_port))
+  }
+  if host_port.has_prefix("[") {
+    let close = match host_port.find("]") {
+      Some(index) => index
+      None => return None
+    }
+    let literal = host_port[:close + 1].to_owned()
+    let address = strip_ipv6_brackets(literal)
+    if address == "" ||
+      address.find("[") is Some(_) ||
+      address.find("]") is Some(_) {
+      return None
+    }
+    let rest = host_port[close + 1:]
+    if rest.length() == 0 {
+      return Some((literal, default_port))
+    }
+    if !rest.has_prefix(":") {
+      return None
+    }
+    let port_text = rest[1:]
+    Some((
+      literal,
+      if port_text.length() == 0 {
+        default_port
+      } else {
+        parse_port(port_text)
+      },
+    ))
+  } else {
+    if host_port.find("[") is Some(_) || host_port.find("]") is Some(_) {
+      return None
+    }
+    match host_port.find(":") {
+      None => Some((host_port.to_owned(), default_port))
+      Some(colon) => {
+        let host = host_port[:colon].to_owned()
+        if host == "" {
+          return None
+        }
+        let port_text = host_port[colon + 1:]
+        if port_text.find(":") is Some(_) {
+          return None
+        }
+        Some((
+          host,
+          if port_text.length() == 0 {
+            default_port
+          } else {
+            parse_port(port_text)
+          },
+        ))
+      }
+    }
+  }
+}
+
 // Split an absolute URL into (scheme, host, port). The scheme is "" when the
 // URL has no valid scheme; the port falls back to the scheme default when it
-// is not explicit; an explicit but unparsable port yields -1.
+// is not explicit; an explicit but unparsable port yields -1. A malformed
+// authority yields an empty host and -1 so callers do not record bogus
+// `server.*` attributes.
 
 ///|
 fn split_url_parts(url : String) -> (String, String, Int32) {
@@ -279,40 +352,9 @@ fn split_url_parts(url : String) -> (String, String, Int32) {
     Some(index) => authority[index + 1:]
     None => authority
   }
-  if host_port.has_prefix("[") {
-    match host_port.find("]") {
-      Some(close) => {
-        let host = host_port[:close + 1].to_owned()
-        let rest = host_port[close + 1:]
-        let port = match rest.find(":") {
-          Some(colon) =>
-            // RFC 3986 allows an empty port, which denotes the scheme's
-            // default port (e.g. `https://example.com:/path`).
-            if colon + 1 == rest.length() {
-              default_port
-            } else {
-              parse_port(rest[colon + 1:])
-            }
-          None => default_port
-        }
-        (scheme, host, port)
-      }
-      None => (scheme, host_port.to_owned(), default_port)
-    }
-  } else {
-    match host_port.find(":") {
-      Some(colon) =>
-        (
-          scheme,
-          host_port[:colon].to_owned(),
-          if colon + 1 == host_port.length() {
-            default_port
-          } else {
-            parse_port(host_port[colon + 1:])
-          },
-        )
-      None => (scheme, host_port.to_owned(), default_port)
-    }
+  match split_url_host_port(host_port, default_port) {
+    Some((host, port)) => (scheme, host, port)
+    None => (scheme, "", -1)
   }
 }
 
