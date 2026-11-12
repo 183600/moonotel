@@ -416,7 +416,8 @@ fn is_absolute_target(path : String) -> Bool {
 
 // Split a `host[:port]` authority into its bare address and port. `None`
 // means the authority is malformed and must not contribute `server.*`
-// attributes: a bracketed IPv6 literal needs exactly one closing bracket
+// attributes: URI path/query/fragment delimiters cannot appear in an
+// authority, a bracketed IPv6 literal needs exactly one closing bracket
 // followed by the end of the authority or a port separator, and an
 // unbracketed authority may contain at most one colon. A syntactically valid
 // host with an invalid explicit port keeps its address and reports `-1`, so
@@ -427,7 +428,10 @@ fn split_host_authority(
   authority : String,
   default_port : Int32,
 ) -> (String, Int32)? {
-  if authority == "" {
+  if authority == "" ||
+    authority.find("/") is Some(_) ||
+    authority.find("?") is Some(_) ||
+    authority.find("#") is Some(_) {
     return None
   }
   if authority.has_prefix("[") {

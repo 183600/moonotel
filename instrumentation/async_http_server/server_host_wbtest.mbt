@@ -62,10 +62,20 @@ test "split_host_authority rejects malformed ipv6 literals" {
 }
 
 ///|
+test "split_host_authority rejects URI delimiters" {
+  assert_eq(split_host_authority("example.com/path", 80), None)
+  assert_eq(split_host_authority("example.com?q=1", 80), None)
+  assert_eq(split_host_authority("example.com#frag", 80), None)
+  assert_eq(split_host_authority("/path", 80), None)
+  assert_eq(split_host_authority("example.com:8080/path", 80), None)
+}
+
+///|
 test "record_host_attributes ignores malformed host authorities" {
   for host in [
     "[::1", "[::1]junk", "[::1]junk:8080", "[[::1]]", "::1", "2001:db8::1",
-    "example.com:8080:90", "foo]",
+    "example.com:8080:90", "foo]", "example.com/path", "example.com?q=1",
+    "example.com#frag",
   ] {
     let (span, exporter) = host_attribute_span()
     record_host_attributes(span, ows_header_map([("Host", host)]), "/")
