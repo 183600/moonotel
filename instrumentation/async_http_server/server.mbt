@@ -963,12 +963,19 @@ fn is_usable_content_length(value : String) -> Bool {
   }
 }
 
-// RFC 9110 section 8.6 forbids `Content-Length` on 1xx and 204 responses,
-// regardless of the request method or the value.
+// RFC 9110 section 8.6 forbids `Content-Length` on 1xx and 204 responses and
+// on successful (2xx) responses to CONNECT requests, regardless of the value.
 
 ///|
-fn response_forbids_content_length(status_code : Int32) -> Bool {
-  (status_code >= 100 && status_code < 200) || status_code == 204
+fn response_forbids_content_length(
+  request_method : @http.RequestMethod,
+  status_code : Int32,
+) -> Bool {
+  match (request_method, status_code) {
+    (Connect, 200..<300) => true
+    (_, 100..<200 | 204) => true
+    _ => false
+  }
 }
 
 ///|
@@ -1008,7 +1015,7 @@ fn wire_response_headers(
     let value = sanitize_wire_header_value(value)
     if name.to_lower() == "content-length" &&
       (
-        response_forbids_content_length(status_code) ||
+        response_forbids_content_length(request_method, status_code) ||
         !is_usable_content_length(value)
       ) {
       continue
@@ -1055,11 +1062,11 @@ pub async fn ServerCall::respond(
         // The transport parses `Content-Length` to choose its framing and
         // aborts the response task when the count is negative or malformed.
         // Drop an unusable value and let the transport add valid framing.
-        // RFC 9110 also forbids the header on 1xx and 204 responses, where
-        // it cannot describe a body.
+        // RFC 9110 also forbids the header on 1xx, 204, and successful
+        // CONNECT responses, where it cannot describe a body.
         if name.to_lower() == "content-length" &&
           (
-            response_forbids_content_length(status_code) ||
+            response_forbids_content_length(self.request.meth, status_code) ||
             !is_usable_content_length(value)
           ) {
           continue

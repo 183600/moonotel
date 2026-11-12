@@ -68,3 +68,24 @@ test "wire_response_headers drops content-length on 1xx and 204 responses" {
     Some("7"),
   )
 }
+
+///|
+test "wire_response_headers drops content-length on successful CONNECT" {
+  let headers : @http.Headers = Map([
+    (@http.CaseInsensitiveString("Content-Length"), "7"),
+  ])
+  for status_code in [200, 299] {
+    let wire = wire_response_headers(headers, @http.Connect, status_code, false)
+    assert_eq(wire.get(@http.CaseInsensitiveString("content-length")), None)
+  }
+  let failed = wire_response_headers(headers, @http.Connect, 400, true)
+  assert_eq(
+    failed.get(@http.CaseInsensitiveString("content-length")),
+    Some("7"),
+  )
+  let succeeded_get = wire_response_headers(headers, @http.Get, 200, true)
+  assert_eq(
+    succeeded_get.get(@http.CaseInsensitiveString("content-length")),
+    Some("7"),
+  )
+}
