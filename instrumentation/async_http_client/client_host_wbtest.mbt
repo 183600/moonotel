@@ -78,12 +78,32 @@ test "split_url rejects authorities with whitespace or control characters" {
 }
 
 ///|
+test "split_url rejects forbidden URI authority characters" {
+  for url in [
+    "http://exa\"mple.com/x", "http://exa<mple.com/x",
+    "http://exa>mple.com/x", "http://exa\\mple.com/x",
+    "http://exa^mple.com/x", "http://exa`mple.com/x",
+    "http://exa{mple.com/x", "http://exa|mple.com/x",
+    "http://exa}mple.com/x", "http://user\"name@example.com/x",
+    "//exa\\mple.com/x",
+  ] {
+    assert_eq(split_url(url), ("", -1))
+  }
+}
+
+///|
 test "initial_client_attributes omits server attributes for invalid authorities" {
   for url in [
     "http://exa mple.com/x", "http://user name@example.com/x",
     "http://example.com:80 80/x", "http://example.com\t/x",
     "http://example.com\n/x", "http://example.com\r/x",
     "http://example.com\u{7F}/x", "//exa mple.com/x",
+    "http://exa\"mple.com/x", "http://exa<mple.com/x",
+    "http://exa>mple.com/x", "http://exa\\mple.com/x",
+    "http://exa^mple.com/x", "http://exa`mple.com/x",
+    "http://exa{mple.com/x", "http://exa|mple.com/x",
+    "http://exa}mple.com/x", "http://user\"name@example.com/x",
+    "//exa\\mple.com/x",
   ] {
     let attributes = initial_client_attributes(
       url,

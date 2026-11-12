@@ -270,6 +270,19 @@ fn split_url_path_query(url : String) -> (String, String) {
   }
 }
 
+///|
+fn is_forbidden_authority_char(code : Int32) -> Bool {
+  code == 0x22 ||
+  code == 0x3C ||
+  code == 0x3E ||
+  code == 0x5C ||
+  code == 0x5E ||
+  code == 0x60 ||
+  code == 0x7B ||
+  code == 0x7C ||
+  code == 0x7D
+}
+
 // Whether an authority contains a code unit that cannot appear in a URI
 // authority. RFC 3986 excludes whitespace and control characters, and the
 // HTTP transport rejects them as well. Reporting such text as a host would
@@ -281,7 +294,7 @@ fn has_invalid_authority_char(text : StringView) -> Bool {
   let mut i = 0
   while i < len {
     let code = text.unsafe_get(i).to_int()
-    if code <= 0x20 || code == 0x7F {
+    if code <= 0x20 || code == 0x7F || is_forbidden_authority_char(code) {
       return true
     }
     i = i + 1

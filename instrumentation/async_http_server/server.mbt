@@ -414,6 +414,19 @@ fn is_absolute_target(path : String) -> Bool {
   http_absolute_target_scheme_end(path) is Some(_)
 }
 
+///|
+fn is_forbidden_authority_char(code : Int32) -> Bool {
+  code == 0x22 ||
+  code == 0x3C ||
+  code == 0x3E ||
+  code == 0x5C ||
+  code == 0x5E ||
+  code == 0x60 ||
+  code == 0x7B ||
+  code == 0x7C ||
+  code == 0x7D
+}
+
 // Split a `host[:port]` authority into its bare address and port. `None`
 // means the authority is malformed and must not contribute `server.*`
 // attributes: URI path/query/fragment delimiters cannot appear in an
@@ -438,7 +451,7 @@ fn split_host_authority(
   let mut i = 0
   while i < authority_len {
     let code = authority.unsafe_get(i).to_int()
-    if code <= 0x20 || code == 0x7F {
+    if code <= 0x20 || code == 0x7F || is_forbidden_authority_char(code) {
       return None
     }
     i = i + 1
