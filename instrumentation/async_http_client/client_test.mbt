@@ -108,6 +108,20 @@ test "split_url ignores invalid scheme separators" {
     @async_http_client.split_url("example.com?next=http://user:pass@host"),
     ("example.com", 80),
   )
+  // A `://` after a prefix that is not a valid scheme belongs to a relative
+  // path, so it must not be mistaken for an authority delimiter.
+  assert_eq(
+    @async_http_client.split_url("1http://example.com/x"),
+    ("", 80),
+  )
+  assert_eq(
+    @async_http_client.split_url("1http://example.com:8080/x"),
+    ("", 80),
+  )
+  assert_eq(
+    @async_http_client.split_url("ht_tp://example.com/x"),
+    ("", 80),
+  )
 }
 
 ///|

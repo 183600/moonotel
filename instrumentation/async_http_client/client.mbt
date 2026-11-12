@@ -222,6 +222,19 @@ fn find_authority_end(text : StringView) -> Int32 {
   len
 }
 
+// Whether a `://` sequence occurs before the end of the would-be authority
+// even though the prefix is not a valid scheme. In that case the sequence is
+// part of a relative path (or query/fragment), not an authority delimiter,
+// matching `split_url_path_query` and `strip_url_userinfo`.
+
+///|
+fn has_invalid_scheme_separator(url : String) -> Bool {
+  match url.find("://") {
+    Some(index) => index < find_authority_end(url[:])
+    None => false
+  }
+}
+
 // Split the path and query components of a URL. The fragment is dropped and
 // the query is returned without its leading `?`. An URL without a path yields
 // an empty path; callers apply the semantic conventions default.
@@ -343,7 +356,17 @@ fn split_url_parts(url : String) -> (String, String, Int32) {
     // though it has no scheme. Treat it like an absolute URL after its scheme
     // so that `split_url` reports the same host/port as `url.full` and
     // `url.path` handling.
-    None => if url.has_prefix("//") { url[2:] } else { url }
+    None =>
+      if url.has_prefix("//") {
+        url[2:]
+      } else if has_invalid_scheme_separator(url) {
+        // An invalid scheme separator is part of a relative path, so it does
+        // not introduce an authority. Reporting its text as a host would leak
+        // a path segment into `server.address`-style consumers.
+        ""
+      } else {
+        url
+      }
   }
   let default_port = if scheme == "https" { 443 } else { 80 }
   let authority_end = find_authority_end(after_scheme)
