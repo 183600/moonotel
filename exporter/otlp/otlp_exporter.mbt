@@ -76,6 +76,14 @@ const DEFAULT_MAX_RETRIES : Int32 = 3
 ///|
 const DEFAULT_TIMEOUT_MILLIS : Int32 = 10000
 
+// Default maximum sizes of OTLP request and response messages, in bytes.
+
+///|
+pub const OTLP_DEFAULT_MAX_REQUEST_SIZE : Int32 = 67108864
+
+///|
+pub const OTLP_DEFAULT_MAX_RESPONSE_SIZE : Int32 = 4194304
+
 // Whether `protocol` is one of the OTLP/HTTP encodings supported by this
 // exporter (`http/protobuf` and `http/json`). Other values (for example
 // `grpc`) are rejected at export time.
@@ -162,6 +170,24 @@ pub fn OtlpHttpConfig::effective_timeout_millis(self : OtlpHttpConfig) -> Int32 
   } else {
     self.timeout_millis
   }
+}
+
+///|
+pub fn normalize_size_limit(limit : Int32?, default : Int32) -> Int32 {
+  match limit {
+    Some(value) => if value <= 0 { default } else { value }
+    None => default
+  }
+}
+
+///|
+pub fn request_size_limit_failure(limit : Int32) -> @sdk.ExportResult {
+  let label = if limit == OTLP_DEFAULT_MAX_REQUEST_SIZE {
+    "64 MiB"
+  } else {
+    limit.to_string() + "-byte"
+  }
+  @sdk.ExportFailure("OTLP request body exceeds the " + label + " limit")
 }
 
 // Whether a code unit is an HTTP token character (RFC 9110 `tchar`). Header
@@ -858,6 +884,8 @@ pub struct OtlpHttpExporter {
   // Request headers (configured headers plus `content-type`).
   headers : Map[String, String]
   retry_wait : RetryWait
+  max_request_size : Int32
+  max_response_size : Int32
   mut shutdown_called : Bool
 }
 
@@ -869,6 +897,8 @@ pub fn OtlpHttpExporter::new(
   config : OtlpHttpConfig,
   transport : Transport,
   retry_wait? : RetryWait,
+  max_request_size? : Int32,
+  max_response_size? : Int32,
 ) -> OtlpHttpExporter {
   // Snapshot the header map so that mutating the caller's config (or a map it
   // shares with the config) after construction cannot change the exporter's
@@ -880,6 +910,14 @@ pub fn OtlpHttpExporter::new(
     url: config.request_url(),
     headers: exporter_headers(config),
     retry_wait: retry_wait.unwrap_or(fn(_attempt) { () }),
+    max_request_size: normalize_size_limit(
+      max_request_size,
+      OTLP_DEFAULT_MAX_REQUEST_SIZE,
+    ),
+    max_response_size: normalize_size_limit(
+      max_response_size,
+      OTLP_DEFAULT_MAX_RESPONSE_SIZE,
+    ),
     shutdown_called: false,
   }
 }
@@ -991,6 +1029,9 @@ pub fn OtlpHttpExporter::export_spans_http(
   if body.length() == 0 {
     return @sdk.ExportSuccess
   }
+  if body.length() > self.max_request_size {
+    return request_size_limit_failure(self.max_request_size)
+  }
   let url = self.url
   let headers = self.headers
   let max_retries = if self.config.max_retries < 0 {
@@ -1020,9 +1061,15 @@ pub fn OtlpHttpExporter::export_spans_http(
     let response = (self.transport)(url, headers.copy(), body)
     if response.status_code == 200 {
       if json {
-        return decode_export_response_json(response.body)
+        return decode_export_response_json(
+          response.body,
+          max_size=self.max_response_size,
+        )
       } else {
-        return decode_export_response(response.body)
+        return decode_export_response(
+          response.body,
+          max_size=self.max_response_size,
+        )
       }
     }
     last_failure = "OTLP export failed with HTTP status " +

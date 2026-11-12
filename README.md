@@ -381,6 +381,17 @@ non-positive `status_code` reports a transport failure that never received an
 HTTP response and is retried. Other 4xx/5xx responses, including 500, are
 terminal and returned as an export failure.
 
+### Message size limits
+
+Encoded OTLP request bodies are limited to 64 MiB and response bodies to 4 MiB
+by default, matching the OTLP exporter specification. `OtlpHttpExporter::new`,
+`OtlpHttpAsyncExporter::new`, `@otlp_async.export_spans` and
+`@otlp_async.post_trace_request` accept `max_request_size` /
+`max_response_size` named arguments to override those limits; a non-positive
+value selects the default. The request limit applies to the encoded message
+before gzip compression. `decode_export_response` and
+`decode_export_response_json` accept the same optional `max_size` argument.
+
 ### Configuration and lifecycle
 
 `OtlpHttpConfig::new` applies the same defaults to programmatic values as

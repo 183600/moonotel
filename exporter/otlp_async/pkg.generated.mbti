@@ -8,9 +8,9 @@ import {
 }
 
 // Values
-pub async fn export_spans(@otlp.OtlpHttpConfig, Array[@sdk.SpanData]) -> @sdk.ExportResult
+pub async fn export_spans(@otlp.OtlpHttpConfig, Array[@sdk.SpanData], max_request_size? : Int32, max_response_size? : Int32) -> @sdk.ExportResult
 
-pub async fn post_trace_request(@otlp.OtlpHttpConfig, Bytes) -> @sdk.ExportResult
+pub async fn post_trace_request(@otlp.OtlpHttpConfig, Bytes, max_request_size? : Int32, max_response_size? : Int32) -> @sdk.ExportResult
 
 // Errors
 
@@ -18,10 +18,12 @@ pub async fn post_trace_request(@otlp.OtlpHttpConfig, Bytes) -> @sdk.ExportResul
 pub struct OtlpHttpAsyncExporter {
   config : @otlp.OtlpHttpConfig
   headers : Map[@http.CaseInsensitiveString, String]
+  max_request_size : Int32
+  max_response_size : Int32
 }
 pub fn OtlpHttpAsyncExporter::config(Self) -> @otlp.OtlpHttpConfig
 pub async fn OtlpHttpAsyncExporter::export_batch(Self, Array[@sdk.SpanData]) -> @sdk.ExportResult
-pub fn OtlpHttpAsyncExporter::new(@otlp.OtlpHttpConfig) -> Self
+pub fn OtlpHttpAsyncExporter::new(@otlp.OtlpHttpConfig, max_request_size? : Int32, max_response_size? : Int32) -> Self
 
 // Type aliases
 

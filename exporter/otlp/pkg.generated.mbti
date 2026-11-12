@@ -6,15 +6,19 @@ import {
 }
 
 // Values
+pub const OTLP_DEFAULT_MAX_REQUEST_SIZE : Int32 = 67108864
+
+pub const OTLP_DEFAULT_MAX_RESPONSE_SIZE : Int32 = 4194304
+
 pub const OTLP_HTTP_JSON_PROTOCOL : String = "http/json"
 
 pub const OTLP_HTTP_PROTOBUF_PROTOCOL : String = "http/protobuf"
 
 pub fn content_type_for_protocol(String) -> String
 
-pub fn decode_export_response(Bytes) -> @sdk.ExportResult
+pub fn decode_export_response(Bytes, max_size? : Int32) -> @sdk.ExportResult
 
-pub fn decode_export_response_json(Bytes) -> @sdk.ExportResult
+pub fn decode_export_response_json(Bytes, max_size? : Int32) -> @sdk.ExportResult
 
 pub fn encode_trace_request(Array[@sdk.SpanData]) -> Bytes
 
@@ -25,6 +29,10 @@ pub fn is_supported_protocol(String) -> Bool
 pub fn is_valid_http_header_name(StringView) -> Bool
 
 pub fn is_valid_http_header_value(String) -> Bool
+
+pub fn normalize_size_limit(Int32?, Int32) -> Int32
+
+pub fn request_size_limit_failure(Int32) -> @sdk.ExportResult
 
 // Errors
 
@@ -51,6 +59,8 @@ pub struct OtlpHttpExporter {
   url : String
   headers : Map[String, String]
   retry_wait : (Int32) -> Unit
+  max_request_size : Int32
+  max_response_size : Int32
   mut shutdown_called : Bool
 }
 pub fn OtlpHttpExporter::config(Self) -> OtlpHttpConfig
@@ -58,7 +68,7 @@ pub fn OtlpHttpExporter::export_span(Self, @sdk.SpanData) -> @sdk.ExportResult
 pub fn OtlpHttpExporter::export_spans(Self, Array[@sdk.SpanData]) -> @sdk.ExportResult
 pub fn OtlpHttpExporter::export_spans_http(Self, Array[@sdk.SpanData]) -> @sdk.ExportResult
 pub fn OtlpHttpExporter::is_shutdown(Self) -> Bool
-pub fn OtlpHttpExporter::new(OtlpHttpConfig, (String, Map[String, String], Bytes) -> TransportResponse, retry_wait? : (Int32) -> Unit) -> Self
+pub fn OtlpHttpExporter::new(OtlpHttpConfig, (String, Map[String, String], Bytes) -> TransportResponse, retry_wait? : (Int32) -> Unit, max_request_size? : Int32, max_response_size? : Int32) -> Self
 pub fn OtlpHttpExporter::shutdown(Self) -> Unit
 pub impl @sdk.SpanExporter for OtlpHttpExporter
 

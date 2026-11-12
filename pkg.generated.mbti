@@ -102,9 +102,9 @@ pub fn current_context() -> @context.Context
 
 pub fn current_span_context() -> @api.SpanContext?
 
-pub fn decode_export_response(Bytes) -> @sdk.ExportResult
+pub fn decode_export_response(Bytes, max_size? : Int32) -> @sdk.ExportResult
 
-pub fn decode_export_response_json(Bytes) -> @sdk.ExportResult
+pub fn decode_export_response_json(Bytes, max_size? : Int32) -> @sdk.ExportResult
 
 pub fn detach(@context.Context) -> Unit
 

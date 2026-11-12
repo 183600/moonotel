@@ -831,11 +831,18 @@ fn json_parse_partial_success(
 // otherwise malformed bodies are reported as failures.
 
 ///|
-pub fn decode_export_response_json(body : Bytes) -> @sdk.ExportResult {
+pub fn decode_export_response_json(
+  body : Bytes,
+  max_size? : Int32,
+) -> @sdk.ExportResult {
   // The OTLP specification requires a response body size limit (4 MiB by
   // recommendation) to be enforced before parsing.
-  if body.length() > OTLP_MAX_RESPONSE_BODY_BYTES {
-    return oversized_response()
+  let max_size = normalize_size_limit(
+    max_size,
+    OTLP_MAX_RESPONSE_BODY_BYTES,
+  )
+  if body.length() > max_size {
+    return oversized_response(max_size)
   }
   // OTLP/JSON response bodies must be valid UTF-8. Lossy decoding would turn
   // malformed bytes inside strings into U+FFFD and could accept an otherwise

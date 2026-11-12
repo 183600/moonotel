@@ -736,6 +736,7 @@ async fn post_trace_request_with_headers(
   config : @otlp.OtlpHttpConfig,
   body : Bytes,
   headers : Map[@http.CaseInsensitiveString, String],
+  max_response_size : Int32,
 ) -> @sdk.ExportResult {
   let json = is_json_protocol(config.protocol)
   let url = config.request_url()
@@ -819,9 +820,15 @@ async fn post_trace_request_with_headers(
       Some((response, response_body)) => {
         if response.code == 200 {
           if json {
-            return @otlp.decode_export_response_json(response_body.binary())
+            return @otlp.decode_export_response_json(
+              response_body.binary(),
+              max_size=max_response_size,
+            )
           } else {
-            return @otlp.decode_export_response(response_body.binary())
+            return @otlp.decode_export_response(
+              response_body.binary(),
+              max_size=max_response_size,
+            )
           }
         }
         last_failure = "OTLP export failed with HTTP status " +
@@ -850,6 +857,8 @@ async fn post_trace_request_with_headers(
 pub async fn post_trace_request(
   config : @otlp.OtlpHttpConfig,
   body : Bytes,
+  max_request_size? : Int32,
+  max_response_size? : Int32,
 ) -> @sdk.ExportResult {
   if !@otlp.is_supported_protocol(effective_protocol(config.protocol)) {
     return @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol)
@@ -860,6 +869,17 @@ pub async fn post_trace_request(
     return @sdk.ExportFailure(
       "unsupported OTLP compression: " + config.compression,
     )
+  }
+  let max_request_size = @otlp.normalize_size_limit(
+    max_request_size,
+    @otlp.OTLP_DEFAULT_MAX_REQUEST_SIZE,
+  )
+  let max_response_size = @otlp.normalize_size_limit(
+    max_response_size,
+    @otlp.OTLP_DEFAULT_MAX_RESPONSE_SIZE,
+  )
+  if body.length() > max_request_size {
+    return @otlp.request_size_limit_failure(max_request_size)
   }
   let body = if gzip {
     match gzip_body(body) {
@@ -873,7 +893,12 @@ pub async fn post_trace_request(
     body
   }
   let headers = request_headers(config, gzip)
-  post_trace_request_with_headers(config, body, headers)
+  post_trace_request_with_headers(
+    config,
+    body,
+    headers,
+    max_response_size,
+  )
 }
 
 // gzip-compress `body`, returning `None` when compression fails.
@@ -892,6 +917,8 @@ async fn gzip_body(body : Bytes) -> Bytes? {
 pub async fn export_spans(
   config : @otlp.OtlpHttpConfig,
   spans : Array[@sdk.SpanData],
+  max_request_size? : Int32,
+  max_response_size? : Int32,
 ) -> @sdk.ExportResult {
   if spans.length() == 0 {
     return @sdk.ExportSuccess
@@ -918,7 +945,18 @@ pub async fn export_spans(
   if body.length() == 0 {
     return @sdk.ExportSuccess
   }
-  post_trace_request(config, body)
+  post_trace_request(
+    config,
+    body,
+    max_request_size=@otlp.normalize_size_limit(
+      max_request_size,
+      @otlp.OTLP_DEFAULT_MAX_REQUEST_SIZE,
+    ),
+    max_response_size=@otlp.normalize_size_limit(
+      max_response_size,
+      @otlp.OTLP_DEFAULT_MAX_RESPONSE_SIZE,
+    ),
+  )
 }
 
 // An async span exporter over OTLP/HTTP. Use it with an async flush loop
@@ -929,6 +967,8 @@ pub struct OtlpHttpAsyncExporter {
   config : @otlp.OtlpHttpConfig
   // Request headers derived from `config`.
   headers : Map[@http.CaseInsensitiveString, String]
+  max_request_size : Int32
+  max_response_size : Int32
 }
 
 // Create an exporter that sends spans to `config`.
@@ -936,6 +976,8 @@ pub struct OtlpHttpAsyncExporter {
 ///|
 pub fn OtlpHttpAsyncExporter::new(
   config : @otlp.OtlpHttpConfig,
+  max_request_size? : Int32,
+  max_response_size? : Int32,
 ) -> OtlpHttpAsyncExporter {
   // Snapshot the header map so that mutating the caller's config after
   // construction cannot change the exporter's configuration or its cached
@@ -944,6 +986,14 @@ pub fn OtlpHttpAsyncExporter::new(
   {
     config,
     headers: request_headers(config, is_gzip_compression(config.compression)),
+    max_request_size: @otlp.normalize_size_limit(
+      max_request_size,
+      @otlp.OTLP_DEFAULT_MAX_REQUEST_SIZE,
+    ),
+    max_response_size: @otlp.normalize_size_limit(
+      max_response_size,
+      @otlp.OTLP_DEFAULT_MAX_RESPONSE_SIZE,
+    ),
   }
 }
 
@@ -988,6 +1038,9 @@ pub async fn OtlpHttpAsyncExporter::export_batch(
   if body.length() == 0 {
     return @sdk.ExportSuccess
   }
+  if body.length() > self.max_request_size {
+    return @otlp.request_size_limit_failure(self.max_request_size)
+  }
   let body = if gzip {
     match gzip_body(body) {
       Some(payload) => payload
@@ -999,5 +1052,10 @@ pub async fn OtlpHttpAsyncExporter::export_batch(
   } else {
     body
   }
-  post_trace_request_with_headers(config, body, self.headers)
+  post_trace_request_with_headers(
+    config,
+    body,
+    self.headers,
+    self.max_response_size,
+  )
 }

@@ -58,6 +58,58 @@ async test "export_spans of an empty batch succeeds without a request" {
 }
 
 ///|
+async test "export_spans enforces a custom request size limit" {
+  let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:1")
+  let result = @otlp_async.export_spans(
+    config,
+    [test_span_data()],
+    max_request_size=1,
+  )
+  match result {
+    @sdk.ExportFailure(message) => assert_true(message.contains("1-byte"))
+    @sdk.ExportSuccess => abort("expected a request size-limit failure")
+  }
+}
+
+///|
+async test "async exporter object enforces a custom request size limit" {
+  let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:1")
+  let exporter = @otlp_async.OtlpHttpAsyncExporter::new(
+    config,
+    max_request_size=1,
+  )
+  let result = exporter.export_batch([test_span_data()])
+  match result {
+    @sdk.ExportFailure(message) => assert_true(message.contains("1-byte"))
+    @sdk.ExportSuccess => abort("expected a request size-limit failure")
+  }
+}
+
+///|
+async test "export_spans applies a custom response size limit" {
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      server.run_forever() <| ((_request, _body, conn) => {
+        conn.send_response(200, "OK")
+        conn.write(b"\x0A\x00")
+      })
+    }
+    let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:\{port}")
+    let result = @otlp_async.export_spans(
+      config,
+      [test_span_data()],
+      max_response_size=1,
+    )
+    match result {
+      @sdk.ExportFailure(message) => assert_true(message.contains("1-byte"))
+      @sdk.ExportSuccess => abort("expected a response size-limit failure")
+    }
+  }
+}
+
+///|
 async test "post_trace_request retries retryable statuses" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))

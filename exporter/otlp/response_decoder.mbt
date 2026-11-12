@@ -7,11 +7,16 @@
 // over the limit is treated as a non-retryable failure.
 
 ///|
-const OTLP_MAX_RESPONSE_BODY_BYTES : Int32 = 4194304
+const OTLP_MAX_RESPONSE_BODY_BYTES : Int32 = OTLP_DEFAULT_MAX_RESPONSE_SIZE
 
 ///|
-fn oversized_response() -> @sdk.ExportResult {
-  @sdk.ExportFailure("OTLP response body exceeds the 4 MiB limit")
+fn oversized_response(limit : Int32) -> @sdk.ExportResult {
+  let label = if limit == OTLP_MAX_RESPONSE_BODY_BYTES {
+    "4 MiB"
+  } else {
+    limit.to_string() + "-byte"
+  }
+  @sdk.ExportFailure("OTLP response body exceeds the " + label + " limit")
 }
 
 ///|
@@ -70,9 +75,16 @@ fn read_response_varint(data : BytesView, offset : Int32) -> (UInt64, Int32)? {
 // proto; truncated or otherwise malformed bodies are reported as failures.
 
 ///|
-pub fn decode_export_response(body : Bytes) -> @sdk.ExportResult {
-  if body.length() > OTLP_MAX_RESPONSE_BODY_BYTES {
-    return oversized_response()
+pub fn decode_export_response(
+  body : Bytes,
+  max_size? : Int32,
+) -> @sdk.ExportResult {
+  let max_size = normalize_size_limit(
+    max_size,
+    OTLP_MAX_RESPONSE_BODY_BYTES,
+  )
+  if body.length() > max_size {
+    return oversized_response(max_size)
   }
   let data = body.exact_view()
   let length = data.length()
