@@ -215,6 +215,29 @@ fn BatchSpanProcessor::flush_batch_at(
   }
 }
 
+// Whether the scheduled flush interval has elapsed at `now`.
+
+///|
+fn BatchSpanProcessor::flush_interval_elapsed(
+  self : BatchSpanProcessor,
+  now : UInt64,
+) -> Bool {
+  now >= self.last_flush_time_millis &&
+  now - self.last_flush_time_millis >= self.flush_interval_millis.to_uint64()
+}
+
+// Export the queue in batches until it is empty.
+
+///|
+fn BatchSpanProcessor::drain_queue(
+  self : BatchSpanProcessor,
+  now : UInt64,
+) -> Unit {
+  while self.count > 0 {
+    self.flush_batch_at(now)
+  }
+}
+
 // Export the queue when the scheduled flush interval has elapsed. This is a
 // no-op when the queue is empty or the interval has not elapsed, so it is safe
 // to call from a periodic loop.
@@ -226,9 +249,7 @@ pub fn BatchSpanProcessor::tick(self : BatchSpanProcessor) -> Unit {
   }
   if self.flush_interval_millis > 0 {
     let now = @env.now()
-    if now >= self.last_flush_time_millis &&
-      now - self.last_flush_time_millis >=
-      self.flush_interval_millis.to_uint64() {
+    if self.flush_interval_elapsed(now) {
       self.flush_batch_at(now)
     }
   }
@@ -252,9 +273,7 @@ pub impl SpanProcessor for BatchSpanProcessor with fn on_end(self, data) {
     self.flush_batch_at(@env.now())
   } else if self.flush_interval_millis > 0 {
     let now = @env.now()
-    if now >= self.last_flush_time_millis &&
-      now - self.last_flush_time_millis >=
-      self.flush_interval_millis.to_uint64() {
+    if self.flush_interval_elapsed(now) {
       self.flush_batch_at(now)
     }
   }
@@ -266,10 +285,7 @@ pub impl SpanProcessor for BatchSpanProcessor with fn force_flush(self) {
   // the queue and closed the exporter, so exporting again would either use a
   // closed exporter or re-enter the shutdown drain.
   if !self.shutdown_called && self.count > 0 {
-    let now = @env.now()
-    while self.count > 0 {
-      self.flush_batch_at(now)
-    }
+    self.drain_queue(@env.now())
   }
 }
 
@@ -300,10 +316,7 @@ pub impl SpanProcessor for BatchSpanProcessor with fn drain_before_shutdown(
     self.draining = false
   }
   if self.count > 0 {
-    let now = @env.now()
-    while self.count > 0 {
-      self.flush_batch_at(now)
-    }
+    self.drain_queue(@env.now())
   }
   // A provider shutdown may have arrived while this direct drain owned the
   // queue. It installed a completion callback because it could not close the
@@ -348,10 +361,7 @@ pub impl SpanProcessor for BatchSpanProcessor with fn shutdown(self) {
       self.draining = false
     }
     if self.count > 0 {
-      let now = @env.now()
-      while self.count > 0 {
-        self.flush_batch_at(now)
-      }
+      self.drain_queue(@env.now())
     }
     self.exporter.shutdown()
     // A provider shutdown that arrived during the drain installed a callback

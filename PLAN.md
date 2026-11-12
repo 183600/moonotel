@@ -4,6 +4,20 @@
 > 关键取舍、测试策略与后续里程碑。文中的路径和包名按当前仓库结构书写；若
 > 与源码或 README 不一致，以源码和 README 为准。
 
+## 目录
+
+- [1. 目标与范围](#1-目标与范围)
+- [2. 分层架构](#2-分层架构)
+- [3. 目录结构](#3-目录结构)
+- [4. Context 与传播](#4-context-与传播)
+- [5. SDK 设计](#5-sdk-设计)
+- [6. OTLP/HTTP 导出](#6-otlphttp-导出)
+- [7. HTTP 埋点](#7-http-埋点)
+- [8. 测试与 CI](#8-测试与-ci)
+- [9. 里程碑](#9-里程碑)
+- [10. 风险与取舍](#10-风险与取舍)
+- [11. 验收标准](#11-验收标准)
+
 ## 1. 目标与范围
 
 本项目提供一个可集成、可测试、尽量贴近 OpenTelemetry 规范的 **Tracing
@@ -41,6 +55,21 @@ MVP**，重点覆盖一条完整的链路：业务代码创建 span，SDK 采样
 | Instrumentation | `instrumentation/async_http_client/` | 客户端请求 helper 与请求 span |
 | Instrumentation | `instrumentation/http_header_capture/` | 请求/响应 header 捕获与脱敏 |
 | Facade | 根包 `otel.mbt` | 常用类型 re-export、全局 provider、`setup` |
+
+一条 span 的主链路：
+
+```text
+业务代码 / HTTP 埋点
+        │
+        ▼
+Tracer / Span（SDK：采样、limits、processor）
+        │
+        ▼
+SpanExporter ── OTLP 编码（protobuf / JSON）── Transport（注入函数或 async HTTP）
+        │
+        ▼
+Collector / backend
+```
 
 设计约束：
 
@@ -329,27 +358,18 @@ CI 同时运行默认与 native 目标，确保 async 埋点和 exporter 不只�
 
 ## 9. 里程碑
 
-以下阶段用于估算和拆分工作；每一项都应以测试和示例可运行作为完成标准。
+以下阶段用于拆分工作；每一阶段都以测试、示例和文档同步更新作为完成标准。
 
-1. **核心契约**：`SpanContext`、`Context`、`Tracer`/`Span` API、W3C
-   `traceparent` 注入与提取。
-2. **SDK 基础**：provider、recording span、sampler、Simple/Batch processor、
-   resource、span limits。
-3. **导出链路**：protobuf/JSON 编码、响应解析、同步 transport、异步 OTLP
-   transport、重试与超时。
-4. **自动埋点**：async HTTP server/client、header 捕获、demo server/client。
-5. **工程化收尾**：环境变量覆盖、facade setup、native/wasm 检查、CI、文档与
-   发布准备。
+| 阶段 | 交付物 | 完成标准 |
+| --- | --- | --- |
+| 核心契约 | `SpanContext`、`Context`、`Tracer` / `Span` API、W3C `traceparent` 注入与提取 | 核心包无网络依赖，传播边界测试通过 |
+| SDK 基础 | provider、recording span、sampler、Simple/Batch processor、resource、span limits | 采样、limits、processor 行为有单元测试与不变量测试 |
+| 导出链路 | protobuf/JSON 编码、响应解析、同步 transport、异步 OTLP transport、重试与超时 | 编码可被标准 Collector 接收，重试与超时路径可测试 |
+| 自动埋点 | async HTTP server/client、header 捕获、demo server/client | 示例可编译运行，客户端与服务端可串联同一 trace |
+| 工程化收尾 | 环境变量覆盖、facade setup、native/wasm 检查、CI、文档与发布准备 | 默认与 native 目标均通过 check/test，hygiene 检查通过 |
 
-参考节奏（可按团队规模调整）：
-
-| 周次 | 交付物 |
-| --- | --- |
-| 1-2 | API、Context、W3C 传播与单元测试 |
-| 3-4 | SDK span、sampler、processor |
-| 3-5 | OTLP 编码器、配置与 HTTP 导出 |
-| 6-7 | Batch/async flush、HTTP 自动埋点与示例 |
-| 8 | 文档、CI、发布检查与 v0.1.0 准备 |
+各阶段不要求严格串行：编码器、配置读取和文档可以在核心契约稳定的前提下并行推进；
+但涉及公共 API 或传播语义的改动应先补测试，再更新 README 与本文档。
 
 ## 10. 风险与取舍
 

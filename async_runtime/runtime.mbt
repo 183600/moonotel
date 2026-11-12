@@ -113,6 +113,41 @@ fn normalized_endpoint_override(endpoint : String?) -> String? {
   }
 }
 
+// The processor that feeds the async OTLP exporter. An explicit `batch`
+// configuration always selects the batch processor and its flush loop;
+// otherwise `use_batch` selects between batch (with the flush loop) and simple
+// processing. The async exporter's own queue performs the batching when no
+// processor is used.
+
+///|
+fn[G] async_otlp_span_processor(
+  exporter : OtlpHttpAsyncSpanExporter,
+  group : @async.TaskGroup[G],
+  use_batch? : Bool,
+  batch? : @sdk.BatchConfig,
+) -> &@sdk.SpanProcessor {
+  match batch {
+    Some(config) => {
+      let value = @sdk.BatchSpanProcessor::with_config(exporter, config)
+      spawn_flush_loop(group, value)
+      let processor : &@sdk.SpanProcessor = value
+      processor
+    }
+    None =>
+      if use_batch.unwrap_or(false) {
+        let value = @sdk.BatchSpanProcessor::from_env(exporter)
+        spawn_flush_loop(group, value)
+        let processor : &@sdk.SpanProcessor = value
+        processor
+      } else {
+        let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
+          exporter,
+        )
+        processor
+      }
+  }
+}
+
 // One-call native setup: build a TracerProvider that exports over OTLP/HTTP
 // through a background task in `group`, and install it as the process-wide
 // provider. The exporters are selected by the `exporters` list when it is
@@ -205,29 +240,9 @@ pub fn[G] setup(
       group,
       max_queue_size?,
     )
-    let processor : &@sdk.SpanProcessor = match batch {
-      // An explicit configuration always uses the batch processor.
-      Some(config) => {
-        let value = @sdk.BatchSpanProcessor::with_config(exporter, config)
-        spawn_flush_loop(group, value)
-        let processor : &@sdk.SpanProcessor = value
-        processor
-      }
-      None =>
-        if use_batch.unwrap_or(false) {
-          // Queue/batch/interval defaults come from the OTEL_BSP_* variables.
-          let value = @sdk.BatchSpanProcessor::from_env(exporter)
-          spawn_flush_loop(group, value)
-          let processor : &@sdk.SpanProcessor = value
-          processor
-        } else {
-          let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
-            exporter,
-          )
-          processor
-        }
-    }
-    provider = provider.with_span_processor(processor)
+    provider = provider.with_span_processor(
+      async_otlp_span_processor(exporter, group, use_batch?, batch?),
+    )
   }
   // The setup is scoped to `group`: once it exits, stop accepting spans so a
   // process-wide provider installed here cannot outlive the infrastructure it

@@ -141,27 +141,26 @@ fn OtlpHttpAsyncSpanExporter::enqueue(
   if spans.length() == 0 {
     return @sdk.ExportSuccess
   }
-  let accepted = self.queue.try_put(spans) catch { _ => false }
-  if accepted {
-    self.accepted_batches = self.accepted_batches + 1
-    return @sdk.ExportSuccess
-  }
-  // The queue is full: discard the oldest batch to make room, then retry once.
-  let discarded : Bool = try {
-    match self.queue.try_get() {
-      Some(_) => true
-      None => false
+  let mut accepted = self.queue.try_put(spans) catch { _ => false }
+  if !accepted {
+    // The queue is full: discard the oldest batch to make room, then retry
+    // once.
+    let discarded : Bool = try {
+      match self.queue.try_get() {
+        Some(_) => true
+        None => false
+      }
+    } catch {
+      _ => false
     }
-  } catch {
-    _ => false
-  }
-  let accepted = self.queue.try_put(spans) catch { _ => false }
-  if discarded {
-    self.dropped = self.dropped + 1
-    // The evicted batch will never be exported; mark it finished so a waiting
-    // `flush` does not wait for it forever.
-    self.completed_batches = self.completed_batches + 1
-    self.send_finished.broadcast()
+    accepted = self.queue.try_put(spans) catch { _ => false }
+    if discarded {
+      self.dropped = self.dropped + 1
+      // The evicted batch will never be exported; mark it finished so a
+      // waiting `flush` does not wait for it forever.
+      self.completed_batches = self.completed_batches + 1
+      self.send_finished.broadcast()
+    }
   }
   if accepted {
     self.accepted_batches = self.accepted_batches + 1

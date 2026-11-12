@@ -19,10 +19,21 @@ trace semantics, a compact implementation, and straightforward integration with
 The repository and MoonBit module are both `183600/moonotel`; the entry package
 is the module root and is imported as `@moonotel`.
 
+## Integration paths
+
+| Path | Use it when | Entry point |
+| --- | --- | --- |
+| Direct SDK | You want to own the provider, processors and exporter wiring | `@sdk.TracerProviderSdk` |
+| Facade setup | You want a process-wide provider with environment-based defaults | `@moonotel.setup` |
+| Async runtime | Native/wasm code should export from a background task | `@async_runtime.setup` |
+| HTTP instrumentation | Requests should be traced automatically | `@server.run_server` / `@client.request` |
+
 ## Contents
 
+- [Integration paths](#integration-paths)
 - [Install](#install)
 - [Getting started](#getting-started)
+- [Examples](#examples)
 - [Packages](#packages)
 - [Spans, sampling, and processing](#spans-sampling-and-processing)
 - [Context and baggage](#context-and-baggage)
@@ -116,6 +127,38 @@ can call `@async_runtime.setup(group, ...)` inside a `moonbitlang/async` task
 group. It accepts the same `service_name`, resource, sampler, span-limit,
 endpoint, header, exporter-selection and batch overrides, uses the same
 environment variables, and drains pending spans when the group exits.
+
+```moonbit
+async fn main {
+  @async.with_task_group(group => {
+    let provider = @async_runtime.setup(group, service_name="checkout")
+    let tracer = provider.get_tracer("checkout")
+    // Run traced work while the group is alive.
+    tracer.with_span("charge-card", fn(span) {
+      span.set_attribute("payment.provider", @sdk.StringValue("acme"))
+    })
+  })
+  // The group exit flushed pending spans and shut the provider down.
+}
+```
+
+The async setup uses the exporter's own queue by default. Pass `use_batch=true`
+or an explicit `batch` configuration to put a `BatchSpanProcessor` and its
+flush loop in front of it.
+
+## Examples
+
+The `examples/` directory contains runnable end-to-end demos:
+
+| Example | Shows | Run |
+| --- | --- | --- |
+| `demo_server` | A traced server that prints finished spans | `moon run examples/demo_server --target native` |
+| `demo_client` | A traced client that injects W3C context and baggage | `moon run examples/demo_client --target native` |
+| `demo_otlp` | Server plus client exporting over OTLP/HTTP from a background task | `moon run examples/demo_otlp --target native` |
+
+Start the server before running `demo_client`. `demo_otlp` expects an OTLP/HTTP
+collector on `http://localhost:4318` unless `OTEL_EXPORTER_OTLP_*` says
+otherwise. Each example's `main.mbt` documents its exact prerequisites.
 
 ## Packages
 
@@ -251,6 +294,7 @@ async fn main {
   let addr = @socket.Addr::parse("127.0.0.1:8080")
   @server.run_server(addr, call => {
     // `call.start_span("db.query")` creates children parented to the request.
+    call.set_route("/hello")
     call.respond(200, body="hello")
   }, tracer=provider.get_tracer("greeter"))
 }
@@ -321,18 +365,19 @@ let result = @otlp_async.export_spans(config, finished_spans)
 
 ### Environment variables
 
-- `OTEL_EXPORTER_OTLP_HEADERS` (`key=value,key2=value2`; values are
-  percent-decoded)
-- `OTEL_EXPORTER_OTLP_COMPRESSION` (`none` or `gzip`; any other value is
-  rejected with a clear error). `gzip` is implemented by the async exporter.
-  The synchronous `exporter/otlp` exporter rejects it rather than sending an
-  uncompressed body under a `Content-Encoding: gzip` header.
-- `OTEL_EXPORTER_OTLP_PROTOCOL` (`http/protobuf`, the default, or `http/json`)
-- `OTEL_EXPORTER_OTLP_TIMEOUT` (milliseconds). The async exporter enforces it
-  as one overall budget for the whole export, covering every request attempt
-  and every wait between retries. The synchronous exporter runs whatever
-  `Transport` you inject, so the transport is expected to enforce any deadline.
-- `OTEL_SERVICE_NAME`
+| Variable | Meaning |
+| --- | --- |
+| `OTEL_EXPORTER_OTLP_HEADERS` | `key=value,key2=value2`; values are percent-decoded |
+| `OTEL_EXPORTER_OTLP_COMPRESSION` | `none` or `gzip`; any other value is rejected |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` (default) or `http/json` |
+| `OTEL_EXPORTER_OTLP_TIMEOUT` | Milliseconds; the async exporter treats it as one overall export budget |
+| `OTEL_SERVICE_NAME` | Default `service.name` resource attribute |
+
+`gzip` is implemented by the async exporter. The synchronous `exporter/otlp`
+exporter rejects it rather than sending an uncompressed body under a
+`Content-Encoding: gzip` header. The async timeout covers every request attempt
+and every wait between retries. The synchronous exporter runs whatever
+`Transport` you inject, so the transport is expected to enforce any deadline.
 
 The signal-specific `OTEL_EXPORTER_OTLP_TRACES_HEADERS`,
 `OTEL_EXPORTER_OTLP_TRACES_COMPRESSION`, `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`
@@ -473,34 +518,30 @@ the W3C limits of 64 members and 8192 bytes; excess members are dropped whole.
 Besides the OTLP variables above, the SDK reads the standard OpenTelemetry
 environment configuration:
 
-- `OTEL_SDK_DISABLED=true` makes tracers no-op (nothing is recorded or
-  exported).
-- `OTEL_TRACES_EXPORTER` is a comma-separated list of `otlp`, `console` and
-  `none`. It defaults to `otlp`, and `none` disables every exporter. The facade
-  `setup` and the async `setup` use this list unless an explicit `exporters`
-  argument is given.
-- `OTEL_TRACES_SAMPLER` selects `always_on`, `always_off`, `traceidratio`,
-  `parentbased_always_on` (the default), `parentbased_always_off` or
-  `parentbased_traceidratio`. `OTEL_TRACES_SAMPLER_ARG` is the ratio for the
-  ratio-based variants.
-- `OTEL_BSP_MAX_QUEUE_SIZE`, `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` and
-  `OTEL_BSP_SCHEDULE_DELAY` (milliseconds) configure `BatchSpanProcessor`.
-- `OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT`, `OTEL_SPAN_EVENT_COUNT_LIMIT`,
-  `OTEL_SPAN_LINK_COUNT_LIMIT`, `OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT`,
-  `OTEL_LINK_ATTRIBUTE_COUNT_LIMIT` and
-  `OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT` configure span collection limits,
-  with the generic `OTEL_ATTRIBUTE_*` variables as fallbacks.
-- `OTEL_RESOURCE_ATTRIBUTES` (`key=value,key2=value2`; keys and values are
-  percent-decoded) and `OTEL_SERVICE_NAME` configure the resource.
-- `OTEL_PROPAGATORS` selects the global propagators (default
-  `tracecontext,baggage`; `none` disables propagation).
-- `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST`,
-  `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_RESPONSE`,
-  `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_REQUEST` and
-  `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_RESPONSE` opt into header
-  capture as span attributes.
-- `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SANITIZE_FIELDS` selects captured
-  headers whose value is replaced with `[REDACTED]`.
+| Variable | Effect |
+| --- | --- |
+| `OTEL_SDK_DISABLED=true` | Makes tracers no-op; nothing is recorded or exported |
+| `OTEL_TRACES_EXPORTER` | Comma-separated `otlp`, `console`, `none`; defaults to `otlp` |
+| `OTEL_TRACES_SAMPLER` | `always_on`, `always_off`, `traceidratio`, `parentbased_always_on` (default), `parentbased_always_off`, `parentbased_traceidratio` |
+| `OTEL_TRACES_SAMPLER_ARG` | Ratio for the ratio-based samplers |
+| `OTEL_BSP_MAX_QUEUE_SIZE` | `BatchSpanProcessor` queue size |
+| `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` | `BatchSpanProcessor` export batch size |
+| `OTEL_BSP_SCHEDULE_DELAY` | `BatchSpanProcessor` flush interval in milliseconds |
+| `OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT` | Span attribute limit |
+| `OTEL_SPAN_EVENT_COUNT_LIMIT` | Span event limit |
+| `OTEL_SPAN_LINK_COUNT_LIMIT` | Span link limit |
+| `OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT` | Event attribute limit |
+| `OTEL_LINK_ATTRIBUTE_COUNT_LIMIT` | Link attribute limit |
+| `OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT` | String attribute value length limit |
+| `OTEL_RESOURCE_ATTRIBUTES` | `key=value,key2=value2`; keys and values are percent-decoded |
+| `OTEL_PROPAGATORS` | Global propagators; default `tracecontext,baggage`, `none` disables propagation |
+| `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_*` | Opt into request/response header capture |
+| `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SANITIZE_FIELDS` | Captured headers replaced with `[REDACTED]` |
+
+The span collection limits fall back to the generic `OTEL_ATTRIBUTE_*`
+variables. The facade `setup` and the async `setup` use `OTEL_TRACES_EXPORTER`
+unless an explicit `exporters` argument is given. `none` anywhere in the
+exporter list disables every exporter.
 
 Header-capture values are comma-separated lists of header names matched
 case-insensitively; `*` captures every header. The same name matching applies to

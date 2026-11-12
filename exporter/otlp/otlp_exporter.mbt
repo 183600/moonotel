@@ -948,6 +948,20 @@ fn map_capacity_for_entries(entries : Int32) -> Int32 {
   }
 }
 
+// Whether the exporter supplies its own value for a header, so a configured
+// spelling must not be forwarded. Body framing belongs to the transport;
+// `content-type`, `accept` and `content-encoding` describe the request this
+// exporter actually sends.
+
+///|
+fn is_exporter_managed_header(name : String) -> Bool {
+  name == "content-type" ||
+  name == "accept" ||
+  name == "content-encoding" ||
+  name == "content-length" ||
+  name == "transfer-encoding"
+}
+
 ///|
 fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
   let headers = Map(
@@ -964,19 +978,12 @@ fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
     if !is_valid_http_header_name(key) || !is_valid_http_header_value(value) {
       continue
     }
-    // HTTP header names are case-insensitive, so drop any user-configured
-    // `Content-Type`, `Accept` or `Content-Encoding` spelling before adding
-    // the protocol's own values, and collapse differently-cased duplicates of
-    // other headers. This exporter never compresses request bodies, so a
-    // configured `Content-Encoding` would describe the body incorrectly. The
-    // transport owns body framing (`Content-Length` / `Transfer-Encoding`), so
-    // a configured value cannot contradict the bytes actually sent.
-    let lower = key.to_lower()
-    if lower != "content-type" &&
-      lower != "accept" &&
-      lower != "content-encoding" &&
-      lower != "content-length" &&
-      lower != "transfer-encoding" {
+    // HTTP header names are case-insensitive, so drop any configured spelling
+    // of a header the exporter or transport owns before adding the protocol's
+    // own values, and collapse differently-cased duplicates of other headers.
+    // This exporter never compresses request bodies, so a configured
+    // `Content-Encoding` would describe the body incorrectly.
+    if !is_exporter_managed_header(key.to_lower()) {
       set_header(headers, key, value)
     }
   }

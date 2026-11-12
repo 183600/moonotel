@@ -171,6 +171,113 @@ pub using @otlp {
   encode_trace_request_json,
 }
 
+// Apply the optional provider overrides in the order documented by `setup`.
+
+///|
+fn provider_with_options(
+  provider : @sdk.TracerProviderSdk,
+  resource? : @sdk.Resource,
+  resource_attributes? : Map[String, @sdk.AttributeValue],
+  sampler? : @sdk.Sampler,
+  span_limits? : @sdk.SpanLimits,
+) -> @sdk.TracerProviderSdk {
+  let mut provider = provider
+  match resource {
+    Some(value) => provider = provider.with_resource(value)
+    None => ()
+  }
+  match resource_attributes {
+    Some(values) => provider = provider.with_resource_attributes(values)
+    None => ()
+  }
+  match sampler {
+    Some(value) => provider = provider.with_sampler(value)
+    None => ()
+  }
+  match span_limits {
+    Some(value) => provider = provider.with_span_limits(value)
+    None => ()
+  }
+  provider
+}
+
+///|
+fn console_span_processor() -> &@sdk.SpanProcessor {
+  let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
+    @sdk.ConsoleSpanExporter::new(),
+  )
+  processor
+}
+
+// Build the OTLP configuration from the environment, applying the
+// programmatic endpoint and header overrides. A blank endpoint is unset, so it
+// neither replaces the environment endpoint nor suppresses an environment
+// traces endpoint. Programmatic headers replace same-named environment
+// headers case-insensitively but keep the other environment headers.
+
+///|
+fn otlp_config_with_overrides(
+  endpoint? : String,
+  headers? : Map[String, String],
+) -> @otlp.OtlpHttpConfig {
+  let base = @otlp.OtlpHttpConfig::from_env()
+  let endpoint_override = match endpoint {
+    Some(value) => {
+      let value = value.trim().to_owned()
+      if value == "" {
+        None
+      } else {
+        Some(value)
+      }
+    }
+    None => None
+  }
+  let config : @otlp.OtlpHttpConfig = {
+    ..base,
+    endpoint: endpoint_override.unwrap_or(base.endpoint),
+    traces_endpoint: match endpoint_override {
+      Some(_) => None
+      None => base.traces_endpoint
+    },
+  }
+  match headers {
+    Some(values) => config.with_headers(values)
+    None => config
+  }
+}
+
+// The processor that feeds the OTLP exporter. An explicit `batch`
+// configuration always selects the batch processor; otherwise `use_batch`
+// selects between batch (the default) and simple processing.
+
+///|
+fn otlp_span_processor(
+  exporter : @otlp.OtlpHttpExporter,
+  use_batch? : Bool,
+  batch? : @sdk.BatchConfig,
+) -> &@sdk.SpanProcessor {
+  match batch {
+    Some(config) => {
+      let value : &@sdk.SpanProcessor = @sdk.BatchSpanProcessor::with_config(
+        exporter, config,
+      )
+      value
+    }
+    None =>
+      if use_batch.unwrap_or(true) {
+        let value : &@sdk.SpanProcessor = @sdk.BatchSpanProcessor::from_env(
+          exporter,
+        )
+        value
+      } else {
+        let value : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
+          exporter,
+        )
+        value
+      }
+  }
+}
+
 // One-call setup: build a TracerProvider, optionally wire the exporters
 // selected by `OTEL_TRACES_EXPORTER`, and install it as the process-wide
 // provider.
@@ -212,101 +319,33 @@ pub fn setup(
   use_batch? : Bool,
   batch? : @sdk.BatchConfig,
 ) -> @sdk.TracerProviderSdk {
-  let mut provider = @sdk.TracerProviderSdk::new(service_name?)
-  match resource {
-    Some(value) => provider = provider.with_resource(value)
-    None => ()
-  }
-  match resource_attributes {
-    Some(values) => provider = provider.with_resource_attributes(values)
-    None => ()
-  }
-  match sampler {
-    Some(value) => provider = provider.with_sampler(value)
-    None => ()
-  }
-  match span_limits {
-    Some(value) => provider = provider.with_span_limits(value)
-    None => ()
-  }
+  let mut provider = provider_with_options(
+    @sdk.TracerProviderSdk::new(service_name?),
+    resource?,
+    resource_attributes?,
+    sampler?,
+    span_limits?,
+  )
   let console_selected = @sdk.exporter_selected(exporters, "console")
   let otlp_selected = @sdk.exporter_selected(exporters, "otlp")
   if console_selected {
-    let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
-      @sdk.ConsoleSpanExporter::new(),
-    )
-    provider = provider.with_span_processor(processor)
+    provider = provider.with_span_processor(console_span_processor())
   }
   match transport {
     Some(send) =>
-      if !otlp_selected {
-        // The OTLP exporter is not selected (for example `none` or
-        // `console`), matching the native async `setup`.
-        ()
-      } else {
-        let base = @otlp.OtlpHttpConfig::from_env()
-        // Mirror `OtlpHttpConfig::new`: a blank programmatic endpoint is
-        // treated as unset, so it neither replaces the environment endpoint
-        // nor suppresses an environment traces endpoint.
-        let endpoint_override = match endpoint {
-          Some(value) => {
-            let value = value.trim().to_owned()
-            if value == "" {
-              None
-            } else {
-              Some(value)
-            }
-          }
-          None => None
-        }
-        let config : @otlp.OtlpHttpConfig = {
-          ..base,
-          endpoint: endpoint_override.unwrap_or(base.endpoint),
-          traces_endpoint: match endpoint_override {
-            Some(_) => None
-            None => base.traces_endpoint
-          },
-        }
-        // Programmatic headers override same-named environment headers but do
-        // not discard the other headers configured through the environment.
-        let config = match headers {
-          Some(values) => config.with_headers(values)
-          None => config
-        }
+      if otlp_selected {
+        let config = otlp_config_with_overrides(endpoint?, headers?)
         let exporter = @otlp.OtlpHttpExporter::new(config, send)
-        let processor : &@sdk.SpanProcessor = match batch {
-          // An explicit configuration always uses the batch processor.
-          Some(config) => {
-            let value : &@sdk.SpanProcessor = @sdk.BatchSpanProcessor::with_config(
-              exporter, config,
-            )
-            value
-          }
-          None =>
-            if use_batch.unwrap_or(true) {
-              // Queue/batch/interval defaults come from the OTEL_BSP_* variables.
-              let value : &@sdk.SpanProcessor = @sdk.BatchSpanProcessor::from_env(
-                exporter,
-              )
-              value
-            } else {
-              let value : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
-                exporter,
-              )
-              value
-            }
-        }
-        provider = provider.with_span_processor(processor)
+        provider = provider.with_span_processor(
+          otlp_span_processor(exporter, use_batch?, batch?),
+        )
       }
     None =>
       if otlp_selected && !console_selected {
         // The OTLP exporter is selected but there is no transport to send the
         // payload with, so fall back to the console exporter rather than
         // dropping every span silently.
-        let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
-          @sdk.ConsoleSpanExporter::new(),
-        )
-        provider = provider.with_span_processor(processor)
+        provider = provider.with_span_processor(console_span_processor())
       }
   }
   @sdk.set_global_tracer_provider(provider)

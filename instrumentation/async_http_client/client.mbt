@@ -984,6 +984,18 @@ fn initial_client_attributes(
   attributes
 }
 
+// Record a request failure on `span` with the same triple the SDK's scoped
+// spans use: an `error.type` attribute, an `Error` status and an `exception`
+// event.
+
+///|
+fn record_request_error(span : @sdk.SpanSdk, error : Error) -> Unit {
+  let type_name = error.to_string()
+  span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(type_name))
+  span.set_status(@api.StatusCode::Error, description=type_name)
+  span.record_exception(error)
+}
+
 // Perform a traced HTTP request. The response headers, the fully read
 // response body and the client span are returned; the span is ended before
 // this function returns.
@@ -1066,10 +1078,7 @@ pub async fn request(
       let (response, client) = match outcome {
         Ok(result) => result
         Err(error) => {
-          let type_name = error.to_string()
-          span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(type_name))
-          span.set_status(@api.StatusCode::Error, description=type_name)
-          span.record_exception(error)
+          record_request_error(span, error)
           raise error
         }
       }
@@ -1093,10 +1102,7 @@ pub async fn request(
       let response_body = match body_outcome {
         Ok(body) => body
         Err(error) => {
-          let type_name = error.to_string()
-          span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(type_name))
-          span.set_status(@api.StatusCode::Error, description=type_name)
-          span.record_exception(error)
+          record_request_error(span, error)
           raise error
         }
       }
