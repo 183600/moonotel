@@ -378,9 +378,11 @@ fn split_url_host_port(
 
 // Split an absolute URL into (scheme, host, port). The scheme is "" when the
 // URL has no valid scheme; the port falls back to the scheme default when it
-// is not explicit; an explicit but unparsable port yields -1. A malformed
-// authority yields an empty host and -1 so callers do not record bogus
-// `server.*` attributes.
+// is not explicit and the scheme has a known default (http/https, or a
+// schemeless URL resolved as HTTP); an explicit but unparsable port, an
+// unknown scheme without a port, or an unknown scheme with an empty port
+// yields -1. A malformed authority yields an empty host and -1 so callers do
+// not record bogus `server.*` attributes.
 
 ///|
 fn split_url_parts(url : String) -> (String, String, Int32) {
@@ -403,7 +405,15 @@ fn split_url_parts(url : String) -> (String, String, Int32) {
         url
       }
   }
-  let default_port = if scheme == "https" { 443 } else { 80 }
+  // Only HTTP has a known default port here. A schemeless reference is
+  // resolved as HTTP, but another scheme (for example `ftp`) has no port we
+  // can infer, so report -1 instead of fabricating port 80. An explicit port
+  // on an unknown scheme is still parsed and recorded.
+  let default_port = match scheme {
+    "https" => 443
+    "http" | "" => 80
+    _ => -1
+  }
   let authority_end = find_authority_end(after_scheme)
   let authority = after_scheme[:authority_end]
   if has_invalid_authority_char(authority) {
@@ -429,8 +439,9 @@ pub fn split_scheme(url : String) -> String {
 }
 
 // Best-effort split of an absolute URL into (host, port). The port falls back
-// to the scheme default when it is not explicit; an explicit but unparsable
-// port yields -1 and the URL is still traced.
+// to the scheme default for `http` (80), `https` (443) and schemeless
+// references (80); an unknown scheme without an explicit port and an explicit
+// but unparsable port yield -1, and the URL is still traced.
 
 ///|
 pub fn split_url(url : String) -> (String, Int32) {
