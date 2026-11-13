@@ -1720,8 +1720,12 @@ pub async fn run_server(
 }
 
 // Like `run_server`, but on an already constructed server (for example one
-// bound to port 0 whose actual port was read from `server.addr`). The caller
-// keeps ownership of `server`.
+// bound to port 0 whose actual port was read from `server.addr`). The server
+// is closed when `run_forever` returns. `@http.Server` does not expose the TCP
+// peer address, so this entry point omits `client.address` / `client.port`
+// and `network.peer.*` unless a forwarding header supplies the client; use
+// `run_server` or `run_server_with_client_address_on` to record the direct
+// peer.
 
 ///|
 pub async fn run_server_on(
