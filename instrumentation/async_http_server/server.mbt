@@ -1625,10 +1625,30 @@ pub async fn ServerCall::respond(
     extra_headers.set(@http.CaseInsensitiveString("connection"), "close")
   }
   let body_allowed = response_body_allowed(self.request.meth, status_code)
-  let body_written = match body {
-    Some(text) => body_allowed && text.length() > 0
-    None => false
+  let response_content_length = match body {
+    Some(text) =>
+      utf8_byte_length(sanitize_utf16_surrogates(text)).to_int64()
+    None => 0L
   }
+  if body_allowed {
+    match extra_headers.get(@http.CaseInsensitiveString("content-length")) {
+      Some(value) => {
+        let declared_length = try
+          @string.parse_int64(value.trim(), base=10)
+        catch {
+          _ => -1L
+        }
+        if declared_length >= 0L && declared_length != response_content_length {
+          extra_headers.set(
+            @http.CaseInsensitiveString("content-length"),
+            response_content_length.to_string(),
+          )
+        }
+      }
+      None => ()
+    }
+  }
+  let body_written = body_allowed && response_content_length > 0L
   if !body_allowed && !response_body_suppressed(self.request.meth, status_code) {
     // The transport does not suppress the body of a 205 response, while this
     // instrumentation does. Force a zero length so the transport does not
@@ -1680,13 +1700,12 @@ pub async fn ServerCall::respond(
         // substitute U+FFFD instead of aborting the connection task.
         let response_body = sanitize_utf16_surrogates(text)
         self.connection.write(response_body)
-        let response_size = utf8_byte_length(response_body)
-        if response_size > 0 {
+        if response_content_length > 0L {
           match self.span {
             Some(span) =>
               span.set_attribute(
                 @sdk.HTTP_RESPONSE_BODY_SIZE,
-                @sdk.IntValue(response_size.to_int64()),
+                @sdk.IntValue(response_content_length),
               )
             None => ()
           }
