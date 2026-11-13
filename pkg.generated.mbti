@@ -44,6 +44,10 @@ pub const HTTP_RESPONSE_STATUS_CODE : String = "http.response.status_code"
 
 pub const HTTP_ROUTE : String = "http.route"
 
+pub const NETWORK_PEER_ADDRESS : String = "network.peer.address"
+
+pub const NETWORK_PEER_PORT : String = "network.peer.port"
+
 pub const NETWORK_PROTOCOL_NAME : String = "network.protocol.name"
 
 pub const NETWORK_PROTOCOL_VERSION : String = "network.protocol.version"

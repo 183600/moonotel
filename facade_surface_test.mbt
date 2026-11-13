@@ -22,6 +22,8 @@ test "facade_exposes_the_semantic_convention_keys" {
   assert_eq(@moonotel.USER_AGENT_ORIGINAL, "user_agent.original")
   assert_eq(@moonotel.NETWORK_PROTOCOL_NAME, "network.protocol.name")
   assert_eq(@moonotel.NETWORK_PROTOCOL_VERSION, "network.protocol.version")
+  assert_eq(@moonotel.NETWORK_PEER_ADDRESS, "network.peer.address")
+  assert_eq(@moonotel.NETWORK_PEER_PORT, "network.peer.port")
   assert_eq(@moonotel.ERROR_TYPE, "error.type")
   assert_eq(@moonotel.SERVICE_NAME, "service.name")
   assert_eq(@moonotel.SERVICE_VERSION, "service.version")
