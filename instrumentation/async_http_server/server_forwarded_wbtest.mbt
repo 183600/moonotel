@@ -143,6 +143,96 @@ test "effective_forwarded_host_prefers_forwarded_and_skips_invalid_values" {
 }
 
 ///|
+test "parse_forwarded_node_accepts_ip_literals_and_ports" {
+  assert_eq(
+    parse_forwarded_node("192.0.2.43"),
+    Some(("192.0.2.43", None)),
+  )
+  assert_eq(
+    parse_forwarded_node("192.0.2.43:1234"),
+    Some(("192.0.2.43", Some(1234))),
+  )
+  assert_eq(
+    parse_forwarded_node("0.0.0.0:0"),
+    Some(("0.0.0.0", Some(0))),
+  )
+  assert_eq(
+    parse_forwarded_node("[2001:db8::1]"),
+    Some(("2001:db8::1", None)),
+  )
+  assert_eq(
+    parse_forwarded_node("[2001:db8::1]:4711"),
+    Some(("2001:db8::1", Some(4711))),
+  )
+  assert_eq(
+    parse_forwarded_node("2001:db8::1"),
+    Some(("2001:db8::1", None)),
+  )
+}
+
+///|
+test "parse_forwarded_node_rejects_unknown_and_malformed_values" {
+  for value in [
+    "", "unknown", "_gazonk", "192.0.2.43:", "192.0.2.43:not-a-port",
+    "[2001:db8::1", "[2001:db8::1]junk", "[2001:db8::1]:",
+    "192.0.2.43:80:90",
+  ] {
+    assert_eq(parse_forwarded_node(value), None)
+  }
+}
+
+///|
+test "effective_forwarded_client_prefers_forwarded_for" {
+  assert_eq(
+    effective_forwarded_client(
+      ows_header_map([("Forwarded", "for=192.0.2.1;host=x")]),
+    ),
+    Some(("192.0.2.1", None)),
+  )
+  assert_eq(
+    effective_forwarded_client(
+      ows_header_map([("X-Forwarded-For", "192.0.2.2, 10.0.0.1")]),
+    ),
+    Some(("192.0.2.2", None)),
+  )
+  assert_eq(
+    effective_forwarded_client(
+      ows_header_map([
+        ("Forwarded", "for=\"[2001:db8::1]:4711\""),
+        ("X-Forwarded-For", "10.0.0.1"),
+      ]),
+    ),
+    Some(("2001:db8::1", Some(4711))),
+  )
+}
+
+///|
+test "effective_forwarded_client_does_not_fall_back_from_an_unusable_forwarded_for" {
+  assert_eq(
+    effective_forwarded_client(
+      ows_header_map([
+        ("Forwarded", "for=unknown"),
+        ("X-Forwarded-For", "10.0.0.1"),
+      ]),
+    ),
+    None,
+  )
+}
+
+///|
+test "effective_forwarded_client_falls_back_to_x_forwarded_for" {
+  assert_eq(
+    effective_forwarded_client(
+      ows_header_map([
+        ("Forwarded", "host=example.com"),
+        ("X-Forwarded-For", "10.0.0.1"),
+      ]),
+    ),
+    Some(("10.0.0.1", None)),
+  )
+}
+
+///|
 test "record_host_attributes_uses_forwarded_host_and_proto" {
   let (span, exporter) = host_attribute_span()
   record_host_attributes(

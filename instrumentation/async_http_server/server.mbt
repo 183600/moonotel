@@ -789,6 +789,113 @@ fn effective_request_scheme(
   }
 }
 
+// Parse a `Forwarded#for` / `X-Forwarded-For` node identifier into the client
+// address and, when present, its port. Only IP literals are accepted: RFC 7239
+// also allows obfuscated identifiers and `unknown`, which cannot populate
+// `client.address`.
+
+///|
+fn parse_forwarded_node(value : String) -> (String, Int32?)? {
+  let value = trim_header_ows(value[:])
+  if value.length() == 0 {
+    return None
+  }
+  if value.has_prefix("[") {
+    let close = match value.find("]") {
+      Some(index) => index
+      None => return None
+    }
+    let address = value[1:close].to_owned()
+    if address.length() == 0 {
+      return None
+    }
+    let _ = @socket.Addr::parse("[\{address}]:0") catch { _ => return None }
+    let rest = value[close + 1:]
+    if rest.length() == 0 {
+      return Some((address, None))
+    }
+    if !rest.has_prefix(":") {
+      return None
+    }
+    let port_text = rest[1:]
+    if port_text.length() == 0 {
+      return None
+    }
+    let port = parse_port(port_text)
+    if port < 0 {
+      return None
+    }
+    Some((address, Some(port)))
+  } else {
+    let mut colons = 0
+    let mut i = 0
+    while i < value.length() {
+      if value.unsafe_get(i).to_int() == 0x3A {
+        colons = colons + 1
+      }
+      i = i + 1
+    }
+    if colons > 1 {
+      // A bare IPv6 literal without a port is common in X-Forwarded-For. An
+      // IPv6 address with a port must use the bracketed form handled above.
+      let address = value.to_owned()
+      let _ = @socket.Addr::parse("[\{address}]:0") catch { _ => return None }
+      Some((address, None))
+    } else if colons == 1 {
+      let colon = match value.find(":") {
+        Some(index) => index
+        None => return None
+      }
+      let address = value[:colon].to_owned()
+      if address.length() == 0 {
+        return None
+      }
+      let port_text = value[colon + 1:]
+      if port_text.length() == 0 {
+        return None
+      }
+      let port = parse_port(port_text)
+      if port < 0 {
+        return None
+      }
+      let _ = @socket.Addr::parse("\{address}:0") catch { _ => return None }
+      Some((address, Some(port)))
+    } else {
+      let address = value.to_owned()
+      let _ = @socket.Addr::parse("\{address}:0") catch { _ => return None }
+      Some((address, None))
+    }
+  }
+}
+
+///|
+fn x_forwarded_for(
+  headers : Map[@http.CaseInsensitiveString, String],
+) -> (String, Int32?)? {
+  match first_header_token(headers, "x-forwarded-for") {
+    Some(value) => parse_forwarded_node(value)
+    None => None
+  }
+}
+
+// The original client advertised by a reverse proxy. A `Forwarded` header with
+// an unusable `for` parameter is authoritative: it must not fall through to
+// `X-Forwarded-For`, which the client could have supplied.
+
+///|
+fn effective_forwarded_client(
+  headers : Map[@http.CaseInsensitiveString, String],
+) -> (String, Int32?)? {
+  match headers.get(@http.CaseInsensitiveString("forwarded")) {
+    Some(_) =>
+      match first_forwarded_parameter(headers, "for") {
+        Some(value) => parse_forwarded_node(value)
+        None => x_forwarded_for(headers)
+      }
+    None => x_forwarded_for(headers)
+  }
+}
+
 // The authority of the `Host` header, with any userinfo removed. A Host header
 // must not contain userinfo, but a malformed or hostile request may still send
 // it; credentials must never reach `server.address`.
@@ -915,9 +1022,11 @@ fn initial_server_attributes(
     attributes.set(@sdk.URL_QUERY, @sdk.StringValue(query))
   }
   set_host_attributes(attributes, request.headers, request.path)
+  // `network.peer.*` always describes the immediate TCP peer. `client.address`
+  // prefers the original client advertised by a reverse proxy, falling back to
+  // that peer when no usable forwarding information is present.
   match client_address {
     Some(address) => {
-      attributes.set(@sdk.CLIENT_ADDRESS, @sdk.StringValue(address))
       attributes.set(@sdk.NETWORK_PEER_ADDRESS, @sdk.StringValue(address))
       match client_port {
         Some(port) =>
@@ -930,10 +1039,32 @@ fn initial_server_attributes(
     }
     None => ()
   }
-  match client_port {
-    Some(port) =>
-      attributes.set(@sdk.CLIENT_PORT, @sdk.IntValue(port.to_int64()))
-    None => ()
+  match effective_forwarded_client(request.headers) {
+    Some((address, port)) => {
+      attributes.set(@sdk.CLIENT_ADDRESS, @sdk.StringValue(address))
+      // A forwarded address without a port must not be paired with the peer's
+      // port: `client.port` describes whichever client was captured above.
+      match port {
+        Some(port) =>
+          attributes.set(@sdk.CLIENT_PORT, @sdk.IntValue(port.to_int64()))
+        None => ()
+      }
+    }
+    None =>
+      match client_address {
+        Some(address) => {
+          attributes.set(@sdk.CLIENT_ADDRESS, @sdk.StringValue(address))
+          match client_port {
+            Some(port) =>
+              attributes.set(
+                @sdk.CLIENT_PORT,
+                @sdk.IntValue(port.to_int64()),
+              )
+            None => ()
+          }
+        }
+        None => ()
+      }
   }
   match request.headers.get(@http.CaseInsensitiveString("user-agent")) {
     Some(agent) =>

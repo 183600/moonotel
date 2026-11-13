@@ -112,6 +112,120 @@ async test "Forwarded host without a port uses the forwarded scheme default" {
 }
 
 ///|
+async test "server records the original client from Forwarded for" {
+  let (tracer, exporter) = forwarded_tracer("forwarded-client-test")
+  @async.with_task_group() <| group => {
+    let server = @socket.TcpServer(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_with_client_address_on(
+        server,
+        call => call.respond(204),
+        tracer~,
+      )
+    }
+    let connection = @socket.Tcp::connect(
+      @socket.Addr::parse("127.0.0.1:\{port}"),
+    )
+    let peer_port = connection.addr().port()
+    connection.write(
+      "GET /items HTTP/1.1\r\nHost: backend.internal\r\nForwarded: for=\"[2001:db8::1]:4711\"\r\nConnection: close\r\n\r\n",
+    )
+    let _ = @async.with_timeout(5000, () => connection.read_all().text())
+    connection.close()
+    @async.sleep(50)
+    assert_eq(exporter.exported_spans().length(), 1)
+    let data = exporter.exported_spans()[0]
+    assert_eq(
+      data.attributes.get(@sdk.CLIENT_ADDRESS),
+      Some(@sdk.StringValue("2001:db8::1")),
+    )
+    assert_eq(data.attributes.get(@sdk.CLIENT_PORT), Some(@sdk.IntValue(4711)))
+    assert_eq(
+      data.attributes.get(@sdk.NETWORK_PEER_ADDRESS),
+      Some(@sdk.StringValue("127.0.0.1")),
+    )
+    assert_eq(
+      data.attributes.get(@sdk.NETWORK_PEER_PORT),
+      Some(@sdk.IntValue(peer_port.to_int64())),
+    )
+  }
+}
+
+///|
+async test "X-Forwarded-For without a port does not reuse the peer port" {
+  let (tracer, exporter) = forwarded_tracer("x-forwarded-client-test")
+  @async.with_task_group() <| group => {
+    let server = @socket.TcpServer(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_with_client_address_on(
+        server,
+        call => call.respond(204),
+        tracer~,
+      )
+    }
+    let connection = @socket.Tcp::connect(
+      @socket.Addr::parse("127.0.0.1:\{port}"),
+    )
+    let peer_port = connection.addr().port()
+    connection.write(
+      "GET /items HTTP/1.1\r\nHost: backend.internal\r\nX-Forwarded-For: 203.0.113.7\r\nConnection: close\r\n\r\n",
+    )
+    let _ = @async.with_timeout(5000, () => connection.read_all().text())
+    connection.close()
+    @async.sleep(50)
+    assert_eq(exporter.exported_spans().length(), 1)
+    let data = exporter.exported_spans()[0]
+    assert_eq(
+      data.attributes.get(@sdk.CLIENT_ADDRESS),
+      Some(@sdk.StringValue("203.0.113.7")),
+    )
+    assert_eq(data.attributes.get(@sdk.CLIENT_PORT), None)
+    assert_eq(
+      data.attributes.get(@sdk.NETWORK_PEER_PORT),
+      Some(@sdk.IntValue(peer_port.to_int64())),
+    )
+  }
+}
+
+///|
+async test "an unusable Forwarded for falls back to the peer, not X-Forwarded-For" {
+  let (tracer, exporter) = forwarded_tracer("forwarded-client-unknown-test")
+  @async.with_task_group() <| group => {
+    let server = @socket.TcpServer(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_with_client_address_on(
+        server,
+        call => call.respond(204),
+        tracer~,
+      )
+    }
+    let connection = @socket.Tcp::connect(
+      @socket.Addr::parse("127.0.0.1:\{port}"),
+    )
+    let peer_port = connection.addr().port()
+    connection.write(
+      "GET /items HTTP/1.1\r\nHost: backend.internal\r\nForwarded: for=unknown\r\nX-Forwarded-For: 203.0.113.7\r\nConnection: close\r\n\r\n",
+    )
+    let _ = @async.with_timeout(5000, () => connection.read_all().text())
+    connection.close()
+    @async.sleep(50)
+    assert_eq(exporter.exported_spans().length(), 1)
+    let data = exporter.exported_spans()[0]
+    assert_eq(
+      data.attributes.get(@sdk.CLIENT_ADDRESS),
+      Some(@sdk.StringValue("127.0.0.1")),
+    )
+    assert_eq(
+      data.attributes.get(@sdk.CLIENT_PORT),
+      Some(@sdk.IntValue(peer_port.to_int64())),
+    )
+  }
+}
+
+///|
 async test "server falls back from an invalid forwarded host" {
   let (tracer, exporter) = forwarded_tracer("forwarded-invalid-test")
   @async.with_task_group() <| group => {

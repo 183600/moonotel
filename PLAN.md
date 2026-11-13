@@ -321,8 +321,10 @@ wrapper 直接转发请求，不改变调用方行为。
 `Error`；handler 异常记录后重新抛出。`start_span` 显式以该请求 span 为父，
 适配并发连接。服务端地址优先采用反向代理提供的 `Forwarded#host` /
 `X-Forwarded-Host`，`url.scheme` 优先采用 `Forwarded#proto` /
-`X-Forwarded-Proto`；解析失败时回退到请求目标与 `Host`。这些头可被客户端伪造，
-部署方应确保代理覆盖或清理它们。
+`X-Forwarded-Proto`；解析失败时回退到请求目标与 `Host`。`client.address` /
+`client.port` 优先采用 `Forwarded#for` / `X-Forwarded-For` 中的 IP 字面量，
+`network.peer.*` 始终描述直接 TCP 对端。这些头可被客户端伪造，部署方应确保
+代理覆盖或清理它们。
 
 客户端 helper 创建 `Client` span，注入当前 trace context 与 baggage，记录方法、
 URL、服务端地址/端口和响应状态，并把 4xx/5xx 标为 `Error`。只有带显式 scheme

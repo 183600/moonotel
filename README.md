@@ -309,9 +309,12 @@ installs the context while the handler runs, and ends the span afterwards.
 When a reverse proxy supplies `Forwarded#host` / `X-Forwarded-Host`, the
 original host is preferred for `server.address` / `server.port`; `url.scheme`
 prefers `Forwarded#proto` / `X-Forwarded-Proto`, falling back to the request
-target and `Host` header. Malformed forwarded values are ignored. Deployments
-should strip these headers from untrusted clients if the proxy does not
-overwrite them.
+target and `Host` header. `client.address` / `client.port` prefer the original
+client in `Forwarded#for` / `X-Forwarded-For` when it contains an IP literal,
+while `network.peer.address` / `network.peer.port` always describe the
+immediate TCP peer. Malformed forwarded values are ignored. Deployments should
+strip these headers from untrusted clients if the proxy does not overwrite
+them.
 
 - `set_route` records `http.route` and renames the span to `METHOD route`; an
   empty or blank route is ignored because no route was matched.
