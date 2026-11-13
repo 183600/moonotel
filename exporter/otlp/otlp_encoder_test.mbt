@@ -251,6 +251,23 @@ test "encode_trace_request_span_fields" {
 }
 
 ///|
+test "encode_span_writes_status_message" {
+  let span : @sdk.SpanData = {
+    ..sample_span(),
+    status: @api.StatusCode::Error,
+    status_description: "database unavailable",
+  }
+  let span_fields = link_test_span_fields(span)
+  let status = first_of(span_fields, 15).unwrap()
+  let status_fields = parse_fields(status.payload)
+  assert_eq(
+    first_of(status_fields, 2).unwrap().payload |> @utf8.decode_lossy,
+    "database unavailable",
+  )
+  assert_eq(first_of(status_fields, 3).unwrap().varint, 2)
+}
+
+///|
 fn byte_to_int(value : Byte) -> Int32 {
   value.to_int() & 0xFF
 }
