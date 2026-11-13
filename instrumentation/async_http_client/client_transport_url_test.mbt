@@ -55,3 +55,40 @@ async test "client without a tracer accepts an uppercase HTTP scheme" {
     assert_eq(body.text(), "")
   }
 }
+
+///|
+async test "client sends a root target for a query-only URL with a fragment" {
+  let (tracer, exporter) = test_tracer("client-transport-root-target")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    let observed_target : Ref[String] = Ref("")
+    group.spawn_bg(no_wait=true) <| () => {
+      server.run_forever() <| ((request, _body, conn) => {
+        observed_target.val = request.path
+        conn.send_response(200, "OK")
+      })
+    }
+    let url = "http://127.0.0.1:\{port}?x=1#frag"
+    let (response, body) = @async_http_client.get(
+      url,
+      tracer~,
+      context=@context.Context::root(),
+    )
+    assert_eq(response.code, 200)
+    assert_eq(body.text(), "")
+    // The fragment is not sent, and the missing path becomes `/`.
+    assert_eq(observed_target.val, "/?x=1")
+    assert_eq(exporter.spans.val.length(), 1)
+    let data = exporter.spans.val[0]
+    assert_eq(data.attributes.get(@sdk.URL_FULL), Some(@sdk.StringValue(url)))
+    assert_eq(
+      data.attributes.get(@sdk.URL_PATH),
+      Some(@sdk.StringValue("/")),
+    )
+    assert_eq(
+      data.attributes.get(@sdk.URL_QUERY),
+      Some(@sdk.StringValue("x=1")),
+    )
+  }
+}

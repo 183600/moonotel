@@ -65,3 +65,60 @@ test "retry_after_millis_combines_seconds_and_dates" {
   assert_eq(retry_after_millis(""), None)
   assert_eq(retry_after_millis("Mon, 31 Feb 2024 00:00:00 GMT"), None)
 }
+
+///|
+fn two_digit(value : Int32) -> String {
+  if value < 10 {
+    "0" + value.to_string()
+  } else {
+    value.to_string()
+  }
+}
+
+///|
+fn month_abbreviation(month : Int32) -> String {
+  match month {
+    1 => "Jan"
+    2 => "Feb"
+    3 => "Mar"
+    4 => "Apr"
+    5 => "May"
+    6 => "Jun"
+    7 => "Jul"
+    8 => "Aug"
+    9 => "Sep"
+    10 => "Oct"
+    11 => "Nov"
+    _ => "Dec"
+  }
+}
+
+///|
+test "retry_after_millis_returns_the_delay_of_a_near_future_http_date" {
+  // A server may send an HTTP-date a few seconds in the future. Build one
+  // relative to the current clock so that the positive-delay branch is
+  // exercised without a fixed date that would expire.
+  let target_seconds = (@env.now() / 1000).reinterpret_as_int64() + 30L
+  let seconds_of_day = (target_seconds % 86400L).to_int()
+  let (year, month, day) = civil_date_from_days(target_seconds / 86400L)
+  let value = "Mon, " +
+    two_digit(day) +
+    " " +
+    month_abbreviation(month) +
+    " " +
+    year.to_string() +
+    " " +
+    two_digit(seconds_of_day / 3600) +
+    ":" +
+    two_digit(seconds_of_day / 60 % 60) +
+    ":" +
+    two_digit(seconds_of_day % 60) +
+    " GMT"
+  match retry_after_millis(value) {
+    Some(delay) => {
+      assert_true(delay >= 28000)
+      assert_true(delay <= 30000)
+    }
+    None => fail("expected a positive delay from a near-future HTTP date")
+  }
+}

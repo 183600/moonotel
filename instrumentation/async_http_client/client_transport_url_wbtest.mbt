@@ -68,3 +68,30 @@ test "split_url_for_transport_uses_a_normalized_empty_port" {
   )
   assert_eq(split_url_for_transport("https://[::1]:/"), ("https://[::1]", "/"))
 }
+
+///|
+test "split_url_for_transport_drops_the_fragment_and_defaults_the_path" {
+  // An absolute URL without a path is sent to the root path. A fragment is
+  // never part of the request target, and a query without a path keeps the
+  // root path in front of it.
+  assert_eq(
+    split_url_for_transport("http://example.com"),
+    ("http://example.com", "/"),
+  )
+  assert_eq(
+    split_url_for_transport("http://example.com#frag"),
+    ("http://example.com", "/"),
+  )
+  assert_eq(
+    split_url_for_transport("http://example.com/path#frag"),
+    ("http://example.com", "/path"),
+  )
+  assert_eq(
+    split_url_for_transport("http://example.com?q=1"),
+    ("http://example.com", "/?q=1"),
+  )
+  assert_eq(
+    split_url_for_transport("http://example.com?q=1#frag"),
+    ("http://example.com", "/?q=1"),
+  )
+}
