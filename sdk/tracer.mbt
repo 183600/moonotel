@@ -292,10 +292,13 @@ fn record_raised_error(span : SpanSdk, error : Error) -> Unit {
   // The HTTP instrumentation records the same triple for failures: an
   // `error.type` attribute, an `Error` status and the `exception` event. The
   // SDK honors the `Ok` status being final, so a span the callback already
-  // marked `Ok` keeps it.
+  // marked `Ok` keeps it. Following the recording-errors convention, the
+  // status description is the exception message rather than a duplicate of
+  // `error.type`.
   let type_name = error.to_string()
+  let message = exception_message(error)
   span.set_attribute(ERROR_TYPE, StringValue(type_name))
-  span.set_status(@api.StatusCode::Error, description=type_name)
+  span.set_status(@api.StatusCode::Error, description=message)
   span.record_exception(error)
 }
 

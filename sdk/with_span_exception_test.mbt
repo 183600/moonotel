@@ -40,12 +40,22 @@ fn exception_tracer() -> (@sdk.Tracer, WithSpanExceptionExporter) {
   (provider.get_tracer("t"), exporter)
 }
 
-// The `error.type` / status description derived from the raised error.
+// The `exception.type` derived from the raised error.
 
 ///|
 fn type_name_from(exporter : WithSpanExceptionExporter) -> String {
   match exporter.spans[0].events[0].attributes.get(@sdk.EXCEPTION_TYPE) {
     Some(@sdk.StringValue(type_name)) => type_name
+    Some(_) | None => "missing"
+  }
+}
+
+// The `exception.message` derived from the raised error.
+
+///|
+fn exception_message_from(exporter : WithSpanExceptionExporter) -> String {
+  match exporter.spans[0].events[0].attributes.get(@sdk.EXCEPTION_MESSAGE) {
+    Some(@sdk.StringValue(message)) => message
     Some(_) | None => "missing"
   }
 }
@@ -84,9 +94,10 @@ test "with_span records a raised error and re-raises it" {
   }
   assert_true(data.attributes.get("op.stage") is Some(_))
   assert_eq(data.status, @api.StatusCode::Error)
-  // The status description matches the `exception.type` derived from the
-  // error (`WithSpanBoom.WithSpanBoom`).
-  assert_eq(data.status_description, type_name_from(exporter))
+  // The recording-errors convention recommends the exception message as the
+  // status description and warns against duplicating `error.type`.
+  assert_eq(data.status_description, exception_message_from(exporter))
+  assert_true(data.status_description != type_name_from(exporter))
 }
 
 ///|

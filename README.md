@@ -186,9 +186,11 @@ provider has no processors registered.
 an error raised by their callback before re-raising it. They use the same triple
 as the HTTP instrumentation: an `exception` event with `exception.type` /
 `exception.message`, an `error.type` attribute, and an `Error` status. The
-status is left alone when the callback already set it to `Ok`, because `Ok` is
-final under the OpenTelemetry status rules. The deferred `end()` and context
-restore still run afterwards.
+status description carries the exception message, following the recording-errors
+convention, while `error.type` carries the exception type. The status is left
+alone when the callback already set it to `Ok`, because `Ok` is final under the
+OpenTelemetry status rules. The deferred `end()` and context restore still run
+afterwards.
 
 A `SpanContext` snapshots its validity when it is constructed. The ID views are
 read-only by contract. If an aliased ID array is shortened or zeroed anyway, the

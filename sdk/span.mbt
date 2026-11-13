@@ -835,6 +835,15 @@ pub fn SpanSdk::add_link(self : SpanSdk, link : SpanLink) -> Unit {
   }
 }
 
+// The `exception.message` value for an error. The generic `Error` trait does
+// not expose the message separately, so the debug representation (which keeps
+// the payload) is the best available representation.
+
+///|
+fn exception_message(error : Error) -> String {
+  @debug.to_string(error)
+}
+
 // Record an exception as an `exception` event, following the OpenTelemetry
 // semantic conventions (`exception.type` / `exception.message`). Additional
 // event attributes may be supplied; they take precedence over the attributes
@@ -850,7 +859,7 @@ pub fn SpanSdk::record_exception(
   time_unix_nano? : Int64,
 ) -> Unit {
   if self.recording && !self.ended {
-    let message = @debug.to_string(error)
+    let message = exception_message(error)
     let type_name = match exception_type {
       Some(value) => value
       None => error.to_string()

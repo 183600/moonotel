@@ -482,6 +482,11 @@ async test "client span records error.type when the request fails" {
     }
     assert_eq(data.events.length(), 1)
     assert_eq(data.events[0].name, "exception")
+    match data.events[0].attributes.get(@sdk.EXCEPTION_MESSAGE) {
+      Some(@sdk.StringValue(message)) =>
+        assert_eq(data.status_description, message)
+      _ => fail("exception.message attribute is missing")
+    }
   }
 }
 

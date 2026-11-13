@@ -986,13 +986,15 @@ fn initial_client_attributes(
 
 // Record a request failure on `span` with the same triple the SDK's scoped
 // spans use: an `error.type` attribute, an `Error` status and an `exception`
-// event.
+// event. The status description is the exception message, as recommended by
+// the recording-errors convention, rather than a duplicate of `error.type`.
 
 ///|
 fn record_request_error(span : @sdk.SpanSdk, error : Error) -> Unit {
   let type_name = error.to_string()
+  let message = @debug.to_string(error)
   span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(type_name))
-  span.set_status(@api.StatusCode::Error, description=type_name)
+  span.set_status(@api.StatusCode::Error, description=message)
   span.record_exception(error)
 }
 
