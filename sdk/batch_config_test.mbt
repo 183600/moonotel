@@ -180,6 +180,22 @@ test "batch_processor_with_config_uses_every_field" {
 }
 
 ///|
+test "batch_processor_normalizes_directly_built_config" {
+  let exporter : ProbeExporter = { names: [], }
+  let config : @sdk.BatchConfig = {
+    max_queue_size: 0,
+    max_export_batch_size: 0,
+    flush_interval_millis: -1,
+  }
+  let processor = @sdk.BatchSpanProcessor::with_config(exporter, config)
+  assert_eq(processor.flush_interval_millis(), 0)
+  processor.on_end(probe_span("direct"))
+  assert_eq(processor.queue_size(), 0)
+  assert_eq(processor.dropped_spans(), 0UL)
+  assert_true(probe_names_equal(exporter.names, ["direct"]))
+}
+
+///|
 test "batch_config_from_env_accepts_zero_schedule_delay" {
   clear_bsp_env()
   @env.set_env_var("OTEL_BSP_SCHEDULE_DELAY", "0")
