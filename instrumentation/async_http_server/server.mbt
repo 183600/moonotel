@@ -145,6 +145,8 @@ fn status_reason(status_code : Int32) -> String {
     418 => "I'm a Teapot"
     421 => "Misdirected Request"
     422 => "Unprocessable Entity"
+    423 => "Locked"
+    424 => "Failed Dependency"
     425 => "Too Early"
     426 => "Upgrade Required"
     428 => "Precondition Required"
