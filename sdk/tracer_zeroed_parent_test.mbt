@@ -90,3 +90,30 @@ test "parent_ids_that_serialize_to_zero_start_a_new_root_trace" {
   assert_false(decision.is_recorded)
   assert_false(decision.is_sampled)
 }
+
+///|
+test "mutated_parent_ids_that_serialize_to_zero_start_a_new_root_trace" {
+  let provider = @sdk.TracerProviderSdk::new(service_name="mutated-parent").with_sampler(
+    @sdk.Sampler::always_on(),
+  )
+  let tracer = provider.get_tracer("mutated-parent")
+  let parent = live_parent_context()
+  // The context was valid when built. Mutating the aliased IDs to values whose
+  // serialized byte is zero must not let it become a parent afterwards.
+  let trace = parent.trace_id_view()
+  for i = 0; i < trace.length(); i = i + 1 {
+    trace[i] = 256
+  }
+  let span = parent.span_id_view()
+  for i = 0; i < span.length(); i = i + 1 {
+    span[i] = 256
+  }
+  let child = tracer.start_span("child", parent~)
+  assert_true(child.context().is_valid())
+  assert_false(all_zero(child.context().trace_id()))
+  assert_eq(child.parent_span_id().length(), 0)
+  let sampler = @sdk.Sampler::parent_based(@sdk.Sampler::always_off())
+  let decision = sampler.should_sample(Some(parent), Array::make(16, 3))
+  assert_false(decision.is_recorded)
+  assert_false(decision.is_sampled)
+}
