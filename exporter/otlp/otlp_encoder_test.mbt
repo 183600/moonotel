@@ -488,3 +488,21 @@ test "encode_span_preserves_valid_surrogate_pairs" {
     "icon \u{1F600}",
   )
 }
+
+///|
+test "encode_span_keeps_pairs_while_replacing_unpaired_surrogates" {
+  let lone = String::from_array([(0xD800).unsafe_to_char()])
+  let pair = String::from_array([
+    (0xD83D).unsafe_to_char(),
+    (0xDE00).unsafe_to_char(),
+  ])
+  let span : @sdk.SpanData = {
+    ..sample_span(),
+    name: "a" + pair + "b" + lone + "c",
+  }
+  let span_fields = link_test_span_fields(span)
+  assert_eq(
+    first_of(span_fields, 5).unwrap().payload |> @utf8.decode_lossy,
+    "a\u{1F600}b\u{FFFD}c",
+  )
+}

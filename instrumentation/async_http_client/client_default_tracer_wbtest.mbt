@@ -56,6 +56,19 @@ test "default_tracer_follows_the_global_provider" {
 }
 
 ///|
+test "default_tracer_reuses_the_cached_tracer_for_the_same_provider" {
+  @sdk.shutdown_global_tracer_provider()
+  defer @sdk.shutdown_global_tracer_provider()
+  let (provider, _) = default_tracer_provider("cache")
+  @sdk.set_global_tracer_provider(provider)
+  let first = default_tracer().unwrap()
+  let cached_provider = default_tracer_cache.val.unwrap().0
+  let second = default_tracer().unwrap()
+  assert_true(physical_equal(cached_provider, provider))
+  assert_true(physical_equal(first, second))
+}
+
+///|
 pub extend DefaultTracerExporter with @sdk.SpanExporter::{
   export_spans,
   export_span,

@@ -459,3 +459,25 @@ test "json_encoder_preserves_valid_surrogate_pairs" {
   )
   assert_eq(json_string_value(json_member(parsed, "name")), "icon \u{1F600}")
 }
+
+///|
+test "json_encoder_keeps_pairs_while_replacing_unpaired_surrogates" {
+  let lone = String::from_array([(0xD800).unsafe_to_char()])
+  let pair = String::from_array([
+    (0xD83D).unsafe_to_char(),
+    (0xDE00).unsafe_to_char(),
+  ])
+  let span : @sdk.SpanData = {
+    ..json_test_span(),
+    name: "a" + pair + "b" + lone + "c",
+  }
+  let root = encode_json([span])
+  let parsed = json_span_of(
+    json_array_value(json_member(root, "resourceSpans"))[0],
+    0,
+  )
+  assert_eq(
+    json_string_value(json_member(parsed, "name")),
+    "a\u{1F600}b\u{FFFD}c",
+  )
+}

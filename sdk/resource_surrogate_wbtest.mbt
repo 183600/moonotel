@@ -25,3 +25,9 @@ test "decode_percent_keeps_pairs_while_replacing_unpaired_surrogates" {
     "\u{1F600}\u{FFFD}A",
   )
 }
+
+///|
+test "decode_percent_keeps_bmp_characters_while_replacing_unpaired_surrogates" {
+  let lone = String::from_array([(0xD800).unsafe_to_char()])
+  assert_eq(decode_percent("café" + lone + "%41"), "café\u{FFFD}A")
+}
