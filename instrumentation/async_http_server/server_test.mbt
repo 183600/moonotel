@@ -230,8 +230,16 @@ async test "handler exceptions are recorded and end the span" {
     assert_eq(data.events.length(), 1)
     assert_eq(data.events[0].name, "exception")
     match data.events[0].attributes.get(@sdk.EXCEPTION_MESSAGE) {
-      Some(@sdk.StringValue(message)) => assert_true(message.contains("boom"))
+      Some(@sdk.StringValue(message)) => {
+        assert_true(message.contains("boom"))
+        assert_eq(data.status_description, message)
+      }
       _ => fail("exception.message attribute is missing")
+    }
+    match data.attributes.get(@sdk.ERROR_TYPE) {
+      Some(@sdk.StringValue(name)) =>
+        assert_true(data.status_description != name)
+      _ => fail("error.type attribute is missing")
     }
   }
 }

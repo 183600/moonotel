@@ -1409,11 +1409,12 @@ async fn serve_call(
       match span {
         Some(server_span) => {
           let type_name = error.to_string()
+          let message = @debug.to_string(error)
           server_span.set_attribute(
             @sdk.ERROR_TYPE,
             @sdk.StringValue(type_name),
           )
-          server_span.set_status(@api.StatusCode::Error, description=type_name)
+          server_span.set_status(@api.StatusCode::Error, description=message)
           server_span.record_exception(error)
         }
         None => ()
