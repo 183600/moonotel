@@ -1,4 +1,5 @@
 import {
+  "moonbitlang/async",
   "moonbitlang/async/http",
   "moonbitlang/async/io",
   "moonbitlang/async/socket",
@@ -12,7 +13,6 @@ import {
 }
 
 import {
-  "moonbitlang/async",
   "moonbitlang/async/socket",
   "moonbitlang/core/debug",
   "moonbitlang/core/env",

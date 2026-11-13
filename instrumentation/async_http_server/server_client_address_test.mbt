@@ -25,7 +25,7 @@ pub impl @sdk.SpanExporter for ClientAddressRecordingExporter with fn shutdown(
 }
 
 ///|
-async test "server span does not record the listen address as client.address" {
+async test "server span records the TCP peer, not the listen address, as client.address" {
   let exporter : ClientAddressRecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
   let provider = @sdk.TracerProviderSdk::new(service_name="client-addr-test").with_span_processor(
@@ -49,6 +49,7 @@ async test "server span does not record the listen address as client.address" {
     let connection = @socket.Tcp::connect(
       @socket.Addr::parse("127.0.0.1:\{port}"),
     )
+    let client_port = connection.addr().port()
     connection.write(
       "GET /client-address HTTP/1.1\r\nHost: 127.0.0.1:\{port}\r\nConnection: close\r\n\r\n",
     )
@@ -56,12 +57,27 @@ async test "server span does not record the listen address as client.address" {
     connection.close()
     @async.sleep(50)
     assert_eq(exporter.spans.val.length(), 1)
-    // `@http.ServerConnection::client_addr()` returns the local listen
-    // address of the server, not the address of the peer, so the server span
-    // must not record it as `client.address`.
+    // `@http.ServerConnection::client_addr()` still reports the local listen
+    // address; `run_server_on` must obtain the peer from `@http.Server::accept`
+    // instead of using it as `client.address`.
     assert_eq(seen_client_addr.val, Some(server.addr.to_string()))
     let data = exporter.spans.val[0]
-    assert_eq(data.attributes.get(@sdk.CLIENT_ADDRESS), None)
+    assert_eq(
+      data.attributes.get(@sdk.CLIENT_ADDRESS),
+      Some(@sdk.StringValue("127.0.0.1")),
+    )
+    assert_eq(
+      data.attributes.get(@sdk.CLIENT_PORT),
+      Some(@sdk.IntValue(client_port.to_int64())),
+    )
+    assert_eq(
+      data.attributes.get(@sdk.NETWORK_PEER_ADDRESS),
+      Some(@sdk.StringValue("127.0.0.1")),
+    )
+    assert_eq(
+      data.attributes.get(@sdk.NETWORK_PEER_PORT),
+      Some(@sdk.IntValue(client_port.to_int64())),
+    )
     // `server.address`/`server.port` still come from the request's Host
     // header.
     assert_eq(

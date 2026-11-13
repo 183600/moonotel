@@ -1721,11 +1721,9 @@ pub async fn run_server(
 
 // Like `run_server`, but on an already constructed server (for example one
 // bound to port 0 whose actual port was read from `server.addr`). The server
-// is closed when `run_forever` returns. `@http.Server` does not expose the TCP
-// peer address, so this entry point omits `client.address` / `client.port`
-// and `network.peer.*` unless a forwarding header supplies the client; use
-// `run_server` or `run_server_with_client_address_on` to record the direct
-// peer.
+// is closed when the accept loop stops. The address of the TCP peer of each
+// connection is recorded as `client.address` / `client.port` on the SERVER
+// span.
 
 ///|
 pub async fn run_server_on(
@@ -1739,27 +1737,52 @@ pub async fn run_server_on(
     Some(value) => Some(value)
     None => default_tracer()
   }
-  server.run_forever(
-    async fn(request, body, connection) {
-      let call = serve_call(
-        request,
-        body,
-        connection,
-        active_tracer,
-        handler,
-        None,
-        None,
-      )
-      // The handler must finish exactly one response. If it returns without
-      // doing so, close the connection instead of leaving the client waiting
-      // for a response while the server attempts to read another request.
-      if !call.responded && !call.connection_closed {
-        connection.close()
+  let connection_limit : @async.Semaphore? = match max_connections {
+    Some(value) => Some(@async.Semaphore(value))
+    None => None
+  }
+  // Match `@http.Server::run_forever`: connection failures (including a client
+  // that disconnects after a response) are contained to that connection
+  // unless the caller explicitly asks for failures to abort the server.
+  let tolerate_failures = match allow_failure {
+    Some(value) => value
+    None => true
+  }
+  defer server.close()
+  @async.with_task_group() <| group => {
+    for ;; {
+      match connection_limit {
+        Some(limit) => limit.acquire()
+        None => ()
       }
-    },
-    allow_failure?,
-    max_connections?,
-  )
+      let (connection, peer_addr) = server.accept()
+      let client_address = client_host_string(peer_addr)
+      let client_port = peer_addr.port()
+      group.spawn_bg(allow_failure=tolerate_failures) <| () => {
+        defer connection.close()
+        match connection_limit {
+          Some(limit) => {
+            defer limit.release()
+            serve_connection(
+              connection,
+              client_address,
+              client_port,
+              active_tracer,
+              handler,
+            )
+          }
+          None =>
+            serve_connection(
+              connection,
+              client_address,
+              client_port,
+              active_tracer,
+              handler,
+            )
+        }
+      }
+    }
+  }
 }
 
 // Serve one request: start the SERVER span (recording the peer address as
@@ -1880,6 +1903,40 @@ fn client_host_string(addr : @socket.Addr) -> String {
   }
 }
 
+// Read and serve requests from one server connection. The handler must
+// finish exactly one response per request (usually via `ServerCall::respond`);
+// when it returns without having responded, close the connection so that a
+// half-written response is never followed by another request.
+
+///|
+async fn serve_connection(
+  connection : @http.ServerConnection,
+  client_address : String,
+  client_port : Int32,
+  active_tracer : @sdk.Tracer?,
+  handler : async (ServerCall) -> Unit,
+) -> Unit {
+  for ;; {
+    let request = connection.read_request()
+    let call = serve_call(
+      request,
+      connection,
+      connection,
+      active_tracer,
+      handler,
+      Some(client_address),
+      Some(client_port),
+    )
+    if call.connection_closed {
+      break
+    }
+    if !call.responded {
+      connection.close()
+      break
+    }
+  }
+}
+
 // Like `run_server`, but the address of the peer of each TCP connection is
 // recorded as `client.address` and `client.port` on the SERVER span.
 //
@@ -1926,28 +1983,12 @@ pub async fn run_server_with_client_address_on(
   }
   server.run_forever(allow_failure?, max_connections?) <| ((tcp, peer_addr) => {
     let connection = @http.ServerConnection::new(tcp)
-    let client_address = client_host_string(peer_addr)
-    let client_port = peer_addr.port()
-    for ;; {
-      let request = connection.read_request()
-      let call = serve_call(
-        request,
-        connection,
-        connection,
-        active_tracer,
-        handler,
-        Some(client_address),
-        Some(client_port),
-      )
-      if call.connection_closed {
-        break
-      }
-      if !call.responded {
-        // The handler returned without finishing a response: close the
-        // connection instead of leaving a partial response on the wire.
-        connection.close()
-        break
-      }
-    }
+    serve_connection(
+      connection,
+      client_host_string(peer_addr),
+      peer_addr.port(),
+      active_tracer,
+      handler,
+    )
   })
 }

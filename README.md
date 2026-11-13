@@ -329,11 +329,10 @@ them.
   method, a header lookup and the server span context to the handler.
 - `start_span` creates a child span explicitly parented to the request, even
   when several connections run concurrently.
-- `run_server_on` serves on an existing `@http.Server`. That API does not
-  expose the TCP peer address, so spans from it omit `client.*` and
-  `network.peer.*` unless a forwarding header supplies the client; use
-  `run_server` or `run_server_with_client_address_on` when the direct peer
-  attributes are required.
+- `run_server_on` serves on an existing `@http.Server` (for example one bound
+  to port 0) and records the direct TCP peer as `client.*` and
+  `network.peer.*`, like `run_server`. The server is closed when the accept
+  loop stops.
 
 ### Client
 
