@@ -53,6 +53,9 @@ pub const CLIENT_PORT : String = "client.port"
 pub const USER_AGENT_ORIGINAL : String = "user_agent.original"
 
 ///|
+pub const NETWORK_TRANSPORT : String = "network.transport"
+
+///|
 pub const NETWORK_PROTOCOL_NAME : String = "network.protocol.name"
 
 ///|

@@ -52,6 +52,8 @@ pub const NETWORK_PROTOCOL_NAME : String = "network.protocol.name"
 
 pub const NETWORK_PROTOCOL_VERSION : String = "network.protocol.version"
 
+pub const NETWORK_TRANSPORT : String = "network.transport"
+
 pub const OTLP_HTTP_JSON_PROTOCOL : String = "http/json"
 
 pub const OTLP_HTTP_PROTOBUF_PROTOCOL : String = "http/protobuf"

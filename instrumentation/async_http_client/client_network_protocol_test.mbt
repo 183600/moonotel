@@ -1,5 +1,5 @@
-// Blackbox tests for the network protocol semantic-convention attributes
-// recorded by the client instrumentation.
+// Blackbox tests for the network semantic-convention attributes recorded by
+// the client instrumentation.
 
 ///|
 struct ClientProtocolExporter {
@@ -23,7 +23,7 @@ pub impl @sdk.SpanExporter for ClientProtocolExporter with fn shutdown(self) {
 }
 
 ///|
-async test "client spans carry the network protocol attributes" {
+async test "client spans carry the network attributes" {
   let exporter : ClientProtocolExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
   let provider = @sdk.TracerProviderSdk::new(service_name="client-protocol").with_span_processor(
@@ -45,6 +45,10 @@ async test "client spans carry the network protocol attributes" {
     assert_eq(response.code, 200)
     assert_eq(exporter.spans.val.length(), 1)
     let data = exporter.spans.val[0]
+    assert_eq(
+      data.attributes.get(@sdk.NETWORK_TRANSPORT),
+      Some(@sdk.StringValue("tcp")),
+    )
     assert_eq(
       data.attributes.get(@sdk.NETWORK_PROTOCOL_NAME),
       Some(@sdk.StringValue("http")),

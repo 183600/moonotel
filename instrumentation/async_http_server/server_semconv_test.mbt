@@ -23,7 +23,7 @@ pub impl @sdk.SpanExporter for SemconvRecordingExporter with fn shutdown(self) {
 }
 
 ///|
-async test "server records url.scheme and user_agent.original" {
+async test "server records url.scheme, network.transport and user_agent.original" {
   let exporter : SemconvRecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
   let provider = @sdk.TracerProviderSdk::new(service_name="semconv-test").with_span_processor(
@@ -50,6 +50,10 @@ async test "server records url.scheme and user_agent.original" {
     assert_eq(
       data.attributes.get(@sdk.URL_SCHEME),
       Some(@sdk.StringValue("http")),
+    )
+    assert_eq(
+      data.attributes.get(@sdk.NETWORK_TRANSPORT),
+      Some(@sdk.StringValue("tcp")),
     )
     assert_eq(
       data.attributes.get(@sdk.USER_AGENT_ORIGINAL),

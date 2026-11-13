@@ -47,6 +47,8 @@ pub const NETWORK_PROTOCOL_NAME : String = "network.protocol.name"
 
 pub const NETWORK_PROTOCOL_VERSION : String = "network.protocol.version"
 
+pub const NETWORK_TRANSPORT : String = "network.transport"
+
 pub const SDK_VERSION : String = "0.1.0"
 
 pub const SERVER_ADDRESS : String = "server.address"

@@ -304,7 +304,8 @@ async fn main {
 
 `run_server` extracts `traceparent` from each request, starts a `Server` span
 with the standard HTTP attributes (`http.request.method`, `url.path`,
-`url.query`, `server.address`, `client.address`, `network.peer.address`, …),
+`url.query`, `server.address`, `client.address`, `network.transport`,
+`network.peer.address`, …),
 installs the context while the handler runs, and ends the span afterwards.
 When a reverse proxy supplies `Forwarded#host` / `X-Forwarded-Host`, the
 original host is preferred for `server.address` / `server.port`; `url.scheme`
@@ -343,8 +344,9 @@ let (response, body) = @client.post(url, "payload", tracer=tracer)
 
 Each call starts a `Client` span, injects the current trace context and baggage
 through the global propagator, records the method, URL, resolved server
-address/port and response status, and marks the span as `Error` for 4xx/5xx
-responses.
+address/port, `network.transport` (`tcp`, since the `moonbitlang/async` HTTP
+client connects over TCP) and response status, and marks the span as `Error`
+for 4xx/5xx responses.
 
 Only URLs with an explicit scheme and authority record
 `server.address` / `server.port`; a relative reference cannot contribute those

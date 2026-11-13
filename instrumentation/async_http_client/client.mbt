@@ -22,6 +22,9 @@ let protocol_name_http : @sdk.AttributeValue = @sdk.StringValue("http")
 let protocol_version_http_1_1 : @sdk.AttributeValue = @sdk.StringValue("1.1")
 
 ///|
+let transport_tcp : @sdk.AttributeValue = @sdk.StringValue("tcp")
+
+///|
 let method_get : @sdk.AttributeValue = @sdk.StringValue("GET")
 
 ///|
@@ -958,7 +961,7 @@ fn initial_client_attributes(
   request_method : @http.RequestMethod,
   request_size : Int32,
 ) -> Map[String, @sdk.AttributeValue] {
-  let attributes : Map[String, @sdk.AttributeValue] = Map([], capacity=10)
+  let attributes : Map[String, @sdk.AttributeValue] = Map([], capacity=11)
   attributes.set(
     @sdk.HTTP_REQUEST_METHOD,
     method_attribute_value(request_method),
@@ -971,6 +974,7 @@ fn initial_client_attributes(
   }
   // `url.full` must not leak credentials: strip the userinfo component.
   attributes.set(@sdk.URL_FULL, @sdk.StringValue(redact_url(url)))
+  attributes.set(@sdk.NETWORK_TRANSPORT, transport_tcp)
   attributes.set(@sdk.NETWORK_PROTOCOL_NAME, protocol_name_http)
   // `moonbitlang/async/http` speaks HTTP/1.1 only.
   attributes.set(@sdk.NETWORK_PROTOCOL_VERSION, protocol_version_http_1_1)

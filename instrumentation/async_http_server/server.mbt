@@ -33,6 +33,9 @@ let protocol_name_http : @sdk.AttributeValue = @sdk.StringValue("http")
 let protocol_version_http_1_1 : @sdk.AttributeValue = @sdk.StringValue("1.1")
 
 ///|
+let transport_tcp : @sdk.AttributeValue = @sdk.StringValue("tcp")
+
+///|
 let method_get : @sdk.AttributeValue = @sdk.StringValue("GET")
 
 ///|
@@ -1007,12 +1010,13 @@ fn initial_server_attributes(
   client_address : String?,
   client_port : Int32?,
 ) -> Map[String, @sdk.AttributeValue] {
-  let attributes : Map[String, @sdk.AttributeValue] = Map([], capacity=12)
+  let attributes : Map[String, @sdk.AttributeValue] = Map([], capacity=13)
   attributes.set(@sdk.HTTP_REQUEST_METHOD, method_attribute_value(request.meth))
   attributes.set(
     @sdk.URL_SCHEME,
     @sdk.StringValue(effective_request_scheme(request.headers, request.path)),
   )
+  attributes.set(@sdk.NETWORK_TRANSPORT, transport_tcp)
   attributes.set(@sdk.NETWORK_PROTOCOL_NAME, protocol_name_http)
   // `moonbitlang/async/http` speaks HTTP/1.1 only.
   attributes.set(@sdk.NETWORK_PROTOCOL_VERSION, protocol_version_http_1_1)
