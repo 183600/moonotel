@@ -51,3 +51,37 @@ test "json_decode_rejects_malformed_partial_success_values" {
     assert_false(decode_malformed_response_body(body).is_success())
   }
 }
+
+///|
+test "json_decode_accepts_structurally_valid_unknown_containers" {
+  for
+    body in ["{\"unknown\":{}}", "{\"unknown\":[]}", "{\"unknown\":{\"a\":[]}}"] {
+    assert_true(decode_malformed_response_body(body).is_success())
+  }
+}
+
+///|
+test "json_decode_accepts_whole_number_exponent_forms" {
+  for
+    body in [
+      "{\"partialSuccess\":{\"rejectedSpans\":1e+2}}", "{\"partialSuccess\":{\"rejectedSpans\":1.0e2}}",
+    ] {
+    match decode_malformed_response_body(body) {
+      @sdk.ExportFailure(message) =>
+        assert_true(message.contains("rejected 100 span(s)"))
+      @sdk.ExportSuccess => abort("expected a partial-success failure")
+    }
+  }
+}
+
+///|
+test "json_decode_rejects_structurally_malformed_partial_success" {
+  for
+    body in [
+      "{\"partialSuccess\":nul}", "{\"partialSuccess\":{1:2}}", "{\"partialSuccess\":{\"rejectedSpans\" 1}}",
+      "{\"partialSuccess\":{\"rejectedSpans\":1,2}}", "{\"partialSuccess\":{\"errorMessage\":nul}}",
+      "{\"partialSuccess\":{\"extra\":tru}}", "{\"partialSuccess\":{},", "{\"partialSuccess\":{",
+    ] {
+    assert_false(decode_malformed_response_body(body).is_success())
+  }
+}
