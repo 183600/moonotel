@@ -75,9 +75,10 @@ test "split_host_authority rejects whitespace and control characters" {
 ///|
 test "split_host_authority rejects forbidden URI authority characters" {
   for authority in [
-    "exa\"mple.com", "exa<mple.com", "exa>mple.com", "exa\\mple.com",
-    "exa^mple.com", "exa`mple.com", "exa{mple.com", "exa|mple.com",
-    "exa}mple.com", "example.com\\path", "example.com:80\"x\"",
+    "exa\"mple.com", "exa<mple.com", "exa>mple.com", "exa@mple.com",
+    "exa\\mple.com", "exa^mple.com", "exa`mple.com", "exa{mple.com",
+    "exa|mple.com", "exa}mple.com", "example.com\\path",
+    "example.com:80\"x\"", "user@example.com", "example.com:80@evil",
   ] {
     assert_eq(split_host_authority(authority, 80), None)
   }

@@ -456,6 +456,7 @@ fn is_forbidden_authority_char(code : Int32) -> Bool {
   code == 0x22 ||
   code == 0x3C ||
   code == 0x3E ||
+  code == 0x40 ||
   code == 0x5C ||
   code == 0x5E ||
   code == 0x60 ||

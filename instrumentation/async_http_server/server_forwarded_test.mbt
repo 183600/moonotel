@@ -252,3 +252,51 @@ async test "server falls back from an invalid forwarded host" {
     )
   }
 }
+
+///|
+async test "Forwarded host with userinfo is ignored" {
+  let (tracer, exporter) = forwarded_tracer("forwarded-host-userinfo-test")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_on(server, call => call.respond(204), tracer~)
+    }
+    send_forwarded_request(
+      port,
+      "GET /items HTTP/1.1\r\nHost: backend.internal:8080\r\nForwarded: host=user@evil.example:9443\r\nX-Forwarded-Host: public.example.com:8443\r\nConnection: close\r\n\r\n",
+    )
+    @async.sleep(50)
+    assert_eq(exporter.exported_spans().length(), 1)
+    let data = exporter.exported_spans()[0]
+    assert_eq(
+      data.attributes.get(@sdk.SERVER_ADDRESS),
+      Some(@sdk.StringValue("public.example.com")),
+    )
+    assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(8443)))
+  }
+}
+
+///|
+async test "X-Forwarded-Host with userinfo is ignored" {
+  let (tracer, exporter) = forwarded_tracer("x-forwarded-host-userinfo-test")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_on(server, call => call.respond(204), tracer~)
+    }
+    send_forwarded_request(
+      port,
+      "GET /items HTTP/1.1\r\nHost: backend.internal:9090\r\nX-Forwarded-Host: user@evil.example:8443\r\nConnection: close\r\n\r\n",
+    )
+    @async.sleep(50)
+    assert_eq(exporter.exported_spans().length(), 1)
+    let data = exporter.exported_spans()[0]
+    assert_eq(
+      data.attributes.get(@sdk.SERVER_ADDRESS),
+      Some(@sdk.StringValue("backend.internal")),
+    )
+    assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(9090)))
+  }
+}
