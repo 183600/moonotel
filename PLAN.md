@@ -319,7 +319,10 @@ wrapper 直接转发请求，不改变调用方行为。
 查询串、服务端地址、客户端地址、网络对端地址等属性，并在 handler 执行期间安装上下文。
 `set_route` 更新 `http.route` 与 span 名称；`respond` 记录状态码并把 5xx 标为
 `Error`；handler 异常记录后重新抛出。`start_span` 显式以该请求 span 为父，
-适配并发连接。
+适配并发连接。服务端地址优先采用反向代理提供的 `Forwarded#host` /
+`X-Forwarded-Host`，`url.scheme` 优先采用 `Forwarded#proto` /
+`X-Forwarded-Proto`；解析失败时回退到请求目标与 `Host`。这些头可被客户端伪造，
+部署方应确保代理覆盖或清理它们。
 
 客户端 helper 创建 `Client` span，注入当前 trace context 与 baggage，记录方法、
 URL、服务端地址/端口和响应状态，并把 4xx/5xx 标为 `Error`。只有带显式 scheme

@@ -544,46 +544,306 @@ fn split_host_authority(
   }
 }
 
+// Find `delimiter` outside a quoted string. Backslash escapes inside quotes
+// are skipped so a comma or semicolon in a quoted parameter value does not
+// split the header.
+
+///|
+fn find_delimiter_outside_quotes(
+  value : StringView,
+  delimiter : Int32,
+) -> Int32? {
+  let len = value.length()
+  let mut i = 0
+  let mut in_quotes = false
+  while i < len {
+    let code = value.unsafe_get(i).to_int()
+    if in_quotes {
+      if code == 0x5C {
+        // Backslash escape: skip the escaped code unit.
+        i = i + 2
+        continue
+      }
+      if code == 0x22 {
+        in_quotes = false
+      }
+    } else if code == 0x22 {
+      in_quotes = true
+    } else if code == delimiter {
+      return Some(i)
+    }
+    i = i + 1
+  }
+  None
+}
+
+// Trim OWS and remove the surrounding quotes of a `Forwarded` parameter value.
+// Backslash escapes inside a quoted string are resolved. An unterminated or
+// otherwise malformed quoted string yields `None`.
+
+///|
+fn unquote_forwarded_value(value : StringView) -> String? {
+  let value = trim_header_ows(value)
+  let len = value.length()
+  if len >= 2 &&
+    value.unsafe_get(0).to_int() == 0x22 &&
+    value.unsafe_get(len - 1).to_int() == 0x22 {
+    let sb = StringBuilder(size_hint=len)
+    let mut i = 1
+    let end = len - 1
+    while i < end {
+      let code = value.unsafe_get(i).to_int()
+      if code == 0x5C {
+        i = i + 1
+        if i >= end {
+          return None
+        }
+        sb.write_char(value.unsafe_get(i).unsafe_to_char())
+      } else if code == 0x22 {
+        return None
+      } else {
+        sb.write_char(value.unsafe_get(i).unsafe_to_char())
+      }
+      i = i + 1
+    }
+    Some(sb.to_string())
+  } else if value.find("\"") is Some(_) {
+    None
+  } else {
+    Some(value.to_owned())
+  }
+}
+
+// The first `name=value` parameter of the first element of a `Forwarded`
+// header. Parameter names are case-insensitive and values may be quoted
+// (RFC 7239). Only the first element is considered because it describes the
+// original client; later elements describe intermediate proxies.
+
+///|
+fn first_forwarded_parameter(
+  headers : Map[@http.CaseInsensitiveString, String],
+  name : String,
+) -> String? {
+  let value = match headers.get(@http.CaseInsensitiveString("forwarded")) {
+    Some(value) => value
+    None => return None
+  }
+  let value = trim_header_ows(value[:])
+  let element = match find_delimiter_outside_quotes(value, 0x2C) {
+    Some(index) => value[:index]
+    None => value
+  }
+  let mut start = 0
+  let len = element.length()
+  while start <= len {
+    let rest = element[start:]
+    let end = match find_delimiter_outside_quotes(rest, 0x3B) {
+      Some(index) => index
+      None => rest.length()
+    }
+    let param = rest[:end]
+    match find_delimiter_outside_quotes(param, 0x3D) {
+      Some(equals) => {
+        let key = trim_header_ows(param[:equals])
+        if key.to_owned().to_lower() == name {
+          return unquote_forwarded_value(param[equals + 1:])
+        }
+      }
+      None => ()
+    }
+    if end >= rest.length() {
+      break
+    }
+    start = start + end + 1
+  }
+  None
+}
+
+// The first comma-separated token of a header value, trimmed of OWS. Used for
+// the de-facto `X-Forwarded-*` headers, where the first value describes the
+// original client.
+
+///|
+fn first_header_token(
+  headers : Map[@http.CaseInsensitiveString, String],
+  name : String,
+) -> String? {
+  match headers.get(@http.CaseInsensitiveString(name)) {
+    Some(value) => {
+      let value = trim_header_ows(value[:])
+      let token = match find_delimiter_outside_quotes(value, 0x2C) {
+        Some(index) => value[:index]
+        None => value
+      }
+      match unquote_forwarded_value(token) {
+        Some(token) => {
+          let token = trim_header_ows(token[:])
+          if token.length() == 0 {
+            None
+          } else {
+            Some(token.to_owned())
+          }
+        }
+        None => None
+      }
+    }
+    None => None
+  }
+}
+
+// The original host from `Forwarded#host`, when it is syntactically usable.
+
+///|
+fn forwarded_host(
+  headers : Map[@http.CaseInsensitiveString, String],
+) -> String? {
+  match first_forwarded_parameter(headers, "host") {
+    Some(value) => {
+      let value = trim_header_ows(value[:])
+      if value.length() == 0 {
+        None
+      } else {
+        match split_host_authority(value.to_owned(), 80) {
+          Some(_) => Some(value.to_owned())
+          None => None
+        }
+      }
+    }
+    None => None
+  }
+}
+
+// The original host from `X-Forwarded-Host`, when it is syntactically usable.
+
+///|
+fn x_forwarded_host(
+  headers : Map[@http.CaseInsensitiveString, String],
+) -> String? {
+  match first_header_token(headers, "x-forwarded-host") {
+    Some(value) =>
+      match split_host_authority(value, 80) {
+        Some(_) => Some(value)
+        None => None
+      }
+    None => None
+  }
+}
+
+// The original host advertised by a reverse proxy. `Forwarded` is the
+// standardized header and takes precedence over `X-Forwarded-Host`.
+
+///|
+fn effective_forwarded_host(
+  headers : Map[@http.CaseInsensitiveString, String],
+) -> String? {
+  match forwarded_host(headers) {
+    Some(value) => Some(value)
+    None => x_forwarded_host(headers)
+  }
+}
+
+///|
+fn normalize_forwarded_proto(value : String) -> String? {
+  let value = trim_header_ows(value[:]).to_owned().to_lower()
+  if value == "http" || value == "https" {
+    Some(value)
+  } else {
+    None
+  }
+}
+
+// The original request scheme from `Forwarded#proto` or `X-Forwarded-Proto`.
+// Only HTTP schemes are meaningful for an HTTP span.
+
+///|
+fn forwarded_proto(
+  headers : Map[@http.CaseInsensitiveString, String],
+) -> String? {
+  let forwarded = match first_forwarded_parameter(headers, "proto") {
+    Some(value) => normalize_forwarded_proto(value)
+    None => None
+  }
+  match forwarded {
+    Some(value) => Some(value)
+    None =>
+      match first_header_token(headers, "x-forwarded-proto") {
+        Some(value) => normalize_forwarded_proto(value)
+        None => None
+      }
+  }
+}
+
+// The scheme of the original client request when a reverse proxy advertises
+// it, otherwise the scheme of the immediate request. The semantic conventions
+// prefer the original scheme so that client and server spans agree when TLS is
+// terminated at a proxy.
+
+///|
+fn effective_request_scheme(
+  headers : Map[@http.CaseInsensitiveString, String],
+  path : String,
+) -> String {
+  match forwarded_proto(headers) {
+    Some(value) => value
+    None => request_target_scheme(path)
+  }
+}
+
+// The authority of the `Host` header, with any userinfo removed. A Host header
+// must not contain userinfo, but a malformed or hostile request may still send
+// it; credentials must never reach `server.address`.
+
+///|
+fn host_header_authority(
+  headers : Map[@http.CaseInsensitiveString, String],
+) -> String? {
+  match headers.get(@http.CaseInsensitiveString("host")) {
+    Some(value) => {
+      let value = trim_header_ows(value[:])
+      match value.rev_find("@") {
+        Some(index) =>
+          if index + 1 >= value.length() {
+            None
+          } else {
+            Some(value[index + 1:].to_owned())
+          }
+        None =>
+          if value.length() == 0 {
+            None
+          } else {
+            Some(value.to_owned())
+          }
+      }
+    }
+    None => None
+  }
+}
+
 ///|
 fn set_host_attributes(
   attributes : Map[String, @sdk.AttributeValue],
   headers : Map[@http.CaseInsensitiveString, String],
   path : String,
 ) -> Unit {
+  // The original host advertised by a reverse proxy takes precedence over the
+  // request's own authority and Host header (HTTP semantic conventions,
+  // "Setting server.address and server.port attributes").
   // With an absolute-form request target the authority of the target wins
-  // over the Host header (HTTP semantic conventions, footnotes [2] and [3];
-  // RFC 9112 also requires servers to ignore Host in that case). An
-  // absolute-form target with an empty authority therefore has no server
-  // address; falling back to Host would use a header the request told us to
-  // ignore.
-  let host : String? = match absolute_target_authority(path) {
-    Some(authority) => Some(authority)
+  // over the Host header (RFC 9112 also requires servers to ignore Host in
+  // that case). An absolute-form target with an empty authority therefore has
+  // no server address; falling back to Host would use a header the request
+  // told us to ignore.
+  let host : String? = match effective_forwarded_host(headers) {
+    Some(host) => Some(host)
     None =>
-      if is_absolute_target(path) {
-        None
-      } else {
-        // A Host header must not contain userinfo, but a malformed or hostile
-        // request may still send it. Discard it exactly like the authority of
-        // an absolute-form target so credentials never reach `server.address`.
-        match headers.get(@http.CaseInsensitiveString("host")) {
-          Some(value) => {
-            let value = trim_header_ows(value[:])
-            let host = match value.rev_find("@") {
-              Some(index) =>
-                if index + 1 >= value.length() {
-                  None
-                } else {
-                  Some(value[index + 1:].to_owned())
-                }
-              None => Some(value.to_owned())
-            }
-            match host {
-              Some(value) => if value == "" { None } else { Some(value) }
-              None => None
-            }
+      match absolute_target_authority(path) {
+        Some(authority) => Some(authority)
+        None =>
+          if is_absolute_target(path) {
+            None
+          } else {
+            host_header_authority(headers)
           }
-          None => None
-        }
       }
   }
   match host {
@@ -592,7 +852,7 @@ fn set_host_attributes(
       // empty port (`Host: example.com:`). In both cases the scheme's default
       // port is the port actually used, and the semantic conventions require
       // `server.port` whenever `server.address` is recorded.
-      let default_port = if request_target_scheme(path) == "https" {
+      let default_port = if effective_request_scheme(headers, path) == "https" {
         443
       } else {
         80
@@ -643,7 +903,7 @@ fn initial_server_attributes(
   attributes.set(@sdk.HTTP_REQUEST_METHOD, method_attribute_value(request.meth))
   attributes.set(
     @sdk.URL_SCHEME,
-    @sdk.StringValue(request_target_scheme(request.path)),
+    @sdk.StringValue(effective_request_scheme(request.headers, request.path)),
   )
   attributes.set(@sdk.NETWORK_PROTOCOL_NAME, protocol_name_http)
   // `moonbitlang/async/http` speaks HTTP/1.1 only.
