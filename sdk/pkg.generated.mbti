@@ -63,6 +63,8 @@ pub const TELEMETRY_SDK_NAME : String = "telemetry.sdk.name"
 
 pub const TELEMETRY_SDK_VERSION : String = "telemetry.sdk.version"
 
+pub const URL_FRAGMENT : String = "url.fragment"
+
 pub const URL_FULL : String = "url.full"
 
 pub const URL_PATH : String = "url.path"

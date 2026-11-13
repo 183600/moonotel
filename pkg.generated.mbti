@@ -80,6 +80,8 @@ pub const TRACE_FLAGS_RANDOM : Int32 = 2
 
 pub const TRACE_FLAGS_SAMPLED : Int32 = 1
 
+pub const URL_FRAGMENT : String = "url.fragment"
+
 pub const URL_FULL : String = "url.full"
 
 pub const URL_PATH : String = "url.path"

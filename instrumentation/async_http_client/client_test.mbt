@@ -232,6 +232,44 @@ async test "client span records and sanitizes the url path and query" {
 }
 
 ///|
+async test "client span records a non-empty url fragment and omits an empty one" {
+  let (tracer, exporter) = test_tracer("client-url-fragment")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      server.run_forever() <| ((_request, _body, conn) => {
+        conn.send_response(200, "OK")
+      })
+    }
+    let base = "http://127.0.0.1:\{port}/page"
+    let (with_fragment, _with_fragment_body) = @async_http_client.get(
+      base + "#section-2",
+      tracer~,
+      context=@context.Context::root(),
+    )
+    assert_eq(with_fragment.code, 200)
+    let (empty_fragment, _empty_fragment_body) = @async_http_client.get(
+      base + "#",
+      tracer~,
+      context=@context.Context::root(),
+    )
+    assert_eq(empty_fragment.code, 200)
+    assert_eq(exporter.spans.val.length(), 2)
+    let first = exporter.spans.val[0]
+    assert_eq(
+      first.attributes.get(@sdk.URL_FRAGMENT),
+      Some(@sdk.StringValue("section-2")),
+    )
+    assert_eq(
+      first.attributes.get(@sdk.URL_FULL),
+      Some(@sdk.StringValue(base + "#section-2")),
+    )
+    assert_eq(exporter.spans.val[1].attributes.get(@sdk.URL_FRAGMENT), None)
+  }
+}
+
+///|
 async test "client span continues the current trace context" {
   let (tracer, exporter) = test_tracer("client-test-parent")
   @async.with_task_group() <| group => {

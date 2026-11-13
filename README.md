@@ -352,7 +352,8 @@ attributes. The default port is inferred only for `http` (80) and `https`
 (443): an unknown scheme without an explicit port records the address but
 omits `server.port` instead of assuming 80. The `url.full` attribute strips
 credentials from both absolute URLs and network-path references
-(`//user:pass@host/path`), and `user_agent.original` records the request's
+(`//user:pass@host/path`), and a non-empty `url.fragment` is recorded separately
+(an empty fragment is omitted). `user_agent.original` records the request's
 `User-Agent` value.
 
 ## OTLP/HTTP export

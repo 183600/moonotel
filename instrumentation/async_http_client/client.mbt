@@ -235,6 +235,24 @@ fn has_invalid_scheme_separator(url : String) -> Bool {
   }
 }
 
+// The fragment component of a URL, or `None` when there is no `#` or the
+// fragment is empty. The semantic conventions omit an empty fragment.
+
+///|
+fn url_fragment(url : String) -> String? {
+  match url.find("#") {
+    Some(index) => {
+      let fragment = url[index + 1:]
+      if fragment.length() == 0 {
+        None
+      } else {
+        Some(fragment.to_owned())
+      }
+    }
+    None => None
+  }
+}
+
 // Split the path and query components of a URL. The fragment is dropped and
 // the query is returned without its leading `?`. An URL without a path yields
 // an empty path; callers apply the semantic conventions default.
@@ -980,6 +998,11 @@ fn initial_client_attributes(
   let url_query = @sdk.redact_sensitive_query_string(url_query)
   if url_query != "" {
     attributes.set(@sdk.URL_QUERY, @sdk.StringValue(url_query))
+  }
+  match url_fragment(url) {
+    Some(fragment) =>
+      attributes.set(@sdk.URL_FRAGMENT, @sdk.StringValue(fragment))
+    None => ()
   }
   attributes
 }

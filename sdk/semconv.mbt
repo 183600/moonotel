@@ -35,6 +35,9 @@ pub const URL_PATH : String = "url.path"
 pub const URL_QUERY : String = "url.query"
 
 ///|
+pub const URL_FRAGMENT : String = "url.fragment"
+
+///|
 pub const SERVER_ADDRESS : String = "server.address"
 
 ///|
