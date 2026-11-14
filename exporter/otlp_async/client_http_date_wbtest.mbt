@@ -34,8 +34,8 @@ test "http_date_parser_rejects_invalid_dates_and_times" {
      "Xxx, 01 Jan 2024 00:00:00 GMT", "Mon 01 Jan 2024 00:00:00 GMT", "Mon, 01 Jan 2024 00:00:00 UTC",
     "Mon, 01 Jan 2024 00:00:00 GMT ",
     // Non-digit components.
-     "Mon, 0x Jan 2024 00:00:00 GMT", "Mon, 01 Xxx 2024 00:00:00 GMT", "Mon, 01 Jan 20x4 00:00:00 GMT",
-    "Mon, 01 Jan 2024 0x:00:00 GMT",
+     "Mon, 0x Jan 2024 00:00:00 GMT", "Mon, 01 Xxx 2024 00:00:00 GMT", "Mon, 01 Jan x024 00:00:00 GMT",
+    "Mon, 01 Jan 20x4 00:00:00 GMT", "Mon, 01 Jan 2024 0x:00:00 GMT", "Mon, 01 Jan 2024 00:0x:00 GMT",
   ]
   for value in cases {
     assert_eq(parse_http_date_seconds(value[:]), None)

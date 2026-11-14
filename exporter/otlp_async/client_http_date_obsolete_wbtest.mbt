@@ -44,6 +44,13 @@ test "http_date_parser_rejects_malformed_obsolete_dates" {
      "Sunday,X06-Nov-94 08:49:37 GMT", "Sunday,\t06-Nov-94 08:49:37 GMT", "Sun Nov  6 08:49:37 1994 ",
     // Truncated forms must not be accepted.
      "Sunday, 06-Nov-94 08:49:37", "Sun Nov 6 08:49:37 1994", "Sun Nov  6 08:49:37 194",
+    // Non-digit components in RFC 850 dates.
+     "Sunday, x6-Nov-24 00:00:00 GMT", "Sunday, 06-Nov-x4 00:00:00 GMT", "Sunday, 06-Nov-24 x0:00:00 GMT",
+    "Sunday, 06-Nov-24 00:x0:00 GMT", "Sunday, 06-Nov-24 00:00:x0 GMT",
+    // Non-digit components in asctime dates.
+     "Sun Xxx  6 08:49:37 1994", "Sun Nov  x 08:49:37 1994", "Sun Nov x6 08:49:37 1994",
+    "Sun Nov  6 x8:49:37 1994", "Sun Nov  6 08:x9:37 1994", "Sun Nov  6 08:49:x7 1994",
+    "Sun Nov  6 08:49:37 x994", "Sun Nov  6 08:49:37 19x4",
   ]
   for value in cases {
     assert_eq(parse_retry_after_date_seconds(value[:]), None)
