@@ -168,6 +168,14 @@ test "parse_forwarded_node_accepts_ip_literals_and_ports" {
     parse_forwarded_node("2001:db8::1"),
     Some(("2001:db8::1", None)),
   )
+  assert_eq(
+    parse_forwarded_node("[2001:db8::1%25eth0]:4711"),
+    Some(("2001:db8::1%25eth0", Some(4711))),
+  )
+  assert_eq(
+    parse_forwarded_node("[::ffff:192.0.2.1]"),
+    Some(("::ffff:192.0.2.1", None)),
+  )
 }
 
 ///|
@@ -175,7 +183,8 @@ test "parse_forwarded_node_rejects_unknown_and_malformed_values" {
   for value in [
     "", "unknown", "_gazonk", "192.0.2.43:", "192.0.2.43:not-a-port",
     "[2001:db8::1", "[2001:db8::1]junk", "[2001:db8::1]:",
-    "192.0.2.43:80:90",
+    "192.0.2.43:80:90", "01.2.3.4", "192.168.001.1:80", "0x7f.0.0.1",
+    "1.2.3.4:+80", "1.2.3", "[::1%]", "[1:2:3:4:5:6:7:8:9]",
   ] {
     assert_eq(parse_forwarded_node(value), None)
   }

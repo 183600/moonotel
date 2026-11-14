@@ -1020,6 +1020,21 @@ fn effective_request_scheme(
   }
 }
 
+// Whether `text` is a URI IP literal (`IPv4address` or `IPv6address`, with an
+// optional zone identifier for the latter). IP addresses follow the RFC 3986
+// grammar used by the request-target and `Host` parsers rather than the more
+// permissive socket parser, which also accepts legacy forms such as
+// `0x7f.0.0.1` and leading-zero octets.
+
+///|
+fn is_forwarded_ip_literal(text : StringView) -> Bool {
+  if text.find(":") is Some(_) {
+    is_bracketed_ip_literal(text)
+  } else {
+    is_ipv4_literal(text)
+  }
+}
+
 // Parse a `Forwarded#for` / `X-Forwarded-For` node identifier into the client
 // address and, when present, its port. Only IP literals are accepted: RFC 7239
 // also allows obfuscated identifiers and `unknown`, which cannot populate
@@ -1037,10 +1052,9 @@ fn parse_forwarded_node(value : String) -> (String, Int32?)? {
       None => return None
     }
     let address = value[1:close].to_owned()
-    if address.length() == 0 {
+    if address.length() == 0 || !is_bracketed_ip_literal(address[:]) {
       return None
     }
-    let _ = @socket.Addr::parse("[\{address}]:0") catch { _ => return None }
     let rest = value[close + 1:]
     if rest.length() == 0 {
       return Some((address, None))
@@ -1070,7 +1084,9 @@ fn parse_forwarded_node(value : String) -> (String, Int32?)? {
       // A bare IPv6 literal without a port is common in X-Forwarded-For. An
       // IPv6 address with a port must use the bracketed form handled above.
       let address = value.to_owned()
-      let _ = @socket.Addr::parse("[\{address}]:0") catch { _ => return None }
+      if !is_bracketed_ip_literal(value) {
+        return None
+      }
       Some((address, None))
     } else if colons == 1 {
       let colon = match value.find(":") {
@@ -1078,7 +1094,7 @@ fn parse_forwarded_node(value : String) -> (String, Int32?)? {
         None => return None
       }
       let address = value[:colon].to_owned()
-      if address.length() == 0 {
+      if address.length() == 0 || !is_ipv4_literal(address[:]) {
         return None
       }
       let port_text = value[colon + 1:]
@@ -1089,11 +1105,12 @@ fn parse_forwarded_node(value : String) -> (String, Int32?)? {
       if port < 0 {
         return None
       }
-      let _ = @socket.Addr::parse("\{address}:0") catch { _ => return None }
       Some((address, Some(port)))
     } else {
       let address = value.to_owned()
-      let _ = @socket.Addr::parse("\{address}:0") catch { _ => return None }
+      if !is_forwarded_ip_literal(value) {
+        return None
+      }
       Some((address, None))
     }
   }
