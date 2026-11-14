@@ -9,6 +9,7 @@ fn tick_probe_span(name : String) -> SpanData {
     name,
     span_context: @api.span_context(trace_id, span_id, @api.TRACE_FLAGS_SAMPLED),
     parent_span_id: [],
+    parent_is_remote: None,
     kind: @api.SpanKind::Internal,
     start_time_unix_nano: 1L,
     end_time_unix_nano: 2L,

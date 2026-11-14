@@ -784,7 +784,7 @@ fn json_write_span(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
   }
   json_write_status(sb, data)
   sb.write_bytes(b",\"flags\":")
-  json_write_uint32(sb, otlp_flags(data.span_context.trace_flags()))
+  json_write_uint32(sb, otlp_span_flags(data))
   sb.write_char('}')
 }
 

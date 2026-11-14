@@ -151,6 +151,7 @@ fn sample_span() -> @sdk.SpanData {
       1,
     ),
     parent_span_id: @api.bytes_from_hex("1122334455667788").unwrap(),
+    parent_is_remote: None,
     kind: @api.SpanKind::Server,
     start_time_unix_nano: 1600000000000000000L,
     end_time_unix_nano: 1600000000500000000L,

@@ -3,9 +3,9 @@
 
 // Bits 0-7 of the OTLP `flags` field hold the W3C trace flags. Bits 8 and 9
 // carry the OTLP remote-context state for links whose SpanContext was received
-// from a remote peer; the remaining bits are reserved. A runtime SpanContext
-// may carry a wider `Int32` value, so the encoders keep only the documented
-// trace-flag byte before adding the remote state.
+// from a remote peer and for a span's parent; the remaining bits are reserved.
+// A runtime SpanContext may carry a wider `Int32` value, so the encoders keep
+// only the documented trace-flag byte before adding the remote state.
 
 ///|
 fn otlp_flags(trace_flags : Int32) -> Int32 {
@@ -25,6 +25,28 @@ fn otlp_link_flags(context : @api.SpanContext) -> Int32 {
     flags | OTLP_FLAGS_CONTEXT_HAS_IS_REMOTE | OTLP_FLAGS_CONTEXT_IS_REMOTE
   } else {
     flags
+  }
+}
+
+// Span flags bits 8-9 describe whether the span's parent came from a remote
+// peer. A root span (or a span whose parent origin is unknown) leaves both
+// bits clear; a local parent sets the "known" bit, and a remote parent sets
+// both the "known" and "is remote" bits.
+
+///|
+fn otlp_span_flags(data : @sdk.SpanData) -> Int32 {
+  let flags = otlp_flags(data.span_context.trace_flags())
+  if !has_encodable_parent_span_id(data.parent_span_id) {
+    return flags
+  }
+  match data.parent_is_remote {
+    Some(is_remote) =>
+      if is_remote {
+        flags | OTLP_FLAGS_CONTEXT_HAS_IS_REMOTE | OTLP_FLAGS_CONTEXT_IS_REMOTE
+      } else {
+        flags | OTLP_FLAGS_CONTEXT_HAS_IS_REMOTE
+      }
+    None => flags
   }
 }
 
@@ -389,10 +411,7 @@ fn encode_span_fields(span : ProtoWriter, data : @sdk.SpanData) -> Unit {
     span.write_varint_field(14, data.dropped_links_count.to_uint64())
   }
   encode_status(span, data)
-  span.write_fixed32_field(
-    16,
-    otlp_flags(data.span_context.trace_flags()).reinterpret_as_uint(),
-  )
+  span.write_fixed32_field(16, otlp_span_flags(data).reinterpret_as_uint())
 }
 
 // Encode a span (field 2) into `writer`.

@@ -182,6 +182,12 @@ A recording span keeps its data readable after `end()`: the accessors return a
 snapshot of the recorded attributes, events and links, including when the
 provider has no processors registered.
 
+A span also records whether its parent came from a remote peer.
+`SpanSdk::parent_is_remote()` and `SpanData.parent_is_remote` return `None` for
+a root span or an unknown parent origin, `Some(false)` for a locally created
+parent, and `Some(true)` for a parent received through a propagator. OTLP
+exporters encode this state in `Span.flags` bits 8-9.
+
 `Tracer::with_span` and its async counterpart `Tracer::with_span_async` record
 an error raised by their callback before re-raising it. They use the same triple
 as the HTTP instrumentation: an `exception` event with `exception.type` /

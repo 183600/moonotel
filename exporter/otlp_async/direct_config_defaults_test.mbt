@@ -13,6 +13,7 @@ fn blank_config_span_data() -> @sdk.SpanData {
     name: "otlp-async-blank-config",
     span_context,
     parent_span_id: [],
+    parent_is_remote: None,
     kind: @api.SpanKind::Client,
     start_time_unix_nano: 1000L,
     end_time_unix_nano: 2000L,

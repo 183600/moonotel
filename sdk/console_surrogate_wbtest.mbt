@@ -24,6 +24,7 @@ test "console format escapes unpaired surrogates in all text fields" {
       1,
     ),
     parent_span_id: [],
+    parent_is_remote: None,
     kind: @api.SpanKind::Internal,
     start_time_unix_nano: 0L,
     end_time_unix_nano: 0L,

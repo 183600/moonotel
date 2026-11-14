@@ -13,6 +13,7 @@ fn out_of_range_id_span() -> @sdk.SpanData {
     name: "out-of-range",
     span_context,
     parent_span_id: [],
+    parent_is_remote: None,
     kind: @api.SpanKind::Internal,
     start_time_unix_nano: 1L,
     end_time_unix_nano: 2L,

@@ -84,6 +84,7 @@ test "console_format_renders_int_and_double_array_values" {
       1,
     ),
     parent_span_id: [],
+    parent_is_remote: None,
     kind: @api.SpanKind::Internal,
     start_time_unix_nano: 0L,
     end_time_unix_nano: 0L,

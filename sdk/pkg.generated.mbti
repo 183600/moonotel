@@ -328,6 +328,7 @@ pub(all) struct SpanData {
   name : String
   span_context : @api.SpanContext
   parent_span_id : Array[Int32]
+  parent_is_remote : Bool?
   kind : @api.SpanKind
   start_time_unix_nano : Int64
   end_time_unix_nano : Int64
@@ -380,6 +381,7 @@ pub struct SpanSdk {
   mut name : String
   context : @api.SpanContext
   parent_span_id : Array[Int32]
+  parent_is_remote : Bool?
   kind : @api.SpanKind
   start_time_unix_nano : Int64
   mut end_time_unix_nano : Int64
@@ -416,6 +418,7 @@ pub fn SpanSdk::kind(Self) -> @api.SpanKind
 pub fn SpanSdk::limits(Self) -> SpanLimits
 pub fn SpanSdk::links(Self) -> Array[SpanLink]
 pub fn SpanSdk::name(Self) -> String
+pub fn SpanSdk::parent_is_remote(Self) -> Bool?
 pub fn SpanSdk::parent_span_id(Self) -> Array[Int32]
 pub fn SpanSdk::record_exception(Self, Error, exception_type? : String, stacktrace? : String, attributes? : Map[String, AttributeValue], time_unix_nano? : Int64) -> Unit
 pub fn SpanSdk::set_attribute(Self, String, AttributeValue) -> Unit

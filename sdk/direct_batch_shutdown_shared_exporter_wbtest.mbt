@@ -55,6 +55,7 @@ fn direct_shutdown_span(name : String) -> SpanData {
       1,
     ),
     parent_span_id: [],
+    parent_is_remote: None,
     kind: @api.SpanKind::Internal,
     start_time_unix_nano: 1L,
     end_time_unix_nano: 2L,

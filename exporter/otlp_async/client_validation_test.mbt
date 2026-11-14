@@ -11,6 +11,7 @@ fn validation_span_data() -> @sdk.SpanData {
       @api.TRACE_FLAGS_SAMPLED,
     ),
     parent_span_id: [],
+    parent_is_remote: None,
     kind: @api.SpanKind::Internal,
     start_time_unix_nano: 1L,
     end_time_unix_nano: 2L,

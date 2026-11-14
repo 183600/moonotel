@@ -212,6 +212,7 @@ fn jf_random_span(rng : JfRng) -> @sdk.SpanData {
       tracestate=jf_random_text(rng, 3),
     ),
     parent_span_id: jf_random_bytes(rng, 8),
+    parent_is_remote: None,
     kind: @api.SpanKind::Server,
     start_time_unix_nano: jf_ints[rng.below(jf_ints.length())],
     end_time_unix_nano: jf_ints[rng.below(jf_ints.length())],

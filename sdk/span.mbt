@@ -63,6 +63,10 @@ pub(all) struct SpanData {
   name : String
   span_context : @api.SpanContext
   parent_span_id : Array[Int32]
+  // Whether the parent SpanContext came from a remote peer. `None` means the
+  // span has no parent or the parent's origin is unknown; `Some(false)` means
+  // the parent was created locally. OTLP encodes this as Span.flags bits 8-9.
+  parent_is_remote : Bool?
   kind : @api.SpanKind
   start_time_unix_nano : Int64
   end_time_unix_nano : Int64
@@ -94,6 +98,7 @@ pub struct SpanSdk {
   mut name : String
   context : @api.SpanContext
   parent_span_id : Array[Int32]
+  parent_is_remote : Bool?
   kind : @api.SpanKind
   start_time_unix_nano : Int64
   mut end_time_unix_nano : Int64
@@ -132,6 +137,7 @@ fn create_span(
   name : String,
   context : @api.SpanContext,
   parent_span_id : Array[Int32],
+  parent_is_remote : Bool?,
   kind : @api.SpanKind,
   start_time_unix_nano : Int64,
   recording : Bool,
@@ -147,6 +153,7 @@ fn create_span(
     name,
     context,
     parent_span_id,
+    parent_is_remote,
     kind,
     start_time_unix_nano,
     end_time_unix_nano: 0,
@@ -456,6 +463,15 @@ pub fn SpanSdk::end_time_unix_nano(self : SpanSdk) -> Int64 {
 ///|
 pub fn SpanSdk::parent_span_id(self : SpanSdk) -> Array[Int32] {
   self.parent_span_id.copy()
+}
+
+// Whether the parent SpanContext came from a remote peer. `None` for a root
+// span, `Some(false)` for a locally-created parent and `Some(true)` for a
+// parent received through a propagator.
+
+///|
+pub fn SpanSdk::parent_is_remote(self : SpanSdk) -> Bool? {
+  self.parent_is_remote
 }
 
 // The recorded attributes (empty for non-recording spans). The returned map
@@ -1069,6 +1085,7 @@ fn SpanData::take_from_span(span : SpanSdk) -> SpanData {
     name: span.name,
     span_context: @api.SpanContext::copy(span.context),
     parent_span_id: span.parent_span_id.copy(),
+    parent_is_remote: span.parent_is_remote,
     kind: span.kind,
     start_time_unix_nano: span.start_time_unix_nano,
     end_time_unix_nano: span.end_time_unix_nano,

@@ -14,6 +14,7 @@ fn accept_test_span_data() -> @sdk.SpanData {
     name: "otlp-async-accept-op",
     span_context,
     parent_span_id: [],
+    parent_is_remote: None,
     kind: @api.SpanKind::Client,
     start_time_unix_nano: 1000L,
     end_time_unix_nano: 2000L,

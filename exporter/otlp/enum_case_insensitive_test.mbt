@@ -82,6 +82,7 @@ fn enum_case_span() -> @sdk.SpanData {
     name: "enum-case",
     span_context: context,
     parent_span_id: [],
+    parent_is_remote: None,
     kind: @api.SpanKind::Internal,
     start_time_unix_nano: 1L,
     end_time_unix_nano: 2L,
