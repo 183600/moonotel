@@ -973,7 +973,7 @@ async fn open_request(
   url : String,
   request_method : @http.RequestMethod,
   headers : @http.Headers,
-  body : Bytes,
+  body : &@io.Data,
 ) -> (@http.Response, @http.Client) {
   let (origin, path_target) = split_url_for_transport(url)
   let target = match request_method {
@@ -1089,13 +1089,16 @@ pub async fn request(
     None => default_tracer()
   }
   match active_tracer {
-    None =>
-      @http.request(
-        normalize_url_for_transport(url),
+    None => {
+      let (response, client) = open_request(
+        url,
         request_method,
         plain_headers(headers),
         body,
       )
+      defer client.close()
+      (response, client.read_all())
+    }
     Some(tracer) => {
       let request_context : @context.Context = match context {
         Some(value) => value
