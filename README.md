@@ -356,7 +356,10 @@ omits `server.port` instead of assuming 80. The `url.full` attribute strips
 credentials from both absolute URLs and network-path references
 (`//user:pass@host/path`), and a non-empty `url.fragment` is recorded separately
 (an empty fragment is omitted). `user_agent.original` records the request's
-`User-Agent` value.
+`User-Agent` value. A usable caller-supplied `Content-Length` selects
+fixed-length body framing, while a malformed or negative value is ignored and
+the body is sent with chunked encoding; `Transfer-Encoding` remains
+transport-managed.
 
 ## OTLP/HTTP export
 

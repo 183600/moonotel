@@ -12,24 +12,46 @@ async fn captured_client_span(
   tracer : @sdk.Tracer,
   exporter : RecordingExporter,
   request_headers : Map[String, String],
+  request_body? : &@io.Data,
+  received_content_length? : Ref[String?],
 ) -> @sdk.SpanData {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      server.run_forever() <| ((_request, _body, connection) => {
+      server.run_forever() <| ((request, body, connection) => {
+        let _ = body.read_all()
+        match received_content_length {
+          Some(received) =>
+            received.val = request.headers.get(
+              @http.CaseInsensitiveString("content-length"),
+            )
+          None => ()
+        }
         let headers : @http.Headers = Map([
           (@http.CaseInsensitiveString("X-Reply"), "captured"),
         ])
         connection.send_response(200, "OK", extra_headers=headers)
       })
     }
-    let (response, _body) = @async_http_client.get(
-      "http://127.0.0.1:\{port}/capture",
-      headers=request_headers,
-      tracer~,
-      context=@context.Context::root(),
-    )
+    let url = "http://127.0.0.1:\{port}/capture"
+    let (response, _body) = match request_body {
+      Some(body) =>
+        @async_http_client.post(
+          url,
+          body,
+          headers=request_headers,
+          tracer~,
+          context=@context.Context::root(),
+        )
+      None =>
+        @async_http_client.get(
+          url,
+          headers=request_headers,
+          tracer~,
+          context=@context.Context::root(),
+        )
+    }
     assert_eq(response.code, 200)
   }
   assert_eq(exporter.spans.val.length(), 1)
@@ -116,4 +138,58 @@ async test "client header capture follows the configured environment" {
     _ =>
       fail("expected the User-Agent header added by the client to be captured")
   }
+  // A caller-supplied Content-Length is written by the transport, which also
+  // drops the caller's Transfer-Encoding. Capture must show that fixed-length
+  // form instead of the chunked framing used for unknown-length bodies.
+  let (tracer, exporter) = test_tracer("client-header-capture")
+  let received_content_length : Ref[String?] = Ref(None)
+  let data = captured_client_span(
+    tracer,
+    exporter,
+    { "Content-Length": "7", "Transfer-Encoding": "gzip" },
+    request_body="payload",
+    received_content_length=received_content_length,
+  )
+  assert_eq(received_content_length.val, Some("7"))
+  assert_eq(
+    data.attributes.get("http.request.header.content-length"),
+    Some(@sdk.StringArrayValue(["7"])),
+  )
+  assert_eq(
+    data.attributes.get("http.request.header.transfer-encoding"),
+    None,
+  )
+  // Without Content-Length the transport frames the body with chunked
+  // encoding, even when the caller attempted to set Transfer-Encoding.
+  let (tracer, exporter) = test_tracer("client-header-capture")
+  let data = captured_client_span(
+    tracer,
+    exporter,
+    { "Transfer-Encoding": "gzip" },
+    request_body="payload",
+  )
+  assert_eq(
+    data.attributes.get("http.request.header.transfer-encoding"),
+    Some(@sdk.StringArrayValue(["chunked"])),
+  )
+  // An unusable Content-Length is ignored, so the transport falls back to
+  // chunked framing instead of aborting the request.
+  let (tracer, exporter) = test_tracer("client-header-capture")
+  let received_content_length : Ref[String?] = Ref(None)
+  let data = captured_client_span(
+    tracer,
+    exporter,
+    { "Content-Length": "not-a-number" },
+    request_body="payload",
+    received_content_length=received_content_length,
+  )
+  assert_eq(received_content_length.val, None)
+  assert_eq(
+    data.attributes.get("http.request.header.content-length"),
+    None,
+  )
+  assert_eq(
+    data.attributes.get("http.request.header.transfer-encoding"),
+    Some(@sdk.StringArrayValue(["chunked"])),
+  )
 }

@@ -735,11 +735,22 @@ fn sanitize_wire_header_value(value : String) -> String {
   sb.to_string()
 }
 
+// Whether the transport can use this `Content-Length` value. The transport
+// parses the trimmed value and writes the header; a malformed or negative
+// count cannot frame the body.
+
+///|
+fn is_usable_content_length(value : String) -> Bool {
+  try @string.parse_int64(value.trim(), base=10) >= 0L catch {
+    _ => false
+  }
+}
+
 // Reconstruct the request headers that the async HTTP transport writes. The
-// transport filters invalid or forbidden names, strips CR/LF from values and
-// adds `Accept-Encoding` and request-body framing itself, without updating the
-// caller's map. Header capture must therefore describe this wire form, not the
-// pre-send map.
+// transport filters invalid names, strips CR/LF from values, writes a usable
+// `Content-Length`, drops `Transfer-Encoding` and adds `Accept-Encoding` and
+// request-body framing itself, without updating the caller's map. Header
+// capture must therefore describe this wire form, not the pre-send map.
 
 ///|
 fn wire_request_headers(
@@ -751,14 +762,25 @@ fn wire_request_headers(
     capacity=map_capacity_for_entries(headers.length() + 2),
   )
   let mut has_accept_encoding = false
+  let mut has_content_length = false
   for key, value in headers {
     let name = key.to_string()
     if !is_valid_http_header_name(name) {
       continue
     }
     let lower = name.to_lower()
-    // The transport owns framing and never forwards these fields.
-    if lower == "content-length" || lower == "transfer-encoding" {
+    if lower == "content-length" {
+      // A usable caller-supplied length selects fixed-length framing and is
+      // forwarded per request. Unusable values are ignored above, so the
+      // transport falls back to chunked framing.
+      let value = sanitize_wire_header_value(value)
+      if is_usable_content_length(value) {
+        has_content_length = true
+        out.set(key, value)
+      }
+      continue
+    }
+    if lower == "transfer-encoding" {
       continue
     }
     if lower == "accept-encoding" {
@@ -769,11 +791,12 @@ fn wire_request_headers(
   if !has_accept_encoding {
     out.set(@http.CaseInsensitiveString("accept-encoding"), "gzip,identity")
   }
-  // A non-empty request body is sent with chunked framing. An empty request
-  // body has no body-framing field at all: the transport ends the header block
-  // with a bare CRLF rather than adding `Content-Length: 0` (unlike a response
-  // with no body). Capture exactly that wire form.
-  if request_body_size > 0 {
+  // A non-empty request body is sent with chunked framing unless the caller
+  // supplied a `Content-Length`. An empty request body has no body-framing
+  // field at all: the transport ends the header block with a bare CRLF rather
+  // than adding `Content-Length: 0` (unlike a response with no body). Capture
+  // exactly that wire form.
+  if request_body_size > 0 && !has_content_length {
     out.set(@http.CaseInsensitiveString("transfer-encoding"), "chunked")
   }
   out
@@ -927,6 +950,24 @@ fn connect_authority_target(url : String) -> String? {
   Some(host + ":" + port.to_string())
 }
 
+// The async client accepts a per-request `Content-Length`, but drops it from
+// the persistent headers used to construct the client. Forward a usable value
+// as request framing so callers can select fixed-length bodies; an unusable
+// value is ignored and the transport falls back to chunked framing.
+
+///|
+fn request_framing_headers(headers : @http.Headers) -> @http.Headers {
+  match headers.get(@http.CaseInsensitiveString("content-length")) {
+    Some(value) =>
+      if is_usable_content_length(value) {
+        Map([(@http.CaseInsensitiveString("content-length"), value)])
+      } else {
+        Map([], capacity=1)
+      }
+    None => Map([], capacity=1)
+  }
+}
+
 ///|
 async fn open_request(
   url : String,
@@ -943,9 +984,10 @@ async fn open_request(
       }
     _ => path_target
   }
+  let framing_headers = request_framing_headers(headers)
   let client = @http.Client(origin, headers~)
   errdefer client.close()
-  client.request(request_method, target)
+  client.request(request_method, target, extra_headers=framing_headers)
   client.write(body)
   let response = client.end_request()
   (response, client)
