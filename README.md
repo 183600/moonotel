@@ -562,6 +562,8 @@ environment configuration:
 | `OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT` | Event attribute limit |
 | `OTEL_LINK_ATTRIBUTE_COUNT_LIMIT` | Link attribute limit |
 | `OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT` | String attribute value length limit |
+| `OTEL_ATTRIBUTE_COUNT_LIMIT` | Fallback attribute limit for spans, events and links |
+| `OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT` | Fallback string attribute value length limit |
 | `OTEL_RESOURCE_ATTRIBUTES` | `key=value,key2=value2`; keys and values are percent-decoded |
 | `OTEL_PROPAGATORS` | Global propagators; default `tracecontext,baggage`, `none` disables propagation |
 | `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_*` | Opt into request/response header capture |
