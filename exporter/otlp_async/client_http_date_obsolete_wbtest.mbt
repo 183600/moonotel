@@ -100,3 +100,44 @@ test "rfc850_compares_the_full_timestamp_to_the_fifty_year_window" {
   let value = "Sunday, 31-Dec-" + two_digit_year(future_year) + " 23:59:59 GMT"
   assert_eq(retry_after_millis(value), Some(0))
 }
+
+///|
+test "fifty_year_cutoff_compares_the_whole_timestamp" {
+  let (year, month, day, hour, minute, second) = current_utc_datetime()
+  let cutoff_year = year + 50
+  // A year beyond the cutoff is always more than 50 years in the future.
+  assert_true(is_more_than_fifty_years_future(cutoff_year + 1, 1, 1, 0, 0, 0))
+  assert_false(
+    is_more_than_fifty_years_future(cutoff_year - 1, 12, 31, 23, 59, 59),
+  )
+  // A different day, hour or minute in the cutoff year decides the comparison
+  // only when all earlier components are equal.
+  let last_day = days_in_month(cutoff_year, month)
+  let same_day = if day <= last_day { day } else { last_day }
+  let other_day = if same_day < last_day { same_day + 1 } else { same_day - 1 }
+  assert_eq(
+    is_more_than_fifty_years_future(cutoff_year, month, other_day, 0, 0, 0),
+    other_day > same_day,
+  )
+  let other_hour = if hour < 23 { hour + 1 } else { 0 }
+  assert_eq(
+    is_more_than_fifty_years_future(
+      cutoff_year, month, same_day, other_hour, 0, 0,
+    ),
+    other_hour > hour,
+  )
+  let other_minute = if minute < 59 { minute + 1 } else { 0 }
+  assert_eq(
+    is_more_than_fifty_years_future(
+      cutoff_year, month, same_day, hour, other_minute, 0,
+    ),
+    other_minute > minute,
+  )
+  let other_second = if second < 59 { second + 1 } else { 0 }
+  assert_eq(
+    is_more_than_fifty_years_future(
+      cutoff_year, month, same_day, hour, minute, other_second,
+    ),
+    other_second > second,
+  )
+}
