@@ -63,9 +63,10 @@ pub(all) struct SpanData {
   name : String
   span_context : @api.SpanContext
   parent_span_id : Array[Int32]
-  // Whether the parent SpanContext came from a remote peer. `None` means the
-  // span has no parent or the parent's origin is unknown; `Some(false)` means
-  // the parent was created locally. OTLP encodes this as Span.flags bits 8-9.
+  // Whether the parent SpanContext came from a remote peer. `Some(true)` means
+  // a remote parent; `Some(false)` means a locally-created parent or a root
+  // span; `None` means the origin is unknown (for example on manually
+  // constructed data). OTLP encodes this as Span.flags bits 8-9.
   parent_is_remote : Bool?
   kind : @api.SpanKind
   start_time_unix_nano : Int64
@@ -465,9 +466,9 @@ pub fn SpanSdk::parent_span_id(self : SpanSdk) -> Array[Int32] {
   self.parent_span_id.copy()
 }
 
-// Whether the parent SpanContext came from a remote peer. `None` for a root
-// span, `Some(false)` for a locally-created parent and `Some(true)` for a
-// parent received through a propagator.
+// Whether the parent SpanContext came from a remote peer. `Some(true)` for a
+// parent received through a propagator, `Some(false)` for a root span or a
+// locally-created parent, and `None` when the origin is unknown.
 
 ///|
 pub fn SpanSdk::parent_is_remote(self : SpanSdk) -> Bool? {
