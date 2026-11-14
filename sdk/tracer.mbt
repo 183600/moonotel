@@ -55,10 +55,10 @@ pub fn Tracer::start_span(
     Some(ctx) => if has_live_valid_ids(ctx) { Some(ctx) } else { None }
     None => None
   }
-  let parent_is_remote : Bool? = match valid_parent {
-    Some(ctx) => Some(ctx.is_remote())
-    None => None
-  }
+  let parent_is_remote : Bool? = Some(match valid_parent {
+    Some(ctx) => ctx.is_remote()
+    None => false
+  })
   let span_kind = kind.unwrap_or(@api.SpanKind::Internal)
   let start_time = match start_time_unix_nano {
     Some(value) => value

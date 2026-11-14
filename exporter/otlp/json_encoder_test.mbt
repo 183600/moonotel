@@ -259,7 +259,7 @@ test "json_encoder_events_and_links" {
     json_string_value(json_member(links[0], "spanId")),
     "b7ad6b7169203331",
   )
-  assert_eq(json_number_value(json_member(links[0], "flags")), 0.0)
+  assert_eq(json_number_value(json_member(links[0], "flags")), 256.0)
 }
 
 ///|

@@ -22,7 +22,9 @@ test "span_records_root_local_and_remote_parent_origin" {
   let root = tracer.start_root_span("root")
   let local_child = tracer.start_span("local-child", parent=root.context())
   let remote_child = tracer.start_span("remote-child", parent=remote_parent)
-  assert_eq(root.parent_is_remote(), None)
+  // The SDK knows the parent state even for a root span: there is no remote
+  // parent, which OTLP encodes as the "known, not remote" state.
+  assert_eq(root.parent_is_remote(), Some(false))
   assert_eq(local_child.parent_is_remote(), Some(false))
   assert_eq(remote_child.parent_is_remote(), Some(true))
   root.end()
@@ -31,7 +33,7 @@ test "span_records_root_local_and_remote_parent_origin" {
   let spans = exporter.exported_spans()
   assert_eq(spans.length(), 3)
   assert_eq(spans[0].name, "root")
-  assert_eq(spans[0].parent_is_remote, None)
+  assert_eq(spans[0].parent_is_remote, Some(false))
   assert_eq(spans[1].name, "local-child")
   assert_eq(spans[1].parent_is_remote, Some(false))
   assert_eq(spans[2].name, "remote-child")

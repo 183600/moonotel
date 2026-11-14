@@ -1,6 +1,7 @@
 // OTLP `flags` is a 32-bit bit field whose bits 0-7 hold the W3C trace flags.
-// When a span/link message is created from a runtime SpanContext, the high
-// bits must be zero rather than a copy of an oversized trace-flags value.
+// When a span/link message is created from a runtime SpanContext, bits 10-31
+// must be zero rather than a copy of an oversized trace-flags value; bits 8-9
+// may carry the remote-context state.
 
 ///|
 fn flags_mask_span(trace_flags : Int32) -> @sdk.SpanData {
@@ -33,7 +34,7 @@ test "protobuf_flags_drop_reserved_high_bits" {
   let link_flags = first_of(link, 6).unwrap()
   assert_eq(link_flags.wire, 5)
   assert_eq(link_flags.payload.at(0).to_int() & 0xFF, 0xFF)
-  assert_eq(link_flags.payload.at(1).to_int(), 0)
+  assert_eq(link_flags.payload.at(1).to_int(), 1)
   assert_eq(link_flags.payload.at(2).to_int(), 0)
   assert_eq(link_flags.payload.at(3).to_int(), 0)
 }
@@ -47,5 +48,5 @@ test "json_flags_drop_reserved_high_bits" {
   )
   assert_eq(json_number_value(json_member(span, "flags")), 255.0)
   let links = json_array_value(json_member(span, "links"))
-  assert_eq(json_number_value(json_member(links[0], "flags")), 255.0)
+  assert_eq(json_number_value(json_member(links[0], "flags")), 511.0)
 }

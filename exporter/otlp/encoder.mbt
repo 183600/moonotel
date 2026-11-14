@@ -19,34 +19,31 @@ const OTLP_FLAGS_CONTEXT_HAS_IS_REMOTE : Int32 = 0x100
 const OTLP_FLAGS_CONTEXT_IS_REMOTE : Int32 = 0x200
 
 ///|
-fn otlp_link_flags(context : @api.SpanContext) -> Int32 {
-  let flags = otlp_flags(context.trace_flags())
-  if context.is_remote() {
-    flags | OTLP_FLAGS_CONTEXT_HAS_IS_REMOTE | OTLP_FLAGS_CONTEXT_IS_REMOTE
+fn otlp_remote_context_flags(trace_flags : Int32, is_remote : Bool) -> Int32 {
+  let flags = otlp_flags(trace_flags) | OTLP_FLAGS_CONTEXT_HAS_IS_REMOTE
+  if is_remote {
+    flags | OTLP_FLAGS_CONTEXT_IS_REMOTE
   } else {
     flags
   }
 }
 
+///|
+fn otlp_link_flags(context : @api.SpanContext) -> Int32 {
+  otlp_remote_context_flags(context.trace_flags(), context.is_remote())
+}
+
 // Span flags bits 8-9 describe whether the span's parent came from a remote
-// peer. A root span (or a span whose parent origin is unknown) leaves both
-// bits clear; a local parent sets the "known" bit, and a remote parent sets
-// both the "known" and "is remote" bits.
+// peer. `None` leaves the state unknown; a known local parent (including a
+// root span) sets the "known" bit, and a remote parent sets both the "known"
+// and "is remote" bits.
 
 ///|
 fn otlp_span_flags(data : @sdk.SpanData) -> Int32 {
-  let flags = otlp_flags(data.span_context.trace_flags())
-  if !has_encodable_parent_span_id(data.parent_span_id) {
-    return flags
-  }
   match data.parent_is_remote {
     Some(is_remote) =>
-      if is_remote {
-        flags | OTLP_FLAGS_CONTEXT_HAS_IS_REMOTE | OTLP_FLAGS_CONTEXT_IS_REMOTE
-      } else {
-        flags | OTLP_FLAGS_CONTEXT_HAS_IS_REMOTE
-      }
-    None => flags
+      otlp_remote_context_flags(data.span_context.trace_flags(), is_remote)
+    None => otlp_flags(data.span_context.trace_flags())
   }
 }
 
