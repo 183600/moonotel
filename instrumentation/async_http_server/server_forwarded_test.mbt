@@ -153,6 +153,39 @@ async test "server records the original client from Forwarded for" {
 }
 
 ///|
+async test "quoted Forwarded values keep separators and escapes inside parameters" {
+  let (tracer, exporter) = forwarded_tracer("forwarded-quoted-test")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_on(server, call => call.respond(204), tracer~)
+    }
+    send_forwarded_request(
+      port,
+      "GET /items HTTP/1.1\r\nHost: backend.internal\r\nForwarded: FOR=\"192\\.0\\.2\\.1\";Host=\"public\\.example\\.com:9443\";Proto=\"https\";ext=\"a;b,c\\\"d\"\r\nX-Forwarded-Host: ignored.example.com\r\nX-Forwarded-For: 203.0.113.7\r\nConnection: close\r\n\r\n",
+    )
+    @async.sleep(50)
+    assert_eq(exporter.exported_spans().length(), 1)
+    let data = exporter.exported_spans()[0]
+    assert_eq(
+      data.attributes.get(@sdk.SERVER_ADDRESS),
+      Some(@sdk.StringValue("public.example.com")),
+    )
+    assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(9443)))
+    assert_eq(
+      data.attributes.get(@sdk.URL_SCHEME),
+      Some(@sdk.StringValue("https")),
+    )
+    assert_eq(
+      data.attributes.get(@sdk.CLIENT_ADDRESS),
+      Some(@sdk.StringValue("192.0.2.1")),
+    )
+    assert_eq(data.attributes.get(@sdk.CLIENT_PORT), None)
+  }
+}
+
+///|
 async test "X-Forwarded-For without a port does not reuse the peer port" {
   let (tracer, exporter) = forwarded_tracer("x-forwarded-client-test")
   @async.with_task_group() <| group => {
