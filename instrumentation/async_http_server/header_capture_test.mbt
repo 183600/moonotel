@@ -142,4 +142,21 @@ async test "server header capture follows the configured environment" {
     data.attributes.get("http.response.header.transfer-encoding"),
     Some(@sdk.StringArrayValue(["chunked"])),
   )
+  // The transport drops a handler-supplied `Transfer-Encoding`; with an
+  // explicit usable `Content-Length` no framing header is added back.
+  let (tracer, exporter) = header_capture_tracer()
+  let data = captured_server_span(
+    tracer,
+    exporter,
+    {},
+    { "Transfer-Encoding": "gzip", "Content-Length": "2" },
+  )
+  assert_eq(
+    data.attributes.get("http.response.header.transfer-encoding"),
+    None,
+  )
+  assert_eq(
+    data.attributes.get("http.response.header.content-length"),
+    Some(@sdk.StringArrayValue(["2"])),
+  )
 }
