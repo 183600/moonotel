@@ -323,7 +323,218 @@ fn has_invalid_authority_char(text : StringView) -> Bool {
   false
 }
 
-// Split a `host[:port]` authority into its host and port. Bracketed IPv6
+///|
+fn is_hex_code(code : Int32) -> Bool {
+  (code >= 0x30 && code <= 0x39) ||
+  (code >= 0x41 && code <= 0x46) ||
+  (code >= 0x61 && code <= 0x66)
+}
+
+///|
+fn is_hex_group(text : StringView) -> Bool {
+  let len = text.length()
+  if len == 0 || len > 4 {
+    return false
+  }
+  let mut i = 0
+  while i < len {
+    if !is_hex_code(text.unsafe_get(i).to_int()) {
+      return false
+    }
+    i = i + 1
+  }
+  true
+}
+
+///|
+fn is_ipv4_octet(text : StringView) -> Bool {
+  let len = text.length()
+  if len == 0 || len > 3 {
+    return false
+  }
+  let mut value = 0
+  let mut i = 0
+  while i < len {
+    let code = text.unsafe_get(i).to_int()
+    if code < 0x30 || code > 0x39 {
+      return false
+    }
+    value = value * 10 + (code - 0x30)
+    i = i + 1
+  }
+  value <= 255
+}
+
+///|
+fn is_ipv4_literal(text : StringView) -> Bool {
+  let len = text.length()
+  let mut parts = 0
+  let mut start = 0
+  while start <= len {
+    let mut end = start
+    while end < len && text.unsafe_get(end).to_int() != 0x2E {
+      end = end + 1
+    }
+    if !is_ipv4_octet(text[start:end]) {
+      return false
+    }
+    parts = parts + 1
+    if end == len {
+      break
+    }
+    start = end + 1
+  }
+  parts == 4
+}
+
+///|
+fn count_ipv6_side_groups(text : StringView, allow_ipv4_tail : Bool) -> Int32 {
+  let len = text.length()
+  if len == 0 {
+    return 0
+  }
+  let mut count = 0
+  let mut start = 0
+  while start <= len {
+    let mut end = start
+    while end < len && text.unsafe_get(end).to_int() != 0x3A {
+      end = end + 1
+    }
+    let part = text[start:end]
+    if part.length() == 0 {
+      return -1
+    }
+    if end == len && allow_ipv4_tail && part.find(".") is Some(_) {
+      if !is_ipv4_literal(part) {
+        return -1
+      }
+      count = count + 2
+    } else {
+      if !is_hex_group(part) {
+        return -1
+      }
+      count = count + 1
+    }
+    if end == len {
+      break
+    }
+    start = end + 1
+  }
+  count
+}
+
+///|
+fn is_valid_ipv6_zone(zone : StringView) -> Bool {
+  let len = zone.length()
+  if len == 0 {
+    return false
+  }
+  let mut i = 0
+  while i < len {
+    let code = zone.unsafe_get(i).to_int()
+    if code <= 0x20 ||
+      code == 0x2F ||
+      code == 0x3F ||
+      code == 0x23 ||
+      code == 0x40 ||
+      code == 0x5B ||
+      code == 0x5D ||
+      code == 0x7F {
+      return false
+    }
+    i = i + 1
+  }
+  true
+}
+
+///|
+fn is_ipvfuture_char(code : Int32) -> Bool {
+  (code >= 0x30 && code <= 0x39) ||
+  (code >= 0x41 && code <= 0x5A) ||
+  (code >= 0x61 && code <= 0x7A) ||
+  code == 0x2D ||
+  code == 0x2E ||
+  code == 0x5F ||
+  code == 0x7E ||
+  code == 0x21 ||
+  code == 0x24 ||
+  code == 0x26 ||
+  code == 0x27 ||
+  code == 0x28 ||
+  code == 0x29 ||
+  code == 0x2A ||
+  code == 0x2B ||
+  code == 0x2C ||
+  code == 0x3B ||
+  code == 0x3D ||
+  code == 0x3A
+}
+
+///|
+fn is_ipvfuture_literal(text : StringView) -> Bool {
+  let len = text.length()
+  if len < 4 {
+    return false
+  }
+  let dot = match text.find(".") {
+    Some(index) => index
+    None => return false
+  }
+  if dot < 2 || dot + 1 >= len {
+    return false
+  }
+  let mut i = 1
+  while i < dot {
+    if !is_hex_code(text.unsafe_get(i).to_int()) {
+      return false
+    }
+    i = i + 1
+  }
+  i = dot + 1
+  while i < len {
+    if !is_ipvfuture_char(text.unsafe_get(i).to_int()) {
+      return false
+    }
+    i = i + 1
+  }
+  true
+}
+
+///|
+fn is_bracketed_ip_literal(text : StringView) -> Bool {
+  let len = text.length()
+  if len == 0 {
+    return false
+  }
+  let first = text.unsafe_get(0).to_int()
+  if first == 0x76 || first == 0x56 {
+    return is_ipvfuture_literal(text)
+  }
+  let literal = match text.find("%") {
+    Some(index) => {
+      if !is_valid_ipv6_zone(text[index + 1:]) {
+        return false
+      }
+      text[:index]
+    }
+    None => text
+  }
+  match literal.find("::") {
+    Some(index) => {
+      let left = literal[:index]
+      let right = literal[index + 2:]
+      if left.find("::") is Some(_) || right.find("::") is Some(_) {
+        return false
+      }
+      let left_groups = count_ipv6_side_groups(left, false)
+      let right_groups = count_ipv6_side_groups(right, true)
+      left_groups >= 0 && right_groups >= 0 && left_groups + right_groups < 8
+    }
+    None => count_ipv6_side_groups(literal, true) == 8
+  }
+}
+
+// Split a `host[:port]` authority into its host and port. Bracketed IP
 // literals keep their brackets because `split_url` exposes the authority
 // spelling; `None` means the authority is malformed. An unbracketed authority
 // may contain at most one colon, and a bracketed literal must end before any
@@ -348,9 +559,7 @@ fn split_url_host_port(
     }
     let literal = host_port[:close + 1].to_owned()
     let address = strip_ipv6_brackets(literal)
-    if address == "" ||
-      address.find("[") is Some(_) ||
-      address.find("]") is Some(_) {
+    if !is_bracketed_ip_literal(address) {
       return None
     }
     let rest = host_port[close + 1:]
@@ -361,14 +570,16 @@ fn split_url_host_port(
       return None
     }
     let port_text = rest[1:]
-    Some((
-      literal,
-      if port_text.length() == 0 {
-        default_port
-      } else {
-        parse_port(port_text)
-      },
-    ))
+    Some(
+      (
+        literal,
+        if port_text.length() == 0 {
+          default_port
+        } else {
+          parse_port(port_text)
+        },
+      ),
+    )
   } else {
     if host_port.find("[") is Some(_) || host_port.find("]") is Some(_) {
       return None
@@ -384,14 +595,16 @@ fn split_url_host_port(
         if port_text.find(":") is Some(_) {
           return None
         }
-        Some((
-          host,
-          if port_text.length() == 0 {
-            default_port
-          } else {
-            parse_port(port_text)
-          },
-        ))
+        Some(
+          (
+            host,
+            if port_text.length() == 0 {
+              default_port
+            } else {
+              parse_port(port_text)
+            },
+          ),
+        )
       }
     }
   }

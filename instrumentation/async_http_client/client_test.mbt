@@ -50,6 +50,14 @@ test "split_url handles schemes, ports, userinfo and IPv6 hosts" {
     @async_http_client.split_url("http://[::1]:4318/v1/traces"),
     ("[::1]", 4318),
   )
+  assert_eq(
+    @async_http_client.split_url("http://[::ffff:192.168.0.1]:8080/x"),
+    ("[::ffff:192.168.0.1]", 8080),
+  )
+  assert_eq(
+    @async_http_client.split_url("http://[fe80::1%25eth0]/x"),
+    ("[fe80::1%25eth0]", 80),
+  )
   assert_eq(@async_http_client.split_url("example.com"), ("example.com", 80))
   assert_eq(
     @async_http_client.split_url("HTTPS://example.com/x"),
@@ -84,11 +92,12 @@ test "split_url ignores query and fragment when no path is present" {
 
 ///|
 test "split_url rejects malformed ipv6 authorities" {
-  for url in [
-    "http://[::1/x", "http://[::1]junk/x", "http://[::1]junk:8080/x",
-    "http://[[::1]]/x", "http://::1/x", "http://2001:db8::1/x",
-    "http://example.com:8080:90/x", "http://foo]/x",
-  ] {
+  for
+    url in [
+      "http://[::1/x", "http://[::1]junk/x", "http://[::1]junk:8080/x", "http://[[::1]]/x",
+      "http://::1/x", "http://2001:db8::1/x", "http://example.com:8080:90/x", "http://foo]/x",
+      "http://[hello]/x", "http://[::1::2]/x", "http://[1:2:3:4:5:6:7]/x", "http://[::ffff:999.1.1.1]/x",
+    ] {
     assert_eq(@async_http_client.split_url(url), ("", -1))
   }
 }
@@ -110,18 +119,12 @@ test "split_url ignores invalid scheme separators" {
   )
   // A `://` after a prefix that is not a valid scheme belongs to a relative
   // path, so it must not be mistaken for an authority delimiter.
-  assert_eq(
-    @async_http_client.split_url("1http://example.com/x"),
-    ("", 80),
-  )
+  assert_eq(@async_http_client.split_url("1http://example.com/x"), ("", 80))
   assert_eq(
     @async_http_client.split_url("1http://example.com:8080/x"),
     ("", 80),
   )
-  assert_eq(
-    @async_http_client.split_url("ht_tp://example.com/x"),
-    ("", 80),
-  )
+  assert_eq(@async_http_client.split_url("ht_tp://example.com/x"), ("", 80))
 }
 
 ///|

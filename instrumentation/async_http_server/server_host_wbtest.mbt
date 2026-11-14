@@ -30,6 +30,15 @@ test "split_host_authority parses valid hosts" {
     split_host_authority("[2001:db8::1]:4318", 80),
     Some(("2001:db8::1", 4318)),
   )
+  assert_eq(
+    split_host_authority("[::ffff:192.168.0.1]", 80),
+    Some(("::ffff:192.168.0.1", 80)),
+  )
+  assert_eq(
+    split_host_authority("[fe80::1%25eth0]", 80),
+    Some(("fe80::1%25eth0", 80)),
+  )
+  assert_eq(split_host_authority("[v1.fe80]", 80), Some(("v1.fe80", 80)))
   assert_eq(split_host_authority("example.com", 80), Some(("example.com", 80)))
   assert_eq(
     split_host_authority("example.com:", 443),
@@ -43,10 +52,7 @@ test "split_host_authority parses valid hosts" {
     split_host_authority("example.com:not-a-port", 80),
     Some(("example.com", -1)),
   )
-  assert_eq(
-    split_host_authority("[::1]:not-a-port", 80),
-    Some(("::1", -1)),
-  )
+  assert_eq(split_host_authority("[::1]:not-a-port", 80), Some(("::1", -1)))
 }
 
 ///|
@@ -59,27 +65,36 @@ test "split_host_authority rejects malformed ipv6 literals" {
   assert_eq(split_host_authority("2001:db8::1", 80), None)
   assert_eq(split_host_authority("example.com:8080:90", 80), None)
   assert_eq(split_host_authority("foo]", 80), None)
+  assert_eq(split_host_authority("[hello]", 80), None)
+  assert_eq(split_host_authority("[::1::2]", 80), None)
+  assert_eq(split_host_authority("[1:2:3:4:5:6:7]", 80), None)
+  assert_eq(split_host_authority("[1:2:3:4:5:6:7:8:9]", 80), None)
+  assert_eq(split_host_authority("[1:2:3:4:5:6:7:8::]", 80), None)
+  assert_eq(split_host_authority("[::ffff:999.1.1.1]", 80), None)
+  assert_eq(split_host_authority("[::ffff:1.2.3]", 80), None)
+  assert_eq(split_host_authority("[v.fe80]", 80), None)
+  assert_eq(split_host_authority("[v1.]", 80), None)
 }
 
 ///|
 test "split_host_authority rejects whitespace and control characters" {
-  for authority in [
-    "exa mple.com", "exa\tmple.com", "exa\nmple.com", "exa\rmple.com",
-    "example.com :8080", "[::1] ", "[:: 1]", "example.com:\u{0001}",
-    "\u{007f}example.com",
-  ] {
+  for
+    authority in [
+      "exa mple.com", "exa\tmple.com", "exa\nmple.com", "exa\rmple.com", "example.com :8080",
+      "[::1] ", "[:: 1]", "example.com:\u{0001}", "\u{007f}example.com",
+    ] {
     assert_eq(split_host_authority(authority, 80), None)
   }
 }
 
 ///|
 test "split_host_authority rejects forbidden URI authority characters" {
-  for authority in [
-    "exa\"mple.com", "exa<mple.com", "exa>mple.com", "exa@mple.com",
-    "exa\\mple.com", "exa^mple.com", "exa`mple.com", "exa{mple.com",
-    "exa|mple.com", "exa}mple.com", "example.com\\path",
-    "example.com:80\"x\"", "user@example.com", "example.com:80@evil",
-  ] {
+  for
+    authority in [
+      "exa\"mple.com", "exa<mple.com", "exa>mple.com", "exa@mple.com", "exa\\mple.com",
+      "exa^mple.com", "exa`mple.com", "exa{mple.com", "exa|mple.com", "exa}mple.com",
+      "example.com\\path", "example.com:80\"x\"", "user@example.com", "example.com:80@evil",
+    ] {
     assert_eq(split_host_authority(authority, 80), None)
   }
 }
@@ -95,12 +110,13 @@ test "split_host_authority rejects URI delimiters" {
 
 ///|
 test "record_host_attributes ignores malformed host authorities" {
-  for host in [
-    "[::1", "[::1]junk", "[::1]junk:8080", "[[::1]]", "::1", "2001:db8::1",
-    "example.com:8080:90", "foo]", "example.com/path", "example.com?q=1",
-    "example.com#frag", "exa\"mple.com", "exa<mple.com", "exa\\mple.com",
-    "exa|mple.com",
-  ] {
+  for
+    host in [
+      "[::1", "[::1]junk", "[::1]junk:8080", "[[::1]]", "::1", "2001:db8::1", "example.com:8080:90",
+      "foo]", "example.com/path", "example.com?q=1", "example.com#frag", "exa\"mple.com",
+      "exa<mple.com", "exa\\mple.com", "exa|mple.com", "[hello]", "[::1::2]", "[1:2:3:4:5:6:7]",
+      "[::ffff:999.1.1.1]",
+    ] {
     let (span, exporter) = host_attribute_span()
     record_host_attributes(span, ows_header_map([("Host", host)]), "/")
     span.end()
@@ -139,4 +155,21 @@ test "record_host_attributes keeps a valid ipv6 host with an invalid port" {
     Some(@sdk.StringValue("::1")),
   )
   assert_eq(data.attributes.get(@sdk.SERVER_PORT), None)
+}
+
+///|
+test "record_host_attributes keeps an ipv4-tail ipv6 host" {
+  let (span, exporter) = host_attribute_span()
+  record_host_attributes(
+    span,
+    ows_header_map([("Host", "[::ffff:192.168.0.1]:8080")]),
+    "/",
+  )
+  span.end()
+  let data = exporter.exported_spans()[0]
+  assert_eq(
+    data.attributes.get(@sdk.SERVER_ADDRESS),
+    Some(@sdk.StringValue("::ffff:192.168.0.1")),
+  )
+  assert_eq(data.attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(8080)))
 }
