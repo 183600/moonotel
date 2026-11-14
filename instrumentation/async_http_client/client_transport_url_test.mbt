@@ -99,11 +99,10 @@ async test "client without a tracer honors a caller-supplied Content-Length" {
       })
     }
     let url = "http://127.0.0.1:\{port}/untraced-length"
-    let (response, body) = @async_http_client.post(
-      url,
-      "payload",
-      headers={ "Content-Length": "7", "Transfer-Encoding": "gzip" },
-    )
+    let (response, body) = @async_http_client.post(url, "payload", headers={
+      "Content-Length": "7",
+      "Transfer-Encoding": "gzip",
+    })
     assert_eq(response.code, 200)
     assert_eq(body.text(), "")
     assert_eq(received_content_length.val, Some("7"))
@@ -137,10 +136,7 @@ async test "client sends a root target for a query-only URL with a fragment" {
     assert_eq(exporter.spans.val.length(), 1)
     let data = exporter.spans.val[0]
     assert_eq(data.attributes.get(@sdk.URL_FULL), Some(@sdk.StringValue(url)))
-    assert_eq(
-      data.attributes.get(@sdk.URL_PATH),
-      Some(@sdk.StringValue("/")),
-    )
+    assert_eq(data.attributes.get(@sdk.URL_PATH), Some(@sdk.StringValue("/")))
     assert_eq(
       data.attributes.get(@sdk.URL_QUERY),
       Some(@sdk.StringValue("x=1")),

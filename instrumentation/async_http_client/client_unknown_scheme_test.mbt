@@ -19,8 +19,5 @@ test "split_url only defaults ports for http and https" {
     @async_http_client.split_url("ftp://[2001:db8::1]:2121/file"),
     ("[2001:db8::1]", 2121),
   )
-  assert_eq(
-    @async_http_client.split_url("http+unix://socket"),
-    ("socket", -1),
-  )
+  assert_eq(@async_http_client.split_url("http+unix://socket"), ("socket", -1))
 }

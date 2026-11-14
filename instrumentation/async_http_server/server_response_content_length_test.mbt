@@ -1,3 +1,4 @@
+///|
 async test "server reconciles response content-length with utf8 body bytes" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
@@ -13,6 +14,7 @@ async test "server reconciles response content-length with utf8 body bytes" {
   }
 }
 
+///|
 async test "server reconciles response content-length without a body" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))

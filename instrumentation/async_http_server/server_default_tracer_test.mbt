@@ -42,9 +42,7 @@ async test "run_server_on uses the global tracer provider by default" {
         call.respond(200, body="ok")
       })
     }
-    let (response, body) = @http.get(
-      "http://127.0.0.1:\{port}/default-tracer",
-    )
+    let (response, body) = @http.get("http://127.0.0.1:\{port}/default-tracer")
     assert_eq(response.code, 200)
     assert_eq(body.text(), "ok")
     @async.sleep(50)

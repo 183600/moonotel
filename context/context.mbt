@@ -703,8 +703,7 @@ pub fn Context::baggage(self : Context) -> Map[String, String] {
         }
         match context.key {
           Some(key) =>
-            if values.get(key) is None &&
-              !is_deleted_baggage_key(deleted, key) {
+            if values.get(key) is None && !is_deleted_baggage_key(deleted, key) {
               match context.value {
                 Some(value) => values.set(key, value)
                 None => deleted.push(key)

@@ -837,10 +837,7 @@ pub fn decode_export_response_json(
 ) -> @sdk.ExportResult {
   // The OTLP specification requires a response body size limit (4 MiB by
   // recommendation) to be enforced before parsing.
-  let max_size = normalize_size_limit(
-    max_size,
-    OTLP_MAX_RESPONSE_BODY_BYTES,
-  )
+  let max_size = normalize_size_limit(max_size, OTLP_MAX_RESPONSE_BODY_BYTES)
   if body.length() > max_size {
     return oversized_response(max_size)
   }

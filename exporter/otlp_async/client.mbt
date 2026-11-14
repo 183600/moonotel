@@ -893,12 +893,7 @@ pub async fn post_trace_request(
     body
   }
   let headers = request_headers(config, gzip)
-  post_trace_request_with_headers(
-    config,
-    body,
-    headers,
-    max_response_size,
-  )
+  post_trace_request_with_headers(config, body, headers, max_response_size)
 }
 
 // gzip-compress `body`, returning `None` when compression fails.

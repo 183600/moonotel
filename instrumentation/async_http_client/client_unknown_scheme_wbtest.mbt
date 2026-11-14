@@ -8,10 +8,7 @@ test "unknown scheme records an address without a fabricated port" {
     @http.RequestMethod::Get,
     0,
   )
-  assert_eq(
-    attributes.get(@sdk.URL_SCHEME),
-    Some(@sdk.StringValue("ftp")),
-  )
+  assert_eq(attributes.get(@sdk.URL_SCHEME), Some(@sdk.StringValue("ftp")))
   assert_eq(
     attributes.get(@sdk.SERVER_ADDRESS),
     Some(@sdk.StringValue("example.com")),
@@ -26,10 +23,7 @@ test "unknown scheme records an explicit port" {
     @http.RequestMethod::Get,
     0,
   )
-  assert_eq(
-    attributes.get(@sdk.SERVER_PORT),
-    Some(@sdk.IntValue(21)),
-  )
+  assert_eq(attributes.get(@sdk.SERVER_PORT), Some(@sdk.IntValue(21)))
 }
 
 ///|

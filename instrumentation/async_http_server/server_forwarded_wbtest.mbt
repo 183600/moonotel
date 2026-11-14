@@ -13,7 +13,10 @@ test "find_delimiter_outside_quotes_ignores_quoted_separators" {
 ///|
 test "unquote_forwarded_value_handles_quoted_and_plain_values" {
   assert_eq(unquote_forwarded_value("example.com"[:]), Some("example.com"))
-  assert_eq(unquote_forwarded_value(" \"example.com\" "[:]), Some("example.com"))
+  assert_eq(
+    unquote_forwarded_value(" \"example.com\" "[:]),
+    Some("example.com"),
+  )
   assert_eq(unquote_forwarded_value("\"a\\\"b\""[:]), Some("a\"b"))
   assert_eq(unquote_forwarded_value("\"unterminated"[:]), None)
   assert_eq(unquote_forwarded_value("bad\"quote"[:]), None)
@@ -70,7 +73,10 @@ test "first_header_token_takes_the_original_value" {
   )
   assert_eq(first_header_token(headers, "missing"), None)
   assert_eq(
-    first_header_token(ows_header_map([("X-Forwarded-Host", "  ")]), "x-forwarded-host"),
+    first_header_token(
+      ows_header_map([("X-Forwarded-Host", "  ")]),
+      "x-forwarded-host",
+    ),
     None,
   )
 }
@@ -144,30 +150,18 @@ test "effective_forwarded_host_prefers_forwarded_and_skips_invalid_values" {
 
 ///|
 test "parse_forwarded_node_accepts_ip_literals_and_ports" {
-  assert_eq(
-    parse_forwarded_node("192.0.2.43"),
-    Some(("192.0.2.43", None)),
-  )
+  assert_eq(parse_forwarded_node("192.0.2.43"), Some(("192.0.2.43", None)))
   assert_eq(
     parse_forwarded_node("192.0.2.43:1234"),
     Some(("192.0.2.43", Some(1234))),
   )
-  assert_eq(
-    parse_forwarded_node("0.0.0.0:0"),
-    Some(("0.0.0.0", Some(0))),
-  )
-  assert_eq(
-    parse_forwarded_node("[2001:db8::1]"),
-    Some(("2001:db8::1", None)),
-  )
+  assert_eq(parse_forwarded_node("0.0.0.0:0"), Some(("0.0.0.0", Some(0))))
+  assert_eq(parse_forwarded_node("[2001:db8::1]"), Some(("2001:db8::1", None)))
   assert_eq(
     parse_forwarded_node("[2001:db8::1]:4711"),
     Some(("2001:db8::1", Some(4711))),
   )
-  assert_eq(
-    parse_forwarded_node("2001:db8::1"),
-    Some(("2001:db8::1", None)),
-  )
+  assert_eq(parse_forwarded_node("2001:db8::1"), Some(("2001:db8::1", None)))
   assert_eq(
     parse_forwarded_node("[2001:db8::1%25eth0]:4711"),
     Some(("2001:db8::1%25eth0", Some(4711))),
@@ -180,12 +174,12 @@ test "parse_forwarded_node_accepts_ip_literals_and_ports" {
 
 ///|
 test "parse_forwarded_node_rejects_unknown_and_malformed_values" {
-  for value in [
-    "", "unknown", "_gazonk", "192.0.2.43:", "192.0.2.43:not-a-port",
-    "[2001:db8::1", "[2001:db8::1]junk", "[2001:db8::1]:",
-    "192.0.2.43:80:90", "01.2.3.4", "192.168.001.1:80", "0x7f.0.0.1",
-    "1.2.3.4:+80", "1.2.3", "[::1%]", "[1:2:3:4:5:6:7:8:9]",
-  ] {
+  for
+    value in [
+      "", "unknown", "_gazonk", "192.0.2.43:", "192.0.2.43:not-a-port", "[2001:db8::1",
+      "[2001:db8::1]junk", "[2001:db8::1]:", "192.0.2.43:80:90", "01.2.3.4", "192.168.001.1:80",
+      "0x7f.0.0.1", "1.2.3.4:+80", "1.2.3", "[::1%]", "[1:2:3:4:5:6:7:8:9]",
+    ] {
     assert_eq(parse_forwarded_node(value), None)
   }
 }

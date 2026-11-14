@@ -2,14 +2,12 @@
 // reverse proxy supplies `Forwarded` or `X-Forwarded-*` headers.
 
 ///|
-fn forwarded_tracer(
-  scope : String,
-) -> (@sdk.Tracer, @sdk.InMemorySpanExporter) {
+fn forwarded_tracer(scope : String) -> (@sdk.Tracer, @sdk.InMemorySpanExporter) {
   let exporter = @sdk.InMemorySpanExporter::new()
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
-  let provider = @sdk.TracerProviderSdk::new(
-    service_name="forwarded-test",
-  ).with_span_processor(processor)
+  let provider = @sdk.TracerProviderSdk::new(service_name="forwarded-test").with_span_processor(
+    processor,
+  )
   (provider.get_tracer(scope), exporter)
 }
 
@@ -30,11 +28,14 @@ async test "server uses X-Forwarded-Host and X-Forwarded-Proto" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      @async_http_server.run_server_on(server, call => call.respond(204), tracer~)
+      @async_http_server.run_server_on(
+        server,
+        call => call.respond(204),
+        tracer~,
+      )
     }
     send_forwarded_request(
-      port,
-      "GET /items HTTP/1.1\r\nHost: backend.internal\r\nX-Forwarded-Host: public.example.com:8443\r\nX-Forwarded-Proto: https\r\nConnection: close\r\n\r\n",
+      port, "GET /items HTTP/1.1\r\nHost: backend.internal\r\nX-Forwarded-Host: public.example.com:8443\r\nX-Forwarded-Proto: https\r\nConnection: close\r\n\r\n",
     )
     @async.sleep(50)
     assert_eq(exporter.exported_spans().length(), 1)
@@ -58,11 +59,14 @@ async test "Forwarded host overrides the absolute-form target and X-Forwarded-Ho
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      @async_http_server.run_server_on(server, call => call.respond(204), tracer~)
+      @async_http_server.run_server_on(
+        server,
+        call => call.respond(204),
+        tracer~,
+      )
     }
     send_forwarded_request(
-      port,
-      "GET http://backend.internal:8080/items HTTP/1.1\r\nHost: backend.internal\r\nForwarded: for=192.0.2.1;host=public.example.com:9443;proto=https\r\nX-Forwarded-Host: ignored.example.com\r\nConnection: close\r\n\r\n",
+      port, "GET http://backend.internal:8080/items HTTP/1.1\r\nHost: backend.internal\r\nForwarded: for=192.0.2.1;host=public.example.com:9443;proto=https\r\nX-Forwarded-Host: ignored.example.com\r\nConnection: close\r\n\r\n",
     )
     @async.sleep(50)
     assert_eq(exporter.exported_spans().length(), 1)
@@ -90,11 +94,14 @@ async test "Forwarded host without a port uses the forwarded scheme default" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      @async_http_server.run_server_on(server, call => call.respond(204), tracer~)
+      @async_http_server.run_server_on(
+        server,
+        call => call.respond(204),
+        tracer~,
+      )
     }
     send_forwarded_request(
-      port,
-      "GET /items HTTP/1.1\r\nHost: backend.internal\r\nForwarded: host=public.example.com;proto=https\r\nConnection: close\r\n\r\n",
+      port, "GET /items HTTP/1.1\r\nHost: backend.internal\r\nForwarded: host=public.example.com;proto=https\r\nConnection: close\r\n\r\n",
     )
     @async.sleep(50)
     assert_eq(exporter.exported_spans().length(), 1)
@@ -159,11 +166,14 @@ async test "quoted Forwarded values keep separators and escapes inside parameter
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      @async_http_server.run_server_on(server, call => call.respond(204), tracer~)
+      @async_http_server.run_server_on(
+        server,
+        call => call.respond(204),
+        tracer~,
+      )
     }
     send_forwarded_request(
-      port,
-      "GET /items HTTP/1.1\r\nHost: backend.internal\r\nForwarded: FOR=\"192\\.0\\.2\\.1\";Host=\"public\\.example\\.com:9443\";Proto=\"https\";ext=\"a;b,c\\\"d\"\r\nX-Forwarded-Host: ignored.example.com\r\nX-Forwarded-For: 203.0.113.7\r\nConnection: close\r\n\r\n",
+      port, "GET /items HTTP/1.1\r\nHost: backend.internal\r\nForwarded: FOR=\"192\\.0\\.2\\.1\";Host=\"public\\.example\\.com:9443\";Proto=\"https\";ext=\"a;b,c\\\"d\"\r\nX-Forwarded-Host: ignored.example.com\r\nX-Forwarded-For: 203.0.113.7\r\nConnection: close\r\n\r\n",
     )
     @async.sleep(50)
     assert_eq(exporter.exported_spans().length(), 1)
@@ -265,11 +275,14 @@ async test "server falls back from an invalid forwarded host" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      @async_http_server.run_server_on(server, call => call.respond(204), tracer~)
+      @async_http_server.run_server_on(
+        server,
+        call => call.respond(204),
+        tracer~,
+      )
     }
     send_forwarded_request(
-      port,
-      "GET /items HTTP/1.1\r\nHost: example.com:9090\r\nForwarded: host=\"bad host\"\r\nConnection: close\r\n\r\n",
+      port, "GET /items HTTP/1.1\r\nHost: example.com:9090\r\nForwarded: host=\"bad host\"\r\nConnection: close\r\n\r\n",
     )
     @async.sleep(50)
     assert_eq(exporter.exported_spans().length(), 1)
@@ -293,11 +306,14 @@ async test "Forwarded host with userinfo is ignored" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      @async_http_server.run_server_on(server, call => call.respond(204), tracer~)
+      @async_http_server.run_server_on(
+        server,
+        call => call.respond(204),
+        tracer~,
+      )
     }
     send_forwarded_request(
-      port,
-      "GET /items HTTP/1.1\r\nHost: backend.internal:8080\r\nForwarded: host=user@evil.example:9443\r\nX-Forwarded-Host: public.example.com:8443\r\nConnection: close\r\n\r\n",
+      port, "GET /items HTTP/1.1\r\nHost: backend.internal:8080\r\nForwarded: host=user@evil.example:9443\r\nX-Forwarded-Host: public.example.com:8443\r\nConnection: close\r\n\r\n",
     )
     @async.sleep(50)
     assert_eq(exporter.exported_spans().length(), 1)
@@ -317,11 +333,14 @@ async test "X-Forwarded-Host with userinfo is ignored" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      @async_http_server.run_server_on(server, call => call.respond(204), tracer~)
+      @async_http_server.run_server_on(
+        server,
+        call => call.respond(204),
+        tracer~,
+      )
     }
     send_forwarded_request(
-      port,
-      "GET /items HTTP/1.1\r\nHost: backend.internal:9090\r\nX-Forwarded-Host: user@evil.example:8443\r\nConnection: close\r\n\r\n",
+      port, "GET /items HTTP/1.1\r\nHost: backend.internal:9090\r\nX-Forwarded-Host: user@evil.example:8443\r\nConnection: close\r\n\r\n",
     )
     @async.sleep(50)
     assert_eq(exporter.exported_spans().length(), 1)

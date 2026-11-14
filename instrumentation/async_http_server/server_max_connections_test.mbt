@@ -10,12 +10,16 @@ async test "max_connections limits concurrent server connections" {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
     group.spawn_bg(no_wait=true) <| () => {
-      @async_http_server.run_server_on(server, async fn(call) {
-        entered_count.val = entered_count.val + 1
-        entered.release()
-        release.acquire()
-        call.respond(200, body="ok")
-      }, max_connections=1)
+      @async_http_server.run_server_on(
+        server,
+        async fn(call) {
+          entered_count.val = entered_count.val + 1
+          entered.release()
+          release.acquire()
+          call.respond(200, body="ok")
+        },
+        max_connections=1,
+      )
     }
     let first = group.spawn(() => @http.get("http://127.0.0.1:\{port}/one"))
     entered.acquire()

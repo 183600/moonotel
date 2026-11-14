@@ -79,10 +79,7 @@ pub fn decode_export_response(
   body : Bytes,
   max_size? : Int32,
 ) -> @sdk.ExportResult {
-  let max_size = normalize_size_limit(
-    max_size,
-    OTLP_MAX_RESPONSE_BODY_BYTES,
-  )
+  let max_size = normalize_size_limit(max_size, OTLP_MAX_RESPONSE_BODY_BYTES)
   if body.length() > max_size {
     return oversized_response(max_size)
   }

@@ -55,10 +55,12 @@ pub fn Tracer::start_span(
     Some(ctx) => if has_live_valid_ids(ctx) { Some(ctx) } else { None }
     None => None
   }
-  let parent_is_remote : Bool? = Some(match valid_parent {
-    Some(ctx) => ctx.is_remote()
-    None => false
-  })
+  let parent_is_remote : Bool? = Some(
+    match valid_parent {
+      Some(ctx) => ctx.is_remote()
+      None => false
+    },
+  )
   let span_kind = kind.unwrap_or(@api.SpanKind::Internal)
   let start_time = match start_time_unix_nano {
     Some(value) => value
@@ -200,6 +202,8 @@ pub fn Tracer::start_span_with_context(
 
 // Start the span used by `with_span` and `with_span_async`: an explicit
 // parent wins, otherwise the span is parented through the base context.
+
+///|
 fn Tracer::start_scoped_span(
   self : Tracer,
   name : String,
@@ -234,6 +238,8 @@ fn Tracer::start_scoped_span(
 
 // The ambient base context for a scoped span: the explicit context when one
 // was supplied, otherwise the current context.
+
+///|
 fn scoped_base_context(context? : @context.Context) -> @context.Context {
   match context {
     Some(value) => value

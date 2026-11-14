@@ -11,9 +11,7 @@ test "normalize_size_limit falls back for missing and non-positive limits" {
 
 ///|
 test "request_size_limit_failure labels default and custom limits" {
-  match @otlp.request_size_limit_failure(
-    @otlp.OTLP_DEFAULT_MAX_REQUEST_SIZE,
-  ) {
+  match @otlp.request_size_limit_failure(@otlp.OTLP_DEFAULT_MAX_REQUEST_SIZE) {
     @sdk.ExportFailure(message) => {
       assert_true(message.contains("64 MiB"))
       assert_false(message.contains("67108864-byte"))

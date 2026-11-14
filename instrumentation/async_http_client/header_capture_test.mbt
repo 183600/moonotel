@@ -148,17 +148,14 @@ async test "client header capture follows the configured environment" {
     exporter,
     { "Content-Length": "7", "Transfer-Encoding": "gzip" },
     request_body="payload",
-    received_content_length=received_content_length,
+    received_content_length~,
   )
   assert_eq(received_content_length.val, Some("7"))
   assert_eq(
     data.attributes.get("http.request.header.content-length"),
     Some(@sdk.StringArrayValue(["7"])),
   )
-  assert_eq(
-    data.attributes.get("http.request.header.transfer-encoding"),
-    None,
-  )
+  assert_eq(data.attributes.get("http.request.header.transfer-encoding"), None)
   // Without Content-Length the transport frames the body with chunked
   // encoding, even when the caller attempted to set Transfer-Encoding.
   let (tracer, exporter) = test_tracer("client-header-capture")
@@ -181,13 +178,10 @@ async test "client header capture follows the configured environment" {
     exporter,
     { "Content-Length": "not-a-number" },
     request_body="payload",
-    received_content_length=received_content_length,
+    received_content_length~,
   )
   assert_eq(received_content_length.val, None)
-  assert_eq(
-    data.attributes.get("http.request.header.content-length"),
-    None,
-  )
+  assert_eq(data.attributes.get("http.request.header.content-length"), None)
   assert_eq(
     data.attributes.get("http.request.header.transfer-encoding"),
     Some(@sdk.StringArrayValue(["chunked"])),

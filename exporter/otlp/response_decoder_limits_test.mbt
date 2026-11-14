@@ -26,10 +26,7 @@ test "decode_export_response_json honors a custom response size limit" {
 ///|
 test "decode_export_response treats non-positive limits as the default" {
   let body = b"\x0A\x00"
-  assert_eq(
-    @otlp.decode_export_response(body, max_size=0),
-    @sdk.ExportSuccess,
-  )
+  assert_eq(@otlp.decode_export_response(body, max_size=0), @sdk.ExportSuccess)
   assert_eq(
     @otlp.decode_export_response_json(b"{}", max_size=-1),
     @sdk.ExportSuccess,

@@ -37,10 +37,7 @@ test "wire_request_headers_preserves_a_caller_supplied_content_length" {
     (@http.CaseInsensitiveString("Transfer-Encoding"), "gzip"),
   ])
   let wire = wire_request_headers(headers, 3)
-  assert_eq(
-    wire.get(@http.CaseInsensitiveString("content-length")),
-    Some("3"),
-  )
+  assert_eq(wire.get(@http.CaseInsensitiveString("content-length")), Some("3"))
   assert_eq(wire.get(@http.CaseInsensitiveString("transfer-encoding")), None)
 }
 
