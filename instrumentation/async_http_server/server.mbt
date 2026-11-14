@@ -497,6 +497,9 @@ fn is_ipv4_octet(text : StringView) -> Bool {
   if len == 0 || len > 3 {
     return false
   }
+  if len > 1 && text.unsafe_get(0).to_int() == 0x30 {
+    return false
+  }
   let mut value = 0
   let mut i = 0
   while i < len {
@@ -577,17 +580,24 @@ fn is_valid_ipv6_zone(zone : StringView) -> Bool {
   let mut i = 0
   while i < len {
     let code = zone.unsafe_get(i).to_int()
-    if code <= 0x20 ||
-      code == 0x2F ||
-      code == 0x3F ||
-      code == 0x23 ||
-      code == 0x40 ||
-      code == 0x5B ||
-      code == 0x5D ||
-      code == 0x7F {
-      return false
+    if (code >= 0x30 && code <= 0x39) ||
+      (code >= 0x41 && code <= 0x5A) ||
+      (code >= 0x61 && code <= 0x7A) ||
+      code == 0x2D ||
+      code == 0x2E ||
+      code == 0x5F ||
+      code == 0x7E {
+      i = i + 1
+      continue
     }
-    i = i + 1
+    if code == 0x25 && i + 2 < len {
+      if is_hex_code(zone.unsafe_get(i + 1).to_int()) &&
+        is_hex_code(zone.unsafe_get(i + 2).to_int()) {
+        i = i + 3
+        continue
+      }
+    }
+    return false
   }
   true
 }
