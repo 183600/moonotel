@@ -16,7 +16,7 @@ async fn main {
   )
   let tracer = provider.get_tracer("demo-client")
   let previous = @context.attach(
-    @context.Context::root().with_value("user.id", "demo-user"),
+    @context.Context::root().with_baggage(Map([("user.id", "demo-user")])),
   )
   defer @context.detach(previous)
   let outcome = try {
