@@ -22,10 +22,11 @@ pub fn Tracer::scope_version(self : Tracer) -> String {
   self.scope_version
 }
 
-// Whether this tracer will record and export spans. False when the SDK is
-// disabled through `OTEL_SDK_DISABLED`, when no span processor is registered
-// and after the provider has been shut down, as specified by the OpenTelemetry
-// tracing SDK.
+// Whether this tracer can export spans. False when the SDK is disabled through
+// `OTEL_SDK_DISABLED`, when no span processor is registered and after the
+// provider has been shut down, as specified by the OpenTelemetry tracing SDK.
+// A tracer with no processors may still create recording spans that remain
+// readable by the application; those spans are simply not exported.
 
 ///|
 pub fn Tracer::enabled(self : Tracer) -> Bool {
