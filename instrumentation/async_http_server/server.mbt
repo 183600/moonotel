@@ -735,6 +735,11 @@ fn split_host_authority(
       return None
     }
     let port_text = rest[1:]
+    if port_text.find(":") is Some(_) ||
+      port_text.find("[") is Some(_) ||
+      port_text.find("]") is Some(_) {
+      return None
+    }
     Some(
       (
         address,
