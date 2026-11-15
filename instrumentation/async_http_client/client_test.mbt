@@ -97,6 +97,7 @@ test "split_url rejects malformed ipv6 authorities" {
       "http://[::1/x", "http://[::1]junk/x", "http://[::1]junk:8080/x", "http://[[::1]]/x",
       "http://::1/x", "http://2001:db8::1/x", "http://example.com:8080:90/x", "http://foo]/x",
       "http://[hello]/x", "http://[::1::2]/x", "http://[1:2:3:4:5:6:7]/x", "http://[::ffff:999.1.1.1]/x",
+      "http://[::1]:80:90/x", "http://[::1]:80]/x", "http://[::1]:[80]/x",
     ] {
     assert_eq(@async_http_client.split_url(url), ("", -1))
   }

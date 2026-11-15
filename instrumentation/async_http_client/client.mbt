@@ -547,9 +547,11 @@ fn is_bracketed_ip_literal(text : StringView) -> Bool {
 // Split a `host[:port]` authority into its host and port. Bracketed IP
 // literals keep their brackets because `split_url` exposes the authority
 // spelling; `None` means the authority is malformed. An unbracketed authority
-// may contain at most one colon, and a bracketed literal must end before any
-// path separator. A valid host with an invalid explicit port keeps the host
-// and reports `-1`, matching the best-effort contract of `split_url`.
+// may contain at most one colon, and a bracketed IP literal needs exactly one
+// closing bracket followed by the end of the authority or a port separator
+// whose text contains no brackets or further colons. A valid host with an
+// invalid explicit port keeps the host and reports `-1`, matching the
+// best-effort contract of `split_url`.
 
 ///|
 fn split_url_host_port(
@@ -580,6 +582,11 @@ fn split_url_host_port(
       return None
     }
     let port_text = rest[1:]
+    if port_text.find(":") is Some(_) ||
+      port_text.find("[") is Some(_) ||
+      port_text.find("]") is Some(_) {
+      return None
+    }
     Some(
       (
         literal,

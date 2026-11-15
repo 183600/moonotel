@@ -51,6 +51,9 @@ test "split_url_host_port rejects malformed ipv6 literals" {
   assert_eq(split_url_host_port("[::1", 80), None)
   assert_eq(split_url_host_port("[::1]junk", 80), None)
   assert_eq(split_url_host_port("[::1]junk:8080", 80), None)
+  assert_eq(split_url_host_port("[::1]:80:90", 80), None)
+  assert_eq(split_url_host_port("[::1]:80]", 80), None)
+  assert_eq(split_url_host_port("[::1]:[80]", 80), None)
   assert_eq(split_url_host_port("[[::1]]", 80), None)
   assert_eq(split_url_host_port("::1", 80), None)
   assert_eq(split_url_host_port("2001:db8::1", 80), None)
@@ -147,7 +150,8 @@ test "initial_client_attributes omits malformed ipv6 authorities" {
     url in [
       "http://[::1/x", "http://[::1]junk/x", "http://::1/x", "http://2001:db8::1/x",
       "http://example.com:8080:90/x", "http://[hello]/x", "http://[::1::2]/x", "http://[1:2:3:4:5:6:7]/x",
-      "http://[::ffff:999.1.1.1]/x",
+      "http://[::ffff:999.1.1.1]/x", "http://[::1]:80:90/x", "http://[::1]:80]/x",
+      "http://[::1]:[80]/x",
     ] {
     let attributes = initial_client_attributes(url, @http.RequestMethod::Get, 0)
     assert_eq(attributes.get(@sdk.SERVER_ADDRESS), None)
