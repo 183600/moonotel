@@ -96,3 +96,29 @@ async test "async_span_exporter_sends_with_a_zero_timeout" {
     }
   }
 }
+
+///|
+async test "async_setup_with_sdk_disabled_installs_no_processor" {
+  let previous = @env.get_env_var("OTEL_SDK_DISABLED")
+  defer (match previous {
+    Some(value) => @env.set_env_var("OTEL_SDK_DISABLED", value)
+    None => @env.unset_env_var("OTEL_SDK_DISABLED")
+  })
+  @env.set_env_var("OTEL_SDK_DISABLED", "true")
+  @async.with_task_group() <| group => {
+    let provider = @async_runtime.setup(
+      group,
+      service_name="async-disabled-sdk",
+      exporters=["otlp", "console"],
+      use_batch=true,
+      install_global=false,
+    )
+    assert_true(provider.is_disabled())
+    assert_eq(provider.processor_count(), 0)
+    let tracer = provider.get_tracer("async-disabled-sdk")
+    assert_false(tracer.enabled())
+    let span = tracer.start_root_span("dropped")
+    assert_false(span.is_recording())
+    span.end()
+  }
+}

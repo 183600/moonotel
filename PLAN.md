@@ -275,6 +275,8 @@ facade 提供进程级 provider 的安装、获取、强制 flush 和关闭。`s
 - 选择 OTLP 但未提供 transport 时，回退到 console exporter（除非已选择
   console），避免 span 静默丢失；
 - 选择 `none` 时不安装 exporter；
+- `OTEL_SDK_DISABLED=true` 时不创建 exporter 或 processor，因为 provider 不会
+  记录 span；
 - 显式 headers 按名称大小写不敏感地覆盖环境 headers，其余环境 headers 保留；
 - `@async_runtime.setup` 接受同一组覆盖项，并把导出任务与 flush 绑定到传入的
   task group。

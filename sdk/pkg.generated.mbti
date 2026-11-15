@@ -467,6 +467,7 @@ pub struct TracerProviderSdk {
 }
 pub fn TracerProviderSdk::force_flush(Self) -> Unit
 pub fn TracerProviderSdk::get_tracer(Self, String, version? : String) -> Tracer
+pub fn TracerProviderSdk::is_disabled(Self) -> Bool
 pub fn TracerProviderSdk::is_shutdown(Self) -> Bool
 pub fn TracerProviderSdk::new(service_name? : String) -> Self
 pub fn TracerProviderSdk::processor_count(Self) -> Int32

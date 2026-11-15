@@ -615,7 +615,9 @@ environment configuration:
 The span collection limits fall back to the generic `OTEL_ATTRIBUTE_*`
 variables. The facade `setup` and the async `setup` use `OTEL_TRACES_EXPORTER`
 unless an explicit `exporters` argument is given. `none` anywhere in the
-exporter list disables every exporter.
+exporter list disables every exporter. When `OTEL_SDK_DISABLED=true`, both
+setup helpers skip exporter and processor creation because the provider never
+records a span.
 
 Header-capture values are comma-separated lists of header names matched
 case-insensitively; `*` captures every header. The same name matching applies to

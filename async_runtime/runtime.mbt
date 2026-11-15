@@ -154,7 +154,8 @@ fn[G] async_otlp_span_processor(
 // supplied and by the comma-separated `OTEL_TRACES_EXPORTER` environment
 // variable otherwise: `otlp` (the default) installs the async OTLP exporter,
 // `console` prints every finished span, and `none` disables export entirely
-// (spans are recorded but not exported).
+// (spans are recorded but not exported). When `OTEL_SDK_DISABLED=true`, no
+// exporter or processor is installed, since the provider never records a span.
 //
 // `endpoint` overrides the value read from the OTEL_EXPORTER_OTLP_*
 // environment variables, `headers` is merged into the environment headers
@@ -228,21 +229,23 @@ pub fn[G] setup(
     Some(value) => provider = provider.with_span_limits(value)
     None => ()
   }
-  if @sdk.exporter_selected(exporters, "console") {
-    let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
-      @sdk.ConsoleSpanExporter::new(),
-    )
-    provider = provider.with_span_processor(processor)
-  }
-  if @sdk.exporter_selected(exporters, "otlp") {
-    let exporter = OtlpHttpAsyncSpanExporter::new(
-      config,
-      group,
-      max_queue_size?,
-    )
-    provider = provider.with_span_processor(
-      async_otlp_span_processor(exporter, group, use_batch?, batch?),
-    )
+  if !provider.is_disabled() {
+    if @sdk.exporter_selected(exporters, "console") {
+      let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(
+        @sdk.ConsoleSpanExporter::new(),
+      )
+      provider = provider.with_span_processor(processor)
+    }
+    if @sdk.exporter_selected(exporters, "otlp") {
+      let exporter = OtlpHttpAsyncSpanExporter::new(
+        config,
+        group,
+        max_queue_size?,
+      )
+      provider = provider.with_span_processor(
+        async_otlp_span_processor(exporter, group, use_batch?, batch?),
+      )
+    }
   }
   // The setup is scoped to `group`: once it exits, stop accepting spans so a
   // process-wide provider installed here cannot outlive the infrastructure it

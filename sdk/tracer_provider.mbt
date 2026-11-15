@@ -324,6 +324,16 @@ pub fn TracerProviderSdk::is_shutdown(self : TracerProviderSdk) -> Bool {
   self.shutdown_called.val
 }
 
+// Whether this provider was created while `OTEL_SDK_DISABLED` requested a
+// disabled SDK. Such a provider records and exports nothing; setup helpers use
+// this to skip building processors and exporters that could never receive a
+// span.
+
+///|
+pub fn TracerProviderSdk::is_disabled(self : TracerProviderSdk) -> Bool {
+  self.disabled
+}
+
 // Create a tracer for the given instrumentation scope.
 
 ///|

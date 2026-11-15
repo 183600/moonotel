@@ -308,7 +308,8 @@ fn otlp_span_processor(
 // exporter is selected but no transport is supplied, the console exporter is
 // installed instead so that finished spans are still exported (and visible)
 // instead of being dropped silently. Selecting `none`, or an exporter that is
-// not supported, still installs nothing.
+// not supported, still installs nothing. When `OTEL_SDK_DISABLED=true`, no
+// exporter or processor is installed, since the provider never records a span.
 
 ///|
 pub fn setup(
@@ -331,27 +332,29 @@ pub fn setup(
     sampler?,
     span_limits?,
   )
-  let console_selected = @sdk.exporter_selected(exporters, "console")
-  let otlp_selected = @sdk.exporter_selected(exporters, "otlp")
-  if console_selected {
-    provider = provider.with_span_processor(console_span_processor())
-  }
-  match transport {
-    Some(send) =>
-      if otlp_selected {
-        let config = otlp_config_with_overrides(endpoint?, headers?)
-        let exporter = @otlp.OtlpHttpExporter::new(config, send)
-        provider = provider.with_span_processor(
-          otlp_span_processor(exporter, use_batch?, batch?),
-        )
-      }
-    None =>
-      if otlp_selected && !console_selected {
-        // The OTLP exporter is selected but there is no transport to send the
-        // payload with, so fall back to the console exporter rather than
-        // dropping every span silently.
-        provider = provider.with_span_processor(console_span_processor())
-      }
+  if !provider.is_disabled() {
+    let console_selected = @sdk.exporter_selected(exporters, "console")
+    let otlp_selected = @sdk.exporter_selected(exporters, "otlp")
+    if console_selected {
+      provider = provider.with_span_processor(console_span_processor())
+    }
+    match transport {
+      Some(send) =>
+        if otlp_selected {
+          let config = otlp_config_with_overrides(endpoint?, headers?)
+          let exporter = @otlp.OtlpHttpExporter::new(config, send)
+          provider = provider.with_span_processor(
+            otlp_span_processor(exporter, use_batch?, batch?),
+          )
+        }
+      None =>
+        if otlp_selected && !console_selected {
+          // The OTLP exporter is selected but there is no transport to send the
+          // payload with, so fall back to the console exporter rather than
+          // dropping every span silently.
+          provider = provider.with_span_processor(console_span_processor())
+        }
+    }
   }
   @sdk.set_global_tracer_provider(provider)
   provider
