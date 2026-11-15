@@ -2,27 +2,11 @@
 // environment variables so callers can tune batching in code instead of (or
 // on top of) the environment.
 
-// Read a positive integer from an environment variable, falling back to
-// `default` when the variable is absent, not a valid integer, or not positive.
-
-///|
-fn env_int(name : String, default : Int32) -> Int32 {
-  match @env.get_env_var(name) {
-    Some(value) =>
-      match parse_decimal_int(value.trim()) {
-        Some(parsed) => if parsed < 1 { default } else { parsed }
-        None => default
-      }
-    None => default
-  }
-}
-
 // Read a non-negative integer from an environment variable, falling back to
-// `default` when the variable is absent, not a valid integer, or negative.
-// Durations accept zero; only negative values are invalid.
+// `default` when the variable is absent, blank, malformed or negative.
 
 ///|
-fn env_duration(name : String, default : Int32) -> Int32 {
+fn env_non_negative_int(name : String, default : Int32) -> Int32 {
   match @env.get_env_var(name) {
     Some(value) =>
       match parse_decimal_int(value.trim()) {
@@ -30,6 +14,20 @@ fn env_duration(name : String, default : Int32) -> Int32 {
         None => default
       }
     None => default
+  }
+}
+
+// Read a positive integer from an environment variable, falling back to
+// `default` when the variable is absent, malformed or not positive. Zero is
+// not a useful queue or batch size, so it selects the default.
+
+///|
+fn env_positive_int(name : String, default : Int32) -> Int32 {
+  let parsed = env_non_negative_int(name, default)
+  if parsed < 1 {
+    default
+  } else {
+    parsed
   }
 }
 
@@ -92,9 +90,9 @@ pub fn BatchConfig::default() -> BatchConfig {
 
 ///|
 pub fn BatchConfig::from_env() -> BatchConfig {
-  let queue_size = env_int("OTEL_BSP_MAX_QUEUE_SIZE", 2048)
-  let batch_size = env_int("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", 512)
-  let schedule_delay = env_duration("OTEL_BSP_SCHEDULE_DELAY", 5000)
+  let queue_size = env_positive_int("OTEL_BSP_MAX_QUEUE_SIZE", 2048)
+  let batch_size = env_positive_int("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", 512)
+  let schedule_delay = env_non_negative_int("OTEL_BSP_SCHEDULE_DELAY", 5000)
   let effective_batch = if batch_size > queue_size {
     queue_size
   } else {

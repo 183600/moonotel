@@ -19,6 +19,15 @@ trace semantics, a compact implementation, and straightforward integration with
 The repository and MoonBit module are both `183600/moonotel`; the entry package
 is the module root and is imported as `@moonotel`.
 
+## Scope
+
+Moonotel implements the OpenTelemetry **tracing** signal: the Trace API and
+SDK, W3C Trace Context and Baggage, OTLP/HTTP export, and
+`moonbitlang/async/http` instrumentation. Metrics, logs, a collector, and gRPC
+export are intentionally out of scope. The API, context, propagation, SDK and
+synchronous OTLP encoder target every MoonBit target; the async runtime, real
+HTTP transport and HTTP instrumentation target native and wasm.
+
 ## Integration paths
 
 | Path | Use it when | Entry point |
@@ -30,6 +39,7 @@ is the module root and is imported as `@moonotel`.
 
 ## Contents
 
+- [Scope](#scope)
 - [Integration paths](#integration-paths)
 - [Install](#install)
 - [Getting started](#getting-started)
@@ -101,10 +111,25 @@ Attribute keys must be non-empty, as required by the OpenTelemetry data model.
 An empty key passed to a span, event, link or resource setter is ignored: it is
 not recorded, exported, or counted as dropped by a limit.
 
-The examples use the conventional aliases `@api`, `@context`, `@sdk`,
-`@propagation`, `@client`, `@server`, `@otlp`, `@otlp_async`, `@async_runtime`
-and `@moonotel`. Declare the corresponding imports, with aliases where needed,
-in your `moon.pkg`.
+The examples use short aliases. A `moon.pkg` import block covering the packages
+shown in this README looks like this:
+
+```text
+import {
+  "183600/moonotel" @moonotel,
+  "183600/moonotel/api" @api,
+  "183600/moonotel/context" @context,
+  "183600/moonotel/sdk" @sdk,
+  "183600/moonotel/propagation" @propagation,
+  "183600/moonotel/exporter/otlp" @otlp,
+}
+```
+
+Add `@otlp_async`, `@async_runtime`, `@client` and `@server` from
+`183600/moonotel/exporter/otlp_async`, `183600/moonotel/async_runtime`,
+`183600/moonotel/instrumentation/async_http_client` and
+`183600/moonotel/instrumentation/async_http_server` when you use those
+packages.
 
 ### Install a global provider
 
@@ -374,7 +399,25 @@ transport-managed.
 `exporter/otlp` is transport-agnostic: provide a
 `(url, headers, body) -> TransportResponse` function (a test double, a custom
 client, …) and the exporter handles encoding, headers, status handling and
-retries.
+retries. Wire the exporter into the SDK with a processor:
+
+```moonbit
+let transport : @otlp.Transport = fn(url, headers, body) {
+  // Send `body` to `url` with `headers` using your HTTP client, then return
+  // the status and response body.
+  { status_code: 200, body: b"" }
+}
+
+let exporter = @otlp.OtlpHttpExporter::new(
+  @otlp.OtlpHttpConfig::new(endpoint="http://localhost:4318"),
+  transport,
+)
+let provider = @sdk.TracerProviderSdk::new(service_name="checkout")
+  .with_span_processor(@sdk.BatchSpanProcessor::from_env(exporter))
+```
+
+The transport callback runs synchronously from `export_spans`. Keep it fast, or
+use `exporter/otlp_async` when the HTTP client is asynchronous.
 
 `exporter/otlp_async` provides the production transport:
 
@@ -603,9 +646,11 @@ checks passed.
 ## Development
 
 The repository also contains `PLAN.md` with design notes and maintenance
-context. The test suite lives next to each package. Add a regression test when
-changing behavior, and run both the default and native checks before
-committing.
+context. The test suite lives next to each package, and
+`sdk/readme_usage_test.mbt` compiles the Getting started example. Add a
+regression test when changing behavior, keep this README and `PLAN.md` in sync
+when changing public APIs or defaults, and run both the default and native
+checks before committing.
 
 ## License
 

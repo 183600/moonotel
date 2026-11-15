@@ -9,22 +9,28 @@
 // Code that consumes a parent therefore revalidates the live serialized bytes
 // as well, just like the W3C injector does.
 
+// The byte produced by the hex and OTLP serializers for one ID element.
+// In-range values are used as-is; out-of-range values keep only the low
+// nibble, matching `@api.bytes_to_hex`.
+
+///|
+fn serialized_id_byte(value : Int32) -> Int32 {
+  if value >= 0 && value < 256 {
+    value
+  } else {
+    value & 0x0F
+  }
+}
+
 // Whether the first `count` elements of `bytes` serialize to a nonzero byte.
-// Out-of-range values are rendered like `@api.bytes_to_hex` (the low nibble is
-// kept and the high nibble becomes "0"), so they must not be mistaken for a
-// nonzero wire byte.
+// Out-of-range values must be interpreted like the serializer does, so they
+// are not mistaken for a nonzero wire byte.
 
 ///|
 fn has_live_nonzero_byte(bytes : Array[Int32], count : Int32) -> Bool {
   let mut i = 0
   while i < count {
-    let value = bytes.unsafe_get(i)
-    let serialized = if value >= 0 && value < 256 {
-      value
-    } else {
-      value & 0x0F
-    }
-    if serialized != 0 {
+    if serialized_id_byte(bytes.unsafe_get(i)) != 0 {
       return true
     }
     i = i + 1

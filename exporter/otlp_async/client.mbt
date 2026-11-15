@@ -848,6 +848,77 @@ async fn post_trace_request_with_headers(
   @sdk.ExportFailure(last_failure)
 }
 
+// Outcome of validating and encoding a trace request before it is sent.
+
+///|
+priv enum PreparedTraceBody {
+  // The body is ready; the flag says whether it still needs gzip compression.
+  Ready(Bytes, Bool)
+  // Every span was skipped or the caller supplied an empty body.
+  NothingToSend
+  // The configuration or the encoded body cannot be exported.
+  Rejected(@sdk.ExportResult)
+}
+
+// Validate the configuration, encode the request body, and enforce the
+// request size limit. `encode` runs only after the configuration is known to
+// be usable, so an unsupported protocol never pays for encoding.
+
+///|
+fn prepare_trace_body(
+  config : @otlp.OtlpHttpConfig,
+  max_request_size : Int32,
+  encode : () -> Bytes,
+) -> PreparedTraceBody {
+  if !@otlp.is_supported_protocol(effective_protocol(config.protocol)) {
+    return Rejected(
+      @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol),
+    )
+  }
+  let compression = effective_compression(config.compression)
+  let gzip = compression == "gzip"
+  if !gzip && compression != "none" {
+    return Rejected(
+      @sdk.ExportFailure(
+        "unsupported OTLP compression: " + config.compression,
+      ),
+    )
+  }
+  let body = encode()
+  if body.length() == 0 {
+    return NothingToSend
+  }
+  // The limit applies to the encoded message before gzip compression.
+  if body.length() > max_request_size {
+    return Rejected(@otlp.request_size_limit_failure(max_request_size))
+  }
+  Ready(body, gzip)
+}
+
+// Compress the prepared body when needed and send it with `headers`.
+
+///|
+async fn send_prepared_trace_body(
+  config : @otlp.OtlpHttpConfig,
+  body : Bytes,
+  gzip : Bool,
+  headers : Map[@http.CaseInsensitiveString, String],
+  max_response_size : Int32,
+) -> @sdk.ExportResult {
+  let body = if gzip {
+    match gzip_body(body) {
+      Some(payload) => payload
+      None =>
+        return @sdk.ExportFailure(
+          "failed to gzip-compress the OTLP request body",
+        )
+    }
+  } else {
+    body
+  }
+  post_trace_request_with_headers(config, body, headers, max_response_size)
+}
+
 // POST an already encoded `ExportTraceServiceRequest` body to the configured
 // trace endpoint and interpret the response, building the request headers
 // from `config` and compressing the body first when `config.compression` is
@@ -860,16 +931,6 @@ pub async fn post_trace_request(
   max_request_size? : Int32,
   max_response_size? : Int32,
 ) -> @sdk.ExportResult {
-  if !@otlp.is_supported_protocol(effective_protocol(config.protocol)) {
-    return @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol)
-  }
-  let compression = effective_compression(config.compression)
-  let gzip = compression == "gzip"
-  if !gzip && compression != "none" {
-    return @sdk.ExportFailure(
-      "unsupported OTLP compression: " + config.compression,
-    )
-  }
   let max_request_size = @otlp.normalize_size_limit(
     max_request_size,
     @otlp.OTLP_DEFAULT_MAX_REQUEST_SIZE,
@@ -878,22 +939,18 @@ pub async fn post_trace_request(
     max_response_size,
     @otlp.OTLP_DEFAULT_MAX_RESPONSE_SIZE,
   )
-  if body.length() > max_request_size {
-    return @otlp.request_size_limit_failure(max_request_size)
+  match prepare_trace_body(config, max_request_size, fn() { body }) {
+    Rejected(result) => result
+    NothingToSend => @sdk.ExportSuccess
+    Ready(body, gzip) =>
+      send_prepared_trace_body(
+        config,
+        body,
+        gzip,
+        request_headers(config, gzip),
+        max_response_size,
+      )
   }
-  let body = if gzip {
-    match gzip_body(body) {
-      Some(payload) => payload
-      None =>
-        return @sdk.ExportFailure(
-          "failed to gzip-compress the OTLP request body",
-        )
-    }
-  } else {
-    body
-  }
-  let headers = request_headers(config, gzip)
-  post_trace_request_with_headers(config, body, headers, max_response_size)
 }
 
 // gzip-compress `body`, returning `None` when compression fails.
@@ -902,6 +959,20 @@ pub async fn post_trace_request(
 async fn gzip_body(body : Bytes) -> Bytes? {
   Some(gzip_compress(body)) catch {
     _ => None
+  }
+}
+
+// Encode `spans` with the OTLP/HTTP encoding selected by `config.protocol`.
+
+///|
+fn encode_trace_body(
+  config : @otlp.OtlpHttpConfig,
+  spans : Array[@sdk.SpanData],
+) -> Bytes {
+  if is_json_protocol(config.protocol) {
+    @otlp.encode_trace_request_json(spans)
+  } else {
+    @otlp.encode_trace_request(spans)
   }
 }
 
@@ -918,40 +989,28 @@ pub async fn export_spans(
   if spans.length() == 0 {
     return @sdk.ExportSuccess
   }
-  // Validate the configuration before encoding. An all-malformed batch also
-  // produces an empty body, but an unusable protocol or compression setting
-  // is still an export failure rather than a silent success.
-  if !@otlp.is_supported_protocol(effective_protocol(config.protocol)) {
-    return @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol)
-  }
-  let compression = effective_compression(config.compression)
-  if compression != "gzip" && compression != "none" {
-    return @sdk.ExportFailure(
-      "unsupported OTLP compression: " + config.compression,
-    )
-  }
-  let body = if is_json_protocol(config.protocol) {
-    @otlp.encode_trace_request_json(spans)
-  } else {
-    @otlp.encode_trace_request(spans)
-  }
-  // All spans were skipped because their live IDs were malformed; there is no
-  // request body to send.
-  if body.length() == 0 {
-    return @sdk.ExportSuccess
-  }
-  post_trace_request(
-    config,
-    body,
-    max_request_size=@otlp.normalize_size_limit(
-      max_request_size,
-      @otlp.OTLP_DEFAULT_MAX_REQUEST_SIZE,
-    ),
-    max_response_size=@otlp.normalize_size_limit(
-      max_response_size,
-      @otlp.OTLP_DEFAULT_MAX_RESPONSE_SIZE,
-    ),
+  let max_request_size = @otlp.normalize_size_limit(
+    max_request_size,
+    @otlp.OTLP_DEFAULT_MAX_REQUEST_SIZE,
   )
+  let max_response_size = @otlp.normalize_size_limit(
+    max_response_size,
+    @otlp.OTLP_DEFAULT_MAX_RESPONSE_SIZE,
+  )
+  match prepare_trace_body(config, max_request_size, fn() {
+    encode_trace_body(config, spans)
+  }) {
+    Rejected(result) => result
+    NothingToSend => @sdk.ExportSuccess
+    Ready(body, gzip) =>
+      send_prepared_trace_body(
+        config,
+        body,
+        gzip,
+        request_headers(config, gzip),
+        max_response_size,
+      )
+  }
 }
 
 // An async span exporter over OTLP/HTTP. Use it with an async flush loop
@@ -1013,44 +1072,18 @@ pub async fn OtlpHttpAsyncExporter::export_batch(
     return @sdk.ExportSuccess
   }
   let config = self.config
-  if !@otlp.is_supported_protocol(effective_protocol(config.protocol)) {
-    return @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol)
+  match prepare_trace_body(config, self.max_request_size, fn() {
+    encode_trace_body(config, spans)
+  }) {
+    Rejected(result) => result
+    NothingToSend => @sdk.ExportSuccess
+    Ready(body, gzip) =>
+      send_prepared_trace_body(
+        config,
+        body,
+        gzip,
+        self.headers,
+        self.max_response_size,
+      )
   }
-  let compression = effective_compression(config.compression)
-  let gzip = compression == "gzip"
-  if !gzip && compression != "none" {
-    return @sdk.ExportFailure(
-      "unsupported OTLP compression: " + config.compression,
-    )
-  }
-  let body = if is_json_protocol(config.protocol) {
-    @otlp.encode_trace_request_json(spans)
-  } else {
-    @otlp.encode_trace_request(spans)
-  }
-  // All spans were skipped because their live IDs were malformed; there is no
-  // request body to send.
-  if body.length() == 0 {
-    return @sdk.ExportSuccess
-  }
-  if body.length() > self.max_request_size {
-    return @otlp.request_size_limit_failure(self.max_request_size)
-  }
-  let body = if gzip {
-    match gzip_body(body) {
-      Some(payload) => payload
-      None =>
-        return @sdk.ExportFailure(
-          "failed to gzip-compress the OTLP request body",
-        )
-    }
-  } else {
-    body
-  }
-  post_trace_request_with_headers(
-    config,
-    body,
-    self.headers,
-    self.max_response_size,
-  )
 }

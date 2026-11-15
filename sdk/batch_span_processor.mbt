@@ -73,11 +73,9 @@ pub fn BatchSpanProcessor::with_config(
   exporter : &SpanExporter,
   config : BatchConfig,
 ) -> BatchSpanProcessor {
-  let config = BatchConfig::new(
-    max_queue_size=config.max_queue_size,
-    max_export_batch_size=config.max_export_batch_size,
-    flush_interval_millis=config.flush_interval_millis,
-  )
+  // `new` applies the same normalization as `BatchConfig::new`, so a config
+  // assembled directly from the public fields is handled like one built by
+  // the constructor.
   BatchSpanProcessor::new(
     exporter,
     max_queue_size=config.max_queue_size,

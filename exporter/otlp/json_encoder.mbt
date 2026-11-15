@@ -649,7 +649,7 @@ fn json_write_link(sb : JsonBuf, link : @sdk.SpanLink) -> Unit {
   let mut first = true
   // An invalid link keeps its attributes/tracestate, but its IDs are not
   // representable in OTLP and must not be written as a short hex string.
-  if has_encodable_link_ids(link.span_context) {
+  if has_encodable_ids(link.span_context) {
     sb.write_bytes(b"\"traceId\":")
     json_write_hex_quoted(sb, link.span_context.trace_id_view())
     sb.write_bytes(b",\"spanId\":")

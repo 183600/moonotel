@@ -67,34 +67,14 @@ pub fn TextMapCarrier::from_entries(
   let map : Map[String, String] = Map([])
   let mut duplicate_traceparent = false
   for entry in entries {
-    match map.get(entry.0) {
-      Some(existing) => {
-        if ascii_case_insensitive_equal(entry.0, traceparent_header_name()) {
+    match find_entry_case_insensitive(map, entry.0) {
+      Some((candidate, existing)) => {
+        if ascii_case_insensitive_equal(candidate, traceparent_header_name()) {
           duplicate_traceparent = true
         }
-        map.set(entry.0, existing + ", " + entry.1)
+        map.set(candidate, existing + ", " + entry.1)
       }
-      None => {
-        let mut matched : (String, String)? = None
-        for candidate, existing in map {
-          if ascii_case_insensitive_equal(candidate, entry.0) {
-            matched = Some((candidate, existing))
-            break
-          }
-        }
-        match matched {
-          Some((candidate, existing)) => {
-            if ascii_case_insensitive_equal(
-                candidate,
-                traceparent_header_name(),
-              ) {
-              duplicate_traceparent = true
-            }
-            map.set(candidate, existing + ", " + entry.1)
-          }
-          None => map.set(entry.0, entry.1)
-        }
-      }
+      None => map.set(entry.0, entry.1)
     }
   }
   {
@@ -194,26 +174,41 @@ fn ascii_case_insensitive_equal(a : String, b : String) -> Bool {
   true
 }
 
+// Find the locally stored entry for `key`. An exact match is preferred,
+// otherwise the first case-insensitive match wins. The stored spelling is
+// returned so callers can replace the existing field instead of adding a
+// differently-cased duplicate.
+
+///|
+fn find_entry_case_insensitive(
+  entries : Map[String, String],
+  key : String,
+) -> (String, String)? {
+  match entries.get(key) {
+    Some(value) => Some((key, value))
+    None => {
+      for candidate, value in entries {
+        if ascii_case_insensitive_equal(candidate, key) {
+          return Some((candidate, value))
+        }
+      }
+      None
+    }
+  }
+}
+
 // Look up a single header value. HTTP header names are case-insensitive: an
 // exact match is preferred, otherwise the first case-insensitive match wins.
 
 ///|
 pub fn TextMapCarrier::get(self : TextMapCarrier, key : String) -> String? {
-  match self.entries.get(key) {
-    Some(value) => Some(value)
-    None => {
-      if self.entries.length() > 0 {
-        for candidate, value in self.entries {
-          if ascii_case_insensitive_equal(candidate, key) {
-            return Some(value)
-          }
-        }
-      }
+  match find_entry_case_insensitive(self.entries, key) {
+    Some((_, value)) => Some(value)
+    None =>
       match self.getter {
         Some(get) => get(key)
         None => None
       }
-    }
   }
 }
 

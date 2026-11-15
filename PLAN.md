@@ -56,6 +56,16 @@ MVP**，重点覆盖一条完整的链路：业务代码创建 span，SDK 采样
 | Instrumentation | `instrumentation/http_header_capture/` | 请求/响应 header 捕获与脱敏 |
 | Facade | 根包 `otel.mbt` | 常用类型 re-export、全局 provider、`setup` |
 
+核心概念：
+
+| 概念 | 主要类型 / 入口 | 说明 |
+| --- | --- | --- |
+| Trace / Span ID | `@api.SpanContext` | 不可变 ID 视图；创建子 span、注入与导出时都会重新校验 |
+| Context | `@context.Context` | 不可变上下文链，携带当前 span 与 baggage |
+| SpanData | `@sdk.SpanData` | 已结束 span 的快照，是 processor 与 exporter 的输入 |
+| SpanProcessor | `@sdk.SpanProcessor` | 接收 span 生命周期事件，决定立即导出或批量排队 |
+| SpanExporter | `@sdk.SpanExporter` | 将一批 `SpanData` 编码并发送到后端 |
+
 一条 span 的主链路：
 
 ```text
@@ -112,6 +122,11 @@ Collector / backend
     simple_span_processor.mbt
     batch_span_processor.mbt
     batch_config.mbt
+    multi_span_processor.mbt
+    console_exporter.mbt
+    in_memory_exporter.mbt
+    span_context_checks.mbt
+    url_query_redaction.mbt
     resource.mbt
     semconv.mbt
     env_parse.mbt
@@ -127,6 +142,7 @@ Collector / backend
       json_response_decoder.mbt
       protobuf_writer.mbt
       utf8_encode.mbt
+      span_id_checks.mbt
     otlp_async/
       client.mbt               # 真实 HTTP 传输、Retry-After、gzip
   instrumentation/
@@ -347,6 +363,8 @@ URL 会移除 userinfo，并对 HTTP 语义约定列出的敏感查询参数做�
   通过独立测试校验。
 - **文档示例**：`sdk/readme_usage_test.mbt` 保证 README 的 Getting started
   用法可编译并产生预期 span。
+- **文档一致性**：修改公开 API、环境变量或默认值时，同步更新 README 与本文档；
+  新增用户可见示例时，优先补上对应的编译测试。
 
 提交前运行：
 

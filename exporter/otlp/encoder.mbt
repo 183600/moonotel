@@ -342,7 +342,7 @@ fn encode_link(writer : ProtoWriter, link : @sdk.SpanLink) -> Unit {
   let len_pos = writer.begin_message(13)
   // An invalid link still carries its attributes/tracestate, but its IDs are
   // not representable in OTLP and must not be written as a short byte string.
-  if has_encodable_link_ids(link.span_context) {
+  if has_encodable_ids(link.span_context) {
     writer.write_bytes_from_int_array(1, link.span_context.trace_id_view())
     writer.write_bytes_from_int_array(2, link.span_context.span_id_view())
   }

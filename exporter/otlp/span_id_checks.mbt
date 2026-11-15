@@ -29,8 +29,12 @@ fn has_nonzero_id_byte(bytes : Array[Int32], count : Int32) -> Bool {
   false
 }
 
+// Whether a span context still has the exact live ID shape OTLP can encode.
+// The same rule applies to a span and to a link: both need a 16-byte nonzero
+// trace ID and an 8-byte nonzero span ID.
+
 ///|
-fn has_encodable_link_ids(context : @api.SpanContext) -> Bool {
+fn has_encodable_ids(context : @api.SpanContext) -> Bool {
   if !context.is_valid() {
     return false
   }
@@ -43,11 +47,6 @@ fn has_encodable_link_ids(context : @api.SpanContext) -> Bool {
 }
 
 ///|
-fn has_encodable_span_ids(context : @api.SpanContext) -> Bool {
-  has_encodable_link_ids(context)
-}
-
-///|
 fn has_encodable_parent_span_id(bytes : Array[Int32]) -> Bool {
   bytes.length() == 8 && has_nonzero_id_byte(bytes, 8)
 }
@@ -56,7 +55,7 @@ fn has_encodable_parent_span_id(bytes : Array[Int32]) -> Bool {
 fn filter_encodable_spans(spans : Array[@sdk.SpanData]) -> Array[@sdk.SpanData] {
   let valid : Array[@sdk.SpanData] = Array(capacity=spans.length())
   for data in spans {
-    if has_encodable_span_ids(data.span_context) {
+    if has_encodable_ids(data.span_context) {
       valid.push(data)
     }
   }
