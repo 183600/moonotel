@@ -87,6 +87,38 @@ test "span_limits_unlimited_drops_nothing" {
 }
 
 ///|
+test "negative_span_limits_are_normalized_to_unlimited" {
+  let limits = @sdk.SpanLimits::new(
+    attribute_count_limit=-5,
+    event_count_limit=-2,
+    link_count_limit=-3,
+    event_attribute_count_limit=-4,
+    link_attribute_count_limit=-6,
+    attribute_value_length_limit=-7,
+  )
+  assert_eq(limits.attribute_count_limit(), -1)
+  assert_eq(limits.event_count_limit(), -1)
+  assert_eq(limits.link_count_limit(), -1)
+  assert_eq(limits.event_attribute_count_limit(), -1)
+  assert_eq(limits.link_attribute_count_limit(), -1)
+  assert_eq(limits.attribute_value_length_limit(), -1)
+  let span = limit_test_span(limits)
+  let attributes : Map[String, @sdk.AttributeValue] = Map([])
+  attributes.set("k", @sdk.StringValue("abcdef"))
+  for i = 0; i < 200; i = i + 1 {
+    attributes.set("k" + i.to_string(), @sdk.StringValue("v"))
+  }
+  span.add_event("ev", attributes~)
+  span.add_link(@sdk.SpanLink::new(valid_context(1), attributes~))
+  assert_eq(span.events()[0].attributes.length(), 201)
+  assert_eq(
+    span.events()[0].attributes.get("k"),
+    Some(@sdk.StringValue("abcdef")),
+  )
+  assert_eq(span.links()[0].attributes.length(), 201)
+}
+
+///|
 test "attributes_beyond_the_default_limit_are_dropped_and_counted" {
   let span = limit_test_span(@sdk.SpanLimits::new())
   for i = 0; i < 130; i = i + 1 {

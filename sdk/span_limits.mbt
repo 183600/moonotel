@@ -23,8 +23,21 @@ pub struct SpanLimits {
   attribute_value_length_limit : Int32
 }
 
+// Normalize a configured limit. The specification only defines `-1` as
+// "no limit", so any other negative value is normalized to `-1` rather than
+// leaking an invalid value through the getters.
+
+///|
+fn normalize_limit(value : Int32?, default : Int32) -> Int32 {
+  match value {
+    Some(limit) => if limit < 0 { -1 } else { limit }
+    None => default
+  }
+}
+
 // Create span limits. Every parameter defaults to the value required by the
-// specification; pass `-1` for "no limit".
+// specification; pass `-1` for "no limit". Other negative values are treated
+// as `-1`.
 
 ///|
 pub fn SpanLimits::new(
@@ -36,12 +49,21 @@ pub fn SpanLimits::new(
   attribute_value_length_limit? : Int32,
 ) -> SpanLimits {
   {
-    attribute_count_limit: attribute_count_limit.unwrap_or(128),
-    event_count_limit: event_count_limit.unwrap_or(128),
-    link_count_limit: link_count_limit.unwrap_or(128),
-    event_attribute_count_limit: event_attribute_count_limit.unwrap_or(128),
-    link_attribute_count_limit: link_attribute_count_limit.unwrap_or(128),
-    attribute_value_length_limit: attribute_value_length_limit.unwrap_or(-1),
+    attribute_count_limit: normalize_limit(attribute_count_limit, 128),
+    event_count_limit: normalize_limit(event_count_limit, 128),
+    link_count_limit: normalize_limit(link_count_limit, 128),
+    event_attribute_count_limit: normalize_limit(
+      event_attribute_count_limit,
+      128,
+    ),
+    link_attribute_count_limit: normalize_limit(
+      link_attribute_count_limit,
+      128,
+    ),
+    attribute_value_length_limit: normalize_limit(
+      attribute_value_length_limit,
+      -1,
+    ),
   }
 }
 
