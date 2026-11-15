@@ -1,12 +1,12 @@
-struct ZzServerRng {
+struct ServerFuzzRng {
   state : Ref[Int64]
 }
 
-fn ZzServerRng::new(seed : Int64) -> ZzServerRng {
+fn ServerFuzzRng::new(seed : Int64) -> ServerFuzzRng {
   { state: Ref(seed), }
 }
 
-fn ZzServerRng::next(self : ZzServerRng) -> Int64 {
+fn ServerFuzzRng::next(self : ServerFuzzRng) -> Int64 {
   let mut x = self.state.val
   x = x ^ (x >> 12)
   x = x ^ (x << 25)
@@ -15,34 +15,34 @@ fn ZzServerRng::next(self : ZzServerRng) -> Int64 {
   x
 }
 
-fn ZzServerRng::below(self : ZzServerRng, bound : Int32) -> Int32 {
+fn ServerFuzzRng::below(self : ServerFuzzRng, bound : Int32) -> Int32 {
   let value = self.next() & 0x7FFFFFFFFFFFFFFFL
   (value % bound.to_int64()).to_int()
 }
 
-let zz_server_fragments : Array[String] = [
+let server_fuzz_fragments : Array[String] = [
   "a", "Z", "0", "9", ":", "/", "//", "?", "#", "@", "[", "]", "%", "%25",
   "%zz", ".", "-", "_", "+", "~", "!", "$", "&", "'", "(", ")", "*", ",", ";",
   "=", " ", "\t", "\r", "\n", "é", "🤣", "\u{0}", "\\", "\"", "<", ">", "|",
   "http", "https", "HTTP", "for", "by", "host", "proto", "\"\"", "\\\"",
 ]
 
-fn zz_server_text(rng : ZzServerRng, max : Int32) -> String {
+fn server_fuzz_text(rng : ServerFuzzRng, max : Int32) -> String {
   let sb = StringBuilder()
   let count = rng.below(max + 1)
   let mut i = 0
   while i < count {
-    sb.write_view(zz_server_fragments[rng.below(zz_server_fragments.length())][:])
+    sb.write_view(server_fuzz_fragments[rng.below(server_fuzz_fragments.length())][:])
     i = i + 1
   }
   sb.to_string()
 }
 
-test "zz_server_parsers_do_not_panic_on_random_input" {
-  let rng = ZzServerRng::new(0x2468_ACE0_1357_9BDFL)
+test "server_parsers_do_not_panic_on_random_input" {
+  let rng = ServerFuzzRng::new(0x2468_ACE0_1357_9BDFL)
   let mut i = 0
   while i < 20000 {
-    let text = zz_server_text(rng, 24)
+    let text = server_fuzz_text(rng, 24)
     let _ = split_path_query(text)
     let _ = absolute_target_scheme_end(text)
     let _ = http_absolute_target_scheme_end(text)

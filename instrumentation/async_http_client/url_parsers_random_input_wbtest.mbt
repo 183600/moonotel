@@ -1,12 +1,12 @@
-struct ZzRng {
+struct UrlFuzzRng {
   state : Ref[Int64]
 }
 
-fn ZzRng::new(seed : Int64) -> ZzRng {
+fn UrlFuzzRng::new(seed : Int64) -> UrlFuzzRng {
   { state: Ref(seed), }
 }
 
-fn ZzRng::next(self : ZzRng) -> Int64 {
+fn UrlFuzzRng::next(self : UrlFuzzRng) -> Int64 {
   let mut x = self.state.val
   x = x ^ (x >> 12)
   x = x ^ (x << 25)
@@ -15,33 +15,33 @@ fn ZzRng::next(self : ZzRng) -> Int64 {
   x
 }
 
-fn ZzRng::below(self : ZzRng, bound : Int32) -> Int32 {
+fn UrlFuzzRng::below(self : UrlFuzzRng, bound : Int32) -> Int32 {
   let value = self.next() & 0x7FFFFFFFFFFFFFFFL
   (value % bound.to_int64()).to_int()
 }
 
-let zz_fragments : Array[String] = [
+let url_fuzz_fragments : Array[String] = [
   "a", "Z", "0", "9", ":", "/", "//", "?", "#", "@", "[", "]", "%", "%25",
   "%zz", ".", "-", "_", "+", "~", "!", "$", "&", "'", "(", ")", "*", ",", ";",
   "=", " ", "\t", "\r", "\n", "é", "🤣", "\u{0}", "\\", "\"", "<", ">", "|",
 ]
 
-fn zz_text(rng : ZzRng, max : Int32) -> String {
+fn url_fuzz_text(rng : UrlFuzzRng, max : Int32) -> String {
   let sb = StringBuilder()
   let count = rng.below(max + 1)
   let mut i = 0
   while i < count {
-    sb.write_view(zz_fragments[rng.below(zz_fragments.length())][:])
+    sb.write_view(url_fuzz_fragments[rng.below(url_fuzz_fragments.length())][:])
     i = i + 1
   }
   sb.to_string()
 }
 
-test "zz_url_parsers_do_not_panic_on_random_input" {
-  let rng = ZzRng::new(0x1357_9BDF_2468_ACE0L)
+test "url_parsers_do_not_panic_on_random_input" {
+  let rng = UrlFuzzRng::new(0x1357_9BDF_2468_ACE0L)
   let mut i = 0
   while i < 20000 {
-    let text = zz_text(rng, 24)
+    let text = url_fuzz_text(rng, 24)
     let _ = split_scheme(text)
     let _ = split_url(text)
     let _ = split_url_parts(text)
