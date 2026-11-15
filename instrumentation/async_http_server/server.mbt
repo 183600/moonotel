@@ -846,18 +846,21 @@ fn unquote_forwarded_value(value : StringView) -> String? {
 }
 
 // The first `name=value` parameter of the first element of a `Forwarded`
-// header. Parameter names are case-insensitive and values may be quoted
-// (RFC 7239). Only the first element is considered because it describes the
-// original client; later elements describe intermediate proxies.
+// header, together with whether a parameter with that name appeared at all.
+// A present but malformed parameter yields `(true, None)`; an absent one
+// yields `(false, None)`. Parameter names are case-insensitive and values may
+// be quoted (RFC 7239). Only the first element is considered because it
+// describes the original client; later elements describe intermediate
+// proxies.
 
 ///|
-fn first_forwarded_parameter(
+fn first_forwarded_parameter_with_presence(
   headers : Map[@http.CaseInsensitiveString, String],
   name : String,
-) -> String? {
+) -> (Bool, String?) {
   let value = match headers.get(@http.CaseInsensitiveString("forwarded")) {
     Some(value) => value
-    None => return None
+    None => return (false, None)
   }
   let value = trim_header_ows(value[:])
   let element = match find_delimiter_outside_quotes(value, 0x2C) {
@@ -877,17 +880,29 @@ fn first_forwarded_parameter(
       Some(equals) => {
         let key = trim_header_ows(param[:equals])
         if key.to_owned().to_lower() == name {
-          return unquote_forwarded_value(param[equals + 1:])
+          return (true, unquote_forwarded_value(param[equals + 1:]))
         }
       }
-      None => ()
+      None =>
+        // A bare parameter name is malformed but still claims the parameter.
+        if trim_header_ows(param).to_owned().to_lower() == name {
+          return (true, None)
+        }
     }
     if end >= rest.length() {
       break
     }
     start = start + end + 1
   }
-  None
+  (false, None)
+}
+
+///|
+fn first_forwarded_parameter(
+  headers : Map[@http.CaseInsensitiveString, String],
+  name : String,
+) -> String? {
+  first_forwarded_parameter_with_presence(headers, name).1
 }
 
 // The first comma-separated token of a header value, trimmed of OWS. Used for
@@ -1135,11 +1150,22 @@ fn effective_forwarded_client(
   headers : Map[@http.CaseInsensitiveString, String],
 ) -> (String, Int32?)? {
   match headers.get(@http.CaseInsensitiveString("forwarded")) {
-    Some(_) =>
-      match first_forwarded_parameter(headers, "for") {
-        Some(value) => parse_forwarded_node(value)
-        None => x_forwarded_for(headers)
+    Some(_) => {
+      let (present, value) = first_forwarded_parameter_with_presence(
+        headers, "for",
+      )
+      if present {
+        // A malformed value is still authoritative: `None` suppresses the
+        // `X-Forwarded-For` fallback instead of trusting a client-supplied
+        // value.
+        match value {
+          Some(value) => parse_forwarded_node(value)
+          None => None
+        }
+      } else {
+        x_forwarded_for(headers)
       }
+    }
     None => x_forwarded_for(headers)
   }
 }

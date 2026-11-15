@@ -223,6 +223,25 @@ test "effective_forwarded_client_does_not_fall_back_from_an_unusable_forwarded_f
 }
 
 ///|
+test "effective_forwarded_client_does_not_fall_back_from_a_malformed_forwarded_for" {
+  assert_eq(
+    effective_forwarded_client(
+      ows_header_map([
+        ("Forwarded", "for=\"192.0.2.1"),
+        ("X-Forwarded-For", "10.0.0.1"),
+      ]),
+    ),
+    None,
+  )
+  assert_eq(
+    effective_forwarded_client(
+      ows_header_map([("Forwarded", "for"), ("X-Forwarded-For", "10.0.0.1")]),
+    ),
+    None,
+  )
+}
+
+///|
 test "effective_forwarded_client_falls_back_to_x_forwarded_for" {
   assert_eq(
     effective_forwarded_client(
