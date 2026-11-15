@@ -26,3 +26,5 @@ import {
 pkgtype(kind: "library")
 
 supported_targets = "native+wasm"
+
+max_concurrent_tests = 1
