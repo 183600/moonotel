@@ -405,6 +405,20 @@ pub fn SpanContext::trace_flags(self : SpanContext) -> Int32 {
   self.trace_flags
 }
 
+// Derive a copy of this context carrying the given raw trace flags. The flags
+// are stored as-is, so callers can preserve implementation-specific bits while
+// changing the sampled or random flag with `TRACE_FLAGS_SAMPLED` and
+// `TRACE_FLAGS_RANDOM`. IDs, `tracestate`, validity, and the remote flag are
+// preserved.
+
+///|
+pub fn SpanContext::with_trace_flags(
+  self : SpanContext,
+  trace_flags : Int32,
+) -> SpanContext {
+  { ..self.copy(), trace_flags, }
+}
+
 // Get a copy of the trace ID bytes. The result always has the 16-byte shape
 // required by the Trace API; an ID that was shortened through a view is
 // reported as the canonical all-zero ID.

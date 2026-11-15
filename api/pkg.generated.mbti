@@ -48,6 +48,7 @@ pub fn SpanContext::trace_id_hex(Self) -> String
 pub fn SpanContext::trace_id_view(Self) -> Array[Int32]
 pub fn SpanContext::tracestate(Self) -> String
 pub fn SpanContext::with_remote(Self, Bool) -> Self
+pub fn SpanContext::with_trace_flags(Self, Int32) -> Self
 pub fn SpanContext::with_tracestate(Self, String) -> Self
 
 #derive(Eq, @debug.Debug)
