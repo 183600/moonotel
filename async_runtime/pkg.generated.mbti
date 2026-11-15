@@ -25,13 +25,16 @@ pub fn[G] spawn_flush_loop(@async.TaskGroup[G], @sdk.BatchSpanProcessor, interva
 // Types and methods
 pub struct OtlpHttpAsyncSpanExporter {
   exporter : @otlp_async.OtlpHttpAsyncExporter
-  queue : @aqueue.Queue[Array[@sdk.SpanData]]
+  queue : @aqueue.Queue[(UInt64, Array[@sdk.SpanData])]
   mut shutdown_called : Bool
   mut dropped : UInt64
   mut failures : UInt64
   mut active_sends : Int32
   mut accepted_batches : UInt64
   mut completed_batches : UInt64
+  mut completed_prefix : UInt64
+  outstanding_batches : Map[UInt64, Unit]
+  mut deferred_batch : (UInt64, Array[@sdk.SpanData])?
   send_finished : @cond_var.Cond
 }
 pub fn OtlpHttpAsyncSpanExporter::config(Self) -> @otlp.OtlpHttpConfig

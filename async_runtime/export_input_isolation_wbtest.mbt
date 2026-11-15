@@ -13,7 +13,7 @@ async test "export_available keeps the caller's first batch unchanged" {
       })
     }
     let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:\{port}")
-    let queue : @aqueue.Queue[Array[@sdk.SpanData]] = @aqueue.Queue(
+    let queue : @aqueue.Queue[(UInt64, Array[@sdk.SpanData])] = @aqueue.Queue(
       kind=@aqueue.DiscardOldest(4),
     )
     let exporter : OtlpHttpAsyncSpanExporter = {
@@ -25,12 +25,15 @@ async test "export_available keeps the caller's first batch unchanged" {
       active_sends: 0,
       accepted_batches: 0,
       completed_batches: 0,
+      completed_prefix: 0,
+      outstanding_batches: Map([]),
+      deferred_batch: None,
       send_finished: @cond_var.Cond(),
     }
     let first = Array::make(1, split_probe_span("first"))
     let queued = Array::make(1, split_probe_span("queued"))
-    let _ = queue.try_put(queued) catch { _ => false }
-    let _ = exporter.export_available(first)
+    let _ = queue.try_put((1UL, queued)) catch { _ => false }
+    let _ = exporter.export_available(0UL, first)
     assert_eq(first.length(), 1)
     assert_eq(first[0].name, "first")
   }

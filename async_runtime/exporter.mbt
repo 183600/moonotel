@@ -19,17 +19,29 @@ const MAX_EXPORT_SPANS : Int32 = 512
 ///|
 pub struct OtlpHttpAsyncSpanExporter {
   exporter : @otlp_async.OtlpHttpAsyncExporter
-  queue : @aqueue.Queue[Array[@sdk.SpanData]]
+  // Each queued batch carries the sequence number assigned when it was
+  // accepted. Sequence numbers let `flush` wait only for batches that existed
+  // when it started, without waiting for spans that keep arriving.
+  queue : @aqueue.Queue[(UInt64, Array[@sdk.SpanData])]
   mut shutdown_called : Bool
   mut dropped : UInt64
   mut failures : UInt64
   mut active_sends : Int32
-  // Number of batches accepted by `enqueue` and number of those batches whose
-  // export attempt has finished (including batches discarded on overflow).
-  // `flush` uses the difference to wait for a batch that was handed directly to
-  // a blocked background reader, before that reader has started sending it.
+  // Number of batches accepted by `enqueue`; also the sequence number of the
+  // next accepted batch.
   mut accepted_batches : UInt64
+  // Number of accepted batches whose export attempt has finished (including
+  // batches discarded on overflow).
   mut completed_batches : UInt64
+  // Every batch with a sequence number below this value has finished. This is
+  // the contiguous completion watermark used by `flush`.
+  mut completed_prefix : UInt64
+  // Accepted batches that have neither finished nor been discarded.
+  outstanding_batches : Map[UInt64, Unit]
+  // A batch pulled from the head of the queue that `flush` does not own. It is
+  // put back logically in front of the queue and taken first by the background
+  // sender.
+  mut deferred_batch : (UInt64, Array[@sdk.SpanData])?
   send_finished : @cond_var.Cond
 }
 
@@ -56,6 +68,9 @@ pub fn[G] OtlpHttpAsyncSpanExporter::new(
     active_sends: 0,
     accepted_batches: 0,
     completed_batches: 0,
+    completed_prefix: 0,
+    outstanding_batches: Map([]),
+    deferred_batch: None,
     send_finished: @cond_var.Cond(),
   }
   group.spawn_bg(no_wait=true) <| () => { exporter.run() }
@@ -106,9 +121,9 @@ pub fn OtlpHttpAsyncSpanExporter::is_shutdown(
   self.shutdown_called
 }
 
-// Drain and export every batch currently queued, waiting for the OTLP
-// requests to finish. Spans accepted after the drain started may remain in
-// the queue for the background sender. Failed requests are counted by
+// Drain and export every batch accepted before this call, waiting for the
+// OTLP requests to finish. Spans accepted after the flush started may remain
+// in the queue for the background sender. Failed requests are counted by
 // `export_failures`; they are not retried beyond the exporter's configured
 // retry policy.
 
@@ -116,9 +131,14 @@ pub fn OtlpHttpAsyncSpanExporter::is_shutdown(
 pub async fn OtlpHttpAsyncSpanExporter::flush(
   self : OtlpHttpAsyncSpanExporter,
 ) -> Unit {
+  // Snapshot the sequence counter: batches accepted after this point are not
+  // part of this flush. Using a per-batch watermark instead of the global
+  // accepted/completed counters keeps the wait bounded even while producers
+  // keep enqueueing spans.
+  let target = self.accepted_batches
   while true {
-    self.drain()
-    if self.completed_batches >= self.accepted_batches && self.active_sends == 0 {
+    self.drain_until(target)
+    if self.completed_prefix >= target {
       return
     }
     self.send_finished.wait()
@@ -141,32 +161,47 @@ fn OtlpHttpAsyncSpanExporter::enqueue(
   if spans.length() == 0 {
     return @sdk.ExportSuccess
   }
-  let mut accepted = self.queue.try_put(spans) catch { _ => false }
+  let sequence = self.accepted_batches
+  let mut accepted = self.queue.try_put((sequence, spans)) catch { _ => false }
   if !accepted {
     // The queue is full: discard the oldest batch to make room, then retry
     // once.
-    let discarded : Bool = try {
-      match self.queue.try_get() {
-        Some(_) => true
-        None => false
-      }
-    } catch {
-      _ => false
+    let discarded : (UInt64, Array[@sdk.SpanData])? = self.queue.try_get() catch {
+      _ => None
     }
-    accepted = self.queue.try_put(spans) catch { _ => false }
-    if discarded {
-      self.dropped = self.dropped + 1
-      // The evicted batch will never be exported; mark it finished so a
-      // waiting `flush` does not wait for it forever.
-      self.completed_batches = self.completed_batches + 1
-      self.send_finished.broadcast()
+    accepted = self.queue.try_put((sequence, spans)) catch { _ => false }
+    match discarded {
+      Some((discarded_sequence, _)) => {
+        self.dropped = self.dropped + 1
+        // The evicted batch will never be exported; mark it finished so a
+        // waiting `flush` does not wait for it forever.
+        self.finish_batch(discarded_sequence)
+      }
+      None => ()
     }
   }
   if accepted {
     self.accepted_batches = self.accepted_batches + 1
+    self.outstanding_batches.set(sequence, ())
     @sdk.ExportSuccess
   } else {
     @sdk.ExportFailure("OTLP async export queue is full")
+  }
+}
+
+// Take the next batch for export: a batch deferred by `flush` comes first,
+// then the head of the queue.
+
+///|
+fn OtlpHttpAsyncSpanExporter::try_take_batch(
+  self : OtlpHttpAsyncSpanExporter,
+) -> (UInt64, Array[@sdk.SpanData])? raise {
+  match self.deferred_batch {
+    Some(batch) => {
+      self.deferred_batch = None
+      Some(batch)
+    }
+    None => self.queue.try_get()
   }
 }
 
@@ -177,13 +212,15 @@ fn OtlpHttpAsyncSpanExporter::enqueue(
 ///|
 async fn OtlpHttpAsyncSpanExporter::export_available(
   self : OtlpHttpAsyncSpanExporter,
+  first_sequence : UInt64,
   first : Array[@sdk.SpanData],
-) -> Int32 {
+) -> Array[UInt64] {
   // Coalescing appends queued spans to `batch`; own the array so the caller's
   // batch is never modified.
   let mut pending = first.copy()
-  // Number of accepted batches this call finishes, including `first`.
-  let mut processed = 1
+  // Sequence numbers of the accepted batches this call finishes, including
+  // `first`.
+  let processed : Array[UInt64] = [first_sequence]
   let mut split = false
   while pending.length() > 0 {
     // The queue loop below only enforces the limit on spans appended from the
@@ -199,12 +236,12 @@ async fn OtlpHttpAsyncSpanExporter::export_available(
     let batch = pending
     batch.reserve_capacity(MAX_EXPORT_SPANS)
     while batch.length() < MAX_EXPORT_SPANS {
-      let next : Array[@sdk.SpanData]? = self.queue.try_get() catch {
+      let next : (UInt64, Array[@sdk.SpanData])? = self.try_take_batch() catch {
         _ => None
       }
       match next {
-        Some(items) => {
-          processed = processed + 1
+        Some((sequence, items)) => {
+          processed.push(sequence)
           let remaining = MAX_EXPORT_SPANS - batch.length()
           if items.length() <= remaining {
             batch.append(items)
@@ -265,15 +302,46 @@ async fn OtlpHttpAsyncSpanExporter::send(
   })
 }
 
-// Record that `count` accepted batches have been fully handled and wake any
-// `flush` waiting for them.
+// Advance the contiguous completion watermark over batches that are already
+// finished. A batch is finished either because its export attempt completed or
+// because it was discarded on overflow.
+
+///|
+fn OtlpHttpAsyncSpanExporter::advance_completed_prefix(
+  self : OtlpHttpAsyncSpanExporter,
+) -> Unit {
+  while self.completed_prefix < self.accepted_batches &&
+        !self.outstanding_batches.contains(self.completed_prefix) {
+    self.completed_prefix = self.completed_prefix + 1
+  }
+}
+
+// Record that one accepted batch has been fully handled.
+
+///|
+fn OtlpHttpAsyncSpanExporter::finish_batch(
+  self : OtlpHttpAsyncSpanExporter,
+  sequence : UInt64,
+) -> Unit {
+  let _ = self.outstanding_batches.remove(sequence)
+  self.completed_batches = self.completed_batches + 1
+  self.advance_completed_prefix()
+  self.send_finished.broadcast()
+}
+
+// Record that `sequences` accepted batches have been fully handled and wake
+// any `flush` waiting for them.
 
 ///|
 fn OtlpHttpAsyncSpanExporter::finish_batches(
   self : OtlpHttpAsyncSpanExporter,
-  count : Int32,
+  sequences : Array[UInt64],
 ) -> Unit {
-  self.completed_batches = self.completed_batches + count.to_uint64()
+  for sequence in sequences {
+    let _ = self.outstanding_batches.remove(sequence)
+    self.completed_batches = self.completed_batches + 1
+  }
+  self.advance_completed_prefix()
   self.send_finished.broadcast()
 }
 
@@ -284,10 +352,42 @@ async fn OtlpHttpAsyncSpanExporter::drain(
   self : OtlpHttpAsyncSpanExporter,
 ) -> Unit {
   while true {
-    let next : Array[@sdk.SpanData]? = self.queue.try_get() catch { _ => None }
+    let next : (UInt64, Array[@sdk.SpanData])? = self.try_take_batch() catch {
+      _ => None
+    }
     match next {
-      Some(batch) => {
-        let processed = self.export_available(batch)
+      Some((sequence, batch)) => {
+        let processed = self.export_available(sequence, batch)
+        self.finish_batches(processed)
+      }
+      None => break
+    }
+  }
+}
+
+// Export queued batches only until every batch accepted before `target` has
+// finished. A producer that keeps enqueueing spans would otherwise keep the
+// full drain below busy indefinitely. A batch that belongs to a later flush is
+// put back in `deferred_batch` instead of being exported here.
+
+///|
+async fn OtlpHttpAsyncSpanExporter::drain_until(
+  self : OtlpHttpAsyncSpanExporter,
+  target : UInt64,
+) -> Unit {
+  while self.completed_prefix < target {
+    let next : (UInt64, Array[@sdk.SpanData])? = self.try_take_batch() catch {
+      _ => None
+    }
+    match next {
+      Some((sequence, batch)) => {
+        if sequence >= target {
+          // Belongs to a later flush or to the background sender; put it back
+          // without spending a request on it.
+          self.deferred_batch = Some((sequence, batch))
+          break
+        }
+        let processed = self.export_available(sequence, batch)
         self.finish_batches(processed)
       }
       None => break
@@ -306,12 +406,16 @@ async fn OtlpHttpAsyncSpanExporter::run(
     let _ = @async.protect_from_cancel(() => self.drain())
   }
   while true {
-    let next : Array[@sdk.SpanData]? = Some(self.queue.get()) catch {
-      _ => None
+    let next : (UInt64, Array[@sdk.SpanData])? = match self.deferred_batch {
+      Some(batch) => {
+        self.deferred_batch = None
+        Some(batch)
+      }
+      None => Some(self.queue.get()) catch { _ => None }
     }
     match next {
-      Some(batch) => {
-        let processed = self.export_available(batch)
+      Some((sequence, batch)) => {
+        let processed = self.export_available(sequence, batch)
         self.finish_batches(processed)
       }
       None => break

@@ -65,7 +65,7 @@ async test "oversized queued batch is re-split after a partial fill" {
       endpoint="http://127.0.0.1:\{port}",
       protocol=@otlp.OTLP_HTTP_JSON_PROTOCOL,
     )
-    let queue : @aqueue.Queue[Array[@sdk.SpanData]] = @aqueue.Queue(
+    let queue : @aqueue.Queue[(UInt64, Array[@sdk.SpanData])] = @aqueue.Queue(
       kind=@aqueue.DiscardOldest(4),
     )
     let exporter : OtlpHttpAsyncSpanExporter = {
@@ -77,6 +77,9 @@ async test "oversized queued batch is re-split after a partial fill" {
       active_sends: 0,
       accepted_batches: 0,
       completed_batches: 0,
+      completed_prefix: 0,
+      outstanding_batches: Map([]),
+      deferred_batch: None,
       send_finished: @cond_var.Cond(),
     }
     // The first batch takes one slot, so 511 spans of the queued 1025 fit in
@@ -86,8 +89,8 @@ async test "oversized queued batch is re-split after a partial fill" {
       1025,
       split_probe_span("queued"),
     )
-    let _ = queue.try_put(queued) catch { _ => false }
-    let _ = exporter.export_available([split_probe_span("first")])
+    let _ = queue.try_put((1UL, queued)) catch { _ => false }
+    let _ = exporter.export_available(0UL, [split_probe_span("first")])
     assert_eq(spans_per_request.length(), 3)
     assert_eq(spans_per_request[0], 512)
     assert_eq(spans_per_request[1], 512)
@@ -111,7 +114,7 @@ async test "exact multiple oversized batch stops after complete splits" {
       endpoint="http://127.0.0.1:\{port}",
       protocol=@otlp.OTLP_HTTP_JSON_PROTOCOL,
     )
-    let queue : @aqueue.Queue[Array[@sdk.SpanData]] = @aqueue.Queue(
+    let queue : @aqueue.Queue[(UInt64, Array[@sdk.SpanData])] = @aqueue.Queue(
       kind=@aqueue.DiscardOldest(4),
     )
     let exporter : OtlpHttpAsyncSpanExporter = {
@@ -123,6 +126,9 @@ async test "exact multiple oversized batch stops after complete splits" {
       active_sends: 0,
       accepted_batches: 0,
       completed_batches: 0,
+      completed_prefix: 0,
+      outstanding_batches: Map([]),
+      deferred_batch: None,
       send_finished: @cond_var.Cond(),
     }
     // Exactly two full requests; the loop must stop instead of sending an
@@ -131,7 +137,7 @@ async test "exact multiple oversized batch stops after complete splits" {
       1024,
       split_probe_span("first"),
     )
-    let _ = exporter.export_available(first)
+    let _ = exporter.export_available(0UL, first)
     assert_eq(spans_per_request.length(), 2)
     assert_eq(spans_per_request[0], 512)
     assert_eq(spans_per_request[1], 512)
