@@ -234,12 +234,7 @@ pub impl SpanExporter for ConsoleSpanExporter with fn export_spans(self, spans) 
 
 ///|
 pub impl SpanExporter for ConsoleSpanExporter with fn export_span(self, data) {
-  if self.shutdown_called {
-    ExportFailure("console exporter is shut down")
-  } else {
-    println(format_span(data))
-    ExportSuccess
-  }
+  self.export_spans([data])
 }
 
 ///|

@@ -7,12 +7,8 @@
 
 ///|
 fn env_non_negative_int(name : String, default : Int32) -> Int32 {
-  match @env.get_env_var(name) {
-    Some(value) =>
-      match parse_decimal_int(value.trim()) {
-        Some(parsed) => if parsed < 0 { default } else { parsed }
-        None => default
-      }
+  match parse_env_non_negative_int(name) {
+    Some(value) => value
     None => default
   }
 }

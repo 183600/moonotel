@@ -417,17 +417,9 @@ pub fn ResourceAttributes::get(
   self : ResourceAttributes,
   key : String,
 ) -> AttributeValue? {
-  match self.own {
-    Some(map) =>
-      match map.get(key) {
-        Some(value) => Some(copy_attribute_value(value))
-        None => None
-      }
-    None =>
-      match self.shared.get(key) {
-        Some(value) => Some(copy_attribute_value(value))
-        None => None
-      }
+  match self.raw_map().get(key) {
+    Some(value) => Some(copy_attribute_value(value))
+    None => None
   }
 }
 
@@ -448,13 +440,10 @@ pub fn ResourceAttributes::set(
   let map = match self.own {
     Some(map) => map
     None => {
-      let copied : Map[String, AttributeValue] = Map(
-        [],
-        capacity=map_capacity_for_entries(self.shared.length() + 1),
+      let copied = copy_attributes_with_capacity(
+        self.shared,
+        map_capacity_for_entries(self.shared.length() + 1),
       )
-      for entry_key, entry_value in self.shared {
-        copied.set(entry_key, copy_attribute_value(entry_value))
-      }
       self.own = Some(copied)
       copied
     }

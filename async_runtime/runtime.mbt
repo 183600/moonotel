@@ -38,6 +38,17 @@ pub fn[G] spawn_flush_loop(
   }
 }
 
+// The context a spawned task starts with: the explicit context when one was
+// supplied, otherwise the current context captured at the spawn site.
+
+///|
+fn context_or_current(context : @context.Context?) -> @context.Context {
+  match context {
+    Some(value) => value
+    None => @context.current_context()
+  }
+}
+
 // Spawn a background task that starts with `context` (the current context
 // when omitted) installed as the ambient context, and restores the previous
 // context when it finishes. Use this instead of `TaskGroup::spawn_bg` to
@@ -51,10 +62,7 @@ pub fn[G] spawn_bg(
   no_wait? : Bool,
   allow_failure? : Bool,
 ) -> Unit {
-  let carried = match context {
-    Some(value) => value
-    None => @context.current_context()
-  }
+  let carried = context_or_current(context)
   group.spawn_bg(
     () => {
       let previous = @context.attach(carried)
@@ -79,10 +87,7 @@ pub fn[G, X] spawn(
   no_wait? : Bool,
   allow_failure? : Bool,
 ) -> @async.Task[X] {
-  let carried = match context {
-    Some(value) => value
-    None => @context.current_context()
-  }
+  let carried = context_or_current(context)
   group.spawn(
     () => {
       let previous = @context.attach(carried)

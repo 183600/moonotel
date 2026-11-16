@@ -1115,8 +1115,7 @@ pub fn SpanSdk::end(self : SpanSdk, end_time_unix_nano? : Int64) -> Unit {
   self.ended = true
   match end_time_unix_nano {
     Some(value) => self.end_time_unix_nano = value
-    None =>
-      self.end_time_unix_nano = (@env.now() * 1000000).reinterpret_as_int64()
+    None => self.end_time_unix_nano = unix_nano_now()
   }
   if self.recording {
     let data = SpanData::take_from_span(self)

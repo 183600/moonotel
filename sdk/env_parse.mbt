@@ -25,6 +25,28 @@ fn parse_decimal_int(value : StringView) -> Int32? {
   Some(number)
 }
 
+// Read a non-negative decimal integer from the environment variable `name`.
+// An absent, blank, malformed or negative value yields `None`; surrounding
+// whitespace is ignored.
+
+///|
+fn parse_env_non_negative_int(name : String) -> Int32? {
+  match @env.get_env_var(name) {
+    Some(value) => {
+      let trimmed = value.trim()
+      if trimmed == "" {
+        None
+      } else {
+        match parse_decimal_int(trimmed) {
+          Some(parsed) => if parsed < 0 { None } else { Some(parsed) }
+          None => None
+        }
+      }
+    }
+    None => None
+  }
+}
+
 // Parse an environment value as a decimal floating-point number. `parse_double`
 // accepts digit separators, which are not part of the decimal notation used by
 // the standard OTEL environment variables, so reject them explicitly.

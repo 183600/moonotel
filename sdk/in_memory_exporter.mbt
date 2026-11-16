@@ -19,22 +19,6 @@ pub fn InMemorySpanExporter::new() -> InMemorySpanExporter {
   { batches: [], span_total: 0, shutdown_called: false, }
 }
 
-// Deep-copy a span snapshot so that mutating the result cannot change the
-// exporter's stored data.
-
-///|
-fn copy_span_data(data : SpanData) -> SpanData {
-  {
-    ..data,
-    span_context: @api.SpanContext::copy(data.span_context),
-    parent_span_id: data.parent_span_id.copy(),
-    attributes: copy_attribute_map(data.attributes),
-    events: copy_events(data.events),
-    links: copy_links(data.links),
-    resource: data.resource.copy(),
-  }
-}
-
 // The exported batches, in arrival order. Batches and their spans are copied
 // so callers cannot mutate the exporter's state.
 
@@ -46,7 +30,7 @@ pub fn InMemorySpanExporter::exported_batches(
   for batch in self.batches {
     let copied : Array[SpanData] = Array(capacity=batch.length())
     for span in batch {
-      copied.push(copy_span_data(span))
+      copied.push(span.copy())
     }
     out.push(copied)
   }
@@ -62,7 +46,7 @@ pub fn InMemorySpanExporter::exported_spans(
   let out : Array[SpanData] = Array(capacity=self.span_total)
   for batch in self.batches {
     for span in batch {
-      out.push(copy_span_data(span))
+      out.push(span.copy())
     }
   }
   out
@@ -114,7 +98,7 @@ pub impl SpanExporter for InMemorySpanExporter with fn export_spans(self, spans)
     // the caller's data cannot change what was exported.
     let copied : Array[SpanData] = Array(capacity=spans.length())
     for span in spans {
-      copied.push(copy_span_data(span))
+      copied.push(span.copy())
     }
     self.batches.push(copied)
     self.span_total = self.span_total + spans.length()
@@ -124,14 +108,7 @@ pub impl SpanExporter for InMemorySpanExporter with fn export_spans(self, spans)
 
 ///|
 pub impl SpanExporter for InMemorySpanExporter with fn export_span(self, data) {
-  if self.shutdown_called {
-    ExportFailure("in-memory exporter is shut down")
-  } else {
-    // Store the data as its own batch and isolate it from the caller.
-    self.batches.push([copy_span_data(data)])
-    self.span_total = self.span_total + 1
-    ExportSuccess
-  }
+  self.export_spans([data])
 }
 
 ///|

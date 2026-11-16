@@ -123,33 +123,12 @@ pub fn SpanLimits::attribute_value_length_limit(self : SpanLimits) -> Int32 {
   self.attribute_value_length_limit
 }
 
-// Read a non-negative integer from an environment variable. An absent, empty,
-// malformed or negative value yields `None`, as required by the specification.
-
-///|
-fn env_limit_opt(name : String) -> Int32? {
-  match @env.get_env_var(name) {
-    Some(value) => {
-      let trimmed = value.trim()
-      if trimmed == "" {
-        None
-      } else {
-        match parse_decimal_int(trimmed) {
-          Some(parsed) => if parsed < 0 { None } else { Some(parsed) }
-          None => None
-        }
-      }
-    }
-    None => None
-  }
-}
-
 // Read a non-negative integer, falling back to `default` when the variable is
 // absent, empty, malformed or negative.
 
 ///|
 fn env_limit(name : String, default : Int32) -> Int32 {
-  match env_limit_opt(name) {
+  match parse_env_non_negative_int(name) {
     Some(value) => value
     None => default
   }
@@ -161,7 +140,7 @@ fn env_limit(name : String, default : Int32) -> Int32 {
 
 ///|
 fn env_attribute_count_limit(name : String) -> Int32 {
-  match env_limit_opt(name) {
+  match parse_env_non_negative_int(name) {
     Some(value) => value
     None => env_limit("OTEL_ATTRIBUTE_COUNT_LIMIT", 128)
   }
@@ -187,7 +166,7 @@ fn env_attribute_count_limit(name : String) -> Int32 {
 ///|
 pub fn SpanLimits::from_env() -> SpanLimits {
   let attribute_value_length_limit = match
-    env_limit_opt("OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT") {
+    parse_env_non_negative_int("OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT") {
     Some(value) => value
     None => env_limit("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", -1)
   }

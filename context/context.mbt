@@ -86,14 +86,14 @@ pub fn Context::root() -> Context {
   root_context
 }
 
-// Derive a context carrying the given span. The context owns a copy of the
-// SpanContext, so later mutations through the caller's ID views cannot change
-// it.
+// A child node with no span or baggage payload. Derived contexts extend this
+// node with exactly the state they carry, so the parent chain and the default
+// empty state are defined in one place.
 
 ///|
-pub fn Context::with_span(self : Context, sc : @api.SpanContext) -> Context {
+fn Context::child_node(self : Context) -> Context {
   {
-    span_ctx: Some(sc.copy()),
+    span_ctx: None,
     key: None,
     value: None,
     properties: None,
@@ -102,6 +102,15 @@ pub fn Context::with_span(self : Context, sc : @api.SpanContext) -> Context {
     clear_baggage: false,
     parent: Some(self),
   }
+}
+
+// Derive a context carrying the given span. The context owns a copy of the
+// SpanContext, so later mutations through the caller's ID views cannot change
+// it.
+
+///|
+pub fn Context::with_span(self : Context, sc : @api.SpanContext) -> Context {
+  { ..self.child_node(), span_ctx: Some(sc.copy()) }
 }
 
 // Derive a context carrying a string baggage value. An empty name is not a
@@ -117,16 +126,7 @@ pub fn Context::with_value(
   if key == "" {
     return self
   }
-  {
-    span_ctx: None,
-    key: Some(key),
-    value: Some(value),
-    properties: None,
-    baggage_map: None,
-    baggage_list: None,
-    clear_baggage: false,
-    parent: Some(self),
-  }
+  { ..self.child_node(), key: Some(key), value: Some(value) }
 }
 
 // Derive a context carrying a baggage value together with its W3C baggage
@@ -154,14 +154,10 @@ pub fn Context::with_baggage_entry(
     None => None
   }
   {
-    span_ctx: None,
+    ..self.child_node(),
     key: Some(key),
     value: Some(value),
     properties,
-    baggage_map: None,
-    baggage_list: None,
-    clear_baggage: false,
-    parent: Some(self),
   }
 }
 
@@ -175,16 +171,7 @@ pub fn Context::without_value(self : Context, key : String) -> Context {
   if key == "" {
     return self
   }
-  {
-    span_ctx: None,
-    key: Some(key),
-    value: None,
-    properties: None,
-    baggage_map: None,
-    baggage_list: None,
-    clear_baggage: false,
-    parent: Some(self),
-  }
+  { ..self.child_node(), key: Some(key) }
 }
 
 // Derive a context in which no baggage value is visible: every value stored in
@@ -194,16 +181,7 @@ pub fn Context::without_value(self : Context, key : String) -> Context {
 
 ///|
 pub fn Context::without_baggage(self : Context) -> Context {
-  {
-    span_ctx: None,
-    key: None,
-    value: None,
-    properties: None,
-    baggage_map: None,
-    baggage_list: None,
-    clear_baggage: true,
-    parent: Some(self),
-  }
+  { ..self.child_node(), clear_baggage: true }
 }
 
 // Derive a context carrying every key/value pair of `values` as baggage.
@@ -232,16 +210,7 @@ pub fn Context::with_baggage(
   if baggage.length() == 0 {
     return self
   }
-  {
-    span_ctx: None,
-    key: None,
-    value: None,
-    properties: None,
-    baggage_map: Some(baggage),
-    baggage_list: None,
-    clear_baggage: false,
-    parent: Some(self),
-  }
+  { ..self.child_node(), baggage_map: Some(baggage) }
 }
 
 // Like `with_baggage`, but takes ownership of `values` instead of copying it.
@@ -284,16 +253,7 @@ pub fn Context::with_baggage_owned(
   } else {
     values
   }
-  {
-    span_ctx: None,
-    key: None,
-    value: None,
-    properties: None,
-    baggage_map: Some(baggage),
-    baggage_list: None,
-    clear_baggage: false,
-    parent: Some(self),
-  }
+  { ..self.child_node(), baggage_map: Some(baggage) }
 }
 
 // Derive a context carrying every member of `entries`. Members are applied in
@@ -336,16 +296,7 @@ pub fn Context::with_baggage_entries(
   if list.length() == 0 {
     return self
   }
-  {
-    span_ctx: None,
-    key: None,
-    value: None,
-    properties: None,
-    baggage_map: None,
-    baggage_list: Some(list),
-    clear_baggage: false,
-    parent: Some(self),
-  }
+  { ..self.child_node(), baggage_list: Some(list) }
 }
 
 // Overlay all baggage stored in `other` onto this context. Unlike

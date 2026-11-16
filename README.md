@@ -41,19 +41,42 @@ HTTP transport and HTTP instrumentation target native and wasm.
 
 - [Scope](#scope)
 - [Integration paths](#integration-paths)
+- [Request lifecycle](#request-lifecycle)
 - [Install](#install)
 - [Getting started](#getting-started)
 - [Examples](#examples)
 - [Packages](#packages)
 - [Spans, sampling, and processing](#spans-sampling-and-processing)
 - [Context and baggage](#context-and-baggage)
+- [Common patterns](#common-patterns)
 - [HTTP instrumentation](#http-instrumentation)
 - [OTLP/HTTP export](#otlphttp-export)
 - [W3C propagation](#w3c-propagation)
 - [Configuration reference](#configuration-reference)
+- [Troubleshooting](#troubleshooting)
 - [Testing and CI](#testing-and-ci)
 - [Development](#development)
 - [License](#license)
+
+## Request lifecycle
+
+A request usually crosses four layers. The context is the hand-off point
+between them: extraction creates it, span creation reads it, instrumentation
+injects it, and the exporter only sees finished snapshots.
+
+```text
+incoming request
+      │  extract traceparent / tracestate / baggage
+      ▼
+Context ──► Tracer ──► Span ──► SpanProcessor ──► SpanExporter
+      ▲                 │                              │
+      └── inject        └── attributes, events, status └── OTLP/HTTP
+          outgoing request
+```
+
+The API, Context and propagation packages never perform I/O. The SDK records
+and processes spans, while exporters own encoding and transport. This keeps the
+core usable on every MoonBit target and makes the network boundary explicit.
 
 ## Install
 
@@ -300,6 +323,62 @@ names are all invalid leaves the context unchanged.
 `@moonotel.ContextBaggageEntry` (an alias of `@context.BaggageEntry`), which
 carries W3C baggage properties. It is distinct from the propagation
 `BaggageEntry` used by the `baggage` header helpers.
+
+## Common patterns
+
+### Parent and child spans
+
+`with_span` installs the new span as the current span for the duration of the
+callback, so nested calls form a trace without passing the parent explicitly.
+The callback form also ends the span and restores the previous context even
+when the callback raises.
+
+```moonbit
+tracer.with_span("checkout", fn(_parent) {
+  tracer.with_span("charge-card", fn(child) {
+    child.set_string_attribute("payment.provider", "acme")
+  })
+})
+```
+
+For work that interleaves with other tasks, pass an explicit `Context` or use
+the context-aware spawn helpers from `@async_runtime` instead of relying on the
+default ambient slot.
+
+### A custom sampler
+
+A sampler sees the parent, trace ID, name, kind, attributes and links of every
+new span. Return one of the three shared decisions; returning a decision that
+records but does not sample keeps the span local while excluding it from
+export.
+
+```moonbit
+let sampler = @sdk.Sampler::new("DropHealthChecks", fn(parameters) {
+  if parameters.name == "health-check" {
+    @sdk.sampling_decision_drop()
+  } else {
+    @sdk.sampling_decision_record_and_sample()
+  }
+})
+let provider = @sdk.TracerProviderSdk::new(service_name="checkout")
+  .with_sampler(sampler)
+```
+
+### Inspect spans in tests
+
+`InMemorySpanExporter` stores deep copies, so tests can inspect spans without a
+collector and without sharing mutable data with the SDK.
+
+```moonbit
+let exporter = @sdk.InMemorySpanExporter::new()
+let provider = @sdk.TracerProviderSdk::new(service_name="test")
+  .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+
+provider.get_tracer("test").with_span("unit", fn(span) {
+  span.set_status(@api.StatusCode::Ok)
+})
+assert_eq(exporter.exported_spans().length(), 1)
+```
 
 ## HTTP instrumentation
 
@@ -626,6 +705,27 @@ the sanitize-fields list (`*` sanitizes every captured header), so
 credential-bearing headers can be captured without leaking their values. Prefer
 explicit names: a wildcard also captures headers such as `Authorization` and
 `Cookie`, so only enable it when those values are safe to record or sanitized.
+
+## Troubleshooting
+
+- **A recording span is not exported.** With the direct SDK, a provider needs a
+  processor before spans are exported; without one the span is still readable
+  after `end()` but stays local. `SimpleSpanProcessor` exports immediately and
+  `BatchSpanProcessor` buffers until a batch, flush interval or `tick()` fires.
+- **`setup` installed a console exporter instead of OTLP.** The facade and
+  async `setup` need a transport for OTLP. When OTLP is selected without one,
+  they intentionally fall back to the console exporter unless `none` is
+  selected. Use `@async_runtime.setup` for the built-in async transport.
+- **No spans are recorded at all.** Check `OTEL_SDK_DISABLED`: when it is
+  `true`, tracers are no-ops. Also check `OTEL_TRACES_SAMPLER`; `always_off`
+  drops every root span, while `record_only` keeps spans local without export.
+- **Headers or endpoints are ignored.** Signal-specific
+  `OTEL_EXPORTER_OTLP_TRACES_*` variables take precedence over the generic
+  `OTEL_EXPORTER_OTLP_*` variables. Blank values are treated as unset.
+- **A carrier has an old trace header.** Reuse is handled: `inject` removes a
+  stale `traceparent`/`tracestate` when the context has no valid span, and
+  baggage injection removes a stale `baggage` header when no members are
+  visible.
 
 ## Testing and CI
 

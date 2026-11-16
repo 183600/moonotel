@@ -801,17 +801,7 @@ pub fn encode_trace_request_json(spans : Array[@sdk.SpanData]) -> Bytes {
   // resource/scope group.
   let first = spans[0]
   let shared_resource = first.resource.as_map()
-  let mut uniform = true
-  for i = 1; i < spans.length(); i = i + 1 {
-    let data = spans[i]
-    if shared_resource != data.resource.as_map() ||
-      data.scope_name != first.scope_name ||
-      data.scope_version != first.scope_version {
-      uniform = false
-      break
-    }
-  }
-  if uniform {
+  if spans_share_one_group(spans, first) {
     let mut spans_hint = 0
     for data in spans {
       spans_hint = spans_hint + estimate_span_size(data)

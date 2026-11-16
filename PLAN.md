@@ -90,6 +90,23 @@ Collector / backend
 - Instrumentation 只依赖公开 API/SDK，不把 HTTP 细节反向带进核心包。
 - 平台相关能力集中在 `async_runtime`、`exporter/otlp_async` 和 HTTP 埋点包中。
 
+依赖方向（箭头左侧被右侧依赖，反向依赖不允许）：
+
+```text
+api
+context             -> api
+propagation         -> api, context
+sdk                 -> api, context
+exporter/otlp       -> api, context, sdk
+exporter/otlp_async -> api, sdk, exporter/otlp
+async_runtime       -> context, sdk, exporter/otlp, exporter/otlp_async
+instrumentation/*   -> api, context, propagation, sdk
+根包 facade         -> 上述核心包
+```
+
+这条方向保证核心类型可以在没有网络、没有 async runtime 的目标上编译；
+需要平台能力的包集中在上层，测试替身也只需要替换最外层的 transport。
+
 ## 3. 目录结构
 
 ```text
@@ -281,6 +298,24 @@ facade 提供进程级 provider 的安装、获取、强制 flush 和关闭。`s
 - `@async_runtime.setup` 接受同一组覆盖项，并把导出任务与 flush 绑定到传入的
   task group。
 
+### 5.6 并发、重入与关闭
+
+provider、processor 和 exporter 都可能在回调内部被再次调用，例如 exporter
+在 `export_spans` 中触发 provider shutdown。实现按以下顺序处理这类重入：
+
+| 场景 | 行为 |
+| --- | --- |
+| `with_*` 修改 provider | 返回副本，不修改已共享的 provider |
+| provider 副本共享 processor | processor 的 shutdown 标记共享，副本新增的 processor 仍有独立状态 |
+| `force_flush` 重入 | 同一 processor 集只由外层执行；副本只补刷自己新增的 processor |
+| shutdown 重入 | 外层 drain 拥有队列；后到的请求在 drain 结束后执行 |
+| processor 正在直接 drain | provider 注册完成回调，等 drain 结束再关闭其余 processor |
+| shutdown 开始后 span 结束 | 不再向 processor 派发 `on_start` / `on_end` |
+
+导出器是单次使用的 sink：关闭后不再接受批次。provider 关闭时先 drain 所有
+batch processor，再关闭 exporter，因此共享同一 exporter 的 processor 不会因为
+关闭顺序而丢失已接受的 span。
+
 ## 6. OTLP/HTTP 导出
 
 ### 6.1 编码与响应
@@ -327,6 +362,23 @@ OTLP 编码器为 protobuf 和 JSON 各自实现，响应解析器分别处理�
 exporter 是单次使用的 sink。`OtlpHttpExporter` 在 `shutdown()` 后拒绝所有批次
 （包括空批次）；异步 span exporter 关闭队列。shutdown 开始后不再派发
 `on_start` / `on_end`，包括在回调内部触发 shutdown 的重入场景。
+
+### 6.5 同步与异步 exporter 对比
+
+两个 exporter 共享编码、配置、响应解析和大小限制，差别集中在传输与调度：
+
+| 能力 | `exporter/otlp` | `exporter/otlp_async` |
+| --- | --- | --- |
+| 传输 | 注入的 `Transport` 函数 | `moonbitlang/async/http` |
+| 目标 | 所有目标 | native+wasm |
+| gzip | 拒绝，避免 body 与 header 不一致 | 支持，压缩在大小检查之后 |
+| 超时 | 由注入的 transport 负责 | 覆盖所有尝试与等待的总预算 |
+| 重试等待 | 注入的 `RetryWait` | `Retry-After` + 带 jitter 的指数退避 |
+| 响应 header | `TransportResponse` 不暴露 | 可读取 `Retry-After` |
+| 适用场景 | 测试替身、自定义同步客户端 | 生产环境的异步服务 |
+
+同步路径保持最小依赖，便于在任意目标上单测；生产路径只把真实网络行为放进
+`otlp_async`，避免核心 API 和 SDK 被迫引入 async 依赖。
 
 ## 7. HTTP 埋点
 
@@ -380,6 +432,16 @@ bash scripts/check-hygiene.sh
 
 CI 同时运行默认与 native 目标，确保 async 埋点和 exporter 不只是被声明，而是
 真正编译和测试过。hygiene 脚本阻止临时探针文件与脚手架占位符进入仓库。
+
+测试编写约定：
+
+- 新增行为先补测试，再同步 README 与本文档；公开 API、环境变量和默认值以
+  源码和 README 为准。
+- 读取环境变量的测试必须恢复原值，避免测试顺序影响结果。
+- 涉及 native+wasm 包时同时检查默认目标与 `--target native`；默认 wasm-gc
+  目标会跳过这些包的函数体。
+- 临时脚本和探针写到 `/tmp`，不要提交带 `zz_`、`tmp_`、`scratch`、`dbg` 或
+  `probe` 前缀的文件。
 
 ## 9. 里程碑
 

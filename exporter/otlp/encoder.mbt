@@ -512,6 +512,16 @@ priv struct ScopeGroup {
 }
 
 ///|
+fn ScopeGroup::new(
+  scope_name : String,
+  scope_version : String,
+  spans : Array[@sdk.SpanData],
+  size_hint : Int32,
+) -> ScopeGroup {
+  { scope_name, scope_version, spans, size_hint, }
+}
+
+///|
 priv struct ResourceGroup {
   resource : Map[String, @sdk.AttributeValue]
   scopes : Array[ScopeGroup]
@@ -519,6 +529,33 @@ priv struct ResourceGroup {
   // Index of `(scope_name, scope_version)` into `scopes`, built when a group
   // with several interleaved scopes is looked up.
   mut scope_index : Map[(String, String), Int32]?
+}
+
+///|
+fn ResourceGroup::new(
+  resource : Map[String, @sdk.AttributeValue],
+) -> ResourceGroup {
+  { resource, scopes: [], size_hint: 0, scope_index: None, }
+}
+
+// Whether every span shares the resource and scope of `first`, so the batch
+// can be encoded as one resource/scope group.
+
+///|
+fn spans_share_one_group(
+  spans : Array[@sdk.SpanData],
+  first : @sdk.SpanData,
+) -> Bool {
+  let shared_resource = first.resource.as_map()
+  for i = 1; i < spans.length(); i = i + 1 {
+    let data = spans[i]
+    if shared_resource != data.resource.as_map() ||
+      data.scope_name != first.scope_name ||
+      data.scope_version != first.scope_version {
+      return false
+    }
+  }
+  true
 }
 
 // Find the scope group with the given name and version inside a resource
@@ -680,26 +717,14 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
           match known {
             Some(index) => index
             None => {
-              let created : ResourceGroup = {
-                resource: data_resource,
-                scopes: [],
-                size_hint: 0,
-                scope_index: None,
-              }
-              groups.push(created)
+              groups.push(ResourceGroup::new(data_resource))
               unindexed = true
               groups.length() - 1
             }
           }
         }
       None => {
-        let created : ResourceGroup = {
-          resource: data_resource,
-          scopes: [],
-          size_hint: 0,
-          scope_index: None,
-        }
-        groups.push(created)
+        groups.push(ResourceGroup::new(data_resource))
         unindexed = true
         groups.length() - 1
       }
@@ -729,12 +754,12 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
       }
       None => {
         let spans_for_scope : Array[@sdk.SpanData] = [data]
-        let created : ScopeGroup = {
-          scope_name: data.scope_name,
-          scope_version: data.scope_version,
-          spans: spans_for_scope,
-          size_hint: span_hint,
-        }
+        let created = ScopeGroup::new(
+          data.scope_name,
+          data.scope_version,
+          spans_for_scope,
+          span_hint,
+        )
         target.scopes.push(created)
         match target.scope_index {
           Some(scope_index) =>
@@ -781,17 +806,7 @@ pub fn encode_trace_request(spans : Array[@sdk.SpanData]) -> Bytes {
   // resource/scope group.
   let first = spans[0]
   let shared_resource = first.resource.as_map()
-  let mut uniform = true
-  for i = 1; i < spans.length(); i = i + 1 {
-    let data = spans[i]
-    if shared_resource != data.resource.as_map() ||
-      data.scope_name != first.scope_name ||
-      data.scope_version != first.scope_version {
-      uniform = false
-      break
-    }
-  }
-  if uniform {
+  if spans_share_one_group(spans, first) {
     let mut spans_hint = 0
     for data in spans {
       spans_hint = spans_hint + estimate_span_size(data)

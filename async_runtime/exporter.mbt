@@ -316,6 +316,18 @@ fn OtlpHttpAsyncSpanExporter::advance_completed_prefix(
   }
 }
 
+// Mark one accepted batch as handled without updating the completion
+// watermark. Callers update the watermark once after a group of batches.
+
+///|
+fn OtlpHttpAsyncSpanExporter::mark_batch_completed(
+  self : OtlpHttpAsyncSpanExporter,
+  sequence : UInt64,
+) -> Unit {
+  let _ = self.outstanding_batches.remove(sequence)
+  self.completed_batches = self.completed_batches + 1
+}
+
 // Record that one accepted batch has been fully handled.
 
 ///|
@@ -323,8 +335,7 @@ fn OtlpHttpAsyncSpanExporter::finish_batch(
   self : OtlpHttpAsyncSpanExporter,
   sequence : UInt64,
 ) -> Unit {
-  let _ = self.outstanding_batches.remove(sequence)
-  self.completed_batches = self.completed_batches + 1
+  self.mark_batch_completed(sequence)
   self.advance_completed_prefix()
   self.send_finished.broadcast()
 }
@@ -338,8 +349,7 @@ fn OtlpHttpAsyncSpanExporter::finish_batches(
   sequences : Array[UInt64],
 ) -> Unit {
   for sequence in sequences {
-    let _ = self.outstanding_batches.remove(sequence)
-    self.completed_batches = self.completed_batches + 1
+    self.mark_batch_completed(sequence)
   }
   self.advance_completed_prefix()
   self.send_finished.broadcast()

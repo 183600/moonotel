@@ -318,17 +318,8 @@ pub fn OtlpHttpConfig::new(
     traces_endpoint,
     // The config owns a snapshot of the headers: mutating the caller's map
     // afterwards cannot change what an exporter built from this config sends.
-    // Only headers that can be represented as HTTP fields are kept.
     headers: match headers {
-      Some(values) => {
-        let snapshot = Map([], capacity=values.length())
-        for key, value in values {
-          if is_valid_http_header_name(key) && is_valid_http_header_value(value) {
-            set_header(snapshot, key, value)
-          }
-        }
-        snapshot
-      }
+      Some(values) => valid_header_snapshot(values)
       None => Map([])
     },
     timeout_millis: if timeout < 0 {
@@ -358,11 +349,7 @@ pub fn OtlpHttpConfig::with_headers(
   headers : Map[String, String],
 ) -> OtlpHttpConfig {
   let merged = self.headers.copy()
-  for key, value in headers {
-    if is_valid_http_header_name(key) && is_valid_http_header_value(value) {
-      set_header(merged, key, value)
-    }
-  }
+  merge_valid_headers(merged, headers)
   { ..self, headers: merged, }
 }
 
@@ -469,6 +456,35 @@ fn set_header(
   headers.set(key, value)
 }
 
+// Copy the headers that can be represented as HTTP fields into a new map.
+
+///|
+fn valid_header_snapshot(
+  values : Map[String, String],
+) -> Map[String, String] {
+  let snapshot : Map[String, String] = Map(
+    [],
+    capacity=map_capacity_for_entries(values.length()),
+  )
+  merge_valid_headers(snapshot, values)
+  snapshot
+}
+
+// Add the headers that can be represented as HTTP fields to `target`,
+// replacing same-named entries case-insensitively.
+
+///|
+fn merge_valid_headers(
+  target : Map[String, String],
+  values : Map[String, String],
+) -> Unit {
+  for key, value in values {
+    if is_valid_http_header_name(key) && is_valid_http_header_value(value) {
+      set_header(target, key, value)
+    }
+  }
+}
+
 ///|
 fn parse_headers(value : String) -> Map[String, String] {
   let headers = Map([])
@@ -545,6 +561,35 @@ fn parse_timeout_env(name : String) -> Int32? {
   }
 }
 
+// The value of the signal-specific environment variable, falling back to its
+// generic counterpart. Both are treated like other OTLP enum values: absent
+// or blank means unset.
+
+///|
+fn signal_or_generic_env(
+  signal_name : String,
+  generic_name : String,
+) -> String? {
+  match non_blank_env_value(signal_name) {
+    Some(value) => Some(value)
+    None => non_blank_env_value(generic_name)
+  }
+}
+
+// The timeout from the signal-specific environment variable, falling back to
+// the generic one when the specific value is absent or invalid.
+
+///|
+fn signal_or_generic_timeout(
+  signal_name : String,
+  generic_name : String,
+) -> Int32? {
+  match parse_timeout_env(signal_name) {
+    Some(value) => Some(value)
+    None => parse_timeout_env(generic_name)
+  }
+}
+
 // Build a configuration from the standard OTLP environment variables:
 // OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
 // OTEL_EXPORTER_OTLP_HEADERS, OTEL_EXPORTER_OTLP_TRACES_HEADERS,
@@ -580,32 +625,20 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
     }
     None => ()
   }
-  let compression = match
-    non_blank_env_value("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION") {
+  let compression = signal_or_generic_env(
+    "OTEL_EXPORTER_OTLP_TRACES_COMPRESSION",
+    "OTEL_EXPORTER_OTLP_COMPRESSION",
+  ).unwrap_or("none")
+  let protocol = signal_or_generic_env(
+    "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL",
+    "OTEL_EXPORTER_OTLP_PROTOCOL",
+  ).unwrap_or(OTLP_HTTP_PROTOBUF_PROTOCOL)
+  let timeout_millis = match signal_or_generic_timeout(
+    "OTEL_EXPORTER_OTLP_TRACES_TIMEOUT",
+    "OTEL_EXPORTER_OTLP_TIMEOUT",
+  ) {
     Some(value) => value
-    None =>
-      match non_blank_env_value("OTEL_EXPORTER_OTLP_COMPRESSION") {
-        Some(value) => value
-        None => "none"
-      }
-  }
-  let protocol = match
-    non_blank_env_value("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL") {
-    Some(value) => value
-    None =>
-      match non_blank_env_value("OTEL_EXPORTER_OTLP_PROTOCOL") {
-        Some(value) => value
-        None => OTLP_HTTP_PROTOBUF_PROTOCOL
-      }
-  }
-  let timeout_millis = match
-    parse_timeout_env("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT") {
-    Some(value) => value
-    None =>
-      match parse_timeout_env("OTEL_EXPORTER_OTLP_TIMEOUT") {
-        Some(value) => value
-        None => DEFAULT_TIMEOUT_MILLIS
-      }
+    None => DEFAULT_TIMEOUT_MILLIS
   }
   {
     endpoint,
