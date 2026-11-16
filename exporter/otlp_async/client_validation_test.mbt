@@ -111,3 +111,14 @@ async test "all_malformed_batches_still_validate_the_configuration" {
     @sdk.ExportSuccess => fail("expected an unsupported-compression failure")
   }
 }
+
+///|
+async test "post_trace_request treats an empty body as success" {
+  let config = @otlp.OtlpHttpConfig::new(endpoint="http://127.0.0.1:1")
+  assert_true(@otlp_async.post_trace_request(config, b"").is_success())
+  let gzip = @otlp.OtlpHttpConfig::new(
+    endpoint="http://127.0.0.1:1",
+    compression="gzip",
+  )
+  assert_true(@otlp_async.post_trace_request(gzip, b"").is_success())
+}
