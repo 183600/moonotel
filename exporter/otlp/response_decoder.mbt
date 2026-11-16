@@ -10,7 +10,7 @@
 const OTLP_MAX_RESPONSE_BODY_BYTES : Int32 = OTLP_DEFAULT_MAX_RESPONSE_SIZE
 
 ///|
-fn oversized_response(limit : Int32) -> @sdk.ExportResult {
+pub fn response_size_limit_failure(limit : Int32) -> @sdk.ExportResult {
   let label = if limit == OTLP_MAX_RESPONSE_BODY_BYTES {
     "4 MiB"
   } else {
@@ -81,7 +81,7 @@ pub fn decode_export_response(
 ) -> @sdk.ExportResult {
   let max_size = normalize_size_limit(max_size, OTLP_MAX_RESPONSE_BODY_BYTES)
   if body.length() > max_size {
-    return oversized_response(max_size)
+    return response_size_limit_failure(max_size)
   }
   let data = body.exact_view()
   let length = data.length()

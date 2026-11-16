@@ -731,6 +731,59 @@ fn retry_backoff_millis(attempt : Int32) -> Int32 {
   }
 }
 
+// A response read under the configured size limit. The body is only kept for
+// HTTP 200 responses, since other statuses are classified from the headers
+// alone and never decoded.
+
+///|
+priv enum LimitedHttpResponse {
+  WithBody(Bytes)
+  WithoutBody(@http.Response)
+  TooLarge
+}
+
+// POST `body` and read at most `max_response_size` response bytes. Reading
+// through the streaming client keeps the limit effective before the whole
+// body (including a gzip-expanded body) has been buffered.
+
+///|
+async fn post_with_response_limit(
+  url : String,
+  body : Bytes,
+  headers : Map[@http.CaseInsensitiveString, String],
+  max_response_size : Int32,
+) -> LimitedHttpResponse {
+  let client = @http.post_stream(url, headers~)
+  defer client.close()
+  client.write(body)
+  let response = client.end_request()
+  if response.code != 200 {
+    return WithoutBody(response)
+  }
+  let buffer = FixedArray::make(max_response_size, b'\x00')
+  let mut total = 0
+  while total < max_response_size {
+    let read = client.read(
+      buffer,
+      offset=total,
+      max_len=max_response_size - total,
+    )
+    if read == 0 {
+      break
+    }
+    total = total + read
+  }
+  // An exact-size body is valid; only a further byte proves that the limit
+  // was exceeded.
+  if total == max_response_size {
+    let extra = FixedArray::make(1, b'\x00')
+    if client.read(extra) > 0 {
+      return TooLarge
+    }
+  }
+  WithBody(buffer.unsafe_reinterpret_as_bytes()[:total].to_owned())
+}
+
 ///|
 async fn post_trace_request_with_headers(
   config : @otlp.OtlpHttpConfig,
@@ -798,15 +851,21 @@ async fn post_trace_request_with_headers(
     // exporter headers stay unchanged across retries and concurrent exports.
     let request_headers = headers.copy()
     let outcome = try {
-      if attempt_timeout > 0 {
-        Some(
-          @async.with_timeout(attempt_timeout, () => {
-            @http.post(url, body, headers=request_headers)
-          }),
+      let post = () => {
+        post_with_response_limit(
+          url,
+          body,
+          request_headers,
+          max_response_size,
         )
-      } else {
-        Some(@http.post(url, body, headers=request_headers))
       }
+      Some(
+        if attempt_timeout > 0 {
+          @async.with_timeout(attempt_timeout, post)
+        } else {
+          post()
+        },
+      )
     } catch {
       error => {
         last_failure = "OTLP request to " +
@@ -817,20 +876,20 @@ async fn post_trace_request_with_headers(
       }
     }
     match outcome {
-      Some((response, response_body)) => {
-        if response.code == 200 {
-          if json {
-            return @otlp.decode_export_response_json(
-              response_body.binary(),
-              max_size=max_response_size,
-            )
-          } else {
-            return @otlp.decode_export_response(
-              response_body.binary(),
-              max_size=max_response_size,
-            )
-          }
+      Some(WithBody(response_body)) => {
+        if json {
+          return @otlp.decode_export_response_json(
+            response_body,
+            max_size=max_response_size,
+          )
+        } else {
+          return @otlp.decode_export_response(
+            response_body,
+            max_size=max_response_size,
+          )
         }
+      }
+      Some(WithoutBody(response)) => {
         last_failure = "OTLP export failed with HTTP status " +
           response.code.to_string()
         if !is_retryable_status(response.code) {
@@ -841,6 +900,9 @@ async fn post_trace_request_with_headers(
           None => ()
         }
       }
+      Some(TooLarge) => return @otlp.response_size_limit_failure(
+        max_response_size,
+      )
       None => ()
     }
     attempt = attempt + 1

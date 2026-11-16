@@ -34,6 +34,8 @@ pub fn normalize_size_limit(Int32?, Int32) -> Int32
 
 pub fn request_size_limit_failure(Int32) -> @sdk.ExportResult
 
+pub fn response_size_limit_failure(Int32) -> @sdk.ExportResult
+
 // Errors
 
 // Types and methods

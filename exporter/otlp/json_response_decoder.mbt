@@ -839,7 +839,7 @@ pub fn decode_export_response_json(
   // recommendation) to be enforced before parsing.
   let max_size = normalize_size_limit(max_size, OTLP_MAX_RESPONSE_BODY_BYTES)
   if body.length() > max_size {
-    return oversized_response(max_size)
+    return response_size_limit_failure(max_size)
   }
   // OTLP/JSON response bodies must be valid UTF-8. Lossy decoding would turn
   // malformed bytes inside strings into U+FFFD and could accept an otherwise

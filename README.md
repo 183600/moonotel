@@ -589,7 +589,9 @@ by default, matching the OTLP exporter specification. `OtlpHttpExporter::new`,
 `@otlp_async.post_trace_request` accept `max_request_size` /
 `max_response_size` named arguments to override those limits; a non-positive
 value selects the default. The request limit applies to the encoded message
-before gzip compression. `decode_export_response` and
+before gzip compression. The async transport also enforces the response limit
+while reading, after gzip decompression, so an oversized response is not
+buffered in full. `decode_export_response` and
 `decode_export_response_json` accept the same optional `max_size` argument.
 
 ### Configuration and lifecycle
