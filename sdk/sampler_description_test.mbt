@@ -18,9 +18,27 @@ test "ratio_sampler_description_keeps_configured_ratio" {
 }
 
 ///|
-test "parent_based_description_mentions_root_sampler" {
+test "parent_based_description_lists_root_and_default_delegates" {
   let sampler = @sdk.Sampler::parent_based(@sdk.Sampler::always_off())
-  assert_eq(sampler.description(), "ParentBased{AlwaysOffSampler}")
+  assert_eq(
+    sampler.description(),
+    "ParentBased{root:AlwaysOffSampler,remoteParentSampled:AlwaysOnSampler,remoteParentNotSampled:AlwaysOffSampler,localParentSampled:AlwaysOnSampler,localParentNotSampled:AlwaysOffSampler}",
+  )
+}
+
+///|
+test "parent_based_description_reflects_custom_delegates" {
+  let sampler = @sdk.Sampler::parent_based(
+    @sdk.Sampler::trace_id_ratio_based(0.5),
+    remote_parent_sampled=@sdk.Sampler::record_only(),
+    remote_parent_not_sampled=@sdk.Sampler::record_only(),
+    local_parent_sampled=@sdk.Sampler::always_off(),
+    local_parent_not_sampled=@sdk.Sampler::always_on(),
+  )
+  assert_eq(
+    sampler.description(),
+    "ParentBased{root:TraceIdRatioBased{0.5},remoteParentSampled:RecordOnlySampler,remoteParentNotSampled:RecordOnlySampler,localParentSampled:AlwaysOffSampler,localParentNotSampled:AlwaysOnSampler}",
+  )
 }
 
 ///|

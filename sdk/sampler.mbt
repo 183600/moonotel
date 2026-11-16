@@ -251,7 +251,18 @@ pub fn Sampler::parent_based(
     Some(value) => value
     None => Sampler::always_off()
   }
-  Sampler::new("ParentBased{" + root.description() + "}", fn(parameters) {
+  let description = "ParentBased{root:" +
+    root.description() +
+    ",remoteParentSampled:" +
+    remote_sampled.description() +
+    ",remoteParentNotSampled:" +
+    remote_not_sampled.description() +
+    ",localParentSampled:" +
+    local_sampled.description() +
+    ",localParentNotSampled:" +
+    local_not_sampled.description() +
+    "}"
+  Sampler::new(description, fn(parameters) {
     match parameters.parent {
       Some(ctx) =>
         if has_live_valid_ids(ctx) {
