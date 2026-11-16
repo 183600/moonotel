@@ -314,7 +314,8 @@ attributes known before the request, so a custom sampler sees them in
 URL attributes strip userinfo and redact the values of the well-known sensitive
 query parameters listed by the HTTP semantic conventions (`X-Amz-Signature`,
 `X-Amz-Credential`, `X-Amz-Security-Token`, `AWSAccessKeyId`, `Signature`,
-`sig`, and `X-Goog-Signature`). Captured header values and `user_agent.original`
+`sig`, and `X-Goog-Signature`). Matching is case-sensitive, as recommended by
+the semantic conventions. Captured header values and `user_agent.original`
 have surrounding HTTP optional whitespace removed. The server records the
 received `User-Agent`; the client records the `User-Agent` it actually sent,
 including one supplied by the HTTP client when the caller did not set it.

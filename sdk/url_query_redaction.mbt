@@ -1,17 +1,17 @@
 // Query parameter names whose values the HTTP semantic conventions ask
-// instrumentations to redact by default.
+// instrumentations to redact by default. Matching is case-sensitive, as
+// recommended by the semantic conventions.
 // https://opentelemetry.io/docs/specs/semconv/registry/attributes/url/
 
 ///|
 fn is_sensitive_query_parameter(name : StringView) -> Bool {
-  let lower = name.to_lower()
-  lower == "x-amz-signature" ||
-  lower == "x-amz-credential" ||
-  lower == "x-amz-security-token" ||
-  lower == "awsaccesskeyid" ||
-  lower == "signature" ||
-  lower == "sig" ||
-  lower == "x-goog-signature"
+  name == "X-Amz-Signature" ||
+  name == "X-Amz-Credential" ||
+  name == "X-Amz-Security-Token" ||
+  name == "AWSAccessKeyId" ||
+  name == "Signature" ||
+  name == "sig" ||
+  name == "X-Goog-Signature"
 }
 
 ///|
@@ -80,8 +80,9 @@ fn is_sensitive_query_key(name : StringView) -> Bool {
 
 // Replace the value of each well-known sensitive query parameter with
 // `REDACTED`, preserving parameter order, separators and unrelated values.
-// Matching is case-insensitive; percent-encoded parameter names are decoded
-// before matching while their original spelling is preserved in the output.
+// Matching is case-sensitive, as recommended by the semantic conventions;
+// percent-encoded parameter names are decoded before matching while their
+// original spelling is preserved in the output.
 
 ///|
 pub fn redact_sensitive_query_string(query : String) -> String {

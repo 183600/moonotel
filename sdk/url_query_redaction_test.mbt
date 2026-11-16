@@ -12,12 +12,18 @@ test "redacts well-known sensitive query parameters" {
 }
 
 ///|
-test "sensitive query parameter matching is case-insensitive" {
+test "sensitive query parameter matching is case-sensitive" {
   assert_eq(
     @sdk.redact_sensitive_query_string(
       "x-amz-signature=one&SIG=two&x-goog-signature=three",
     ),
-    "x-amz-signature=REDACTED&SIG=REDACTED&x-goog-signature=REDACTED",
+    "x-amz-signature=one&SIG=two&x-goog-signature=three",
+  )
+  assert_eq(
+    @sdk.redact_sensitive_query_string(
+      "X-Amz-Signature=one&Sig=two&X-Goog-Signature=three",
+    ),
+    "X-Amz-Signature=REDACTED&Sig=two&X-Goog-Signature=REDACTED",
   )
 }
 
@@ -48,9 +54,14 @@ test "leaves unrelated and valueless parameter names unchanged" {
 test "redacts percent-encoded sensitive parameter names" {
   assert_eq(
     @sdk.redact_sensitive_query_string(
-      "X%2DAmz%2DSignature=secret&%58-Amz-Credential=cred&x%2damz%2dsecurity%2dtoken=tok",
+      "X%2DAmz%2DSignature=secret&%58-Amz-Credential=cred&X%2DAmz%2DSecurity%2DToken=tok",
     ),
-    "X%2DAmz%2DSignature=REDACTED&%58-Amz-Credential=REDACTED&x%2damz%2dsecurity%2dtoken=REDACTED",
+    "X%2DAmz%2DSignature=REDACTED&%58-Amz-Credential=REDACTED&X%2DAmz%2DSecurity%2DToken=REDACTED",
+  )
+  // Percent-decoding does not make matching case-insensitive.
+  assert_eq(
+    @sdk.redact_sensitive_query_string("x%2damz%2dsignature=secret"),
+    "x%2damz%2dsignature=secret",
   )
   // A malformed escape cannot name a sensitive parameter and stays as-is.
   assert_eq(
@@ -67,7 +78,7 @@ test "redacts AWS access key id and CloudFront signature parameters" {
     @sdk.redact_sensitive_query_string(
       "AWSAccessKeyId=key&Signature=cloud&awsaccesskeyid=lower&signature=lower",
     ),
-    "AWSAccessKeyId=REDACTED&Signature=REDACTED&awsaccesskeyid=REDACTED&signature=REDACTED",
+    "AWSAccessKeyId=REDACTED&Signature=REDACTED&awsaccesskeyid=lower&signature=lower",
   )
 }
 
