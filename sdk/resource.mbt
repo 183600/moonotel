@@ -48,14 +48,12 @@ fn hex_digit_value(c : Char) -> Int32 {
   }
 }
 
-// Encode a string view as UTF-8, replacing unpaired UTF-16 surrogates with
-// U+FFFD so that invalid strings cannot abort percent-decoding.
+// Whether a string view contains an unpaired UTF-16 surrogate.
 
 ///|
-fn encode_utf8_lossy(value : StringView) -> Bytes {
+fn has_unpaired_surrogate(value : StringView) -> Bool {
   let len = value.length()
   let mut i = 0
-  let mut has_unpaired = false
   while i < len {
     let unit = value.unsafe_get(i).to_int()
     if unit >= 0xD800 && unit <= 0xDBFF {
@@ -66,17 +64,24 @@ fn encode_utf8_lossy(value : StringView) -> Bytes {
           continue
         }
       }
-      has_unpaired = true
-      break
+      return true
     } else if unit >= 0xDC00 && unit <= 0xDFFF {
-      has_unpaired = true
-      break
+      return true
     }
     i = i + 1
   }
-  if !has_unpaired {
+  false
+}
+
+// Encode a string view as UTF-8, replacing unpaired UTF-16 surrogates with
+// U+FFFD so that invalid strings cannot abort percent-decoding.
+
+///|
+fn encode_utf8_lossy(value : StringView) -> Bytes {
+  if !has_unpaired_surrogate(value) {
     return @utf8.encode(value)
   }
+  let len = value.length()
   let sb = StringBuilder()
   let mut j = 0
   while j < len {
@@ -108,7 +113,10 @@ fn encode_utf8_lossy(value : StringView) -> Bytes {
 ///|
 fn decode_percent(value : StringView) -> String {
   if value.find("%") is None {
-    return value.to_owned()
+    if !has_unpaired_surrogate(value) {
+      return value.to_owned()
+    }
+    return @utf8.decode_lossy(encode_utf8_lossy(value).exact_view())
   }
   let len = value.length()
   let bytes : Array[Byte] = Array(capacity=len)

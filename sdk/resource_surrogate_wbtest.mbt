@@ -8,6 +8,14 @@ test "decode_percent_replaces_unpaired_surrogates" {
 }
 
 ///|
+test "decode_percent_replaces_unpaired_surrogates_without_percent_escapes" {
+  let lone = String::from_array([(0xD800).unsafe_to_char()])
+  assert_eq(decode_percent(lone), "\u{FFFD}")
+  assert_eq(decode_percent("café" + lone), "café\u{FFFD}")
+  assert_eq(decode_percent("\u{1F600}"), "\u{1F600}")
+}
+
+///|
 test "decode_percent_keeps_valid_surrogate_pairs" {
   assert_eq(decode_percent("\u{1F600}%41"), "\u{1F600}A")
 }
