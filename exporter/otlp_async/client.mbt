@@ -103,12 +103,17 @@ fn request_headers(
     // to the HTTP client. CR/LF in a value would otherwise split the request.
     if @otlp.is_valid_http_header_name(key) &&
       @otlp.is_valid_http_header_value(value) {
-      // The HTTP client owns body framing. A configured `Content-Length` or
-      // `Transfer-Encoding` could contradict the bytes actually written and
-      // make the collector wait for a body that never arrives (or read past
-      // this request), so never forward those fields.
+      // The HTTP client owns body framing and response decompression. A
+      // configured `Content-Length` or `Transfer-Encoding` could contradict
+      // the bytes actually written and make the collector wait for a body that
+      // never arrives (or read past this request). A configured
+      // `Accept-Encoding` would disable the client's automatic gzip response
+      // decompression, while the OTLP response decoder still expects the
+      // decoded bytes. Never forward those transport-managed fields.
       let lower = key.to_lower()
-      if lower != "content-length" && lower != "transfer-encoding" {
+      if lower != "content-length" &&
+        lower != "transfer-encoding" &&
+        lower != "accept-encoding" {
         headers.set(@http.CaseInsensitiveString(key), value)
       }
     }
