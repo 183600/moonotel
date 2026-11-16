@@ -13,6 +13,12 @@ async test "server installs the incoming context without a tracer" {
     group.spawn_bg(no_wait=true) <| () => {
       @async_http_server.run_server_on(server, call => {
         seen.val = @context.current_span_context()
+        assert_eq(call.path(), "/ctx")
+        assert_eq(call.query(), "")
+        assert_eq(call.header("X-Missing"), None)
+        assert_true(call.span_context() is None)
+        assert_true(call.start_span("child") is None)
+        assert_false(call.set_route("/ctx"))
         call.respond(200)
       })
     }

@@ -522,16 +522,20 @@ async test "ServerCall exposes method header and span context" {
         server,
         call => {
           assert_eq(call.http_method(), "GET")
+          assert_eq(call.path(), "/accessors")
+          assert_eq(call.query(), "q=1&x=2")
           assert_eq(call.header("X-Probe"), Some("value"))
+          assert_eq(call.header("X-Missing"), None)
           assert_true(call.span_context() is Some(_))
           call.respond(200)
         },
         tracer~,
       )
     }
-    let (response, _body) = @http.get("http://127.0.0.1:\{port}/accessors", headers={
-      "X-Probe": "value",
-    })
+    let (response, _body) = @http.get(
+      "http://127.0.0.1:\{port}/accessors?q=1&x=2",
+      headers={ "X-Probe": "value" },
+    )
     assert_eq(response.code, 200)
     @async.sleep(50)
     assert_eq(exporter.spans.val.length(), 1)
