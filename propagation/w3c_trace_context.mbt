@@ -790,8 +790,7 @@ fn is_digit_char(c : Char) -> Bool {
 }
 
 // Whether each ASCII code unit (0-127) may appear after the first character
-// of a `tracestate` key part: `lcalpha`, digit, `_`, `-`, `*` or `/`.
-// `@` joins the two parts of a multi-tenant key and is handled separately.
+// of a `tracestate` key: `lcalpha`, digit, `_`, `-`, `*`, `/` or `@`.
 
 ///|
 let tracestate_key_char_table : FixedArray[Bool] = build_tracestate_key_char_table()
@@ -806,7 +805,8 @@ fn build_tracestate_key_char_table() -> FixedArray[Bool] {
       code == 0x5F ||
       code == 0x2D ||
       code == 0x2A ||
-      code == 0x2F
+      code == 0x2F ||
+      code == 0x40
     table.unsafe_set(code, allowed)
     code = code + 1
   }
@@ -839,46 +839,9 @@ fn build_tracestate_value_char_table() -> FixedArray[Bool] {
   table
 }
 
-// Whether `key[start..end]` is a valid part of a `tracestate` key: a
-// lowercase letter or, when allowed, a digit followed by key characters.
-// Effects: returns false for an empty part or one longer than `max_length`.
-
-///|
-fn is_valid_tracestate_key_part(
-  key : StringView,
-  start : Int32,
-  end : Int32,
-  allow_digit_first : Bool,
-  max_length : Int32,
-) -> Bool {
-  let length = end - start
-  if length <= 0 || length > max_length {
-    return false
-  }
-  let first = key.unsafe_get(start).unsafe_to_char()
-  if !is_lcalpha(first) && !(allow_digit_first && is_digit_char(first)) {
-    return false
-  }
-  let mut i = start + 1
-  while i < end {
-    if !is_tracestate_key_tail(key.unsafe_get(i).unsafe_to_char()) {
-      return false
-    }
-    i = i + 1
-  }
-  true
-}
-
 // Validate a `tracestate` key using the Trace Context Level 2 grammar:
-//
-//   simple-key     = lcalpha 0*255(lcalpha / DIGIT / "_" / "-" / "*" / "/")
-//   multi-tenant-key = tenant-id "@" system-id
-//   tenant-id      = (lcalpha / DIGIT) 0*240(keychar)
-//   system-id      = lcalpha 0*13(keychar)
-//
-// A key contains at most one `@`. Both key forms are at most 256 characters;
-// a simple key may not start with a digit, and a digit-led key must have a
-// non-empty system-id.
+// `key = (lcalpha / DIGIT) 0*255 keychar`, where `keychar` also includes `@`.
+// Keys are limited to 256 characters whether or not they contain `@`.
 
 ///|
 fn is_valid_tracestate_key(key : StringView) -> Bool {
@@ -886,22 +849,18 @@ fn is_valid_tracestate_key(key : StringView) -> Bool {
   if len == 0 || len > 256 {
     return false
   }
-  let mut at = -1
-  let mut i = 0
+  let first = key.unsafe_get(0).unsafe_to_char()
+  if !is_lcalpha(first) && !is_digit_char(first) {
+    return false
+  }
+  let mut i = 1
   while i < len {
-    if key.unsafe_get(i) == 0x40 {
-      if at >= 0 {
-        return false
-      }
-      at = i
+    if !is_tracestate_key_tail(key.unsafe_get(i).unsafe_to_char()) {
+      return false
     }
     i = i + 1
   }
-  if at < 0 {
-    return is_valid_tracestate_key_part(key, 0, len, false, 256)
-  }
-  is_valid_tracestate_key_part(key, 0, at, true, 241) &&
-  is_valid_tracestate_key_part(key, at + 1, len, false, 14)
+  true
 }
 
 // Validate a `tracestate` value: printable ASCII without `,` or `=`, holding
