@@ -85,6 +85,71 @@ test "grouping keeps interleaved resources and scopes separate" {
 }
 
 ///|
+test "grouping finds an existing scope before indexing the resource" {
+  let ra : Map[String, @sdk.AttributeValue] = Map([
+    ("service.name", @sdk.StringValue("a")),
+  ])
+  let rb : Map[String, @sdk.AttributeValue] = Map([
+    ("service.name", @sdk.StringValue("b")),
+  ])
+  let spans = [
+    grouping_test_span("a1", ra, "s1"),
+    grouping_test_span("b1", rb, "s1"),
+    grouping_test_span("a2", ra, "s1"),
+  ]
+  let groups = group_spans(spans)
+  assert_eq(groups.length(), 2)
+  let svc = match groups[0].resource.get("service.name") {
+    Some(@sdk.StringValue(s)) => s
+    _ => abort("missing service")
+  }
+  assert_eq(svc, "a")
+  assert_eq(groups[0].scopes.length(), 1)
+  assert_eq(groups[0].scopes[0].spans.length(), 2)
+  assert_eq(groups[0].scopes[0].spans[0].name, "a1")
+  assert_eq(groups[0].scopes[0].spans[1].name, "a2")
+}
+
+///|
+test "grouping updates a scope index after adding a new scope" {
+  let ra : Map[String, @sdk.AttributeValue] = Map([
+    ("service.name", @sdk.StringValue("a")),
+  ])
+  let rb : Map[String, @sdk.AttributeValue] = Map([
+    ("service.name", @sdk.StringValue("b")),
+  ])
+  let spans = [
+    grouping_test_span("a1", ra, "s1"),
+    grouping_test_span("a2", ra, "s2"),
+    grouping_test_span("b1", rb, "s1"),
+    grouping_test_span("a3", ra, "s3"),
+    grouping_test_span("b2", rb, "s2"),
+    grouping_test_span("a4", ra, "s2"),
+    grouping_test_span("a5", ra, "s3"),
+  ]
+  let groups = group_spans(spans)
+  assert_eq(groups.length(), 2)
+  let group_a = groups[0]
+  let svc = match group_a.resource.get("service.name") {
+    Some(@sdk.StringValue(s)) => s
+    _ => abort("missing service")
+  }
+  assert_eq(svc, "a")
+  assert_eq(group_a.scopes.length(), 3)
+  assert_eq(group_a.scopes[0].scope_name, "s1")
+  assert_eq(group_a.scopes[0].spans.length(), 1)
+  assert_eq(group_a.scopes[0].spans[0].name, "a1")
+  assert_eq(group_a.scopes[1].scope_name, "s2")
+  assert_eq(group_a.scopes[1].spans.length(), 2)
+  assert_eq(group_a.scopes[1].spans[0].name, "a2")
+  assert_eq(group_a.scopes[1].spans[1].name, "a4")
+  assert_eq(group_a.scopes[2].scope_name, "s3")
+  assert_eq(group_a.scopes[2].spans.length(), 2)
+  assert_eq(group_a.scopes[2].spans[0].name, "a3")
+  assert_eq(group_a.scopes[2].spans[1].name, "a5")
+}
+
+///|
 test "resource keys distinguish attribute value types" {
   let values : Array[@sdk.AttributeValue] = [
     @sdk.StringValue("1"),
