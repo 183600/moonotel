@@ -125,10 +125,9 @@ test "record_host_attributes ignores malformed host authorities" {
   for
     host in [
       "[::1", "[::1]junk", "[::1]junk:8080", "[[::1]]", "::1", "2001:db8::1", "example.com:8080:90",
-      "[::1]:80:90", "[::1]:80]", "[::1]:[80]",
-      "foo]", "example.com/path", "example.com?q=1", "example.com#frag", "exa\"mple.com",
-      "exa<mple.com", "exa\\mple.com", "exa|mple.com", "[hello]", "[::1::2]", "[1:2:3:4:5:6:7]",
-      "[::ffff:999.1.1.1]",
+      "[::1]:80:90", "[::1]:80]", "[::1]:[80]", "foo]", "example.com/path", "example.com?q=1",
+      "example.com#frag", "exa\"mple.com", "exa<mple.com", "exa\\mple.com", "exa|mple.com",
+      "[hello]", "[::1::2]", "[1:2:3:4:5:6:7]", "[::ffff:999.1.1.1]",
     ] {
     let (span, exporter) = host_attribute_span()
     record_host_attributes(span, ows_header_map([("Host", host)]), "/")

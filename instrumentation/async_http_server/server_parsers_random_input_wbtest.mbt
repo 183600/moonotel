@@ -1,11 +1,14 @@
+///|
 struct ServerFuzzRng {
   state : Ref[Int64]
 }
 
+///|
 fn ServerFuzzRng::new(seed : Int64) -> ServerFuzzRng {
   { state: Ref(seed), }
 }
 
+///|
 fn ServerFuzzRng::next(self : ServerFuzzRng) -> Int64 {
   let mut x = self.state.val
   x = x ^ (x >> 12)
@@ -15,29 +18,35 @@ fn ServerFuzzRng::next(self : ServerFuzzRng) -> Int64 {
   x
 }
 
+///|
 fn ServerFuzzRng::below(self : ServerFuzzRng, bound : Int32) -> Int32 {
   let value = self.next() & 0x7FFFFFFFFFFFFFFFL
   (value % bound.to_int64()).to_int()
 }
 
+///|
 let server_fuzz_fragments : Array[String] = [
-  "a", "Z", "0", "9", ":", "/", "//", "?", "#", "@", "[", "]", "%", "%25",
-  "%zz", ".", "-", "_", "+", "~", "!", "$", "&", "'", "(", ")", "*", ",", ";",
-  "=", " ", "\t", "\r", "\n", "é", "🤣", "\u{0}", "\\", "\"", "<", ">", "|",
-  "http", "https", "HTTP", "for", "by", "host", "proto", "\"\"", "\\\"",
+  "a", "Z", "0", "9", ":", "/", "//", "?", "#", "@", "[", "]", "%", "%25", "%zz",
+  ".", "-", "_", "+", "~", "!", "$", "&", "'", "(", ")", "*", ",", ";", "=", " ",
+  "\t", "\r", "\n", "é", "🤣", "\u{0}", "\\", "\"", "<", ">", "|", "http", "https",
+  "HTTP", "for", "by", "host", "proto", "\"\"", "\\\"",
 ]
 
+///|
 fn server_fuzz_text(rng : ServerFuzzRng, max : Int32) -> String {
   let sb = StringBuilder()
   let count = rng.below(max + 1)
   let mut i = 0
   while i < count {
-    sb.write_view(server_fuzz_fragments[rng.below(server_fuzz_fragments.length())][:])
+    sb.write_view(
+      server_fuzz_fragments[rng.below(server_fuzz_fragments.length())][:],
+    )
     i = i + 1
   }
   sb.to_string()
 }
 
+///|
 test "server_parsers_do_not_panic_on_random_input" {
   let rng = ServerFuzzRng::new(0x2468_ACE0_1357_9BDFL)
   let mut i = 0

@@ -11,9 +11,8 @@ test "normalize_size_limit falls back for missing and non-positive limits" {
 
 ///|
 test "response_size_limit_failure labels default and custom limits" {
-  match @otlp.response_size_limit_failure(
-    @otlp.OTLP_DEFAULT_MAX_RESPONSE_SIZE,
-  ) {
+  match
+    @otlp.response_size_limit_failure(@otlp.OTLP_DEFAULT_MAX_RESPONSE_SIZE) {
     @sdk.ExportFailure(message) => {
       assert_true(message.contains("4 MiB"))
       assert_false(message.contains("4194304-byte"))
@@ -23,8 +22,7 @@ test "response_size_limit_failure labels default and custom limits" {
   }
   match @otlp.response_size_limit_failure(1234) {
     @sdk.ExportFailure(message) => assert_true(message.contains("1234-byte"))
-    @sdk.ExportSuccess =>
-      abort("expected a custom response size-limit failure")
+    @sdk.ExportSuccess => abort("expected a custom response size-limit failure")
   }
 }
 

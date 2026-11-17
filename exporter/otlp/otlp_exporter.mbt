@@ -459,9 +459,7 @@ fn set_header(
 // Copy the headers that can be represented as HTTP fields into a new map.
 
 ///|
-fn valid_header_snapshot(
-  values : Map[String, String],
-) -> Map[String, String] {
+fn valid_header_snapshot(values : Map[String, String]) -> Map[String, String] {
   let snapshot : Map[String, String] = Map(
     [],
     capacity=map_capacity_for_entries(values.length()),
@@ -626,17 +624,15 @@ pub fn OtlpHttpConfig::from_env() -> OtlpHttpConfig {
     None => ()
   }
   let compression = signal_or_generic_env(
-    "OTEL_EXPORTER_OTLP_TRACES_COMPRESSION",
-    "OTEL_EXPORTER_OTLP_COMPRESSION",
+    "OTEL_EXPORTER_OTLP_TRACES_COMPRESSION", "OTEL_EXPORTER_OTLP_COMPRESSION",
   ).unwrap_or("none")
   let protocol = signal_or_generic_env(
-    "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL",
-    "OTEL_EXPORTER_OTLP_PROTOCOL",
+    "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "OTEL_EXPORTER_OTLP_PROTOCOL",
   ).unwrap_or(OTLP_HTTP_PROTOBUF_PROTOCOL)
-  let timeout_millis = match signal_or_generic_timeout(
-    "OTEL_EXPORTER_OTLP_TRACES_TIMEOUT",
-    "OTEL_EXPORTER_OTLP_TIMEOUT",
-  ) {
+  let timeout_millis = match
+    signal_or_generic_timeout(
+      "OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", "OTEL_EXPORTER_OTLP_TIMEOUT",
+    ) {
     Some(value) => value
     None => DEFAULT_TIMEOUT_MILLIS
   }

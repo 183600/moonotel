@@ -53,16 +53,11 @@ pub fn SpanLimits::new(
     event_count_limit: normalize_limit(event_count_limit, 128),
     link_count_limit: normalize_limit(link_count_limit, 128),
     event_attribute_count_limit: normalize_limit(
-      event_attribute_count_limit,
-      128,
+      event_attribute_count_limit, 128,
     ),
-    link_attribute_count_limit: normalize_limit(
-      link_attribute_count_limit,
-      128,
-    ),
+    link_attribute_count_limit: normalize_limit(link_attribute_count_limit, 128),
     attribute_value_length_limit: normalize_limit(
-      attribute_value_length_limit,
-      -1,
+      attribute_value_length_limit, -1,
     ),
   }
 }

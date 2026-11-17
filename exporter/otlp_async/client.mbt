@@ -857,12 +857,7 @@ async fn post_trace_request_with_headers(
     let request_headers = headers.copy()
     let outcome = try {
       let post = () => {
-        post_with_response_limit(
-          url,
-          body,
-          request_headers,
-          max_response_size,
-        )
+        post_with_response_limit(url, body, request_headers, max_response_size)
       }
       Some(
         if attempt_timeout > 0 {
@@ -881,7 +876,7 @@ async fn post_trace_request_with_headers(
       }
     }
     match outcome {
-      Some(WithBody(response_body)) => {
+      Some(WithBody(response_body)) =>
         if json {
           return @otlp.decode_export_response_json(
             response_body,
@@ -893,7 +888,6 @@ async fn post_trace_request_with_headers(
             max_size=max_response_size,
           )
         }
-      }
       Some(WithoutBody(response)) => {
         last_failure = "OTLP export failed with HTTP status " +
           response.code.to_string()
@@ -905,9 +899,8 @@ async fn post_trace_request_with_headers(
           None => ()
         }
       }
-      Some(TooLarge) => return @otlp.response_size_limit_failure(
-        max_response_size,
-      )
+      Some(TooLarge) =>
+        return @otlp.response_size_limit_failure(max_response_size)
       None => ()
     }
     attempt = attempt + 1
@@ -946,9 +939,7 @@ fn prepare_trace_body(
   let gzip = compression == "gzip"
   if !gzip && compression != "none" {
     return Rejected(
-      @sdk.ExportFailure(
-        "unsupported OTLP compression: " + config.compression,
-      ),
+      @sdk.ExportFailure("unsupported OTLP compression: " + config.compression),
     )
   }
   let body = encode()
@@ -1064,9 +1055,10 @@ pub async fn export_spans(
     max_response_size,
     @otlp.OTLP_DEFAULT_MAX_RESPONSE_SIZE,
   )
-  match prepare_trace_body(config, max_request_size, fn() {
-    encode_trace_body(config, spans)
-  }) {
+  match
+    prepare_trace_body(config, max_request_size, fn() {
+      encode_trace_body(config, spans)
+    }) {
     Rejected(result) => result
     NothingToSend => @sdk.ExportSuccess
     Ready(body, gzip) =>
@@ -1139,9 +1131,10 @@ pub async fn OtlpHttpAsyncExporter::export_batch(
     return @sdk.ExportSuccess
   }
   let config = self.config
-  match prepare_trace_body(config, self.max_request_size, fn() {
-    encode_trace_body(config, spans)
-  }) {
+  match
+    prepare_trace_body(config, self.max_request_size, fn() {
+      encode_trace_body(config, spans)
+    }) {
     Rejected(result) => result
     NothingToSend => @sdk.ExportSuccess
     Ready(body, gzip) =>

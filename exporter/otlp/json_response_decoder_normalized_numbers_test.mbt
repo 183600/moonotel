@@ -38,7 +38,9 @@ test "json_decode_accepts_normalized_whole_number_forms" {
 ///|
 test "json_decode_accepts_zero_with_any_exponent_or_sign" {
   assert_eq(
-    decode_normalized_number_body("{\"partialSuccess\":{\"rejectedSpans\":0e5}}"),
+    decode_normalized_number_body(
+      "{\"partialSuccess\":{\"rejectedSpans\":0e5}}",
+    ),
     @sdk.ExportSuccess,
   )
   assert_eq(
