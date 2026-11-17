@@ -120,3 +120,31 @@ test "shutdown_from_on_end_stops_later_on_end_callbacks" {
   assert_true(events.val.contains("second:shutdown"))
   assert_false(events.val.contains("second:end"))
 }
+
+///|
+test "shutdown_from_on_end_inside_multi_stops_later_on_end_callbacks" {
+  let events : Ref[Array[String]] = Ref([])
+  let provider_ref : Ref[@sdk.TracerProviderSdk?] = Ref(None)
+  let first = dispatch_processor(
+    "first",
+    events,
+    provider_ref,
+    shutdown_on_end=true,
+  )
+  let second = dispatch_processor("second", events, provider_ref)
+  let multi = @sdk.MultiSpanProcessor::new(processors=[first, second])
+  let provider = @sdk.TracerProviderSdk::new(service_name="dispatch-multi-end")
+    .with_span_processor(multi)
+    .with_sampler(@sdk.Sampler::always_on())
+  provider_ref.val = Some(provider)
+  let span = provider
+    .get_tracer("dispatch-multi-end")
+    .start_root_span("op")
+  assert_true(events.val.contains("first:start"))
+  assert_true(events.val.contains("second:start"))
+  span.end()
+  assert_true(events.val.contains("first:end"))
+  assert_true(events.val.contains("first:shutdown"))
+  assert_true(events.val.contains("second:shutdown"))
+  assert_false(events.val.contains("second:end"))
+}
