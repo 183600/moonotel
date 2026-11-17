@@ -86,3 +86,15 @@ test "header_validation_rejects_unpaired_utf16_surrogates" {
   assert_eq(config.headers.get("x-bad"), None)
   assert_eq(config.headers.get("x-good"), Some(pair))
 }
+
+// Only HTAB is allowed among the C0 controls and DEL. Empty values are valid
+// because HTTP permits an empty field value.
+
+///|
+test "header_validation_rejects_non_tab_control_characters" {
+  for value in ["a\u{1}b", "a\u{b}b", "a\u{1f}b", "a\u{7f}b"] {
+    assert_false(@otlp.is_valid_http_header_value(value))
+  }
+  assert_true(@otlp.is_valid_http_header_value(""))
+  assert_true(@otlp.is_valid_http_header_value("\t"))
+}
