@@ -31,10 +31,14 @@ test "parse_tracestate_accepts_a_digit_led_key_ending_with_at" {
 
 ///|
 test "parse_tracestate_accepts_at_anywhere_after_the_first_character" {
-  for key in ["0", "1vendor", "vendor@", "vendor@1system", "tenant@system@extra"] {
+  for
+    key in ["0", "1vendor", "vendor@", "vendor@1system", "tenant@system@extra"] {
     let value = key + "=v"
     assert_eq(@propagation.parse_tracestate(value), Some(value))
-    assert_eq(@propagation.Tracestate::parse(value).unwrap().get(key), Some("v"))
+    assert_eq(
+      @propagation.Tracestate::parse(value).unwrap().get(key),
+      Some("v"),
+    )
   }
 }
 
@@ -79,7 +83,8 @@ test "tracestate_mutation_accepts_a_max_length_key_with_at" {
 
 ///|
 test "tracestate_mutation_accepts_level_2_keys_under_the_limit" {
-  for key in ["0", "1vendor", "vendor@", "vendor@1system", "tenant@system@extra"] {
+  for
+    key in ["0", "1vendor", "vendor@", "vendor@1system", "tenant@system@extra"] {
     let state = @propagation.Tracestate::parse("a=1").unwrap().add(key, "v")
     assert_eq(state.get(key), Some("v"))
     assert_eq(state.to_header(), key + "=v,a=1")

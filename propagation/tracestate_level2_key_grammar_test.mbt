@@ -30,7 +30,10 @@ test "tracestate_level_2_key_rejects_disallowed_characters" {
 test "tracestate_level_2_key_length_boundary_with_multiple_at" {
   let at_limit = "a@" + level2_repeated_char('b', 252) + "@c"
   assert_eq(at_limit.length(), 256)
-  assert_eq(@propagation.parse_tracestate(at_limit + "=v"), Some(at_limit + "=v"))
+  assert_eq(
+    @propagation.parse_tracestate(at_limit + "=v"),
+    Some(at_limit + "=v"),
+  )
   let over_limit = at_limit + "c"
   assert_eq(over_limit.length(), 257)
   assert_eq(@propagation.parse_tracestate(over_limit + "=v"), None)
