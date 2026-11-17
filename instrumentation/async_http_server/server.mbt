@@ -223,7 +223,7 @@ fn trim_header_ows(value : StringView) -> StringView {
 
 ///|
 fn parse_content_length(text : StringView) -> Int64? {
-  let value = @string.parse_uint64(text, base=10) catch { _ => return None }
+  let value = @string.parse_uint64(text, radix=10) catch { _ => return None }
   let max = 9223372036854775807UL
   if value > max {
     return None
@@ -824,7 +824,7 @@ fn unquote_forwarded_value(value : StringView) -> String? {
   if len >= 2 &&
     value.unsafe_get(0).to_int() == 0x22 &&
     value.unsafe_get(len - 1).to_int() == 0x22 {
-    let sb = StringBuilder(size_hint=len)
+    let sb = StringBuilder(capacity=len)
     let mut i = 1
     let end = len - 1
     while i < end {
@@ -1587,7 +1587,7 @@ fn sanitize_utf16_surrogates(value : String) -> String {
   if i >= len {
     return value
   }
-  let sb = StringBuilder(size_hint=len)
+  let sb = StringBuilder(capacity=len)
   let mut j = 0
   while j < len {
     let unit = value.unsafe_get(j).to_int()
@@ -1724,7 +1724,7 @@ fn sanitize_wire_header_value(value : String) -> String {
   if i >= len {
     return value
   }
-  let sb = StringBuilder(size_hint=len)
+  let sb = StringBuilder(capacity=len)
   let mut j = 0
   while j < len {
     let code = value.unsafe_get(j).to_int()
@@ -1744,7 +1744,7 @@ fn sanitize_wire_header_value(value : String) -> String {
 
 ///|
 fn is_usable_content_length(value : String) -> Bool {
-  try @string.parse_int64(value.trim(), base=10) >= 0L catch {
+  try @string.parse_int64(value.trim(), radix=10) >= 0L catch {
     _ => false
   }
 }
@@ -1895,7 +1895,7 @@ pub async fn ServerCall::respond(
   if body_allowed {
     match extra_headers.get(@http.CaseInsensitiveString("content-length")) {
       Some(value) => {
-        let declared_length = @string.parse_int64(value.trim(), base=10) catch {
+        let declared_length = @string.parse_int64(value.trim(), radix=10) catch {
           _ => -1L
         }
         if declared_length >= 0L && declared_length != response_content_length {

@@ -810,7 +810,7 @@ fn strip_empty_port(url : String) -> String {
   if !url_authority_has_empty_port(authority) {
     return url
   }
-  let sb = StringBuilder(size_hint=url.length())
+  let sb = StringBuilder(capacity=url.length())
   sb.write_stringview(url[:authority_start])
   sb.write_stringview(authority[:authority.length() - 1])
   sb.write_stringview(rest[authority_end:])

@@ -185,7 +185,7 @@ fn parse_url_scheme(url : String) -> (String, Int32?) {
         if !is_alpha(candidate.unsafe_get(0).unsafe_to_char()) {
           ("", None)
         } else {
-          let sb = StringBuilder(size_hint=index * 2)
+          let sb = StringBuilder(capacity=index * 2)
           let mut valid = true
           let mut i = 0
           while i < index {
@@ -743,7 +743,7 @@ fn strip_url_userinfo(url : String) -> String {
   let authority = rest[:authority_end]
   match authority.rev_find("@") {
     Some(at) => {
-      let sb = StringBuilder(size_hint=url.length() * 2)
+      let sb = StringBuilder(capacity=url.length() * 2)
       sb.write_stringview(url[:authority_start])
       sb.write_stringview(authority[at + 1:])
       sb.write_stringview(rest[authority_end:])
@@ -769,7 +769,7 @@ fn redact_url_query(url : String) -> String {
   let query_begin = query_start + 1
   let query = url[query_begin:fragment_start].to_owned()
   let redacted = @sdk.redact_sensitive_query_string(query)
-  let sb = StringBuilder(size_hint=url.length())
+  let sb = StringBuilder(capacity=url.length())
   sb.write_stringview(url[:query_begin])
   sb.write_string(redacted)
   sb.write_stringview(url[fragment_start:])
@@ -823,7 +823,7 @@ fn sanitize_utf16_surrogates(value : String) -> String {
   if i >= len {
     return value
   }
-  let sb = StringBuilder(size_hint=len)
+  let sb = StringBuilder(capacity=len)
   let mut j = 0
   while j < len {
     let unit = value.unsafe_get(j).to_int()
@@ -953,7 +953,7 @@ fn sanitize_wire_header_value(value : String) -> String {
   if i >= len {
     return value
   }
-  let sb = StringBuilder(size_hint=len)
+  let sb = StringBuilder(capacity=len)
   let mut j = 0
   while j < len {
     let code = value.unsafe_get(j).to_int()
@@ -971,7 +971,7 @@ fn sanitize_wire_header_value(value : String) -> String {
 
 ///|
 fn is_usable_content_length(value : String) -> Bool {
-  try @string.parse_int64(value.trim(), base=10) >= 0L catch {
+  try @string.parse_int64(value.trim(), radix=10) >= 0L catch {
     _ => false
   }
 }
@@ -1117,7 +1117,7 @@ fn normalize_url_for_transport(url : String) -> String {
   if !empty_port && !scheme_has_uppercase(url, scheme_end) {
     return url
   }
-  let sb = StringBuilder(size_hint=url.length())
+  let sb = StringBuilder(capacity=url.length())
   sb.write_string(scheme)
   sb.write_string("://")
   if empty_port {

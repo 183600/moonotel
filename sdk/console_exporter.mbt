@@ -129,7 +129,7 @@ fn write_escaped_console_text(out : StringBuilder, text : String) -> Unit {
 
 ///|
 fn escape_console_text(text : String) -> String {
-  let out = StringBuilder(size_hint=text.length())
+  let out = StringBuilder(capacity=text.length())
   write_escaped_console_text(out, text)
   out.to_string()
 }

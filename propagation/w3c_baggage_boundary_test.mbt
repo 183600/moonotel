@@ -7,7 +7,7 @@
 
 ///|
 fn boundary_baggage_value(length : Int32) -> String {
-  let sb = StringBuilder(size_hint=length)
+  let sb = StringBuilder(capacity=length)
   let mut i = 0
   while i < length {
     sb.write_char('v')

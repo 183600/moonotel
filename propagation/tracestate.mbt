@@ -268,7 +268,7 @@ pub fn Tracestate::to_header(self : Tracestate) -> String {
   for entry in members {
     size_hint = size_hint + entry.0.length() + entry.1.length() + 2
   }
-  let sb = StringBuilder(size_hint=size_hint * 2)
+  let sb = StringBuilder(capacity=size_hint * 2)
   let mut count = 0
   for entry in members {
     if count > 0 {

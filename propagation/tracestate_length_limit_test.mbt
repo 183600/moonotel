@@ -4,7 +4,7 @@
 
 ///|
 fn length_limit_repeated(c : Char, count : Int32) -> String {
-  let sb = StringBuilder(size_hint=count * 2)
+  let sb = StringBuilder(capacity=count * 2)
   for i = 0; i < count; i = i + 1 {
     sb.write_char(c)
   }

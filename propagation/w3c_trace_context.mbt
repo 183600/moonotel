@@ -891,7 +891,7 @@ fn is_valid_tracestate_value(value : StringView) -> Bool {
 
 ///|
 fn write_normalized_tracestate(view : StringView, len : Int32) -> String {
-  let sb = StringBuilder(size_hint=len * 2)
+  let sb = StringBuilder(capacity=len * 2)
   let mut count = 0
   let seen : Array[StringView] = []
   let mut start = 0

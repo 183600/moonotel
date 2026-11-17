@@ -5,7 +5,7 @@
 
 ///|
 fn escaped_baggage_value(escape : String, count : Int32) -> String {
-  let sb = StringBuilder(size_hint=escape.length() * count)
+  let sb = StringBuilder(capacity=escape.length() * count)
   let mut i = 0
   while i < count {
     sb.write_string(escape)

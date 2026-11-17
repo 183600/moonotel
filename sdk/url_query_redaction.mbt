@@ -89,7 +89,7 @@ pub fn redact_sensitive_query_string(query : String) -> String {
   let len = query.length()
   let mut start = 0
   let mut changed = false
-  let out = StringBuilder(size_hint=len)
+  let out = StringBuilder(capacity=len)
   while start <= len {
     let end = match query[start:].find("&") {
       Some(offset) => start + offset
