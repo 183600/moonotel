@@ -1255,19 +1255,6 @@ fn set_host_attributes(
   }
 }
 
-///|
-fn record_host_attributes(
-  span : @sdk.SpanSdk,
-  headers : Map[@http.CaseInsensitiveString, String],
-  path : String,
-) -> Unit {
-  let attributes : Map[String, @sdk.AttributeValue] = Map([])
-  set_host_attributes(attributes, headers, path)
-  for key, value in attributes {
-    span.set_attribute(key, value)
-  }
-}
-
 // The attributes known before the server span starts. Passing them at span
 // creation makes them available to samplers, as the HTTP semantic conventions
 // require for `http.request.method` and the request URL/server attributes.
@@ -2105,15 +2092,13 @@ async fn serve_call(
     connection_closed: false,
   }
   match span {
-    Some(server_span) => {
-      // The host attributes were part of the span-creation map (so a sampler
-      // could inspect them). Re-applying the same values keeps this helper as
-      // the single source of truth for direct span mutations as well.
-      record_host_attributes(server_span, request.headers, request.path)
+    Some(server_span) =>
+      // Host attributes are already part of the span-creation map (so a
+      // sampler can inspect them). Re-applying them would count them as
+      // dropped a second time when the attribute count limit discarded them.
       @http_header_capture.HeaderCapture::from_env(
         @http_header_capture.ENV_SERVER_REQUEST_HEADERS,
       ).record_request(request.headers, server_span)
-    }
     None => ()
   }
   // Install the extracted request context for the handler even when tracing

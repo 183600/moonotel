@@ -14,6 +14,19 @@ fn ows_header_map(
 }
 
 ///|
+fn record_host_attributes(
+  span : @sdk.SpanSdk,
+  headers : Map[@http.CaseInsensitiveString, String],
+  path : String,
+) -> Unit {
+  let attributes : Map[String, @sdk.AttributeValue] = Map([])
+  set_host_attributes(attributes, headers, path)
+  for key, value in attributes {
+    span.set_attribute(key, value)
+  }
+}
+
+///|
 test "request_body_size trims optional whitespace around content-length" {
   let headers = ows_header_map([("Content-Length", " 5 \t")])
   assert_eq(request_body_size(headers), Some(5L))
