@@ -30,11 +30,6 @@ test "parse_tracestate_trims_surrounding_whitespace" {
 test "parse_tracestate_accepts_multi_tenant_keys" {
   assert_eq(@propagation.parse_tracestate("foo@bar=baz"), Some("foo@bar=baz"))
   assert_eq(@propagation.parse_tracestate("1a@b=c"), Some("1a@b=c"))
-  // Level 2 permits a digit as the first character and `@` anywhere after it.
-  assert_eq(@propagation.parse_tracestate("0=v"), Some("0=v"))
-  assert_eq(@propagation.parse_tracestate("a@1=v"), Some("a@1=v"))
-  assert_eq(@propagation.parse_tracestate("a@b@c=1"), Some("a@b@c=1"))
-  assert_eq(@propagation.parse_tracestate("a@=1"), Some("a@=1"))
 }
 
 ///|
@@ -71,6 +66,12 @@ test "parse_tracestate_rejects_invalid_keys" {
   assert_eq(@propagation.parse_tracestate("@=1"), None)
   assert_eq(@propagation.parse_tracestate("a@B=1"), None)
   assert_eq(@propagation.parse_tracestate("a b=1"), None)
+  // A simple key must start with a lowercase letter, and a multi-tenant key
+  // has exactly one `@` followed by a lowercase-letter-led system-id.
+  assert_eq(@propagation.parse_tracestate("0=v"), None)
+  assert_eq(@propagation.parse_tracestate("a@1=v"), None)
+  assert_eq(@propagation.parse_tracestate("a@b@c=1"), None)
+  assert_eq(@propagation.parse_tracestate("a@=1"), None)
 }
 
 ///|
