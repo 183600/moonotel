@@ -29,6 +29,42 @@ test "json_decode_rejects_malformed_nested_unknown_values" {
 }
 
 ///|
+test "json_decode_skips_escaped_unknown_values" {
+  for
+    body in [
+      "{\"unknown\":\"a\\nb\"}", "{\"unknown\":\"\\u0041\"}",
+      "{\"unknown\":{\"a\":\"b\\tc\"}}",
+    ] {
+    assert_true(decode_malformed_response_body(body).is_success())
+  }
+}
+
+///|
+test "json_decode_rejects_truncated_escaped_strings" {
+  for
+    body in [
+      "{\"unknown\":\"abc", "{\"unknown\":\"abc\\", "{\"unknown\":\"\\u12",
+      "{\"partialSuccess\":{\"rejectedSpans\":\"abc",
+      "{\"partialSuccess\":{\"rejectedSpans\":\"\\x\"}}",
+    ] {
+    assert_false(decode_malformed_response_body(body).is_success())
+  }
+}
+
+///|
+test "json_decode_rejects_malformed_unknown_objects" {
+  for
+    body in [
+      "{\"unknown\":{\"a\":}}", "{\"unknown\":{\"a\":1 \"b\":2}}",
+      "{\"unknown\":{\"a\":1]}}", "{\"unknown\":{\"a\":1,",
+      "{\"unknown\":[1,", "{\"unknown\":-}", "{\"unknown\": }",
+      "{\"partialSuccess\": ",
+    ] {
+    assert_false(decode_malformed_response_body(body).is_success())
+  }
+}
+
+///|
 test "json_decode_rejects_malformed_partial_success_values" {
   for
     body in [
