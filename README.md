@@ -720,7 +720,8 @@ explicit names: a wildcard also captures headers such as `Authorization` and
   selected. Use `@async_runtime.setup` for the built-in async transport.
 - **No spans are recorded at all.** Check `OTEL_SDK_DISABLED`: when it is
   `true`, tracers are no-ops. Also check `OTEL_TRACES_SAMPLER`; `always_off`
-  drops every root span, while `record_only` keeps spans local without export.
+  drops every root span. A programmatic `record_only` sampler instead keeps
+  spans local without export.
 - **Headers or endpoints are ignored.** Signal-specific
   `OTEL_EXPORTER_OTLP_TRACES_*` variables take precedence over the generic
   `OTEL_EXPORTER_OTLP_*` variables. Blank values are treated as unset.
