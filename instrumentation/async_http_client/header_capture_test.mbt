@@ -120,6 +120,16 @@ async test "client header capture follows the configured environment" {
     }
     _ => fail("expected the transport Accept-Encoding header to be captured")
   }
+  // A caller-supplied Accept-Encoding is forwarded as-is; the transport default
+  // must not be added alongside it.
+  let (tracer, exporter) = test_tracer("client-header-capture")
+  let data = captured_client_span(tracer, exporter, {
+    "Accept-Encoding": "identity",
+  })
+  assert_eq(
+    data.attributes.get("http.request.header.accept-encoding"),
+    Some(@sdk.StringArrayValue(["identity"])),
+  )
   match data.attributes.get("http.request.header.traceparent") {
     Some(@sdk.StringArrayValue(values)) => assert_eq(values.length(), 1)
     _ => fail("expected the injected traceparent header to be captured")
