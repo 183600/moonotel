@@ -8,10 +8,10 @@ async test "server span does not double count dropped host attributes" {
   let exporter : RecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
   let provider = @sdk.TracerProviderSdk::new(
-    service_name="server-attribute-limit",
-  ).with_span_processor(processor).with_span_limits(
-    @sdk.SpanLimits::new(attribute_count_limit=0),
-  )
+      service_name="server-attribute-limit",
+    )
+    .with_span_processor(processor)
+    .with_span_limits(@sdk.SpanLimits::new(attribute_count_limit=0))
   let tracer = provider.get_tracer("server-attribute-limit")
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))

@@ -24,17 +24,12 @@ pub impl SpanProcessor for FlushDuringDrainProcessor with fn on_start(
 }
 
 ///|
-pub impl SpanProcessor for FlushDuringDrainProcessor with fn on_end(
-  self,
-  _data,
-) {
+pub impl SpanProcessor for FlushDuringDrainProcessor with fn on_end(self, _data) {
   let _ = self
 }
 
 ///|
-pub impl SpanProcessor for FlushDuringDrainProcessor with fn force_flush(
-  self,
-) {
+pub impl SpanProcessor for FlushDuringDrainProcessor with fn force_flush(self) {
   self.flushes.val = self.flushes.val + 1
 }
 

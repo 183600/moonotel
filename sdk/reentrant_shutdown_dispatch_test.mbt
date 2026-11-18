@@ -137,9 +137,7 @@ test "shutdown_from_on_end_inside_multi_stops_later_on_end_callbacks" {
     .with_span_processor(multi)
     .with_sampler(@sdk.Sampler::always_on())
   provider_ref.val = Some(provider)
-  let span = provider
-    .get_tracer("dispatch-multi-end")
-    .start_root_span("op")
+  let span = provider.get_tracer("dispatch-multi-end").start_root_span("op")
   assert_true(events.val.contains("first:start"))
   assert_true(events.val.contains("second:start"))
   span.end()
