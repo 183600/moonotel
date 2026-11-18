@@ -6,6 +6,9 @@
 test "http_date_parser_accepts_rfc850_dates" {
   let cases : Array[(String, Int64)] = [
     ("Sunday, 06-Nov-94 08:49:37 GMT", 784111777L),
+    // "Tuesday" makes the RFC 850 form 29 characters long, the same length as
+    // an IMF-fixdate; it must still be recognized as RFC 850.
+    ("Tuesday, 06-Nov-94 08:49:37 GMT", 784111777L),
     // A three-letter weekday is accepted as well; some intermediaries send it.
     ("Sun, 06-Nov-94 08:49:37 GMT", 784111777L),
     // A recent two-digit year resolves to the current century.
@@ -61,6 +64,7 @@ test "http_date_parser_rejects_malformed_obsolete_dates" {
 test "retry_after_millis_accepts_obsolete_http_dates" {
   // A date in the past yields no wait.
   assert_eq(retry_after_millis("Sunday, 06-Nov-94 08:49:37 GMT"), Some(0))
+  assert_eq(retry_after_millis("Tuesday, 06-Nov-94 08:49:37 GMT"), Some(0))
   assert_eq(retry_after_millis("Sun Nov  6 08:49:37 1994"), Some(0))
   // A far-future date is capped like an oversized delta-seconds value.
   assert_eq(retry_after_millis("Friday, 31-Dec-69 23:59:59 GMT"), Some(60000))

@@ -572,13 +572,16 @@ fn parse_http_date_seconds(value : StringView) -> Int64? {
 
 ///|
 fn parse_retry_after_date_seconds(value : StringView) -> Int64? {
-  if value.length() == 29 {
-    parse_http_date_seconds(value)
-  } else {
-    match parse_rfc850_date_seconds(value) {
-      Some(seconds) => Some(seconds)
-      None => parse_asctime_date_seconds(value)
-    }
+  // The formats overlap in length: a valid RFC 850 date with the full weekday
+  // name "Tuesday" is also 29 bytes long. Try every format instead of
+  // dispatching on the length alone.
+  match parse_http_date_seconds(value) {
+    Some(seconds) => Some(seconds)
+    None =>
+      match parse_rfc850_date_seconds(value) {
+        Some(seconds) => Some(seconds)
+        None => parse_asctime_date_seconds(value)
+      }
   }
 }
 
