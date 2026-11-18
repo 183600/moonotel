@@ -672,6 +672,32 @@ fn path_and_suffix(endpoint : String) -> (String, String) {
   (endpoint[:cut].to_owned(), endpoint[cut:].to_owned())
 }
 
+// The path component of an absolute or network-path URL. The authority must
+// not be mistaken for the path: `http://v1/traces` has path `/traces`, not
+// `/v1/traces`. A URL without a recognizable authority is returned unchanged.
+
+///|
+fn url_path_component(url : String) -> String {
+  let authority_start = if url.has_prefix("//") {
+    Some(2)
+  } else {
+    match scheme_colon_index(url) {
+      Some(colon) => Some(colon + 3)
+      None => None
+    }
+  }
+  match authority_start {
+    Some(start) => {
+      let rest = url[start:]
+      match rest.find("/") {
+        Some(slash) => rest[slash:].to_owned()
+        None => ""
+      }
+    }
+    None => url
+  }
+}
+
 // Add the root path to an absolute URL whose authority has no path part. The
 // OTLP/HTTP specification requires per-signal endpoints without a path to be
 // sent to `/`; the query and fragment components are preserved.
@@ -873,9 +899,11 @@ pub fn OtlpHttpConfig::traces_url(self : OtlpHttpConfig) -> String {
         None => "http://localhost:4318"
       }
       let (path, suffix) = path_and_suffix(endpoint)
-      if path.has_suffix("/v1/traces") || path.has_suffix("/v1/traces/") {
+      let signal_path = url_path_component(path)
+      if signal_path.has_suffix("/v1/traces") ||
+        signal_path.has_suffix("/v1/traces/") {
         endpoint
-      } else if path.has_suffix("/") {
+      } else if signal_path.has_suffix("/") {
         path[:path.length() - 1].to_owned() + "/v1/traces" + suffix
       } else {
         path + "/v1/traces" + suffix
