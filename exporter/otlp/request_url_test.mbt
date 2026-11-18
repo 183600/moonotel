@@ -84,6 +84,28 @@ test "request_url_removes_an_empty_port" {
 }
 
 ///|
+test "request_url_leaves_authorities_without_a_port_unchanged" {
+  assert_eq(
+    @otlp.OtlpHttpConfig::new(traces_endpoint="http://collector/custom").request_url(),
+    "http://collector/custom",
+  )
+  assert_eq(
+    @otlp.OtlpHttpConfig::new(traces_endpoint="HTTPS://collector/custom").request_url(),
+    "https://collector/custom",
+  )
+  assert_eq(
+    @otlp.OtlpHttpConfig::new(
+      traces_endpoint="http://user@collector/custom",
+    ).request_url(),
+    "http://user@collector/custom",
+  )
+  assert_eq(
+    @otlp.OtlpHttpConfig::new(traces_endpoint="//collector/custom").request_url(),
+    "http://collector/custom",
+  )
+}
+
+///|
 test "request_url_leaves_non_empty_and_malformed_ports" {
   for
     traces_endpoint in [

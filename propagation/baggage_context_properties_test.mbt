@@ -24,6 +24,27 @@ test "extract_baggage_context_preserves_properties" {
 }
 
 ///|
+test "extract_baggage_trims_property_whitespace" {
+  let carrier = @propagation.TextMapCarrier::new()
+  carrier.set(
+    @propagation.baggage_header_name(),
+    "userId=alice ; priority = high ; flag ,tenant=acme",
+  )
+  let context = @propagation.extract_baggage_context(carrier)
+  match context.baggage_entry("userId") {
+    Some(entry) => {
+      assert_eq(entry.value, "alice")
+      assert_eq(entry.properties, [("priority", "high"), ("flag", "")])
+    }
+    None => fail("expected userId baggage")
+  }
+  match context.baggage_entry("tenant") {
+    Some(entry) => assert_eq(entry.value, "acme")
+    None => fail("expected tenant baggage")
+  }
+}
+
+///|
 test "inject_baggage_preserves_properties" {
   let context = @context.Context::root().with_baggage_entry("userId", "alice", properties=[
     ("priority", "a b"),
