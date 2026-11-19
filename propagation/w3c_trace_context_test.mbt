@@ -115,6 +115,17 @@ test "parse_rejects_version_ff" {
 }
 
 ///|
+test "parse_rejects_uppercase_version" {
+  for version in ["0A", "1B", "A0", "FE"] {
+    let value = version +
+      "-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01"
+    assert_true(@propagation.parse_traceparent(value) is None)
+  }
+  let valid = "0a-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01"
+  assert_true(@propagation.parse_traceparent(valid) is Some(_))
+}
+
+///|
 test "parse_rejects_too_few_fields" {
   assert_true(
     @propagation.parse_traceparent("00-4bf92f359d1e75b7618a2d1f3c4e5a6b")

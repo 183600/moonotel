@@ -7,8 +7,9 @@
 //   - parent-id: 16 hex chars, all-zero is invalid
 //   - trace-flags: 2 hex chars, the sampled and random bits are kept
 //
-// Parsing is lenient about hex case and about extra fields for versions
-// greater than `00`, as recommended by the specification.
+// Parsing is lenient about the case of hex fields other than the version, and
+// about extra fields for versions greater than `00`, as recommended by the
+// specification.
 
 // Name of the `traceparent` header
 
@@ -542,6 +543,9 @@ pub fn parse_traceparent(value : String) -> @api.SpanContext? {
   }
   if version_hi_value == 15 && version_lo_value == 15 {
     // `ff` is a reserved invalid version.
+    return None
+  }
+  if !has_lowercase_hex(value, 0, 2) {
     return None
   }
   let flags_start = 53
