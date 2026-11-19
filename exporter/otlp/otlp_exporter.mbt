@@ -715,9 +715,9 @@ fn with_root_path(url : String) -> String {
       url
     }
   } else {
-    match path.find("://") {
-      Some(scheme_end) => {
-        let after_scheme = path[scheme_end + 3:]
+    match scheme_colon_index(path) {
+      Some(colon) => {
+        let after_scheme = path[colon + 3:]
         if after_scheme.find("/") is None {
           path + "/" + suffix
         } else {

@@ -17,6 +17,18 @@ test "request_url_leaves_relative_and_malformed_endpoints_unchanged" {
   }
 }
 
+///|
+test "traces_url leaves malformed endpoints unchanged" {
+  for traces_endpoint in [
+    "1http://collector", "foo/bar://baz", "ht_tp://collector",
+  ] {
+    assert_eq(
+      @otlp.OtlpHttpConfig::new(traces_endpoint~).traces_url(),
+      traces_endpoint,
+    )
+  }
+}
+
 // An RFC 3986 empty port is stripped from a `userinfo@host` authority too. The
 // userinfo (including its colon) must be preserved while the trailing colon of
 // the host is removed.
