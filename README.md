@@ -637,9 +637,10 @@ required for HTTP fields. A duplicated `traceparent` (under any casing) is
 ambiguous, so `extract` ignores the header and restarts the trace.
 
 Parsing is strict about the specification (version `ff`, all-zero IDs, field
-lengths, version-00 extra fields) and, per the version-00 `HEXDIGLC` ABNF,
-requires lowercase hex for `version=00` headers. Future versions (`>= 01`)
-accept hex in either case. A root span created from the SDK's random trace-ID
+lengths, version-00 extra fields). The two-character version is always
+lowercase hex (`HEXDIGLC`). Version `00` headers must also spell the IDs and
+flags in lowercase hex; for future versions (`>= 01`) the ID and flag fields
+accept either case. A root span created from the SDK's random trace-ID
 generator sets the W3C Level 2 random-trace-id flag, and a child span preserves
 the parent's flag; a custom generator opts in with
 `IdGenerator::new(..., trace_id_is_random=true)`. For a future version, the two
