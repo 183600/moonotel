@@ -464,6 +464,7 @@ pub struct TracerProviderSdk {
   flushing_owner : @ref.Ref[Array[&SpanProcessor]?]
   shutdown_waiters : @ref.Ref[Array[() -> Unit]]
   processor_shutdowns : Array[@ref.Ref[Bool]]
+  processor_drains : Array[@ref.Ref[Bool]]
 }
 pub fn TracerProviderSdk::force_flush(Self) -> Unit
 pub fn TracerProviderSdk::get_tracer(Self, String, version? : String) -> Tracer

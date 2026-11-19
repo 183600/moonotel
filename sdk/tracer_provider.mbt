@@ -31,6 +31,7 @@ pub struct TracerProviderSdk {
   // same processor. A processor added to a copy starts out unshut-down even
   // when the provider itself was already shut down.
   processor_shutdowns : Array[Ref[Bool]]
+  processor_drains : Array[Ref[Bool]]
 }
 
 // Version reported as `telemetry.sdk.version` in the resource.
@@ -164,6 +165,7 @@ pub fn TracerProviderSdk::new(service_name? : String) -> TracerProviderSdk {
     flushing_owner: Ref(None),
     shutdown_waiters: Ref([]),
     processor_shutdowns: [],
+    processor_drains: [],
   }
 }
 
@@ -255,11 +257,21 @@ fn TracerProviderSdk::with_added_processors(
 ) -> TracerProviderSdk {
   let merged = self.processors.copy()
   let processor_shutdowns = self.processor_shutdowns.copy()
+  let processor_drains = self.processor_drains.copy()
   for processor in processors {
+    match processor_index(merged, processor) {
+      Some(index) => {
+        processor_shutdowns.push(processor_shutdowns[index])
+        processor_drains.push(processor_drains[index])
+      }
+      None => {
+        processor_shutdowns.push(Ref(false))
+        processor_drains.push(Ref(false))
+      }
+    }
     merged.push(processor)
-    processor_shutdowns.push(Ref(false))
   }
-  { ..self, processors: merged, processor_shutdowns, }
+  { ..self, processors: merged, processor_shutdowns, processor_drains, }
 }
 
 // Register a span processor (called in registration order).
@@ -345,6 +357,19 @@ pub fn TracerProviderSdk::get_tracer(
   { provider: self, scope_name: name, scope_version: version.unwrap_or(""), }
 }
 
+///|
+fn processor_index(
+  processors : Array[&SpanProcessor],
+  target : &SpanProcessor,
+) -> Int32? {
+  for i, processor in processors {
+    if physical_equal(processor, target) {
+      return Some(i)
+    }
+  }
+  None
+}
+
 // Whether a processor array contains the same processor object.
 
 ///|
@@ -352,12 +377,10 @@ fn processor_in_array(
   processors : Array[&SpanProcessor],
   target : &SpanProcessor,
 ) -> Bool {
-  for processor in processors {
-    if physical_equal(processor, target) {
-      return true
-    }
+  match processor_index(processors, target) {
+    Some(_) => true
+    None => false
   }
-  false
 }
 
 ///|
@@ -445,7 +468,8 @@ pub fn TracerProviderSdk::shutdown(self : TracerProviderSdk) -> Unit {
   // a batch processor would otherwise close that exporter before the batch is
   // drained.
   for i, processor in self.processors {
-    if !self.processor_shutdowns[i].val {
+    if !self.processor_drains[i].val {
+      self.processor_drains[i].val = true
       processor.drain_before_shutdown()
     }
   }
@@ -538,6 +562,7 @@ pub fn no_op_tracer_provider() -> TracerProviderSdk {
         flushing_owner: Ref(None),
         shutdown_waiters: Ref([]),
         processor_shutdowns: [],
+        processor_drains: [],
       }
       noop_provider.val = Some(provider)
       provider

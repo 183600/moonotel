@@ -103,6 +103,50 @@ test "copy shutdown does not drain a child that a shared copy already drained" {
 }
 
 ///|
+test "provider shares shutdown state for the same processor instance" {
+  let log : Ref[Array[String]] = Ref([])
+  let processor : &@sdk.SpanProcessor = multi_drain_once_processor("p", log)
+  let base = @sdk.TracerProviderSdk::new(
+    service_name="same-provider-processor",
+  ).with_span_processor(processor)
+  let copy = base.with_span_processor(processor)
+  base.shutdown()
+  copy.shutdown()
+  assert_eq(log.val, ["p:drain", "p:shutdown"])
+}
+
+///|
+test "provider does not shut down a repeated processor twice" {
+  let log : Ref[Array[String]] = Ref([])
+  let processor : &@sdk.SpanProcessor = multi_drain_once_processor("p", log)
+  let provider = @sdk.TracerProviderSdk::new(
+    service_name="repeated-provider-processor",
+  ).with_span_processors([processor, processor])
+  provider.shutdown()
+  assert_eq(log.val, ["p:drain", "p:shutdown"])
+}
+
+///|
+test "multi shares shutdown state for the same child instance" {
+  let log : Ref[Array[String]] = Ref([])
+  let processor : &@sdk.SpanProcessor = multi_drain_once_processor("p", log)
+  let multi = @sdk.MultiSpanProcessor::new(processors=[processor])
+  let copy = multi.with_processor(processor)
+  multi.shutdown()
+  copy.shutdown()
+  assert_eq(log.val, ["p:drain", "p:shutdown"])
+}
+
+///|
+test "multi does not shut down a repeated child twice" {
+  let log : Ref[Array[String]] = Ref([])
+  let processor : &@sdk.SpanProcessor = multi_drain_once_processor("p", log)
+  let multi = @sdk.MultiSpanProcessor::new(processors=[processor, processor])
+  multi.shutdown()
+  assert_eq(log.val, ["p:drain", "p:shutdown"])
+}
+
+///|
 struct MultiDrainOnceEventProcessor {
   name : String
   log : Ref[Array[String]]
