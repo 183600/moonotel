@@ -32,6 +32,7 @@ pub fn HeaderCapture::is_enabled(Self) -> Bool
 pub fn HeaderCapture::parse(String) -> Self
 pub fn HeaderCapture::record_request(Self, Map[@http.CaseInsensitiveString, String], @sdk.SpanSdk) -> Unit
 pub fn HeaderCapture::record_response(Self, Map[@http.CaseInsensitiveString, String], @sdk.SpanSdk) -> Unit
+pub fn HeaderCapture::record_response_with_cookies(Self, Map[@http.CaseInsensitiveString, String], Array[@http.Cookie], @sdk.SpanSdk) -> Unit
 pub fn HeaderCapture::sanitizes(Self, String) -> Bool
 pub fn HeaderCapture::with_sanitize(Self, String) -> Self
 

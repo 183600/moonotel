@@ -1403,7 +1403,7 @@ pub async fn request(
       }
       @http_header_capture.HeaderCapture::from_env(
         @http_header_capture.ENV_CLIENT_RESPONSE_HEADERS,
-      ).record_response(response.headers, span)
+      ).record_response_with_cookies(response.headers, response.cookies, span)
       let body_outcome = Ok(client.read_all()) catch { error => Err(error) }
       let response_body = match body_outcome {
         Ok(body) => body

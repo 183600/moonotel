@@ -206,6 +206,69 @@ fn captured_header_value(
 }
 
 ///|
+fn set_cookie_header_value(cookie : @http.Cookie) -> String {
+  let out = StringBuilder()
+  out.write_string(cookie.name)
+  out.write_string("=")
+  out.write_string(cookie.value)
+  if cookie.path is Some(path) {
+    out.write_string("; Path=")
+    out.write_string(path)
+  }
+  if cookie.expires_raw is Some(expires_raw) {
+    out.write_string("; Expires=")
+    out.write_string(expires_raw)
+  }
+  if cookie.max_age is Some(max_age) {
+    out.write_string("; Max-Age=")
+    out.write_string(max_age.to_string())
+  }
+  if cookie.domain is Some(domain) {
+    out.write_string("; Domain=")
+    out.write_string(domain)
+  }
+  if cookie.secure {
+    out.write_string("; Secure")
+  }
+  if cookie.http_only {
+    out.write_string("; HttpOnly")
+  }
+  for ext in cookie.extensions {
+    out.write_string("; ")
+    out.write_string(ext)
+  }
+  out.to_string()
+}
+
+///|
+fn record_set_cookie_headers(
+  capture : HeaderCapture,
+  headers : @http.Headers,
+  cookies : Array[@http.Cookie],
+  span : @sdk.SpanSdk,
+) -> Unit {
+  if cookies.length() == 0 || !capture.captures("set-cookie") {
+    return
+  }
+  match headers.get(@http.CaseInsensitiveString("set-cookie")) {
+    Some(_) => return
+    None => ()
+  }
+  let values : Array[String] = []
+  for cookie in cookies {
+    if capture.sanitizes("set-cookie") {
+      values.push("[REDACTED]")
+    } else {
+      values.push(set_cookie_header_value(cookie))
+    }
+  }
+  span.set_attribute(
+    @sdk.HTTP_RESPONSE_HEADER_PREFIX + "set-cookie",
+    @sdk.StringArrayValue(values),
+  )
+}
+
+///|
 fn record_headers(
   capture : HeaderCapture,
   prefix : String,
@@ -255,4 +318,15 @@ pub fn HeaderCapture::record_response(
   span : @sdk.SpanSdk,
 ) -> Unit {
   record_headers(self, @sdk.HTTP_RESPONSE_HEADER_PREFIX, headers, span)
+}
+
+///|
+pub fn HeaderCapture::record_response_with_cookies(
+  self : HeaderCapture,
+  headers : @http.Headers,
+  cookies : Array[@http.Cookie],
+  span : @sdk.SpanSdk,
+) -> Unit {
+  record_headers(self, @sdk.HTTP_RESPONSE_HEADER_PREFIX, headers, span)
+  record_set_cookie_headers(self, headers, cookies, span)
 }
