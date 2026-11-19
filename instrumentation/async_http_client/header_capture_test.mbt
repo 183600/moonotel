@@ -196,4 +196,19 @@ async test "client header capture follows the configured environment" {
     data.attributes.get("http.request.header.transfer-encoding"),
     Some(@sdk.StringArrayValue(["chunked"])),
   )
+  // A captured response header must not consume the attribute slot reserved
+  // for the required response status. The initial attributes plus
+  // `user_agent.original` occupy ten slots; limit eleven leaves one for status.
+  @env.unset_env_var(@http_header_capture.ENV_CLIENT_REQUEST_HEADERS)
+  @env.set_env_var(@http_header_capture.ENV_CLIENT_RESPONSE_HEADERS, "X-Reply")
+  let (tracer, exporter) = test_tracer(
+    "client-header-capture",
+    attribute_count_limit=11,
+  )
+  let data = captured_client_span(tracer, exporter, {})
+  assert_eq(
+    data.attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE),
+    Some(@sdk.IntValue(200)),
+  )
+  assert_eq(data.attributes.get("http.response.header.x-reply"), None)
 }

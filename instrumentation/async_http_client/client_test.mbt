@@ -23,12 +23,22 @@ pub impl @sdk.SpanExporter for RecordingExporter with fn shutdown(self) {
 }
 
 ///|
-fn test_tracer(scope : String) -> (@sdk.Tracer, RecordingExporter) {
+fn test_tracer(
+  scope : String,
+  attribute_count_limit? : Int32,
+) -> (@sdk.Tracer, RecordingExporter) {
   let exporter : RecordingExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
   let provider = @sdk.TracerProviderSdk::new(
     service_name="instrumentation-test",
   ).with_span_processor(processor)
+  let provider = match attribute_count_limit {
+    Some(limit) =>
+      provider.with_span_limits(
+        @sdk.SpanLimits::new(attribute_count_limit=limit),
+      )
+    None => provider
+  }
   (provider.get_tracer(scope), exporter)
 }
 

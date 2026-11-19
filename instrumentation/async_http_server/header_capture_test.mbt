@@ -26,12 +26,21 @@ pub impl @sdk.SpanExporter for HeaderCaptureExporter with fn shutdown(self) {
 }
 
 ///|
-fn header_capture_tracer() -> (@sdk.Tracer, HeaderCaptureExporter) {
+fn header_capture_tracer(
+  attribute_count_limit? : Int32,
+) -> (@sdk.Tracer, HeaderCaptureExporter) {
   let exporter : HeaderCaptureExporter = { spans: Ref([]), }
   let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
   let provider = @sdk.TracerProviderSdk::new(service_name="header-capture-test").with_span_processor(
     processor,
   )
+  let provider = match attribute_count_limit {
+    Some(limit) =>
+      provider.with_span_limits(
+        @sdk.SpanLimits::new(attribute_count_limit=limit),
+      )
+    None => provider
+  }
   (provider.get_tracer("header-capture-test"), exporter)
 }
 
@@ -154,4 +163,18 @@ async test "server header capture follows the configured environment" {
     data.attributes.get("http.response.header.content-length"),
     Some(@sdk.StringArrayValue(["2"])),
   )
+  // A captured response header must not consume the attribute slot reserved
+  // for the required response status. The server request starts with thirteen
+  // attributes; limit fourteen leaves one for the status.
+  @env.unset_env_var(@http_header_capture.ENV_SERVER_REQUEST_HEADERS)
+  @env.set_env_var(@http_header_capture.ENV_SERVER_RESPONSE_HEADERS, "X-Reply")
+  let (tracer, exporter) = header_capture_tracer(attribute_count_limit=14)
+  let data = captured_server_span(tracer, exporter, {}, {
+    "X-Reply": "captured",
+  })
+  assert_eq(
+    data.attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE),
+    Some(@sdk.IntValue(200)),
+  )
+  assert_eq(data.attributes.get("http.response.header.x-reply"), None)
 }

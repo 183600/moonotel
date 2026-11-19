@@ -1387,12 +1387,11 @@ pub async fn request(
         }
       }
       defer client.close()
-      // Record the response status and headers as soon as the response starts
-      // arriving. A failure while reading the body (for example a truncated
-      // Content-Length) must not erase the status that was actually received.
-      @http_header_capture.HeaderCapture::from_env(
-        @http_header_capture.ENV_CLIENT_RESPONSE_HEADERS,
-      ).record_response(response.headers, span)
+      // Record the required status and error attributes before optional
+      // header capture, so captured headers cannot consume the attribute
+      // budget reserved for the semantic conventions. A failure while reading
+      // the body (for example a truncated Content-Length) must not erase the
+      // status that was actually received.
       span.set_attribute(
         @sdk.HTTP_RESPONSE_STATUS_CODE,
         @sdk.IntValue(response.code.to_int64()),
@@ -1402,6 +1401,9 @@ pub async fn request(
         span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(status_text))
         span.set_status(@api.StatusCode::Error)
       }
+      @http_header_capture.HeaderCapture::from_env(
+        @http_header_capture.ENV_CLIENT_RESPONSE_HEADERS,
+      ).record_response(response.headers, span)
       let body_outcome = Ok(client.read_all()) catch { error => Err(error) }
       let response_body = match body_outcome {
         Ok(body) => body
