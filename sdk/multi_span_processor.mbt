@@ -200,15 +200,13 @@ pub impl SpanProcessor for MultiSpanProcessor with fn drain_before_shutdown(
   defer {
     self.draining.val = false
   }
-  if !self.shutdown_called.val {
-    for i, processor in self.processors {
-      if self.shutdown_called.val {
-        break
-      }
-      if !self.shutdowns[i].val && !self.drained[i].val {
-        self.drained[i].val = true
-        processor.drain_before_shutdown()
-      }
+  // A copy may share the shutdown marker while still owning a child added
+  // after the source was shut down. Such a child has not been drained yet, so
+  // base the decision on the per-child state instead of the shared marker.
+  for i, processor in self.processors {
+    if !self.shutdowns[i].val && !self.drained[i].val {
+      self.drained[i].val = true
+      processor.drain_before_shutdown()
     }
   }
   // See `BatchSpanProcessor::drain_before_shutdown`: provider shutdowns that
