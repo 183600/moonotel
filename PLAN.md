@@ -220,8 +220,9 @@ Baggage 语义：
 
 - header 名称大小写不敏感；重复的 `tracestate` / `baggage` 按 HTTP 字段规则
   合并；重复的 `traceparent` 视为歧义并忽略。
-- `traceparent` 按规范校验版本、长度、全零 ID 与字段；version `00` 要求
-  小写 hex，未来版本接受大小写混合。
+- `traceparent` 按规范校验版本、长度、全零 ID 与字段；版本号始终要求小写
+  hex，version `00` 的 ID 与 flags 也要求小写，未来版本的 ID 与 flags 接受
+  大小写混合。
 - 随机 trace ID 生成器设置 W3C Level 2 random 标志，子 span 继承父标志。
 - `tracestate` 保持 512 字符以内的推荐上限，超限时按整项丢弃，先删超过
   128 字符的项，再从右侧删除。
