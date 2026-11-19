@@ -393,8 +393,19 @@ async fn OtlpHttpAsyncSpanExporter::drain_until(
       Some((sequence, batch)) => {
         if sequence >= target {
           // Belongs to a later flush or to the background sender; put it back
-          // without spending a request on it.
-          self.deferred_batch = Some((sequence, batch))
+          // without spending a request on it. Reinserting into the queue (the
+          // slot freed by `try_take_batch`) also wakes a background sender
+          // blocked in `queue.get()`; keeping the batch only in
+          // `deferred_batch` would strand it until the next enqueue or
+          // shutdown.
+          let requeued = self.queue.try_put((sequence, batch)) catch {
+            _ => false
+          }
+          if !requeued {
+            // The queue was closed concurrently; the shutdown drain takes the
+            // deferred batch instead.
+            self.deferred_batch = Some((sequence, batch))
+          }
           break
         }
         let processed = self.export_available(sequence, batch)
