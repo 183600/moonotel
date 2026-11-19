@@ -173,6 +173,15 @@ test "parse_forwarded_node_accepts_ip_literals_and_ports" {
 }
 
 ///|
+test "parse_forwarded_port_enforces_the_rfc_7239_five_digit_grammar" {
+  assert_eq(parse_forwarded_port("80"[:]), 80)
+  assert_eq(parse_forwarded_port("00080"[:]), 80)
+  assert_eq(parse_forwarded_port("65535"[:]), 65535)
+  assert_eq(parse_forwarded_port("000001"[:]), -1)
+  assert_eq(parse_forwarded_port("65536"[:]), -1)
+}
+
+///|
 test "parse_forwarded_node_rejects_unknown_and_malformed_values" {
   for
     value in [

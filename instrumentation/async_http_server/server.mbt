@@ -1055,6 +1055,19 @@ fn is_forwarded_ip_literal(text : StringView) -> Bool {
   }
 }
 
+// Parse the port of a `Forwarded#for` / `X-Forwarded-For` node. RFC 7239 uses
+// the RFC 7230 `port` rule (`1*5DIGIT`), so a longer run of digits is
+// malformed even when its numeric value fits in the port range (for example
+// `000001`).
+
+///|
+fn parse_forwarded_port(text : StringView) -> Int32 {
+  if text.length() > 5 {
+    return -1
+  }
+  parse_port(text)
+}
+
 // Parse a `Forwarded#for` / `X-Forwarded-For` node identifier into the client
 // address and, when present, its port. Only IP literals are accepted: RFC 7239
 // also allows obfuscated identifiers and `unknown`, which cannot populate
@@ -1086,7 +1099,7 @@ fn parse_forwarded_node(value : String) -> (String, Int32?)? {
     if port_text.length() == 0 {
       return None
     }
-    let port = parse_port(port_text)
+    let port = parse_forwarded_port(port_text)
     if port < 0 {
       return None
     }
@@ -1121,7 +1134,7 @@ fn parse_forwarded_node(value : String) -> (String, Int32?)? {
       if port_text.length() == 0 {
         return None
       }
-      let port = parse_port(port_text)
+      let port = parse_forwarded_port(port_text)
       if port < 0 {
         return None
       }
