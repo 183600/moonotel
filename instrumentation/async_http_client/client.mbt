@@ -1297,6 +1297,23 @@ fn record_request_error(span : @sdk.SpanSdk, error : Error) -> Unit {
   span.record_exception(error)
 }
 
+///|
+fn record_wire_request(
+  span : @sdk.SpanSdk,
+  capture : @http_header_capture.HeaderCapture,
+  headers : @http.Headers,
+) -> Unit {
+  capture.record_request(headers, span)
+  match headers.get(@http.CaseInsensitiveString("user-agent")) {
+    Some(value) =>
+      span.set_attribute(
+        @sdk.USER_AGENT_ORIGINAL,
+        @sdk.StringValue(trim_header_ows(value[:]).to_owned()),
+      )
+    None => ()
+  }
+}
+
 // Perform a traced HTTP request. The response headers, the fully read
 // response body and the client span are returned; the span is ended before
 // this function returns.
@@ -1367,22 +1384,11 @@ pub async fn request(
       let request_capture = @http_header_capture.HeaderCapture::from_env(
         @http_header_capture.ENV_CLIENT_REQUEST_HEADERS,
       )
-      request_capture.record_request(wire_headers, span)
-      // Record the User-Agent actually sent (the HTTP client supplies one when
-      // the caller does not). The surrounding optional whitespace is not part
-      // of the header value, so `user_agent.original` omits it.
-      match wire_headers.get(@http.CaseInsensitiveString("user-agent")) {
-        Some(value) =>
-          span.set_attribute(
-            @sdk.USER_AGENT_ORIGINAL,
-            @sdk.StringValue(trim_header_ows(value[:]).to_owned()),
-          )
-        None => ()
-      }
       let (response, client) = match outcome {
         Ok(result) => result
         Err(error) => {
           record_request_error(span, error)
+          record_wire_request(span, request_capture, wire_headers)
           raise error
         }
       }
@@ -1401,6 +1407,7 @@ pub async fn request(
         span.set_attribute(@sdk.ERROR_TYPE, @sdk.StringValue(status_text))
         span.set_status(@api.StatusCode::Error)
       }
+      record_wire_request(span, request_capture, wire_headers)
       @http_header_capture.HeaderCapture::from_env(
         @http_header_capture.ENV_CLIENT_RESPONSE_HEADERS,
       ).record_response_with_cookies(response.headers, response.cookies, span)

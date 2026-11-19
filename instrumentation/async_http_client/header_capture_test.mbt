@@ -219,6 +219,23 @@ async test "client header capture follows the configured environment" {
     Some(@sdk.IntValue(200)),
   )
   assert_eq(data.attributes.get("http.response.header.x-reply"), None)
+  @env.set_env_var(@http_header_capture.ENV_CLIENT_REQUEST_HEADERS, "X-Custom")
+  @env.set_env_var(@http_header_capture.ENV_CLIENT_RESPONSE_HEADERS, "X-Reply")
+  let (tracer, exporter) = test_tracer(
+    "client-header-capture",
+    attribute_count_limit=11,
+  )
+  let data = captured_client_span(tracer, exporter, {
+    "X-Custom": "request-value",
+  })
+  assert_eq(
+    data.attributes.get(@sdk.HTTP_RESPONSE_STATUS_CODE),
+    Some(@sdk.IntValue(200)),
+  )
+  assert_eq(
+    data.attributes.get("http.request.header.x-custom"),
+    Some(@sdk.StringArrayValue(["request-value"])),
+  )
   let response_cookies : Array[@http.Cookie] = [
     @http.Cookie::Cookie(
       "session",
