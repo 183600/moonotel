@@ -94,9 +94,7 @@ test "request_url_leaves_authorities_without_a_port_unchanged" {
     "https://collector/custom",
   )
   assert_eq(
-    @otlp.OtlpHttpConfig::new(
-      traces_endpoint="http://user@collector/custom",
-    ).request_url(),
+    @otlp.OtlpHttpConfig::new(traces_endpoint="http://user@collector/custom").request_url(),
     "http://user@collector/custom",
   )
   assert_eq(
