@@ -50,6 +50,9 @@ pub fn IdGenerator::generates_random_trace_ids(self : IdGenerator) -> Bool {
 
 ///|
 fn pseudo_random_bytes(n : Int32, state : Ref[UInt64]) -> Array[Int32] {
+  if n <= 0 {
+    return []
+  }
   let out : Array[Int32] = Array::unsafe_make_uninit(n)
   let mut filled = 0
   let mut acc : UInt64 = 0
@@ -96,6 +99,9 @@ fn take_buffered(
   pending : Ref[Bytes],
   offset : Ref[Int32],
 ) -> Array[Int32]? {
+  if n <= 0 {
+    return Some([])
+  }
   let source = pending.val
   let start = offset.val
   if source.length() - start < n {
