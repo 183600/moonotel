@@ -473,7 +473,7 @@ fn looks_like_traceparent_at(value : String, start : Int32) -> Bool {
   }
   let version_hi = hex_digit_value(value.unsafe_get(start).unsafe_to_char())
   let version_lo = hex_digit_value(value.unsafe_get(start + 1).unsafe_to_char())
-  if version_hi < 0 || version_lo < 0 || (version_hi == 15 && version_lo == 15) {
+  if version_hi < 0 || version_lo < 0 {
     return false
   }
   is_hex_run(value, start + 3, 32) &&

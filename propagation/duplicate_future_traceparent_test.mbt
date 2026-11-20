@@ -57,6 +57,12 @@ test "comma_extension_with_an_invalid_version_is_opaque" {
 }
 
 ///|
+test "combined_future_duplicate_with_reserved_version_restarts" {
+  let reserved = "ff-4bf92f359d1e75b7618a2d1f3c4e5a6b-00f067aa0ba902b7-01"
+  assert_true(@propagation.parse_traceparent(future_traceparent + "," + reserved) is None)
+}
+
+///|
 test "comma_extension_with_misplaced_dashes_is_opaque" {
   let extension = "01-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaXbbbbbbbbbbbbbbbb-01"
   match @propagation.parse_traceparent(future_traceparent + ", " + extension) {
