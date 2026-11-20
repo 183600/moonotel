@@ -34,3 +34,52 @@ test "sampler cannot mutate span sampling inputs" {
     expected_trace,
   )
 }
+
+///|
+test "sampler cannot mutate array attribute payloads or link attributes" {
+  let exporter = @sdk.InMemorySpanExporter::new()
+  let link_context = @api.span_context(
+    Array::make(16, 5),
+    Array::make(8, 6),
+    @api.TRACE_FLAGS_SAMPLED,
+  )
+  let sampler = @sdk.Sampler::new("PayloadMutatingSampler", fn(parameters) {
+    match parameters.attributes.get("items") {
+      Some(@sdk.StringArrayValue(items)) => items[0] = "mutated"
+      _ => ()
+    }
+    parameters.links[0].attributes.set(
+      "injected",
+      @sdk.StringValue("by-sampler"),
+    )
+    @sdk.sampling_decision_record_and_sample()
+  })
+  let provider = @sdk.TracerProviderSdk::new(service_name="sampler-isolation")
+    .with_sampler(sampler)
+    .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
+  let attributes : Map[String, @sdk.AttributeValue] = Map([])
+  attributes.set("items", @sdk.StringArrayValue(["original"]))
+  let link_attributes : Map[String, @sdk.AttributeValue] = Map([])
+  link_attributes.set("original", @sdk.StringValue("link"))
+  let span = provider
+    .get_tracer("sampler-isolation")
+    .start_span("op", attributes~, links=[
+      @sdk.SpanLink::new(link_context, attributes=link_attributes),
+    ])
+  assert_eq(
+    span.attributes().get("items"),
+    Some(@sdk.StringArrayValue(["original"])),
+  )
+  assert_eq(span.links()[0].attributes.get("injected"), None)
+  assert_eq(
+    span.links()[0].attributes.get("original"),
+    Some(@sdk.StringValue("link")),
+  )
+  span.end()
+  let exported = exporter.exported_spans()[0]
+  assert_eq(
+    exported.attributes.get("items"),
+    Some(@sdk.StringArrayValue(["original"])),
+  )
+  assert_eq(exported.links[0].attributes.get("injected"), None)
+}

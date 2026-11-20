@@ -96,11 +96,11 @@ pub fn Tracer::start_span(
   }
   let span_id = self.provider.id_generator.generate_span_id()
   let sampler_attributes : Map[String, AttributeValue] = match attributes {
-    Some(values) => values.copy()
+    Some(values) => copy_attribute_map(values)
     None => Map([])
   }
   let sampler_links : Array[SpanLink] = match links {
-    Some(values) => values.copy()
+    Some(values) => copy_links(values)
     None => []
   }
   let decision = self.provider.sampler.should_sample_parameters({
