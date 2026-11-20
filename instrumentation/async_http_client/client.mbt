@@ -1419,13 +1419,32 @@ pub async fn request(
           raise error
         }
       }
-      // The response body has been fully read, so its size is always known.
-      let response_size = response_body.binary().length()
-      if response_size > 0 {
-        span.set_attribute(
-          @sdk.HTTP_RESPONSE_BODY_SIZE,
-          @sdk.IntValue(response_size.to_int64()),
-        )
+      let decoded_size = response_body.binary().length()
+      if decoded_size > 0 {
+        let declared : Int? = match response.headers.get(
+          @http.CaseInsensitiveString("content-length"),
+        ) {
+          Some(value) =>
+            match (try Some(@string.parse_int64(value.trim(), radix=10)) catch {
+              _ => None
+            }) {
+              Some(size) if size >= 0L && size <= 2147483647L => Some(size.to_int())
+              _ => None
+            }
+          None => None
+        }
+        let encoded = match response.headers.get(
+          @http.CaseInsensitiveString("content-encoding"),
+        ) {
+          Some(value) => @http.CaseInsensitiveString(value.trim().to_owned()) != "identity"
+          None => false
+        }
+        if !encoded || declared is Some(_) {
+          span.set_attribute(
+            @sdk.HTTP_RESPONSE_BODY_SIZE,
+            @sdk.IntValue(declared.unwrap_or(decoded_size).to_int64()),
+          )
+        }
       }
       (response, response_body)
     }

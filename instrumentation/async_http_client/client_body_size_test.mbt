@@ -88,3 +88,37 @@ async test "client span omits body sizes when both bodies are empty" {
     assert_eq(data.attributes.get(@sdk.HTTP_RESPONSE_BODY_SIZE), None)
   }
 }
+
+///|
+async test "client span omits unknown compressed response body size" {
+  let (tracer, exporter) = body_size_tracer("client-body-size-gzip")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      server.run_forever() <| ((_request, _body, conn) => {
+        conn.send_response(200, "OK", extra_headers={
+          "Content-Encoding": "gzip",
+          "Content-Length": "25",
+        })
+        conn.write(
+          Bytes::from_array(
+            @api.bytes_from_hex(
+              "1f8b08000000000002ffcb48cdc9c9070086a6103605000000",
+            ).unwrap().map(fn(value) { value.to_byte() }),
+          ),
+        )
+        conn.end_response()
+      })
+    }
+    let (response, body) = @async_http_client.get(
+      "http://127.0.0.1:\{port}/gzip",
+      tracer~,
+    )
+    assert_eq(response.code, 200)
+    assert_eq(body.text(), "hello")
+    assert_eq(exporter.spans.val.length(), 1)
+    let data = exporter.spans.val[0]
+    assert_eq(data.attributes.get(@sdk.HTTP_RESPONSE_BODY_SIZE), None)
+  }
+}
