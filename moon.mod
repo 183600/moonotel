@@ -19,10 +19,6 @@ keywords = [
   "otlp",
 ]
 
-options(
-  "is-builtin": false,
-)
-
 import {
   "moonbitlang/async@0.22.5",
 }

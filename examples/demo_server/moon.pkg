@@ -1,5 +1,4 @@
 import {
-  "moonbitlang/async",
   "moonbitlang/async/socket",
   "183600/moonotel/instrumentation/async_http_server" @server,
   "183600/moonotel/sdk",
