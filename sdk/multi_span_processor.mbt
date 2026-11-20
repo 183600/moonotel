@@ -310,7 +310,12 @@ pub impl SpanProcessor for MultiSpanProcessor with fn shutdown(self) {
   }
   self.run_shutdown_completions()
   for processor in to_shutdown {
-    processor.shutdown()
+    if processor.is_draining() {
+      let child = processor
+      child.set_shutdown_completion(() => child.shutdown())
+    } else {
+      processor.shutdown()
+    }
   }
 }
 
