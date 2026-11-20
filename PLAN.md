@@ -4,6 +4,13 @@
 > 关键取舍、测试策略与后续里程碑。文中的路径和包名按当前仓库结构书写；若
 > 与源码或 README 不一致，以源码和 README 为准。
 
+阅读指南：
+
+- 先看第 1、2、3 节，了解范围、分层与目录职责。
+- 修改 Context、传播或 SDK 行为前，看第 4、5 节。
+- 修改导出、重试或 HTTP 埋点前，看第 6、7 节。
+- 提交前按第 8、11 节执行检查并核对文档同步项。
+
 ## 目录
 
 - [1. 目标与范围](#1-目标与范围)
@@ -62,9 +69,13 @@ MVP**，重点覆盖一条完整的链路：业务代码创建 span，SDK 采样
 | --- | --- | --- |
 | Trace / Span ID | `@api.SpanContext` | 不可变 ID 视图；创建子 span、注入与导出时都会重新校验 |
 | Context | `@context.Context` | 不可变上下文链，携带当前 span 与 baggage |
+| Tracer | `@sdk.Tracer` | 从当前或显式 `Context` 创建 span，并应用采样与 span limits |
+| Sampler | `@sdk.Sampler` | 对每个新 span 返回 DROP、RECORD_ONLY 或 RECORD_AND_SAMPLE |
 | SpanData | `@sdk.SpanData` | 已结束 span 的快照，是 processor 与 exporter 的输入 |
 | SpanProcessor | `@sdk.SpanProcessor` | 接收 span 生命周期事件，决定立即导出或批量排队 |
 | SpanExporter | `@sdk.SpanExporter` | 将一批 `SpanData` 编码并发送到后端 |
+| Propagator | `@propagation.TextMapPropagator` | 在 carrier 与 `SpanContext` / baggage 之间注入和提取 W3C 字段 |
+| Resource | `@sdk.Resource` | 描述服务身份与部署环境的不可变属性集合 |
 
 一条 span 的主链路：
 
@@ -106,6 +117,29 @@ instrumentation/*   -> api, context, propagation, sdk
 
 这条方向保证核心类型可以在没有网络、没有 async runtime 的目标上编译；
 需要平台能力的包集中在上层，测试替身也只需要替换最外层的 transport。
+
+目标矩阵（默认目标为 wasm-gc）：
+
+| 包组 | 默认 wasm-gc | native | wasm | 说明 |
+| --- | --- | --- | --- | --- |
+| `api`、`context`、`propagation`、`sdk`、`exporter/otlp`、根包 | 编译并测试 | 编译并测试 | 编译并测试 | 无 I/O 核心与同步导出 |
+| `exporter/otlp_async`、`async_runtime` | 跳过函数体 | 编译并测试 | 编译 | 真实网络与异步调度 |
+| `instrumentation/*` | 跳过函数体 | 编译并测试 | 编译 | 依赖 `moonbitlang/async/http` |
+
+`moon check` / `moon test` 验证默认目标；涉及 native+wasm 包时还必须运行
+`moon check --target native` / `moon test --target native`，否则相关函数体
+不会被编译或执行。
+
+关键设计决策：
+
+| 决策 | 理由 | 影响 |
+| --- | --- | --- |
+| 核心包不引入 I/O 与 async 依赖 | 保证任意目标可编译，测试不需要网络 | 真实传输集中在 `otlp_async` 与埋点包 |
+| 同步与异步 exporter 分离 | 测试替身保持简单，生产路径独立演进 | 两者共享编码与配置，但不共享传输实现 |
+| `Context` 不可变且以显式传递为主 | 避免隐式全局状态影响并发任务 | ambient 存储只是单流默认值，可替换 |
+| batch 队列有界并覆盖最旧 span | 保证调用方延迟与内存可预测 | 溢出计入 `dropped_spans()`，不阻塞业务 |
+| OTLP 编码器在仓库内实现 | 避免生成器成为安装依赖 | 需要配套编码、解码与不变量测试 |
+| 传播解析严格按 W3C 校验 | 防止畸形 header 污染 trace | 非法输入被忽略或回退为新 root |
 
 ## 3. 目录结构
 
@@ -411,16 +445,24 @@ URL 会移除 userinfo，并对 HTTP 语义约定列出的敏感查询参数做�
 
 测试分层：
 
-- **单元测试**：每个 package 内的 `*_test.mbt`，覆盖正常路径、边界、错误输入与
-  环境变量隔离。
-- **白盒测试**：native 相关逻辑使用 `*_wbtest.mbt`，依赖内部实现细节。
-- **不变量测试**：编码器、解析器和响应解码器的 fuzz/invariant 测试。
-- **facade 完整性**：根包的 re-export、setup、propagator、sampler 和 resource
-  通过独立测试校验。
-- **文档示例**：`sdk/readme_usage_test.mbt` 保证 README 的 Getting started
-  用法可编译并产生预期 span。
-- **文档一致性**：修改公开 API、环境变量或默认值时，同步更新 README 与本文档；
-  新增用户可见示例时，优先补上对应的编译测试。
+| 层级 | 位置 | 关注点 |
+| --- | --- | --- |
+| 单元测试 | 每个 package 内的 `*_test.mbt` | 正常路径、边界、错误输入与环境变量隔离 |
+| 白盒测试 | native 相关逻辑的 `*_wbtest.mbt` | 依赖内部实现细节的行为 |
+| 不变量测试 | 编码器、解析器与响应解码器 | fuzz/invariant 输入与输出约束 |
+| facade 完整性 | 根包的独立测试 | re-export、setup、propagator、sampler 与 resource |
+| 文档示例 | `sdk/readme_usage_test.mbt` | README 的 Getting started 可编译并产生预期 span |
+
+手动验证示例（需要 native 目标）：
+
+```sh
+moon run examples/demo_server --target native
+moon run examples/demo_client --target native
+moon run examples/demo_otlp --target native
+```
+
+`demo_client` 依赖先启动的 `demo_server`；`demo_otlp` 需要可用的 OTLP/HTTP
+collector，默认地址为 `http://localhost:4318`。
 
 提交前运行：
 
@@ -434,6 +476,14 @@ bash scripts/check-hygiene.sh
 
 CI 同时运行默认与 native 目标，确保 async 埋点和 exporter 不只是被声明，而是
 真正编译和测试过。hygiene 脚本阻止临时探针文件与脚手架占位符进入仓库。
+
+文档同步清单：
+
+- 公开类型、函数或默认值变化：更新 README 对应章节与本文档第 5、6 节。
+- 环境变量变化：更新 README 的配置表和本文档 6.2。
+- 目标支持变化：更新 README 的 Packages 表与本文档的目标矩阵。
+- 用户可见示例变化：同步 `sdk/readme_usage_test.mbt` 或新增可编译测试。
+- 行为变化：先补回归测试，再更新文档。
 
 测试编写约定：
 

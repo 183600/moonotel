@@ -276,15 +276,8 @@ pub fn Context::with_baggage_entries(
       i = i - 1
       continue
     }
-    let mut duplicate = false
-    for existing in list {
-      if existing.key == entry.key {
-        duplicate = true
-        break
-      }
-    }
-    if !duplicate {
-      list.push({ ..entry, properties: entry.properties.copy(), })
+    if !contains_baggage_key(list, entry.key) {
+      list.push(copy_baggage_entry(entry))
     }
     i = i - 1
   }

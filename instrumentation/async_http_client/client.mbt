@@ -1162,10 +1162,6 @@ fn split_url_for_transport(url : String) -> (String, String) {
   }
 }
 
-// Send one request through the streaming HTTP client and return the response
-// together with the client that still owns the unread body. On failure the
-// client is closed before the error propagates; on success the caller owns it.
-
 // Authority-form request target of a CONNECT request, as required by RFC 9110
 // (`CONNECT host:port HTTP/1.1`). Returns `None` when the URL has no usable
 // scheme and authority; the caller then keeps the ordinary path-form target
@@ -1197,6 +1193,10 @@ fn request_framing_headers(headers : @http.Headers) -> @http.Headers {
     None => Map([], capacity=1)
   }
 }
+
+// Send one request through the streaming HTTP client and return the response
+// together with the client that still owns the unread body. On failure the
+// client is closed before the error propagates; on success the caller owns it.
 
 ///|
 async fn open_request(

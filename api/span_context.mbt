@@ -27,11 +27,6 @@ pub fn invalid_span_context() -> SpanContext {
   invalid_context
 }
 
-// Create a valid SpanContext with given IDs. `tracestate` is the raw W3C
-// `tracestate` header value associated with the context ("" when absent).
-// `is_remote` must be `true` for contexts received through a propagator.
-
-///|
 // The byte produced by the hex/OTLP serializers for one ID element. In-range
 // values are used as-is; out-of-range values are rendered like `bytes_to_hex`
 // (the high nibble becomes "0" and the low nibble is kept).
@@ -60,6 +55,10 @@ fn has_nonzero_byte(bytes : Array[Int32]) -> Bool {
   }
   i < len && serialized_byte(bytes.unsafe_get(i)) != 0
 }
+
+// Create a valid SpanContext with given IDs. `tracestate` is the raw W3C
+// `tracestate` header value associated with the context ("" when absent).
+// `is_remote` must be `true` for contexts received through a propagator.
 
 ///|
 pub fn span_context(

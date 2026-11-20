@@ -230,10 +230,6 @@ pub fn is_valid_http_header_name(name : StringView) -> Bool {
   true
 }
 
-// Whether `value` can be sent as an HTTP field value. HTTP forbids CR, LF and
-// NUL because they delimit fields, and every other control character except
-// HTAB is not a field-vchar. Non-ASCII text is allowed (obs-text).
-
 // Whether `value` is well-formed UTF-16. A configured header is forwarded to
 // a UTF-8 transport, and an unpaired surrogate cannot be encoded; dropping the
 // header is better than aborting the export. Complete surrogate pairs are
@@ -262,6 +258,10 @@ fn has_valid_utf16(value : String) -> Bool {
   }
   true
 }
+
+// Whether `value` can be sent as an HTTP field value. HTTP forbids CR, LF and
+// NUL because they delimit fields, and every other control character except
+// HTAB is not a field-vchar. Non-ASCII text is allowed (obs-text).
 
 ///|
 pub fn is_valid_http_header_value(value : String) -> Bool {

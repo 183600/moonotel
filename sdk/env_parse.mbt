@@ -37,10 +37,7 @@ fn parse_env_non_negative_int(name : String) -> Int32? {
       if trimmed == "" {
         None
       } else {
-        match parse_decimal_int(trimmed) {
-          Some(parsed) => if parsed < 0 { None } else { Some(parsed) }
-          None => None
-        }
+        parse_decimal_int(trimmed)
       }
     }
     None => None

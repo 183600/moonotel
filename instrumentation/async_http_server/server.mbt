@@ -1809,11 +1809,12 @@ fn wire_response_headers(
     if !is_valid_http_header_name(name) {
       continue
     }
-    if name.to_lower() == "transfer-encoding" {
+    let lower_name = name.to_lower()
+    if lower_name == "transfer-encoding" {
       continue
     }
     let value = sanitize_wire_header_value(value)
-    if name.to_lower() == "content-length" &&
+    if lower_name == "content-length" &&
       drop_response_content_length(request_method, status_code, value) {
       continue
     }

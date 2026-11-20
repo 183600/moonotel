@@ -132,6 +132,13 @@ pub fn BatchSpanProcessor::export_failures(self : BatchSpanProcessor) -> UInt64 
   self.export_failures
 }
 
+// Wrap a ring-buffer index that has advanced past the end at most once.
+
+///|
+fn wrap_ring_index(index : Int32, capacity : Int32) -> Int32 {
+  if index >= capacity { index - capacity } else { index }
+}
+
 // Append a span, overwriting the oldest buffered span when the queue is full.
 
 ///|
@@ -142,13 +149,11 @@ fn BatchSpanProcessor::push_span(
   let capacity = self.max_queue_size
   if self.count >= capacity {
     self.queue.unsafe_set(self.head, Some(data))
-    let next = self.head + 1
-    self.head = if next >= capacity { 0 } else { next }
+    self.head = wrap_ring_index(self.head + 1, capacity)
     self.dropped_spans = self.dropped_spans + 1
     return
   }
-  let index = self.head + self.count
-  let index = if index >= capacity { index - capacity } else { index }
+  let index = wrap_ring_index(self.head + self.count, capacity)
   if index >= self.queue.length() {
     self.queue.push(Some(data))
   } else {
@@ -203,10 +208,7 @@ fn BatchSpanProcessor::flush_batch_at(
         )
     }
     queue.unsafe_set(index, None)
-    index = index + 1
-    if index >= capacity {
-      index = 0
-    }
+    index = wrap_ring_index(index + 1, capacity)
     i = i + 1
   }
   self.head = index
@@ -334,8 +336,6 @@ pub impl SpanProcessor for BatchSpanProcessor with fn drain_before_shutdown(
 pub impl SpanProcessor for BatchSpanProcessor with fn is_draining(self) {
   self.draining
 }
-
-///|
 
 ///|
 pub impl SpanProcessor for BatchSpanProcessor with fn set_shutdown_completion(

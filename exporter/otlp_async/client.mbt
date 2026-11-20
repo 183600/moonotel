@@ -648,16 +648,6 @@ fn retry_after_millis(value : String) -> Int32? {
   }
 }
 
-// Shared request loop of `post_trace_request` and
-// `OtlpHttpAsyncExporter::export_batch`: the caller has already validated the
-// configuration, compressed the body when needed and built the headers. Both
-// `http/protobuf` and `http/json` bodies are supported; the response is
-// decoded with the matching encoding. Network errors and retryable statuses
-// (429, 502, 503, 504) are retried up to `config.max_retries` times. The delay
-// before a retry is taken from the response's `Retry-After` header when it
-// holds a number of seconds or an HTTP date, and an exponentially increasing,
-// jittered backoff is used otherwise.
-
 // Base delay of the exponential retry backoff, in milliseconds.
 
 ///|
@@ -791,6 +781,16 @@ async fn post_with_response_limit(
   }
   WithBody(buffer.unsafe_reinterpret_as_bytes()[:total].to_owned())
 }
+
+// Shared request loop of `post_trace_request` and
+// `OtlpHttpAsyncExporter::export_batch`: the caller has already validated the
+// configuration, compressed the body when needed and built the headers. Both
+// `http/protobuf` and `http/json` bodies are supported; the response is
+// decoded with the matching encoding. Network errors and retryable statuses
+// (429, 502, 503, 504) are retried up to `config.max_retries` times. The delay
+// before a retry is taken from the response's `Retry-After` header when it
+// holds a number of seconds or an HTTP date, and an exponentially increasing,
+// jittered backoff is used otherwise.
 
 ///|
 async fn post_trace_request_with_headers(
@@ -956,6 +956,15 @@ fn prepare_trace_body(
   Ready(body, gzip)
 }
 
+// gzip-compress `body`, returning `None` when compression fails.
+
+///|
+async fn gzip_body(body : Bytes) -> Bytes? {
+  Some(gzip_compress(body)) catch {
+    _ => None
+  }
+}
+
 // Compress the prepared body when needed and send it with `headers`.
 
 ///|
@@ -1011,15 +1020,6 @@ pub async fn post_trace_request(
         request_headers(config, gzip),
         max_response_size,
       )
-  }
-}
-
-// gzip-compress `body`, returning `None` when compression fails.
-
-///|
-async fn gzip_body(body : Bytes) -> Bytes? {
-  Some(gzip_compress(body)) catch {
-    _ => None
   }
 }
 

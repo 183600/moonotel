@@ -39,19 +39,30 @@ HTTP transport and HTTP instrumentation target native and wasm.
 
 ## Contents
 
-- [Scope](#scope)
-- [Integration paths](#integration-paths)
-- [Request lifecycle](#request-lifecycle)
+**Using moonotel**
+
 - [Install](#install)
 - [Getting started](#getting-started)
 - [Examples](#examples)
-- [Packages](#packages)
+- [Integration paths](#integration-paths)
+
+**Concepts**
+
+- [Request lifecycle](#request-lifecycle)
 - [Spans, sampling, and processing](#spans-sampling-and-processing)
 - [Context and baggage](#context-and-baggage)
+- [W3C propagation](#w3c-propagation)
+
+**Guides**
+
 - [Common patterns](#common-patterns)
 - [HTTP instrumentation](#http-instrumentation)
 - [OTLP/HTTP export](#otlphttp-export)
-- [W3C propagation](#w3c-propagation)
+
+**Reference**
+
+- [Packages](#packages)
+- [Scope](#scope)
 - [Configuration reference](#configuration-reference)
 - [Troubleshooting](#troubleshooting)
 - [Testing and CI](#testing-and-ci)
@@ -113,7 +124,36 @@ import {
 }
 ```
 
+A facade-only application needs just the root package; it re-exports the stable
+API, context, propagation, SDK and OTLP configuration surface:
+
+```text
+import {
+  "183600/moonotel",
+}
+```
+
 ## Getting started
+
+The snippets use short package aliases. A `moon.pkg` import block covering the
+packages shown in this README looks like this:
+
+```text
+import {
+  "183600/moonotel" @moonotel,
+  "183600/moonotel/api" @api,
+  "183600/moonotel/context" @context,
+  "183600/moonotel/sdk" @sdk,
+  "183600/moonotel/propagation" @propagation,
+  "183600/moonotel/exporter/otlp" @otlp,
+}
+```
+
+Add `@otlp_async`, `@async_runtime`, `@client` and `@server` from
+`183600/moonotel/exporter/otlp_async`, `183600/moonotel/async_runtime`,
+`183600/moonotel/instrumentation/async_http_client` and
+`183600/moonotel/instrumentation/async_http_server` when you use those
+packages.
 
 ### Record a span
 
@@ -134,34 +174,33 @@ Attribute keys must be non-empty, as required by the OpenTelemetry data model.
 An empty key passed to a span, event, link or resource setter is ignored: it is
 not recorded, exported, or counted as dropped by a limit.
 
-The examples use short aliases. A `moon.pkg` import block covering the packages
-shown in this README looks like this:
-
-```text
-import {
-  "183600/moonotel" @moonotel,
-  "183600/moonotel/api" @api,
-  "183600/moonotel/context" @context,
-  "183600/moonotel/sdk" @sdk,
-  "183600/moonotel/propagation" @propagation,
-  "183600/moonotel/exporter/otlp" @otlp,
-}
-```
-
-Add `@otlp_async`, `@async_runtime`, `@client` and `@server` from
-`183600/moonotel/exporter/otlp_async`, `183600/moonotel/async_runtime`,
-`183600/moonotel/instrumentation/async_http_client` and
-`183600/moonotel/instrumentation/async_http_server` when you use those
-packages.
+`SimpleSpanProcessor` exports when a span ends. With a batch processor, call
+`provider.force_flush()` before the process exits, then `provider.shutdown()`;
+see [Configuration and lifecycle](#configuration-and-lifecycle).
 
 ### Install a global provider
 
-The process-wide provider can be installed once and used from anywhere:
+`@moonotel.setup` installs the provider process-wide and returns it. A
+console-exporting setup is the shortest end-to-end path:
 
 ```moonbit
-let _ = @moonotel.setup(service_name="checkout")  // installs a global provider
-let tracer = @sdk.global_tracer("checkout")       // or @moonotel.global_tracer(...)
+fn main {
+  let provider = @moonotel.setup(
+    service_name="checkout",
+    exporters=["console"],
+  )
+  let tracer = provider.get_tracer("checkout")
+  tracer.with_span("charge-card", fn(span) {
+    span.set_string_attribute("payment.provider", "acme")
+  })
+  provider.force_flush()
+  provider.shutdown()
+}
 ```
+
+Code that does not have the provider at hand can use
+`@sdk.global_tracer("checkout")` or `@moonotel.global_tracer(...)` after
+installation.
 
 `setup` needs a transport to send OTLP. When OTLP is selected without one, it
 installs a console exporter instead (unless `console` is already selected), so
@@ -198,15 +237,14 @@ flush loop in front of it.
 
 The `examples/` directory contains runnable end-to-end demos:
 
-| Example | Shows | Run |
-| --- | --- | --- |
-| `demo_server` | A traced server that prints finished spans | `moon run examples/demo_server --target native` |
-| `demo_client` | A traced client that injects W3C context and baggage | `moon run examples/demo_client --target native` |
-| `demo_otlp` | Server plus client exporting over OTLP/HTTP from a background task | `moon run examples/demo_otlp --target native` |
+| Example | Shows | Prerequisites | Run |
+| --- | --- | --- | --- |
+| `demo_server` | A traced server that prints finished spans | None; listens on `127.0.0.1:8080` | `moon run examples/demo_server --target native` |
+| `demo_client` | A traced client that injects W3C context and baggage | `demo_server` running | `moon run examples/demo_client --target native` |
+| `demo_otlp` | Server plus client exporting over OTLP/HTTP from a background task | An OTLP/HTTP collector, by default on `http://localhost:4318` | `moon run examples/demo_otlp --target native` |
 
-Start the server before running `demo_client`. `demo_otlp` expects an OTLP/HTTP
-collector on `http://localhost:4318` unless `OTEL_EXPORTER_OTLP_*` says
-otherwise. Each example's `main.mbt` documents its exact prerequisites.
+`demo_otlp` honors `OTEL_EXPORTER_OTLP_*` when the collector is elsewhere. Each
+example's `main.mbt` documents its exact prerequisites.
 
 ## Packages
 
