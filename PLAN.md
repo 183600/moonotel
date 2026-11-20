@@ -345,8 +345,8 @@ OTLP 编码器为 protobuf 和 JSON 各自实现，响应解析器分别处理�
 
 - 请求设置 `Content-Type`、`Accept` 和默认 `User-Agent`；用户提供的
   `User-Agent` 优先。
-- header 在发送前校验名称和值；`Content-Length`、`Transfer-Encoding` 等
-  framing header 由传输层管理，不从配置转发。
+- header 在发送前校验名称和值；`Content-Length`、`Transfer-Encoding` 和
+  `Accept-Encoding` 等传输层 header 不从配置转发，响应压缩由传输层负责。
 - HTTP 200 不重试，但 `partial_success` 作为导出失败上报。
 - 可重试状态码为 429/502/503/504；传输失败同样可重试。
 - 异步 exporter 支持 `Retry-After`（delta-seconds、HTTP-date、RFC 850、

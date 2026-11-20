@@ -1006,9 +1006,9 @@ fn map_capacity_for_entries(entries : Int32) -> Int32 {
 }
 
 // Whether the exporter supplies its own value for a header, so a configured
-// spelling must not be forwarded. Body framing belongs to the transport;
-// `content-type`, `accept` and `content-encoding` describe the request this
-// exporter actually sends.
+// spelling must not be forwarded. Body framing and response decompression
+// belong to the transport; `content-type`, `accept` and `content-encoding`
+// describe the request this exporter actually sends.
 
 ///|
 fn is_exporter_managed_header(name : String) -> Bool {
@@ -1016,7 +1016,8 @@ fn is_exporter_managed_header(name : String) -> Bool {
   name == "accept" ||
   name == "content-encoding" ||
   name == "content-length" ||
-  name == "transfer-encoding"
+  name == "transfer-encoding" ||
+  name == "accept-encoding"
 }
 
 ///|

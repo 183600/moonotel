@@ -548,10 +548,11 @@ character other than HTAB, or an unpaired UTF-16 surrogate. Malformed entries
 are dropped both when the `OTEL_EXPORTER_OTLP_*_HEADERS` variables are parsed
 and when request headers are built from a directly assembled `OtlpHttpConfig`.
 
-Transport-managed body-framing headers (`Content-Length` and
-`Transfer-Encoding`) are not forwarded, so a configured value cannot contradict
-the bytes actually sent. `Content-Type`, `Accept` and `Content-Encoding` are
-likewise set by the exporter.
+Transport-managed headers (`Content-Length`, `Transfer-Encoding` and
+`Accept-Encoding`) are not forwarded, so a configured value cannot contradict
+the bytes actually sent or request a response compression the exporter cannot
+decode. `Content-Type`, `Accept` and `Content-Encoding` are likewise set by the
+exporter.
 
 Requests announce `Content-Type` and `Accept` for the configured protocol and
 carry a default `User-Agent` identifying the exporter and SDK version
