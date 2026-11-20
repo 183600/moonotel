@@ -103,8 +103,12 @@ pub fn Tracer::start_span(
     Some(values) => copy_links(values)
     None => []
   }
+  let sampler_parent : @api.SpanContext? = match valid_parent {
+    Some(ctx) => Some(ctx.copy())
+    None => None
+  }
   let decision = self.provider.sampler.should_sample_parameters({
-    parent: valid_parent,
+    parent: sampler_parent,
     trace_id: trace_id.copy(),
     name,
     kind: span_kind,
