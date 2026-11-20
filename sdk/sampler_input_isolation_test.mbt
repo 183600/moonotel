@@ -22,17 +22,15 @@ test "sampler cannot mutate span sampling inputs" {
     .with_span_processor(@sdk.SimpleSpanProcessor::new(exporter))
   let attributes : Map[String, @sdk.AttributeValue] = Map([])
   attributes.set("kept", @sdk.StringValue("value"))
-  let span = provider.get_tracer("sampler-isolation").start_span(
-    "op",
-    attributes~,
-    links=[@sdk.SpanLink::new(link_context)],
-  )
+  let span = provider
+    .get_tracer("sampler-isolation")
+    .start_span("op", attributes~, links=[@sdk.SpanLink::new(link_context)])
   assert_eq(span.context().trace_id_hex(), expected_trace)
-  assert_eq(
-    span.attributes().get("kept"),
-    Some(@sdk.StringValue("value")),
-  )
+  assert_eq(span.attributes().get("kept"), Some(@sdk.StringValue("value")))
   assert_eq(span.links()[0].span_context.trace_id_hex(), expected_link_trace)
   span.end()
-  assert_eq(exporter.exported_spans()[0].span_context.trace_id_hex(), expected_trace)
+  assert_eq(
+    exporter.exported_spans()[0].span_context.trace_id_hex(),
+    expected_trace,
+  )
 }

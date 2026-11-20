@@ -19,9 +19,10 @@ test "request_url_leaves_relative_and_malformed_endpoints_unchanged" {
 
 ///|
 test "traces_url leaves malformed endpoints unchanged" {
-  for traces_endpoint in [
-    "1http://collector", "foo/bar://baz", "ht_tp://collector",
-  ] {
+  for
+    traces_endpoint in [
+      "1http://collector", "foo/bar://baz", "ht_tp://collector",
+    ] {
     assert_eq(
       @otlp.OtlpHttpConfig::new(traces_endpoint~).traces_url(),
       traces_endpoint,

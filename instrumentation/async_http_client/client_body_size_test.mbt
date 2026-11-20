@@ -105,7 +105,9 @@ async test "client span omits unknown compressed response body size" {
           Bytes::from_array(
             @api.bytes_from_hex(
               "1f8b08000000000002ffcb48cdc9c9070086a6103605000000",
-            ).unwrap().map(fn(value) { value.to_byte() }),
+            )
+            .unwrap()
+            .map(fn(value) { value.to_byte() }),
           ),
         )
         conn.end_response()

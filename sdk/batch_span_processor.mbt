@@ -136,7 +136,11 @@ pub fn BatchSpanProcessor::export_failures(self : BatchSpanProcessor) -> UInt64 
 
 ///|
 fn wrap_ring_index(index : Int32, capacity : Int32) -> Int32 {
-  if index >= capacity { index - capacity } else { index }
+  if index >= capacity {
+    index - capacity
+  } else {
+    index
+  }
 }
 
 // Append a span, overwriting the oldest buffered span when the queue is full.

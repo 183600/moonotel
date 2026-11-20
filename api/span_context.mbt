@@ -30,6 +30,8 @@ pub fn invalid_span_context() -> SpanContext {
 // The byte produced by the hex/OTLP serializers for one ID element. In-range
 // values are used as-is; out-of-range values are rendered like `bytes_to_hex`
 // (the high nibble becomes "0" and the low nibble is kept).
+
+///|
 fn serialized_byte(value : Int32) -> Int32 {
   if value >= 0 && value < 256 {
     value

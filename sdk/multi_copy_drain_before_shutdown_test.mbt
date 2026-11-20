@@ -11,10 +11,7 @@ struct CopyDrainProbe {
 }
 
 ///|
-pub impl @sdk.SpanProcessor for CopyDrainProbe with fn on_start(
-  self,
-  _span,
-) {
+pub impl @sdk.SpanProcessor for CopyDrainProbe with fn on_start(self, _span) {
   let _ = self
 }
 
@@ -41,10 +38,7 @@ pub impl @sdk.SpanProcessor for CopyDrainProbe with fn shutdown(self) {
 }
 
 ///|
-fn copy_drain_probe(
-  name : String,
-  log : Ref[Array[String]],
-) -> CopyDrainProbe {
+fn copy_drain_probe(name : String, log : Ref[Array[String]]) -> CopyDrainProbe {
   { name, log, }
 }
 
@@ -58,16 +52,11 @@ test "provider drains a child added to an already-shut-down multi copy before sh
   assert_eq(log.val, ["source:drain", "source:shutdown"])
   let copy = source.with_processor(copy_drain_probe("added", log))
   let provider = @sdk.TracerProviderSdk::new(
-      service_name="multi-copy-pre-drain",
-    )
-    .with_span_processors([copy_drain_probe("sibling", log), copy])
+    service_name="multi-copy-pre-drain",
+  ).with_span_processors([copy_drain_probe("sibling", log), copy])
   provider.shutdown()
   assert_eq(log.val, [
-    "source:drain",
-    "source:shutdown",
-    "sibling:drain",
-    "added:drain",
-    "sibling:shutdown",
+    "source:drain", "source:shutdown", "sibling:drain", "added:drain", "sibling:shutdown",
     "added:shutdown",
   ])
 }

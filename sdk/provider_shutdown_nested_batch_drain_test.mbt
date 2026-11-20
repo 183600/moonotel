@@ -46,9 +46,8 @@ test "provider shutdown from a nested batch drain closes the child" {
   )
   let multi = @sdk.MultiSpanProcessor::new(processors=[child])
   let provider = @sdk.TracerProviderSdk::new(
-      service_name="provider-shutdown-nested-batch-drain",
-    )
-    .with_span_processor(multi)
+    service_name="provider-shutdown-nested-batch-drain",
+  ).with_span_processor(multi)
   exporter.provider.val = Some(provider)
   child.on_end(probe_span("s0"))
   child.drain_before_shutdown()

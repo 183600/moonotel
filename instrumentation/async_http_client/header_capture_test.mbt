@@ -250,32 +250,40 @@ async test "client header capture follows the configured environment" {
   ]
   @env.unset_env_var(@http_header_capture.ENV_CLIENT_RESPONSE_HEADERS)
   let (tracer, exporter) = test_tracer("client-header-capture")
-  let data = captured_client_span(tracer, exporter, {}, response_cookies=response_cookies)
+  let data = captured_client_span(tracer, exporter, {}, response_cookies~)
   assert_eq(data.attributes.get("http.response.header.set-cookie"), None)
-  @env.set_env_var(@http_header_capture.ENV_CLIENT_RESPONSE_HEADERS, "Set-Cookie")
+  @env.set_env_var(
+    @http_header_capture.ENV_CLIENT_RESPONSE_HEADERS,
+    "Set-Cookie",
+  )
   let (tracer, exporter) = test_tracer("client-header-capture")
-  let data = captured_client_span(tracer, exporter, {}, response_cookies=response_cookies)
+  let data = captured_client_span(tracer, exporter, {}, response_cookies~)
   assert_eq(
     data.attributes.get("http.response.header.set-cookie"),
-    Some(@sdk.StringArrayValue([
-      "session=abc; Path=/app; Max-Age=60; Secure; HttpOnly; SameSite=Lax",
-      "theme=dark",
-    ])),
+    Some(
+      @sdk.StringArrayValue([
+        "session=abc; Path=/app; Max-Age=60; Secure; HttpOnly; SameSite=Lax", "theme=dark",
+      ]),
+    ),
   )
   @env.set_env_var(@http_header_capture.ENV_CLIENT_RESPONSE_HEADERS, "*")
   let (tracer, exporter) = test_tracer("client-header-capture")
-  let data = captured_client_span(tracer, exporter, {}, response_cookies=response_cookies)
+  let data = captured_client_span(tracer, exporter, {}, response_cookies~)
   assert_eq(
     data.attributes.get("http.response.header.set-cookie"),
-    Some(@sdk.StringArrayValue([
-      "session=abc; Path=/app; Max-Age=60; Secure; HttpOnly; SameSite=Lax",
-      "theme=dark",
-    ])),
+    Some(
+      @sdk.StringArrayValue([
+        "session=abc; Path=/app; Max-Age=60; Secure; HttpOnly; SameSite=Lax", "theme=dark",
+      ]),
+    ),
   )
-  @env.set_env_var(@http_header_capture.ENV_CLIENT_RESPONSE_HEADERS, "Set-Cookie")
+  @env.set_env_var(
+    @http_header_capture.ENV_CLIENT_RESPONSE_HEADERS,
+    "Set-Cookie",
+  )
   @env.set_env_var(@http_header_capture.ENV_SANITIZE_FIELDS, "Set-Cookie")
   let (tracer, exporter) = test_tracer("client-header-capture")
-  let data = captured_client_span(tracer, exporter, {}, response_cookies=response_cookies)
+  let data = captured_client_span(tracer, exporter, {}, response_cookies~)
   assert_eq(
     data.attributes.get("http.response.header.set-cookie"),
     Some(@sdk.StringArrayValue(["[REDACTED]", "[REDACTED]"])),

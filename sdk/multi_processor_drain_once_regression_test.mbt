@@ -106,9 +106,9 @@ test "copy shutdown does not drain a child that a shared copy already drained" {
 test "provider shares shutdown state for the same processor instance" {
   let log : Ref[Array[String]] = Ref([])
   let processor : &@sdk.SpanProcessor = multi_drain_once_processor("p", log)
-  let base = @sdk.TracerProviderSdk::new(
-    service_name="same-provider-processor",
-  ).with_span_processor(processor)
+  let base = @sdk.TracerProviderSdk::new(service_name="same-provider-processor").with_span_processor(
+    processor,
+  )
   let copy = base.with_span_processor(processor)
   base.shutdown()
   copy.shutdown()

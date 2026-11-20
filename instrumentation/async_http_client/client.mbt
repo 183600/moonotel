@@ -1421,22 +1421,23 @@ pub async fn request(
       }
       let decoded_size = response_body.binary().length()
       if decoded_size > 0 {
-        let declared : Int? = match response.headers.get(
-          @http.CaseInsensitiveString("content-length"),
-        ) {
+        let declared : Int32? = match
+          response.headers.get(@http.CaseInsensitiveString("content-length")) {
           Some(value) =>
-            match (try Some(@string.parse_int64(value.trim(), radix=10)) catch {
-              _ => None
-            }) {
-              Some(size) if size >= 0L && size <= 2147483647L => Some(size.to_int())
+            match
+              (Some(@string.parse_int64(value.trim(), radix=10)) catch {
+                _ => None
+              }) {
+              Some(size) if size >= 0L && size <= 2147483647L =>
+                Some(size.to_int())
               _ => None
             }
           None => None
         }
-        let encoded = match response.headers.get(
-          @http.CaseInsensitiveString("content-encoding"),
-        ) {
-          Some(value) => @http.CaseInsensitiveString(value.trim().to_owned()) != "identity"
+        let encoded = match
+          response.headers.get(@http.CaseInsensitiveString("content-encoding")) {
+          Some(value) =>
+            @http.CaseInsensitiveString(value.trim().to_owned()) != "identity"
           None => false
         }
         if !encoded || declared is Some(_) {
