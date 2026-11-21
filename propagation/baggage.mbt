@@ -480,6 +480,22 @@ fn is_ows_code(c : UInt16) -> Bool {
   c == 0x20 || c == 0x09
 }
 
+// Whether a property with `key` has already been accepted. Baggage properties
+// are unique per member; later occurrences are ignored.
+
+///|
+fn has_property_key(
+  properties : Array[(String, String)],
+  key : String,
+) -> Bool {
+  for existing in properties {
+    if existing.0 == key {
+      return true
+    }
+  }
+  false
+}
+
 // Number of bytes the percent-encoded form of `value` occupies in a `baggage`
 // header. The encoded form is ASCII, so the length equals the byte count; a
 // character outside the allowed set costs three bytes (`%XX`).
@@ -576,14 +592,7 @@ fn parse_baggage_properties(
         )
         if encoded_len >= 0 {
           let key = key_view.to_owned()
-          let mut duplicate = false
-          for existing in properties {
-            if existing.0 == key {
-              duplicate = true
-              break
-            }
-          }
-          if !duplicate {
+          if !has_property_key(properties, key) {
             properties.push((key, decoded))
           }
         }
@@ -593,14 +602,7 @@ fn parse_baggage_properties(
       let key_view = view.clamped_view(start=item_start, end=property_end)
       if is_valid_baggage_key(key_view) {
         let key = key_view.to_owned()
-        let mut duplicate = false
-        for existing in properties {
-          if existing.0 == key {
-            duplicate = true
-            break
-          }
-        }
-        if !duplicate {
+        if !has_property_key(properties, key) {
           properties.push((key, ""))
         }
       }
@@ -920,14 +922,7 @@ pub fn format_baggage_entries(entries : Array[BaggageEntry]) -> String {
       let properties : Array[(String, String)] = []
       for property in entry.properties {
         if is_valid_baggage_key(property.0) {
-          let mut duplicate = false
-          for existing in properties {
-            if existing.0 == property.0 {
-              duplicate = true
-              break
-            }
-          }
-          if !duplicate {
+          if !has_property_key(properties, property.0) {
             properties.push(property)
           }
         }
@@ -1101,11 +1096,11 @@ pub fn inject_baggage_entries(
   carrier : TextMapCarrier,
 ) -> Unit {
   let formatted = format_baggage_entries(entries)
+  // Always clear the old header first so that a reused carrier cannot retain a
+  // stale value when formatting drops every member.
+  carrier.remove(baggage_header_name())
   if formatted != "" {
-    carrier.remove(baggage_header_name())
     carrier.set(baggage_header_name(), formatted)
-  } else {
-    carrier.remove(baggage_header_name())
   }
 }
 

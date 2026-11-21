@@ -28,8 +28,22 @@
 - [2. 分层架构](#2-分层架构)
 - [3. 目录结构](#3-目录结构)
 - [4. Context 与传播](#4-context-与传播)
+  - [4.1 不可变 Context](#41-不可变-context)
+  - [4.2 跨任务传播](#42-跨任务传播)
+  - [4.3 W3C Trace Context 与 Baggage](#43-w3c-trace-context-与-baggage)
 - [5. SDK 设计](#5-sdk-设计)
+  - [5.1 SpanContext 与 ID](#51-spancontext-与-id)
+  - [5.2 采样](#52-采样)
+  - [5.3 记录型 span](#53-记录型-span)
+  - [5.4 Processor](#54-processor)
+  - [5.5 全局 provider 与 setup](#55-全局-provider-与-setup)
+  - [5.6 并发、重入与关闭](#56-并发重入与关闭)
 - [6. OTLP/HTTP 导出](#6-otlphttp-导出)
+  - [6.1 编码与响应](#61-编码与响应)
+  - [6.2 配置](#62-配置)
+  - [6.3 请求、重试与超时](#63-请求重试与超时)
+  - [6.4 生命周期](#64-生命周期)
+  - [6.5 同步与异步 exporter 对比](#65-同步与异步-exporter-对比)
 - [7. HTTP 埋点](#7-http-埋点)
 - [8. 测试与 CI](#8-测试与-ci)
 - [9. 里程碑](#9-里程碑)
@@ -158,6 +172,10 @@ instrumentation/*   -> api, context, propagation, sdk
 183600/moonotel/
   moon.mod
   moon.pkg
+  README.md                    # 使用文档
+  PLAN.md                      # 本文档：设计、维护与验收说明
+  LICENSE
+  .github/workflows/ci.yml     # 默认/native 检查与 hygiene
   otel.mbt                     # facade、setup、全局 provider
   api/
     span_context.mbt
@@ -502,6 +520,7 @@ CI 同时运行默认与 native 目标，确保 async 埋点和 exporter 不只�
 - 公开类型、函数或默认值变化：更新 README 对应章节与本文档第 5、6 节。
 - 环境变量变化：更新 README 的配置表和本文档 6.2。
 - 目标支持变化：更新 README 的 Packages 表与本文档的目标矩阵。
+- 新增、删除或移动包/源文件：同步本文档第 2 节分层表与第 3 节目录树。
 - 用户可见示例变化：同步 `sdk/readme_usage_test.mbt` 或新增可编译测试。
 - 行为变化：先补回归测试，再更新文档。
 

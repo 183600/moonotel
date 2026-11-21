@@ -989,6 +989,51 @@ async fn send_prepared_trace_body(
   post_trace_request_with_headers(config, body, headers, max_response_size)
 }
 
+// Normalize the optional request and response size limits. A non-positive
+// value selects the OTLP default for that direction.
+
+///|
+fn normalize_size_limits(
+  max_request_size : Int32?,
+  max_response_size : Int32?,
+) -> (Int32, Int32) {
+  (
+    @otlp.normalize_size_limit(
+      max_request_size,
+      @otlp.OTLP_DEFAULT_MAX_REQUEST_SIZE,
+    ),
+    @otlp.normalize_size_limit(
+      max_response_size,
+      @otlp.OTLP_DEFAULT_MAX_RESPONSE_SIZE,
+    ),
+  )
+}
+
+// Validate `config`, encode the body with `encode`, and send the result.
+// Encoding is skipped when the configuration cannot be used, and an empty
+// body is a successful no-op rather than an empty HTTP request.
+
+///|
+async fn export_prepared_trace_body(
+  config : @otlp.OtlpHttpConfig,
+  max_request_size : Int32,
+  max_response_size : Int32,
+  encode : () -> Bytes,
+) -> @sdk.ExportResult {
+  match prepare_trace_body(config, max_request_size, encode) {
+    Rejected(result) => result
+    NothingToSend => @sdk.ExportSuccess
+    Ready(body, gzip) =>
+      send_prepared_trace_body(
+        config,
+        body,
+        gzip,
+        request_headers(config, gzip),
+        max_response_size,
+      )
+  }
+}
+
 // POST an already encoded `ExportTraceServiceRequest` body to the configured
 // trace endpoint and interpret the response, building the request headers
 // from `config` and compressing the body first when `config.compression` is
@@ -1001,26 +1046,16 @@ pub async fn post_trace_request(
   max_request_size? : Int32,
   max_response_size? : Int32,
 ) -> @sdk.ExportResult {
-  let max_request_size = @otlp.normalize_size_limit(
+  let (max_request_size, max_response_size) = normalize_size_limits(
     max_request_size,
-    @otlp.OTLP_DEFAULT_MAX_REQUEST_SIZE,
-  )
-  let max_response_size = @otlp.normalize_size_limit(
     max_response_size,
-    @otlp.OTLP_DEFAULT_MAX_RESPONSE_SIZE,
   )
-  match prepare_trace_body(config, max_request_size, fn() { body }) {
-    Rejected(result) => result
-    NothingToSend => @sdk.ExportSuccess
-    Ready(body, gzip) =>
-      send_prepared_trace_body(
-        config,
-        body,
-        gzip,
-        request_headers(config, gzip),
-        max_response_size,
-      )
-  }
+  export_prepared_trace_body(
+    config,
+    max_request_size,
+    max_response_size,
+    fn() { body },
+  )
 }
 
 // Encode `spans` with the OTLP/HTTP encoding selected by `config.protocol`.
@@ -1050,29 +1085,16 @@ pub async fn export_spans(
   if spans.length() == 0 {
     return @sdk.ExportSuccess
   }
-  let max_request_size = @otlp.normalize_size_limit(
+  let (max_request_size, max_response_size) = normalize_size_limits(
     max_request_size,
-    @otlp.OTLP_DEFAULT_MAX_REQUEST_SIZE,
-  )
-  let max_response_size = @otlp.normalize_size_limit(
     max_response_size,
-    @otlp.OTLP_DEFAULT_MAX_RESPONSE_SIZE,
   )
-  match
-    prepare_trace_body(config, max_request_size, fn() {
-      encode_trace_body(config, spans)
-    }) {
-    Rejected(result) => result
-    NothingToSend => @sdk.ExportSuccess
-    Ready(body, gzip) =>
-      send_prepared_trace_body(
-        config,
-        body,
-        gzip,
-        request_headers(config, gzip),
-        max_response_size,
-      )
-  }
+  export_prepared_trace_body(
+    config,
+    max_request_size,
+    max_response_size,
+    fn() { encode_trace_body(config, spans) },
+  )
 }
 
 // An async span exporter over OTLP/HTTP. Use it with an async flush loop
@@ -1099,17 +1121,15 @@ pub fn OtlpHttpAsyncExporter::new(
   // construction cannot change the exporter's configuration or its cached
   // request headers.
   let config = { ..config, headers: config.headers.copy(), }
+  let (max_request_size, max_response_size) = normalize_size_limits(
+    max_request_size,
+    max_response_size,
+  )
   {
     config,
     headers: request_headers(config, is_gzip_compression(config.compression)),
-    max_request_size: @otlp.normalize_size_limit(
-      max_request_size,
-      @otlp.OTLP_DEFAULT_MAX_REQUEST_SIZE,
-    ),
-    max_response_size: @otlp.normalize_size_limit(
-      max_response_size,
-      @otlp.OTLP_DEFAULT_MAX_RESPONSE_SIZE,
-    ),
+    max_request_size,
+    max_response_size,
   }
 }
 

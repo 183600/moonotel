@@ -24,13 +24,24 @@ fn malformed_response() -> @sdk.ExportResult {
   @sdk.ExportFailure("malformed OTLP response body")
 }
 
+// Report a `partial_success` response as an export failure. A partial success
+// is not retryable, but it is not a full success either: some spans were
+// rejected by the collector, so the caller must see the failure. The optional
+// collector message is appended verbatim.
+
 ///|
-fn partial_success_message_suffix(message : String) -> String {
-  if message == "" {
+fn partial_success_failure(
+  rejected : Int64,
+  message : String,
+) -> @sdk.ExportResult {
+  let suffix = if message == "" {
     ""
   } else {
     " " + message
   }
+  @sdk.ExportFailure(
+    "partial success: rejected " + rejected.to_string() + " span(s)" + suffix,
+  )
 }
 
 // Read a protobuf varint. Returns `None` when the body ends in the middle of a
@@ -202,12 +213,7 @@ pub fn decode_export_response(
     }
   }
   if rejected > 0 || error_message != "" {
-    @sdk.ExportFailure(
-      "partial success: rejected " +
-      rejected.to_string() +
-      " span(s)" +
-      partial_success_message_suffix(error_message),
-    )
+    partial_success_failure(rejected, error_message)
   } else {
     @sdk.ExportSuccess
   }

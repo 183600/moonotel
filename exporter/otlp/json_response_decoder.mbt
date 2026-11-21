@@ -9,11 +9,6 @@
 // the OTLP spec a partial success must not be retried.
 
 ///|
-fn malformed_json_response() -> @sdk.ExportResult {
-  @sdk.ExportFailure("malformed OTLP response body")
-}
-
-///|
 fn json_is_ws_code(code : Int32) -> Bool {
   code == 0x20 || code == 0x09 || code == 0x0A || code == 0x0D
 }
@@ -661,6 +656,24 @@ fn json_skip_number(text : String, start : Int32) -> Int32? {
   Some(pos)
 }
 
+// Whether the complete JSON keyword `keyword` occurs at code-unit index `pos`.
+// The bounds check keeps the comparison from reading past the end of `text`.
+
+///|
+fn json_keyword_at(text : String, pos : Int32, keyword : String) -> Bool {
+  if pos + keyword.length() > text.length() {
+    return false
+  }
+  let mut i = 0
+  while i < keyword.length() {
+    if text.unsafe_get(pos + i) != keyword.unsafe_get(i) {
+      return false
+    }
+    i = i + 1
+  }
+  true
+}
+
 // Skip any JSON value. `start` may point at leading whitespace. The depth
 // bound keeps deeply nested input from exhausting the stack.
 
@@ -685,32 +698,19 @@ fn json_skip_value(text : String, start : Int32, depth : Int32) -> Int32? {
   } else if code == 0x5B {
     json_skip_array(text, pos, depth)
   } else if code == 0x74 {
-    // true
-    if pos + 4 <= len &&
-      text.unsafe_get(pos + 1).to_int() == 0x72 &&
-      text.unsafe_get(pos + 2).to_int() == 0x75 &&
-      text.unsafe_get(pos + 3).to_int() == 0x65 {
+    if json_keyword_at(text, pos, "true") {
       Some(pos + 4)
     } else {
       None
     }
   } else if code == 0x66 {
-    // false
-    if pos + 5 <= len &&
-      text.unsafe_get(pos + 1).to_int() == 0x61 &&
-      text.unsafe_get(pos + 2).to_int() == 0x6C &&
-      text.unsafe_get(pos + 3).to_int() == 0x73 &&
-      text.unsafe_get(pos + 4).to_int() == 0x65 {
+    if json_keyword_at(text, pos, "false") {
       Some(pos + 5)
     } else {
       None
     }
   } else if code == 0x6E {
-    // null
-    if pos + 4 <= len &&
-      text.unsafe_get(pos + 1).to_int() == 0x75 &&
-      text.unsafe_get(pos + 2).to_int() == 0x6C &&
-      text.unsafe_get(pos + 3).to_int() == 0x6C {
+    if json_keyword_at(text, pos, "null") {
       Some(pos + 4)
     } else {
       None
@@ -845,7 +845,7 @@ pub fn decode_export_response_json(
   // malformed bytes inside strings into U+FFFD and could accept an otherwise
   // invalid response as success.
   let text = @utf8.decode(body.exact_view()) catch {
-    _ => return malformed_json_response()
+    _ => return malformed_response()
   }
   let len = text.length()
   let mut pos = json_skip_ws(text, 0)
@@ -853,7 +853,7 @@ pub fn decode_export_response_json(
     return @sdk.ExportSuccess
   }
   if text.unsafe_get(pos).to_int() != 0x7B {
-    return malformed_json_response()
+    return malformed_response()
   }
   pos = json_skip_ws(text, pos + 1)
   if pos < len && text.unsafe_get(pos).to_int() == 0x7D {
@@ -861,7 +861,7 @@ pub fn decode_export_response_json(
     if pos == len {
       return @sdk.ExportSuccess
     }
-    return malformed_json_response()
+    return malformed_response()
   }
   let mut rejected : Int64 = 0L
   let mut message = ""
@@ -869,18 +869,18 @@ pub fn decode_export_response_json(
     let (key, after_key) = match
       json_field_id_at(text, pos, "partialSuccess", "partial_success", "", "") {
       Some(pair) => pair
-      None => return malformed_json_response()
+      None => return malformed_response()
     }
     pos = json_skip_ws(text, after_key)
     if pos >= len || text.unsafe_get(pos).to_int() != 0x3A {
-      return malformed_json_response()
+      return malformed_response()
     }
     pos = json_skip_ws(text, pos + 1)
     if key == 0 {
       let (count, text_message, after) = match
         json_parse_partial_success(text, pos, rejected, message) {
         Some(triple) => triple
-        None => return malformed_json_response()
+        None => return malformed_response()
       }
       rejected = count
       message = text_message
@@ -888,12 +888,12 @@ pub fn decode_export_response_json(
     } else {
       pos = match json_skip_value(text, pos, 0) {
         Some(end) => end
-        None => return malformed_json_response()
+        None => return malformed_response()
       }
     }
     pos = json_skip_ws(text, pos)
     if pos >= len {
-      return malformed_json_response()
+      return malformed_response()
     }
     let code = text.unsafe_get(pos).to_int()
     if code == 0x7D {
@@ -901,24 +901,19 @@ pub fn decode_export_response_json(
       break
     }
     if code != 0x2C {
-      return malformed_json_response()
+      return malformed_response()
     }
     pos = json_skip_ws(text, pos + 1)
     if pos >= len {
-      return malformed_json_response()
+      return malformed_response()
     }
   }
   pos = json_skip_ws(text, pos)
   if pos != len {
-    return malformed_json_response()
+    return malformed_response()
   }
   if rejected != 0 || message != "" {
-    @sdk.ExportFailure(
-      "partial success: rejected " +
-      rejected.to_string() +
-      " span(s)" +
-      partial_success_message_suffix(message),
-    )
+    partial_success_failure(rejected, message)
   } else {
     @sdk.ExportSuccess
   }

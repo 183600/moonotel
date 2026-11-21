@@ -49,14 +49,22 @@ HTTP transport and HTTP instrumentation target native and wasm.
 
 - [Install](#install)
 - [Getting started](#getting-started)
+  - [Record a span](#record-a-span)
+  - [Install a global provider](#install-a-global-provider)
+  - [Use the async runtime](#use-the-async-runtime)
 - [Examples](#examples)
 - [Packages](#packages)
 
 **Concepts and guides**
 
 - [Spans, sampling, and processing](#spans-sampling-and-processing)
+  - [Samplers](#samplers)
+  - [Processors and batching](#processors-and-batching)
 - [Context and baggage](#context-and-baggage)
 - [Common patterns](#common-patterns)
+  - [Parent and child spans](#parent-and-child-spans)
+  - [A custom sampler](#a-custom-sampler)
+  - [Inspect spans in tests](#inspect-spans-in-tests)
 - [HTTP instrumentation](#http-instrumentation)
   - [Server](#server)
   - [Client](#client)
@@ -217,11 +225,12 @@ finished spans remain visible instead of being silently dropped. Selecting
 
 ### Use the async runtime
 
-Native applications that want the OTLP exporter to send from a background task
-can call `@async_runtime.setup(group, ...)` inside a `moonbitlang/async` task
-group. It accepts the same `service_name`, resource, sampler, span-limit,
-endpoint, header, exporter-selection and batch overrides, uses the same
-environment variables, and drains pending spans when the group exits.
+Applications targeting native or wasm that want the OTLP exporter to send from
+a background task can call `@async_runtime.setup(group, ...)` inside a
+`moonbitlang/async` task group. It accepts the same `service_name`, resource,
+sampler, span-limit, endpoint, header, exporter-selection and batch overrides,
+uses the same environment variables, and drains pending spans when the group
+exits.
 
 ```moonbit
 async fn main {
@@ -349,7 +358,8 @@ the async runtime helper.
 
 ## Context and baggage
 
-`Context` is an immutable chain carrying the current span and string baggage.
+`Context` is an immutable chain carrying the current span and baggage entries
+(a string value plus optional W3C properties).
 `@context.with_context(ctx, fn() { ... })`, `attach` / `detach`, and
 `with_span_context` scope it. `Tracer::start_span_with_context` picks up the
 current context automatically.
@@ -462,11 +472,11 @@ async fn main {
 }
 ```
 
-`run_server` extracts `traceparent` from each request, starts a `Server` span
-with the standard HTTP attributes (`http.request.method`, `url.path`,
-`url.query`, `server.address`, `client.address`, `network.transport`,
-`network.peer.address`, …),
-installs the context while the handler runs, and ends the span afterwards.
+`run_server` extracts the W3C context (`traceparent`, `tracestate` and
+`baggage`) from each request, starts a `Server` span with the standard HTTP
+attributes (`http.request.method`, `url.path`, `url.query`, `server.address`,
+`client.address`, `network.transport`, `network.peer.address`, …), installs the
+context while the handler runs, and ends the span afterwards.
 When a reverse proxy supplies `Forwarded#host` / `X-Forwarded-Host`, the
 original host is preferred for `server.address` / `server.port`; `url.scheme`
 prefers `Forwarded#proto` / `X-Forwarded-Proto`, falling back to the request
@@ -543,8 +553,9 @@ let provider = @sdk.TracerProviderSdk::new(service_name="checkout")
   .with_span_processor(@sdk.BatchSpanProcessor::from_env(exporter))
 ```
 
-The transport callback runs synchronously from `export_spans`. Keep it fast, or
-use `exporter/otlp_async` when the HTTP client is asynchronous.
+The transport callback runs synchronously from `export_spans_http` (and from
+the `SpanExporter::export_spans` method it implements). Keep it fast, or use
+`exporter/otlp_async` when the HTTP client is asynchronous.
 
 `exporter/otlp_async` provides the production transport. `export_spans` is
 async, so call it from an async function or task:

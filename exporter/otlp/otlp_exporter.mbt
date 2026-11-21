@@ -1053,6 +1053,14 @@ fn exporter_headers(config : OtlpHttpConfig) -> Map[String, String] {
   headers
 }
 
+// The exporter rejects every export once `shutdown` has been called, including
+// exports that were already in flight and are resumed after a retry wait.
+
+///|
+fn shutdown_failure() -> @sdk.ExportResult {
+  @sdk.ExportFailure("OTLP exporter is shut down")
+}
+
 // Encode and POST the given spans. HTTP 200 (including partial success) is a
 // success and is never retried; the response body is decoded so that a
 // `partial_success` is surfaced as an export failure. Retryable status codes
@@ -1066,7 +1074,7 @@ pub fn OtlpHttpExporter::export_spans_http(
   spans : Array[@sdk.SpanData],
 ) -> @sdk.ExportResult {
   if self.shutdown_called {
-    return @sdk.ExportFailure("OTLP exporter is shut down")
+    return shutdown_failure()
   }
   if spans.length() == 0 {
     return @sdk.ExportSuccess
@@ -1110,14 +1118,14 @@ pub fn OtlpHttpExporter::export_spans_http(
     // The transport or retry wait may have shut the exporter down reentrantly;
     // a shut-down exporter must not send further attempts.
     if self.shutdown_called {
-      return @sdk.ExportFailure("OTLP exporter is shut down")
+      return shutdown_failure()
     }
     if attempt > 0 {
       (self.retry_wait)(attempt)
       // The wait strategy may shut the exporter down reentrantly; do not send
       // another attempt after that.
       if self.shutdown_called {
-        return @sdk.ExportFailure("OTLP exporter is shut down")
+        return shutdown_failure()
       }
     }
     // The transport receives its own copy: a client wrapper may normalize or
