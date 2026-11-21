@@ -89,14 +89,9 @@ pub fn BatchConfig::from_env() -> BatchConfig {
   let queue_size = env_positive_int("OTEL_BSP_MAX_QUEUE_SIZE", 2048)
   let batch_size = env_positive_int("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", 512)
   let schedule_delay = env_non_negative_int("OTEL_BSP_SCHEDULE_DELAY", 5000)
-  let effective_batch = if batch_size > queue_size {
-    queue_size
-  } else {
-    batch_size
-  }
   BatchConfig::new(
     max_queue_size=queue_size,
-    max_export_batch_size=effective_batch,
+    max_export_batch_size=batch_size,
     flush_interval_millis=schedule_delay,
   )
 }

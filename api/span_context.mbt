@@ -213,6 +213,28 @@ fn build_hex_ascii() -> FixedArray[Byte] {
   table
 }
 
+// Write the two UTF-16 code units of one byte's hex form at `pos` and
+// `pos + 2`. Out-of-range values are rendered like `bytes_to_hex`: the high
+// nibble becomes "0" and the low nibble is kept.
+
+///|
+fn write_hex_byte_fallback(
+  out : FixedArray[Byte],
+  pos : Int32,
+  value : Int32,
+) -> Unit {
+  let hi = value >> 4
+  out.unsafe_set(
+    pos,
+    if hi >= 0 && hi < 16 {
+      hex_ascii.unsafe_get(hi)
+    } else {
+      b'0'
+    },
+  )
+  out.unsafe_set(pos + 2, hex_ascii.unsafe_get(value & 0x0F))
+}
+
 // UTF-16LE code unit pairs for every byte value: entry `b` holds the two hex
 // characters of `b` packed into one 32-bit word (low byte first).
 
@@ -280,46 +302,10 @@ pub fn bytes_to_hex(bytes : Array[Int32]) -> String {
       out.unsafe_write_uint64_le(pos, w0)
       out.unsafe_write_uint64_le(pos + 8, w1)
     } else {
-      let hi0 = b0 >> 4
-      out.unsafe_set(
-        pos,
-        if hi0 >= 0 && hi0 < 16 {
-          hex_ascii.unsafe_get(hi0)
-        } else {
-          b'0'
-        },
-      )
-      out.unsafe_set(pos + 2, hex_ascii.unsafe_get(b0 & 0x0F))
-      let hi1 = b1 >> 4
-      out.unsafe_set(
-        pos + 4,
-        if hi1 >= 0 && hi1 < 16 {
-          hex_ascii.unsafe_get(hi1)
-        } else {
-          b'0'
-        },
-      )
-      out.unsafe_set(pos + 6, hex_ascii.unsafe_get(b1 & 0x0F))
-      let hi2 = b2 >> 4
-      out.unsafe_set(
-        pos + 8,
-        if hi2 >= 0 && hi2 < 16 {
-          hex_ascii.unsafe_get(hi2)
-        } else {
-          b'0'
-        },
-      )
-      out.unsafe_set(pos + 10, hex_ascii.unsafe_get(b2 & 0x0F))
-      let hi3 = b3 >> 4
-      out.unsafe_set(
-        pos + 12,
-        if hi3 >= 0 && hi3 < 16 {
-          hex_ascii.unsafe_get(hi3)
-        } else {
-          b'0'
-        },
-      )
-      out.unsafe_set(pos + 14, hex_ascii.unsafe_get(b3 & 0x0F))
+      write_hex_byte_fallback(out, pos, b0)
+      write_hex_byte_fallback(out, pos + 4, b1)
+      write_hex_byte_fallback(out, pos + 8, b2)
+      write_hex_byte_fallback(out, pos + 12, b3)
     }
     i = i + 4
   }
@@ -332,26 +318,8 @@ pub fn bytes_to_hex(bytes : Array[Int32]) -> String {
         (hex_pairs.unsafe_get(b1).to_uint64() << 32)
       out.unsafe_write_uint64_le(pos, word)
     } else {
-      let hi0 = b0 >> 4
-      out.unsafe_set(
-        pos,
-        if hi0 >= 0 && hi0 < 16 {
-          hex_ascii.unsafe_get(hi0)
-        } else {
-          b'0'
-        },
-      )
-      out.unsafe_set(pos + 2, hex_ascii.unsafe_get(b0 & 0x0F))
-      let hi1 = b1 >> 4
-      out.unsafe_set(
-        pos + 4,
-        if hi1 >= 0 && hi1 < 16 {
-          hex_ascii.unsafe_get(hi1)
-        } else {
-          b'0'
-        },
-      )
-      out.unsafe_set(pos + 6, hex_ascii.unsafe_get(b1 & 0x0F))
+      write_hex_byte_fallback(out, pos, b0)
+      write_hex_byte_fallback(out, pos + 4, b1)
     }
     i = i + 2
   }
@@ -361,16 +329,7 @@ pub fn bytes_to_hex(bytes : Array[Int32]) -> String {
     if b >= 0 && b < 256 {
       out.unsafe_write_uint32_le(pos, hex_pairs.unsafe_get(b))
     } else {
-      let hi = b >> 4
-      out.unsafe_set(
-        pos,
-        if hi >= 0 && hi < 16 {
-          hex_ascii.unsafe_get(hi)
-        } else {
-          b'0'
-        },
-      )
-      out.unsafe_set(pos + 2, hex_ascii.unsafe_get(b & 0x0F))
+      write_hex_byte_fallback(out, pos, b)
     }
     i = i + 1
   }

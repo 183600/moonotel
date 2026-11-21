@@ -401,7 +401,8 @@ exporter 是单次使用的 sink。`OtlpHttpExporter` 在 `shutdown()` 后拒绝
 
 ### 6.5 同步与异步 exporter 对比
 
-两个 exporter 共享编码、配置、响应解析和大小限制，差别集中在传输与调度：
+两个 exporter 复用同一套 OTLP 编码器，遵循相同的配置语义和大小限制，差别集中在
+传输与调度：
 
 | 能力 | `exporter/otlp` | `exporter/otlp_async` |
 | --- | --- | --- |
@@ -437,9 +438,17 @@ URL、服务端地址/端口和响应状态，并把 4xx/5xx 标为 `Error`。�
 和 authority 的 URL 才贡献 `server.address` / `server.port`。
 
 URL 会移除 userinfo，并对 HTTP 语义约定列出的敏感查询参数做值脱敏。header
-捕获默认关闭，通过 `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_*` 开启；
-捕获值可再通过 sanitize 列表替换为 `[REDACTED]`。通配符会扩大捕获范围，使用前
-应确认 `Authorization`、`Cookie` 等值是否可以记录或已经脱敏。
+捕获默认关闭，按方向分别通过以下变量开启：
+
+- `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST`
+- `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_RESPONSE`
+- `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_REQUEST`
+- `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_RESPONSE`
+
+每个变量都是逗号分隔的 header 名称，`*` 捕获全部；名称按大小写不敏感匹配。
+捕获值可再通过 `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SANITIZE_FIELDS`
+替换为 `[REDACTED]`。通配符会扩大捕获范围，使用前应确认 `Authorization`、
+`Cookie` 等值是否可以记录或已经脱敏。
 
 ## 8. 测试与 CI
 

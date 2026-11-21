@@ -39,30 +39,30 @@ HTTP transport and HTTP instrumentation target native and wasm.
 
 ## Contents
 
+**Overview**
+
+- [Scope](#scope)
+- [Integration paths](#integration-paths)
+- [Request lifecycle](#request-lifecycle)
+
 **Using moonotel**
 
 - [Install](#install)
 - [Getting started](#getting-started)
 - [Examples](#examples)
-- [Integration paths](#integration-paths)
+- [Packages](#packages)
 
-**Concepts**
+**Concepts and guides**
 
-- [Request lifecycle](#request-lifecycle)
 - [Spans, sampling, and processing](#spans-sampling-and-processing)
 - [Context and baggage](#context-and-baggage)
-- [W3C propagation](#w3c-propagation)
-
-**Guides**
-
 - [Common patterns](#common-patterns)
 - [HTTP instrumentation](#http-instrumentation)
 - [OTLP/HTTP export](#otlphttp-export)
+- [W3C propagation](#w3c-propagation)
 
 **Reference**
 
-- [Packages](#packages)
-- [Scope](#scope)
 - [Configuration reference](#configuration-reference)
 - [Troubleshooting](#troubleshooting)
 - [Testing and CI](#testing-and-ci)
@@ -731,7 +731,10 @@ environment configuration:
 | `OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT` | Fallback string attribute value length limit |
 | `OTEL_RESOURCE_ATTRIBUTES` | `key=value,key2=value2`; keys and values are percent-decoded |
 | `OTEL_PROPAGATORS` | Global propagators; default `tracecontext,baggage`, `none` disables propagation |
-| `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_*` | Opt into request/response header capture |
+| `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST` | Server request headers to capture |
+| `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_RESPONSE` | Server response headers to capture |
+| `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_REQUEST` | Client request headers to capture |
+| `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_RESPONSE` | Client response headers to capture |
 | `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SANITIZE_FIELDS` | Captured headers replaced with `[REDACTED]` |
 
 The span collection limits fall back to the generic `OTEL_ATTRIBUTE_*`

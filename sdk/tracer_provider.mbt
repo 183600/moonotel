@@ -137,6 +137,35 @@ pub fn exporter_selected(exporters : Array[String]?, name : String) -> Bool {
   }
 }
 
+// Build a provider with no processors. Processors are added by the facade and
+// by `with_batch_processor`/`with_simple_processor`, so both the environment
+// driven constructor and the no-op singleton start from the same empty state.
+
+///|
+fn TracerProviderSdk::from_parts(
+  resource : Resource,
+  sampler : Sampler,
+  id_generator : IdGenerator,
+  span_limits : SpanLimits,
+  disabled : Bool,
+) -> TracerProviderSdk {
+  {
+    resource,
+    sampler,
+    id_generator,
+    span_limits,
+    processors: [],
+    disabled,
+    shutdown_called: Ref(false),
+    draining: Ref(false),
+    flushing: Ref(false),
+    flushing_owner: Ref(None),
+    shutdown_waiters: Ref([]),
+    processor_shutdowns: [],
+    processor_drains: [],
+  }
+}
+
 // Create a provider. The service name defaults to `OTEL_SERVICE_NAME`, then
 // to `service.name` from `OTEL_RESOURCE_ATTRIBUTES`, and finally to
 // `unknown_service`; blank values are skipped. The resource also carries the
@@ -148,25 +177,17 @@ pub fn exporter_selected(exporters : Array[String]?, name : String) -> Bool {
 ///|
 pub fn TracerProviderSdk::new(service_name? : String) -> TracerProviderSdk {
   let disabled = sdk_disabled()
-  {
-    resource: Resource::from_env(service_name?),
-    sampler: if disabled {
+  TracerProviderSdk::from_parts(
+    Resource::from_env(service_name?),
+    if disabled {
       Sampler::always_off()
     } else {
       Sampler::from_env()
     },
-    id_generator: IdGenerator::random(),
-    span_limits: SpanLimits::from_env(),
-    processors: [],
+    IdGenerator::random(),
+    SpanLimits::from_env(),
     disabled,
-    shutdown_called: Ref(false),
-    draining: Ref(false),
-    flushing: Ref(false),
-    flushing_owner: Ref(None),
-    shutdown_waiters: Ref([]),
-    processor_shutdowns: [],
-    processor_drains: [],
-  }
+  )
 }
 
 // Replace the whole resource of this provider, for example with one built by
@@ -549,21 +570,13 @@ pub fn no_op_tracer_provider() -> TracerProviderSdk {
   match noop_provider.val {
     Some(provider) => provider
     None => {
-      let provider = {
-        resource: Resource::new(),
-        sampler: Sampler::always_off(),
-        id_generator: IdGenerator::random(),
-        span_limits: SpanLimits::new(),
-        processors: [],
-        disabled: true,
-        shutdown_called: Ref(false),
-        draining: Ref(false),
-        flushing: Ref(false),
-        flushing_owner: Ref(None),
-        shutdown_waiters: Ref([]),
-        processor_shutdowns: [],
-        processor_drains: [],
-      }
+      let provider = TracerProviderSdk::from_parts(
+        Resource::new(),
+        Sampler::always_off(),
+        IdGenerator::random(),
+        SpanLimits::new(),
+        true,
+      )
       noop_provider.val = Some(provider)
       provider
     }

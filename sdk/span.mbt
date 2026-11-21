@@ -600,7 +600,7 @@ pub fn SpanSdk::status_description(self : SpanSdk) -> String {
 
 ///|
 pub fn SpanSdk::update_name(self : SpanSdk, name : String) -> Unit {
-  if self.recording && !self.ended {
+  if self.is_recording() {
     self.name = name
   }
 }
@@ -616,7 +616,7 @@ pub fn SpanSdk::set_attribute(
   key : String,
   value : AttributeValue,
 ) -> Unit {
-  if self.recording && !self.ended {
+  if self.is_recording() {
     self.set_attribute_limited(key, value)
   }
 }
@@ -630,7 +630,7 @@ pub fn SpanSdk::set_attributes(
   self : SpanSdk,
   attributes : Map[String, AttributeValue],
 ) -> Unit {
-  if self.recording && !self.ended {
+  if self.is_recording() {
     let count = attributes.length()
     if self.attributes is None && count > 0 {
       let limit = self.limits.attribute_count_limit
@@ -756,7 +756,7 @@ pub fn SpanSdk::add_event(
   attributes? : Map[String, AttributeValue],
   time_unix_nano? : Int64,
 ) -> Unit {
-  if self.recording && !self.ended {
+  if self.is_recording() {
     if !within_limit(self.event_count(), self.limits.event_count_limit) {
       self.dropped_events = self.dropped_events + 1
       return
@@ -814,7 +814,7 @@ fn SpanSdk::link_count(self : SpanSdk) -> Int32 {
 
 ///|
 pub fn SpanSdk::add_link(self : SpanSdk, link : SpanLink) -> Unit {
-  if !(self.recording && !self.ended) {
+  if !self.is_recording() {
     return
   }
   let (link_attributes, dropped) = limited_attributes(
@@ -875,7 +875,7 @@ pub fn SpanSdk::record_exception(
   attributes? : Map[String, AttributeValue],
   time_unix_nano? : Int64,
 ) -> Unit {
-  if self.recording && !self.ended {
+  if self.is_recording() {
     let message = exception_message(error)
     let type_name = match exception_type {
       Some(value) => value
@@ -913,7 +913,7 @@ pub fn SpanSdk::set_status(
   status : @api.StatusCode,
   description? : String,
 ) -> Unit {
-  if self.recording && !self.ended {
+  if self.is_recording() {
     match status {
       @api.StatusCode::Unset => ()
       @api.StatusCode::Ok => {

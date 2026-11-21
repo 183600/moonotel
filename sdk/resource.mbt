@@ -345,17 +345,6 @@ pub fn Resource::service_name(self : Resource) -> String {
   }
 }
 
-// Build the resource from the standard environment variables:
-//
-// - `OTEL_RESOURCE_ATTRIBUTES` (percent-decoded `key=value` pairs)
-// - `OTEL_SERVICE_NAME`, used when `service_name` is absent or blank
-// - `service.name` from `OTEL_RESOURCE_ATTRIBUTES`, used last (a blank value
-//   falls back to `unknown_service`)
-//
-// The `telemetry.sdk.name`, `telemetry.sdk.language` and
-// `telemetry.sdk.version` attributes are always added and take precedence
-// over same-named values from the environment.
-
 // A copy-on-write attribute map used for the resource carried by span
 // snapshots. Every snapshot of a provider shares the provider's immutable
 // resource map; the first `set` copies the outer map so that mutating one
@@ -578,6 +567,17 @@ pub fn ResourceAttributes::to_array(
   }
   entries
 }
+
+// Build the resource from the standard environment variables:
+//
+// - `OTEL_RESOURCE_ATTRIBUTES` (percent-decoded `key=value` pairs)
+// - `OTEL_SERVICE_NAME`, used when `service_name` is absent or blank
+// - `service.name` from `OTEL_RESOURCE_ATTRIBUTES`, used last (a blank value
+//   falls back to `unknown_service`)
+//
+// The `telemetry.sdk.name`, `telemetry.sdk.language` and
+// `telemetry.sdk.version` attributes are always added and take precedence
+// over same-named values from the environment.
 
 ///|
 pub fn Resource::from_env(service_name? : String) -> Resource {
