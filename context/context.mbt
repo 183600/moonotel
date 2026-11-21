@@ -252,11 +252,13 @@ pub fn Context::with_baggage_owned(
 }
 
 // Derive a context carrying every member of `entries`. Members are applied in
-// order, so a later member overrides an earlier one with the same key. Each
-// member and its properties are copied, so mutating the caller's arrays cannot
-// change the immutable context. An empty name is invalid and is skipped; an
-// empty entries array still clears the outer baggage, while an array whose
-// members are all invalid leaves the context unchanged.
+// order, so a later member overrides an earlier one with the same key. The
+// surviving members keep their input order: a duplicated key is represented by
+// its last occurrence, at that occurrence's position in the input. Each member
+// and its properties are copied, so mutating the caller's arrays cannot change
+// the immutable context. An empty name is invalid and is skipped; an empty
+// entries array still clears the outer baggage, while an array whose members
+// are all invalid leaves the context unchanged.
 
 ///|
 pub fn Context::with_baggage_entries(
@@ -266,9 +268,11 @@ pub fn Context::with_baggage_entries(
   if entries.length() == 0 {
     return self.without_baggage()
   }
-  // Walking from the last entry to the first keeps the innermost occurrence of
-  // each key; the result is ordered from innermost to outermost.
-  let list : Array[BaggageEntry] = Array(capacity=entries.length())
+  // Walking from the last entry to the first keeps the last occurrence of each
+  // key. Reverse the collected members afterwards so the result keeps the
+  // input order (W3C Baggage recommends preserving the order of duplicate
+  // entries when mutating the list).
+  let reversed : Array[BaggageEntry] = Array(capacity=entries.length())
   let mut i = entries.length() - 1
   while i >= 0 {
     let entry = entries.unsafe_get(i)
@@ -276,13 +280,19 @@ pub fn Context::with_baggage_entries(
       i = i - 1
       continue
     }
-    if !contains_baggage_key(list, entry.key) {
-      list.push(copy_baggage_entry(entry))
+    if !contains_baggage_key(reversed, entry.key) {
+      reversed.push(copy_baggage_entry(entry))
     }
     i = i - 1
   }
-  if list.length() == 0 {
+  if reversed.length() == 0 {
     return self
+  }
+  let list : Array[BaggageEntry] = Array(capacity=reversed.length())
+  let mut j = reversed.length() - 1
+  while j >= 0 {
+    list.push(reversed.unsafe_get(j))
+    j = j - 1
   }
   { ..self.child_node(), baggage_list: Some(list), }
 }

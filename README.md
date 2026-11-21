@@ -379,7 +379,9 @@ names are all invalid leaves the context unchanged.
 `Context::with_baggage_entries` and `Context::baggage_entries` use
 `@moonotel.ContextBaggageEntry` (an alias of `@context.BaggageEntry`), which
 carries W3C baggage properties. It is distinct from the propagation
-`BaggageEntry` used by the `baggage` header helpers.
+`BaggageEntry` used by the `baggage` header helpers. Members keep their input
+order; when a key repeats, its last value wins and replaces the earlier
+occurrence.
 
 ## Common patterns
 

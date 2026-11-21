@@ -270,6 +270,7 @@ Baggage 语义：
   全部值，同时保留之后新增的值；
 - 空名称按 OpenTelemetry Baggage API 的要求忽略；
 - 一次非空更新如果名称全部无效，则上下文保持不变；
+- `with_baggage_entries` 保留成员的输入顺序；重复 key 以最后一次出现为准，并保留该次出现的位置；
 - W3C baggage 属性通过 `BaggageEntry` 携带，与传播包中的 header 类型区分。
 
 ### 4.2 跨任务传播

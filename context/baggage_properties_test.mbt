@@ -48,6 +48,24 @@ test "with_baggage_entries_applies_members_in_order" {
 }
 
 ///|
+test "with_baggage_entries_preserves_member_order" {
+  let context = @context.Context::root().with_baggage_entries([
+    @context.BaggageEntry::new("a", "first"),
+    @context.BaggageEntry::new("b", "middle"),
+    @context.BaggageEntry::new("a", "last"),
+    @context.BaggageEntry::new("c", "tail"),
+  ])
+  let entries = context.baggage_entries()
+  assert_eq(entries.length(), 3)
+  assert_eq(entries[0].key, "b")
+  assert_eq(entries[0].value, "middle")
+  assert_eq(entries[1].key, "a")
+  assert_eq(entries[1].value, "last")
+  assert_eq(entries[2].key, "c")
+  assert_eq(entries[2].value, "tail")
+}
+
+///|
 test "without_value_hides_baggage_properties" {
   let context = @context.Context::root()
     .with_baggage_entry("k", "v", properties=[("p", "1")])
