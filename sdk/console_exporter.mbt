@@ -33,21 +33,6 @@ fn hex_nibble_char(value : Int32) -> Char {
   }
 }
 
-// Append the hex form of an `Int32` byte array, matching `@api.bytes_to_hex`
-// (which takes `Array[Int]`).
-
-///|
-fn write_int32_hex(out : StringBuilder, bytes : Array[Int32]) -> Unit {
-  for byte in bytes {
-    if byte >= 0 && byte < 256 {
-      out.write_char(hex_nibble_char(byte >> 4))
-    } else {
-      out.write_char('0')
-    }
-    out.write_char(hex_nibble_char(byte & 0x0F))
-  }
-}
-
 // Render an array value as `[a, b, c]` from already-rendered element strings.
 
 ///|
@@ -173,7 +158,7 @@ fn format_span(data : SpanData) -> String {
   out.write_string(data.span_context.span_id_hex())
   if data.parent_span_id.length() > 0 {
     out.write_string(" parent_span_id=")
-    write_int32_hex(out, data.parent_span_id)
+    out.write_string(@api.bytes_to_hex(data.parent_span_id))
   }
   out.write_string(" kind=")
   out.write_string(data.kind.to_string())

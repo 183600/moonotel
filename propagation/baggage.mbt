@@ -809,93 +809,10 @@ pub fn parse_baggage(value : String) -> Array[(String, String)] {
 
 ///|
 fn parse_baggage_general(value : String) -> Array[(String, String)] {
-  let pairs : Array[(String, String)] = Array(capacity=4)
-  // Size of the normalized header built from `pairs` so far.
-  let mut bytes = 0
-  let view = value[:]
-  let len = view.length()
-  let mut start = 0
-  while start <= len {
-    if pairs.length() >= BAGGAGE_MAX_MEMBERS {
-      break
-    }
-    if bytes >= BAGGAGE_MAX_BYTES {
-      break
-    }
-    // Find the member end (the next `,`) together with the first `;` (which
-    // starts the properties) and the first `=` before it.
-    let mut end = start
-    let mut eq = -1
-    let mut semi = -1
-    while end < len {
-      let c = view.unsafe_get(end)
-      if c == 0x2C {
-        break
-      }
-      if c == 0x3B {
-        if semi < 0 {
-          semi = end
-        }
-      } else if c == 0x3D {
-        if eq < 0 && semi < 0 {
-          eq = end
-        }
-      }
-      end = end + 1
-    }
-    // Trim optional whitespace around the member.
-    let mut item_start = start
-    while item_start < end && is_ows_code(view.unsafe_get(item_start)) {
-      item_start = item_start + 1
-    }
-    let mut item_end = end
-    while item_end > item_start && is_ows_code(view.unsafe_get(item_end - 1)) {
-      item_end = item_end - 1
-    }
-    if item_end > item_start && eq >= 0 {
-      let mut key_end = eq
-      while key_end > item_start && is_ows_code(view.unsafe_get(key_end - 1)) {
-        key_end = key_end - 1
-      }
-      let key_view = view.clamped_view(start=item_start, end=key_end)
-      if is_valid_baggage_key(key_view) {
-        let value_limit = if semi >= 0 { semi } else { item_end }
-        let mut value_start = eq + 1
-        while value_start < value_limit &&
-              is_ows_code(view.unsafe_get(value_start)) {
-          value_start = value_start + 1
-        }
-        let mut value_end = value_limit
-        while value_end > value_start &&
-              is_ows_code(view.unsafe_get(value_end - 1)) {
-          value_end = value_end - 1
-        }
-        let (decoded, encoded_len) = percent_decode_view_with_length(
-          view.clamped_view(start=value_start, end=value_end),
-        )
-        if encoded_len >= 0 {
-          // Properties are dropped from the result, but they still occupy the
-          // header and therefore count towards the byte budget, exactly as in
-          // `parse_baggage_entries`.
-          let properties = parse_baggage_properties(view, semi, item_end)
-          let key = key_view.to_owned()
-          let separator = if pairs.length() > 0 { 1 } else { 0 }
-          let mut size = key.length() + 1 + encoded_len + separator
-          for property in properties {
-            size = size + baggage_property_size(property.0, property.1)
-          }
-          if bytes + size > BAGGAGE_MAX_BYTES {
-            break
-          }
-          pairs.push((key, decoded))
-          bytes = bytes + size
-        }
-      }
-    }
-    if end == len {
-      break
-    }
-    start = end + 1
+  let entries = parse_baggage_entries_general(value)
+  let pairs : Array[(String, String)] = Array(capacity=entries.length())
+  for entry in entries {
+    pairs.push((entry.key, entry.value))
   }
   pairs
 }
@@ -1077,84 +994,11 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
   if entries.length() == 0 {
     return ""
   }
-  let mut size = 0
-  // Every pair is valid and fits within the limits, so the input can be
-  // rendered directly.
-  let mut simple = entries.length() <= BAGGAGE_MAX_MEMBERS
-  if simple {
-    let mut bytes = 0
-    let mut i = 0
-    while i < entries.length() {
-      let entry = entries.unsafe_get(i)
-      if !is_valid_baggage_key(entry.0) {
-        simple = false
-        break
-      }
-      let separator = if i > 0 { 1 } else { 0 }
-      let member_size = entry.0.length() +
-        1 +
-        separator +
-        percent_encoded_length(entry.1)
-      if bytes + member_size > BAGGAGE_MAX_BYTES {
-        simple = false
-        break
-      }
-      bytes = bytes + member_size
-      i = i + 1
-    }
-    if simple {
-      size = bytes
-    }
+  let converted : Array[BaggageEntry] = Array(capacity=entries.length())
+  for entry in entries {
+    converted.push(BaggageEntry::new(entry.0, entry.1))
   }
-  let selected : Array[(String, String)] = if simple {
-    entries
-  } else {
-    // Select the members that fit within the limits. Invalid keys are
-    // skipped; once a member would exceed the byte budget it and every
-    // following member are dropped.
-    let selected : Array[(String, String)] = Array(capacity=entries.length())
-    let mut bytes = 0
-    for entry in entries {
-      if selected.length() >= BAGGAGE_MAX_MEMBERS {
-        break
-      }
-      let key = entry.0
-      if !is_valid_baggage_key(key) {
-        continue
-      }
-      let separator = if selected.length() > 0 { 1 } else { 0 }
-      let member_size = key.length() +
-        1 +
-        separator +
-        percent_encoded_length(entry.1)
-      if bytes + member_size > BAGGAGE_MAX_BYTES {
-        break
-      }
-      selected.push(entry)
-      bytes = bytes + member_size
-      size = size + member_size
-    }
-    selected
-  }
-  if selected.length() == 0 {
-    return ""
-  }
-  // Render the selected members into a UTF-16LE buffer.
-  let out : FixedArray[Byte] = FixedArray::make(size * 2, b'\x00')
-  let mut pos = 0
-  let mut written = 0
-  for entry in selected {
-    if written > 0 {
-      out.unsafe_set(pos * 2, b',')
-      pos = pos + 1
-    }
-    pos = write_baggage_key_to(out, pos, entry.0)
-    out.unsafe_set(pos * 2, b'=')
-    pos = pos + 1
-    pos = write_percent_encode_to(out, pos, entry.1)
-    written = written + 1
-  }
-  out.unsafe_reinterpret_as_bytes().to_unchecked_string()
+  format_baggage_entries(converted)
 }
 
 // Format the baggage of `context` as a `baggage` header value, or `None` when

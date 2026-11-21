@@ -2,17 +2,6 @@
 // environment variables so callers can tune batching in code instead of (or
 // on top of) the environment.
 
-// Read a non-negative integer from an environment variable, falling back to
-// `default` when the variable is absent, blank, malformed or negative.
-
-///|
-fn env_non_negative_int(name : String, default : Int32) -> Int32 {
-  match parse_env_non_negative_int(name) {
-    Some(value) => value
-    None => default
-  }
-}
-
 // Read a positive integer from an environment variable, falling back to
 // `default` when the variable is absent, malformed or not positive. Zero is
 // not a useful queue or batch size, so it selects the default.

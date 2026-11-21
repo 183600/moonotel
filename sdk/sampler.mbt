@@ -34,43 +34,28 @@ pub fn sampling_decision_drop() -> SamplingDecision {
   { is_recorded: false, is_sampled: false, }
 }
 
-// The byte that the hex/OTLP/propagator serializers produce for one trace ID
-// element. In-range values are used as-is; out-of-range values are rendered
-// with the low nibble only (the high nibble becomes "0"). The sampler must use
-// the same value so that a trace ID is sampled identically before and after it
-// crosses a wire boundary.
-
-///|
-fn trace_id_byte(value : Int32) -> UInt64 {
-  if value >= 0 && value < 256 {
-    value.to_uint64()
-  } else {
-    (value & 0x0F).to_uint64()
-  }
-}
-
 // Compose the trace ID's rightmost 8 bytes into an unsigned 64-bit integer.
 // This is the value used by ratio-based sampling. W3C Trace Context Level 2
 // only guarantees randomness in the rightmost bytes, so the decision ignores a
-// timestamp or other structured prefix. The OpenTelemetry SDKs in other
-// languages use the same rightmost 8 bytes, so the same trace ID is sampled
-// consistently across services.
+// timestamp or other structured prefix. Other OpenTelemetry SDKs also use the
+// rightmost 8 bytes, which keeps decisions consistent in practice even though
+// the specification does not mandate the algorithm.
 
 ///|
 fn trace_id_fraction(trace_id : Array[Int32]) -> UInt64 {
   let len = trace_id.length()
   let n = if len < 8 { len } else { 8 }
-  // An 8-byte suffix has a fast path that consumes four bytes per iteration.
+  // An 8-byte suffix has an unrolled fast path.
   if n == 8 {
     let start = len - 8
-    let b0 = trace_id_byte(trace_id.unsafe_get(start))
-    let b1 = trace_id_byte(trace_id.unsafe_get(start + 1))
-    let b2 = trace_id_byte(trace_id.unsafe_get(start + 2))
-    let b3 = trace_id_byte(trace_id.unsafe_get(start + 3))
-    let b4 = trace_id_byte(trace_id.unsafe_get(start + 4))
-    let b5 = trace_id_byte(trace_id.unsafe_get(start + 5))
-    let b6 = trace_id_byte(trace_id.unsafe_get(start + 6))
-    let b7 = trace_id_byte(trace_id.unsafe_get(start + 7))
+    let b0 = serialized_id_byte(trace_id.unsafe_get(start)).to_uint64()
+    let b1 = serialized_id_byte(trace_id.unsafe_get(start + 1)).to_uint64()
+    let b2 = serialized_id_byte(trace_id.unsafe_get(start + 2)).to_uint64()
+    let b3 = serialized_id_byte(trace_id.unsafe_get(start + 3)).to_uint64()
+    let b4 = serialized_id_byte(trace_id.unsafe_get(start + 4)).to_uint64()
+    let b5 = serialized_id_byte(trace_id.unsafe_get(start + 5)).to_uint64()
+    let b6 = serialized_id_byte(trace_id.unsafe_get(start + 6)).to_uint64()
+    let b7 = serialized_id_byte(trace_id.unsafe_get(start + 7)).to_uint64()
     (b0 << 56) |
     (b1 << 48) |
     (b2 << 40) |
@@ -87,7 +72,8 @@ fn trace_id_fraction(trace_id : Array[Int32]) -> UInt64 {
     let mut value : UInt64 = 0
     let mut i = 0
     while i < n {
-      value = (value << 8) | trace_id_byte(trace_id.unsafe_get(i))
+      value = (value << 8) |
+        serialized_id_byte(trace_id.unsafe_get(i)).to_uint64()
       i = i + 1
     }
     value
@@ -96,8 +82,8 @@ fn trace_id_fraction(trace_id : Array[Int32]) -> UInt64 {
 
 // The threshold is `ratio * 2^63` and the trace ID is shifted right by one bit
 // before the comparison, keeping the arithmetic within the 63 bits of integer
-// precision of a double. This matches the algorithm used by the OpenTelemetry
-// SDKs in other languages, so the same trace ID is sampled everywhere.
+// precision of a double. This follows the common OpenTelemetry ratio-sampling
+// layout, so decisions usually agree with other SDKs for the same trace ID.
 
 ///|
 fn ratio_threshold(ratio : Double) -> UInt64 {
@@ -360,7 +346,7 @@ pub fn Sampler::from_env() -> Sampler {
         Sampler::trace_id_ratio_based(sampler_ratio_from_env()),
       )
     "parentbased_always_off" => Sampler::parent_based(Sampler::always_off())
-    "parentbased_always_on" | "" => Sampler::parent_based(Sampler::always_on())
+    "parentbased_always_on" => Sampler::parent_based(Sampler::always_on())
     _ => Sampler::parent_based(Sampler::always_on())
   }
 }

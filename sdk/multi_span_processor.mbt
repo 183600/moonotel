@@ -36,19 +36,6 @@ pub struct MultiSpanProcessor {
 }
 
 ///|
-fn processor_state_index(
-  processors : Array[&SpanProcessor],
-  target : &SpanProcessor,
-) -> Int32? {
-  for i, processor in processors {
-    if physical_equal(processor, target) {
-      return Some(i)
-    }
-  }
-  None
-}
-
-///|
 pub fn MultiSpanProcessor::new(
   processors? : Array[&SpanProcessor],
 ) -> MultiSpanProcessor {
@@ -60,7 +47,7 @@ pub fn MultiSpanProcessor::new(
   let drained : Array[Ref[Bool]] = Array(capacity=processors.length())
   let seen : Array[&SpanProcessor] = Array(capacity=processors.length())
   for processor in processors {
-    match processor_state_index(seen, processor) {
+    match processor_index(seen, processor) {
       Some(index) => {
         shutdowns.push(shutdowns[index])
         drained.push(drained[index])
@@ -93,7 +80,7 @@ pub fn MultiSpanProcessor::with_processor(
   let processors = self.processors.copy()
   let shutdowns = self.shutdowns.copy()
   let drained = self.drained.copy()
-  match processor_state_index(processors, processor) {
+  match processor_index(processors, processor) {
     Some(index) => {
       shutdowns.push(shutdowns[index])
       drained.push(drained[index])

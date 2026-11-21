@@ -11,6 +11,17 @@
 - 修改导出、重试或 HTTP 埋点前，看第 6、7 节。
 - 提交前按第 8、11 节执行检查并核对文档同步项。
 
+常见修改入口：
+
+| 任务 | 主要文件 |
+| --- | --- |
+| 新增或调整环境变量 | `sdk/env_parse.mbt` 及对应的配置读取处（如 `sdk/batch_config.mbt`、`sdk/span_limits.mbt`、`sdk/sampler.mbt`、`exporter/otlp/otlp_exporter.mbt`） |
+| 修改 Context 或 baggage 语义 | `context/context.mbt`、`propagation/baggage.mbt`、`propagation/context_propagation.mbt` |
+| 修改 W3C `traceparent` / `tracestate` | `propagation/w3c_trace_context.mbt`、`propagation/tracestate.mbt` |
+| 修改 span 记录、limits 或 processor | `sdk/span.mbt`、`sdk/span_limits.mbt`、`sdk/simple_span_processor.mbt`、`sdk/batch_span_processor.mbt`、`sdk/multi_span_processor.mbt` |
+| 修改 OTLP 编码或响应解析 | `exporter/otlp/encoder.mbt`、`exporter/otlp/json_encoder.mbt`、`exporter/otlp/response_decoder.mbt`、`exporter/otlp/json_response_decoder.mbt` |
+| 修改 HTTP 埋点 | `instrumentation/async_http_client/`、`instrumentation/async_http_server/`、`instrumentation/http_header_capture/` |
+
 ## 目录
 
 - [1. 目标与范围](#1-目标与范围)

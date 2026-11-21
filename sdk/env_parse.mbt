@@ -44,6 +44,18 @@ fn parse_env_non_negative_int(name : String) -> Int32? {
   }
 }
 
+// Read a non-negative decimal integer from the environment variable `name`,
+// falling back to `default` when the variable is absent, blank, malformed or
+// negative.
+
+///|
+fn env_non_negative_int(name : String, default : Int32) -> Int32 {
+  match parse_env_non_negative_int(name) {
+    Some(value) => value
+    None => default
+  }
+}
+
 // Parse an environment value as a decimal floating-point number. `parse_double`
 // accepts digit separators, which are not part of the decimal notation used by
 // the standard OTEL environment variables, so reject them explicitly.

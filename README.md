@@ -58,7 +58,15 @@ HTTP transport and HTTP instrumentation target native and wasm.
 - [Context and baggage](#context-and-baggage)
 - [Common patterns](#common-patterns)
 - [HTTP instrumentation](#http-instrumentation)
+  - [Server](#server)
+  - [Client](#client)
 - [OTLP/HTTP export](#otlphttp-export)
+  - [Endpoints](#endpoints)
+  - [Environment variables](#environment-variables)
+  - [Headers](#headers)
+  - [Retries, timeouts, and compression](#retries-timeouts-and-compression)
+  - [Message size limits](#message-size-limits)
+  - [Configuration and lifecycle](#configuration-and-lifecycle)
 - [W3C propagation](#w3c-propagation)
 
 **Reference**
@@ -91,9 +99,9 @@ core usable on every MoonBit target and makes the network boundary explicit.
 
 ## Install
 
-The module is not yet published to the mooncakes registry, so `moon add
-183600/moonotel` does not work at the moment. Until it is published, consume
-the module from a git checkout through a MoonBit workspace.
+The module is not yet published to the mooncakes registry, so
+`moon add 183600/moonotel` does not work at the moment. Until it is published,
+consume the module from a git checkout through a MoonBit workspace.
 
 Declare the dependency in your application's `moon.mod` (the version must match
 the module's `moon.mod`):
@@ -310,8 +318,9 @@ deterministic threshold. A timestamp or other structured prefix therefore does
 not bias the decision, a given trace ID always gets the same decision, and a
 higher ratio samples every trace that a lower ratio would. The exact
 `TraceIdRatioBased` algorithm is not standardized; the OpenTelemetry
-specification explicitly warns that different SDKs may disagree. Do not rely on
-the same trace ID being sampled identically by another language's SDK.
+specification explicitly warns that different SDKs may disagree. Most SDKs use
+the rightmost 8 bytes, so decisions usually agree, but do not assume
+bit-for-bit compatibility with another language's SDK.
 
 `always_record(root)` wraps a sampler so spans it would drop are still recorded
 locally (`RECORD_ONLY`) without being exported. This lets processors see every
@@ -537,7 +546,8 @@ let provider = @sdk.TracerProviderSdk::new(service_name="checkout")
 The transport callback runs synchronously from `export_spans`. Keep it fast, or
 use `exporter/otlp_async` when the HTTP client is asynchronous.
 
-`exporter/otlp_async` provides the production transport:
+`exporter/otlp_async` provides the production transport. `export_spans` is
+async, so call it from an async function or task:
 
 ```moonbit
 let config = @otlp.OtlpHttpConfig::from_env() // reads OTEL_EXPORTER_OTLP_*

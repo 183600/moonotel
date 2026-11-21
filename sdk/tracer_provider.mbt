@@ -69,6 +69,40 @@ pub fn traces_exporter_disabled() -> Bool {
   }
 }
 
+// Whether a comma-separated exporter list selects `name`. Blank items are
+// ignored, `none` anywhere disables every exporter, and a list without any
+// named item falls back to the default `otlp` exporter when `default_otlp` is
+// true.
+
+///|
+fn exporter_list_selected(
+  names : Iter[StringView],
+  name : String,
+  default_otlp : Bool,
+) -> Bool {
+  let wanted = name.trim().to_lower()
+  let mut found = false
+  let mut disabled = false
+  let mut named = false
+  for item in names {
+    let item = item.trim().to_lower()
+    if item == "" {
+      continue
+    }
+    named = true
+    if item == "none" {
+      disabled = true
+    } else if item == wanted {
+      found = true
+    }
+  }
+  if !named {
+    default_otlp && wanted == "otlp"
+  } else {
+    found && !disabled
+  }
+}
+
 // Whether `OTEL_TRACES_EXPORTER` requests the exporter named `name`
 // (`otlp`, `console`, ...). The variable holds a comma-separated list that is
 // matched case-insensitively; an unset or blank variable selects the default
@@ -76,38 +110,9 @@ pub fn traces_exporter_disabled() -> Bool {
 
 ///|
 pub fn traces_exporter_enabled(name : String) -> Bool {
-  let wanted = name.trim().to_lower()
   match @env.get_env_var("OTEL_TRACES_EXPORTER") {
-    None => wanted == "otlp"
-    Some(value) => {
-      let trimmed = value.trim()
-      if trimmed == "" {
-        wanted == "otlp"
-      } else {
-        let mut found = false
-        let mut disabled = false
-        let mut named = false
-        for item in trimmed.split(",") {
-          let item = item.trim().to_lower()
-          if item == "" {
-            continue
-          }
-          named = true
-          if item == "none" {
-            disabled = true
-          } else if item == wanted {
-            found = true
-          }
-        }
-        // A list made only of separators/whitespace carries no exporter name,
-        // so it behaves like an unset or blank variable.
-        if !named {
-          wanted == "otlp"
-        } else {
-          found && !disabled
-        }
-      }
-    }
+    None => exporter_list_selected([| |], name, true)
+    Some(value) => exporter_list_selected(value.split(","), name, true)
   }
 }
 
@@ -120,20 +125,12 @@ pub fn traces_exporter_enabled(name : String) -> Bool {
 pub fn exporter_selected(exporters : Array[String]?, name : String) -> Bool {
   match exporters {
     None => traces_exporter_enabled(name)
-    Some(names) => {
-      let wanted = name.trim().to_lower()
-      let mut found = false
-      let mut disabled = false
-      for item in names {
-        let item = item.trim().to_lower()
-        if item == "none" {
-          disabled = true
-        } else if item == wanted {
-          found = true
-        }
-      }
-      found && !disabled
-    }
+    Some(names) =>
+      exporter_list_selected(
+        names.iter().map(fn(item) { item[:] }),
+        name,
+        false,
+      )
   }
 }
 

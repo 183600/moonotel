@@ -48,6 +48,20 @@ pub fn IdGenerator::generates_random_trace_ids(self : IdGenerator) -> Bool {
   self.trace_id_is_random
 }
 
+// Write the eight little-endian bytes of `word` starting at `offset`.
+
+///|
+fn write_word_le(out : Array[Int32], offset : Int32, word : UInt64) -> Unit {
+  out.unsafe_set(offset, (word & 0xFF).to_int())
+  out.unsafe_set(offset + 1, ((word >> 8) & 0xFF).to_int())
+  out.unsafe_set(offset + 2, ((word >> 16) & 0xFF).to_int())
+  out.unsafe_set(offset + 3, ((word >> 24) & 0xFF).to_int())
+  out.unsafe_set(offset + 4, ((word >> 32) & 0xFF).to_int())
+  out.unsafe_set(offset + 5, ((word >> 40) & 0xFF).to_int())
+  out.unsafe_set(offset + 6, ((word >> 48) & 0xFF).to_int())
+  out.unsafe_set(offset + 7, (word >> 56).to_int())
+}
+
 ///|
 fn pseudo_random_bytes(n : Int32, state : Ref[UInt64]) -> Array[Int32] {
   if n <= 0 {
@@ -60,14 +74,7 @@ fn pseudo_random_bytes(n : Int32, state : Ref[UInt64]) -> Array[Int32] {
   while filled + 8 <= n {
     let word = splitmix64(state)
     acc = acc | word
-    out.unsafe_set(filled, (word & 0xFF).to_int())
-    out.unsafe_set(filled + 1, ((word >> 8) & 0xFF).to_int())
-    out.unsafe_set(filled + 2, ((word >> 16) & 0xFF).to_int())
-    out.unsafe_set(filled + 3, ((word >> 24) & 0xFF).to_int())
-    out.unsafe_set(filled + 4, ((word >> 32) & 0xFF).to_int())
-    out.unsafe_set(filled + 5, ((word >> 40) & 0xFF).to_int())
-    out.unsafe_set(filled + 6, ((word >> 48) & 0xFF).to_int())
-    out.unsafe_set(filled + 7, (word >> 56).to_int())
+    write_word_le(out, filled, word)
     filled = filled + 8
   }
   if filled < n {
@@ -113,14 +120,7 @@ fn take_buffered(
   while i + 8 <= n {
     let word = source.unsafe_read_uint64_le(start + i)
     acc = acc | word
-    out.unsafe_set(i, (word & 0xFF).to_int())
-    out.unsafe_set(i + 1, ((word >> 8) & 0xFF).to_int())
-    out.unsafe_set(i + 2, ((word >> 16) & 0xFF).to_int())
-    out.unsafe_set(i + 3, ((word >> 24) & 0xFF).to_int())
-    out.unsafe_set(i + 4, ((word >> 32) & 0xFF).to_int())
-    out.unsafe_set(i + 5, ((word >> 40) & 0xFF).to_int())
-    out.unsafe_set(i + 6, ((word >> 48) & 0xFF).to_int())
-    out.unsafe_set(i + 7, (word >> 56).to_int())
+    write_word_le(out, i, word)
     i = i + 8
   }
   while i < n {

@@ -118,17 +118,6 @@ pub fn SpanLimits::attribute_value_length_limit(self : SpanLimits) -> Int32 {
   self.attribute_value_length_limit
 }
 
-// Read a non-negative integer, falling back to `default` when the variable is
-// absent, empty, malformed or negative.
-
-///|
-fn env_limit(name : String, default : Int32) -> Int32 {
-  match parse_env_non_negative_int(name) {
-    Some(value) => value
-    None => default
-  }
-}
-
 // Read a non-negative integer from `name`, falling back to the generic
 // `OTEL_ATTRIBUTE_COUNT_LIMIT` (then to 128) when the specific variable is
 // absent, empty, malformed or negative.
@@ -137,7 +126,7 @@ fn env_limit(name : String, default : Int32) -> Int32 {
 fn env_attribute_count_limit(name : String) -> Int32 {
   match parse_env_non_negative_int(name) {
     Some(value) => value
-    None => env_limit("OTEL_ATTRIBUTE_COUNT_LIMIT", 128)
+    None => env_non_negative_int("OTEL_ATTRIBUTE_COUNT_LIMIT", 128)
   }
 }
 
@@ -163,14 +152,14 @@ pub fn SpanLimits::from_env() -> SpanLimits {
   let attribute_value_length_limit = match
     parse_env_non_negative_int("OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT") {
     Some(value) => value
-    None => env_limit("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", -1)
+    None => env_non_negative_int("OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", -1)
   }
   {
     attribute_count_limit: env_attribute_count_limit(
       "OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT",
     ),
-    event_count_limit: env_limit("OTEL_SPAN_EVENT_COUNT_LIMIT", 128),
-    link_count_limit: env_limit("OTEL_SPAN_LINK_COUNT_LIMIT", 128),
+    event_count_limit: env_non_negative_int("OTEL_SPAN_EVENT_COUNT_LIMIT", 128),
+    link_count_limit: env_non_negative_int("OTEL_SPAN_LINK_COUNT_LIMIT", 128),
     event_attribute_count_limit: env_attribute_count_limit(
       "OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT",
     ),

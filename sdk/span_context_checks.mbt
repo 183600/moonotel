@@ -9,9 +9,10 @@
 // Code that consumes a parent therefore revalidates the live serialized bytes
 // as well, just like the W3C injector does.
 
-// The byte produced by the hex and OTLP serializers for one ID element.
-// In-range values are used as-is; out-of-range values keep only the low
-// nibble, matching `@api.bytes_to_hex`.
+// The serialized byte for one ID element, as used by the hex and OTLP
+// serializers and by ratio-based sampling. In-range values are used as-is;
+// out-of-range values keep only the low nibble, matching
+// `@api.bytes_to_hex`.
 
 ///|
 fn serialized_id_byte(value : Int32) -> Int32 {
