@@ -48,8 +48,8 @@ fn has_live_valid_ids(context : @api.SpanContext) -> Bool {
   }
   let trace_id = context.trace_id_view()
   let span_id = context.span_id_view()
-  trace_id.length() >= 16 &&
-  span_id.length() >= 8 &&
+  trace_id.length() == 16 &&
+  span_id.length() == 8 &&
   has_live_nonzero_byte(trace_id, 16) &&
   has_live_nonzero_byte(span_id, 8)
 }
