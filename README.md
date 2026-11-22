@@ -335,6 +335,12 @@ bit-for-bit compatibility with another language's SDK.
 locally (`RECORD_ONLY`) without being exported. This lets processors see every
 span.
 
+`Sampler::with_shutdown` attaches a cleanup callback to a sampler.
+`TracerProviderSdk::shutdown` invokes it once for the provider's sampler;
+`parent_based` and `always_record` forward the call to their delegates. A
+shut-down sampler drops further sampling decisions, as required by the
+OpenTelemetry SDK specification.
+
 ### Processors and batching
 
 - `SimpleSpanProcessor` exports when a span ends.

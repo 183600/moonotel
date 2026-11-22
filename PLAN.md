@@ -320,6 +320,9 @@ SDK 提供 `always_on`、`always_off`、`record_only`、`trace_id_ratio_based`
 - `TraceIdRatioBased` 的具体算法并非规范统一，跨语言不保证逐位一致。
 - `always_record(root)` 将原本会 DROP 的 span 提升为 RECORD_ONLY，让本地
   processor 仍能看到数据，但不向外导出。
+- `Sampler::with_shutdown` 注册清理回调；provider shutdown 调用一次，
+  `parent_based` 与 `always_record` 转发给被委托的 sampler；已关闭的 sampler
+  后续采样请求返回 DROP。
 
 ### 5.3 记录型 span
 

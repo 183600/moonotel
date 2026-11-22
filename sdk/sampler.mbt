@@ -112,6 +112,8 @@ pub(all) struct SamplingParameters {
 pub struct Sampler {
   description : String
   sample : (SamplingParameters) -> SamplingDecision
+  on_shutdown : () -> Unit
+  shutdown_called : Ref[Bool]
 }
 
 // Build a sampler from a description and a sampling function. The function is
@@ -123,7 +125,31 @@ pub fn Sampler::new(
   description : String,
   sample : (SamplingParameters) -> SamplingDecision,
 ) -> Sampler {
-  { description, sample, }
+  { description, sample, on_shutdown: fn() {}, shutdown_called: Ref(false), }
+}
+
+// Attach a shutdown callback to a sampler. The callback runs at most once when
+// `Sampler::shutdown` or the owning `TracerProviderSdk::shutdown` is called.
+// Composite samplers forward the call to their delegates.
+
+///|
+pub fn Sampler::with_shutdown(
+  self : Sampler,
+  on_shutdown : () -> Unit,
+) -> Sampler {
+  { ..self, on_shutdown, }
+}
+
+// Release any resource held by a sampler. Calls after the first are no-ops,
+// including on copies of the same sampler. Following the OpenTelemetry
+// specification, a shut-down sampler drops every further sampling request.
+
+///|
+pub fn Sampler::shutdown(self : Sampler) -> Unit {
+  if !self.shutdown_called.val {
+    self.shutdown_called.val = true
+    (self.on_shutdown)()
+  }
 }
 
 // The description of this sampler, following the format required by the
@@ -174,7 +200,7 @@ pub fn Sampler::always_record(root : Sampler) -> Sampler {
     } else {
       decision
     }
-  })
+  }).with_shutdown(fn() { root.shutdown() })
 }
 
 // Sample a deterministic fraction of traces based on the trace ID.
@@ -266,6 +292,12 @@ pub fn Sampler::parent_based(
         }
       None => root.should_sample_parameters(parameters)
     }
+  }).with_shutdown(fn() {
+    root.shutdown()
+    remote_sampled.shutdown()
+    remote_not_sampled.shutdown()
+    local_sampled.shutdown()
+    local_not_sampled.shutdown()
   })
 }
 
@@ -276,7 +308,11 @@ pub fn Sampler::should_sample_parameters(
   self : Sampler,
   parameters : SamplingParameters,
 ) -> SamplingDecision {
-  (self.sample)(parameters)
+  if self.shutdown_called.val {
+    sampling_decision_drop()
+  } else {
+    (self.sample)(parameters)
+  }
 }
 
 // Run the sampler for the given parent context and trace ID. Span-specific

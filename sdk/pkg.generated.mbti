@@ -276,6 +276,8 @@ pub fn ResourceAttributes::values(Self) -> Iter[AttributeValue]
 pub struct Sampler {
   description : String
   sample : (SamplingParameters) -> SamplingDecision
+  on_shutdown : () -> Unit
+  shutdown_called : @ref.Ref[Bool]
 }
 pub fn Sampler::always_off() -> Self
 pub fn Sampler::always_on() -> Self
@@ -287,7 +289,9 @@ pub fn Sampler::parent_based(Self, remote_parent_sampled? : Self, remote_parent_
 pub fn Sampler::record_only() -> Self
 pub fn Sampler::should_sample(Self, @api.SpanContext?, Array[Int32]) -> SamplingDecision
 pub fn Sampler::should_sample_parameters(Self, SamplingParameters) -> SamplingDecision
+pub fn Sampler::shutdown(Self) -> Unit
 pub fn Sampler::trace_id_ratio_based(Double) -> Self
+pub fn Sampler::with_shutdown(Self, () -> Unit) -> Self
 
 #derive(Eq, @debug.Debug)
 pub(all) struct SamplingDecision {

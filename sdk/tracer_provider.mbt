@@ -481,6 +481,9 @@ pub fn TracerProviderSdk::shutdown(self : TracerProviderSdk) -> Unit {
     self.draining.val = false
   }
   self.shutdown_called.val = true
+  // Sampler shutdown is idempotent and does not depend on processor draining,
+  // so it can run before callbacks that may reenter this provider.
+  self.sampler.shutdown()
   // Drain every not-yet-shut-down processor before shutting any exporter down.
   // Processors may share an exporter, and a simple processor registered before
   // a batch processor would otherwise close that exporter before the batch is
