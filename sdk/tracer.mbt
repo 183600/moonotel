@@ -89,12 +89,39 @@ pub fn Tracer::start_span(
       self.scope_version,
     )
   }
-  let (trace_id, parent_span_id, tracestate) = match valid_parent {
-    Some(ctx) => (ctx.trace_id(), ctx.span_id(), ctx.tracestate())
-    None =>
-      (self.provider.id_generator.generate_trace_id(), no_parent_span_id, "")
+  // A custom IdGenerator is expected to return a 16-byte nonzero trace ID and
+  // an 8-byte nonzero span ID. If it returns anything else, the SDK falls back
+  // to its random generator for that ID instead of creating an invalid
+  // SpanContext that processors and exporters must drop.
+  let (trace_id, trace_id_random, parent_span_id, tracestate) = match
+    valid_parent {
+    Some(ctx) =>
+      (
+        ctx.trace_id(),
+        (ctx.trace_flags() & @api.TRACE_FLAGS_RANDOM) != 0,
+        ctx.span_id(),
+        ctx.tracestate(),
+      )
+    None => {
+      let generated = self.provider.id_generator.generate_trace_id()
+      if generated_id_is_valid(generated, 16) {
+        (
+          generated,
+          self.provider.id_generator.generates_random_trace_ids(),
+          no_parent_span_id,
+          "",
+        )
+      } else {
+        (fallback_id_generator().generate_trace_id(), true, no_parent_span_id, "")
+      }
+    }
   }
-  let span_id = self.provider.id_generator.generate_span_id()
+  let generated_span_id = self.provider.id_generator.generate_span_id()
+  let span_id = if generated_id_is_valid(generated_span_id, 8) {
+    generated_span_id
+  } else {
+    fallback_id_generator().generate_span_id()
+  }
   let sampler_attributes : Map[String, AttributeValue] = match attributes {
     Some(values) => copy_attribute_map(values)
     None => Map([])
@@ -116,16 +143,13 @@ pub fn Tracer::start_span(
     links: sampler_links,
   })
   // The W3C random-trace-id flag describes the trace ID. Continuing a parent
-  // preserves its flag; a root span sets it when the SDK generated a random
-  // trace ID that meets the Level 2 randomness requirements.
-  let random_flag = match valid_parent {
-    Some(ctx) => ctx.trace_flags() & @api.TRACE_FLAGS_RANDOM
-    None =>
-      if self.provider.id_generator.generates_random_trace_ids() {
-        @api.TRACE_FLAGS_RANDOM
-      } else {
-        0
-      }
+  // preserves its flag; a root span sets it when the trace ID came from a
+  // generator that meets the Level 2 randomness requirements. A fallback
+  // trace ID always comes from the SDK's random generator.
+  let random_flag = if trace_id_random {
+    @api.TRACE_FLAGS_RANDOM
+  } else {
+    0
   }
   let flags = random_flag |
     (if decision.is_sampled && decision.is_recorded {

@@ -203,6 +203,25 @@ pub fn IdGenerator::random() -> IdGenerator {
   }
 }
 
+// Shared generator used when a configured custom generator returns an ID the
+// SDK cannot use. It is created lazily so providers with a working custom
+// generator do not pay for entropy setup.
+
+///|
+let fallback_generator_slot : Ref[IdGenerator?] = Ref(None)
+
+///|
+fn fallback_id_generator() -> IdGenerator {
+  match fallback_generator_slot.val {
+    Some(generator) => generator
+    None => {
+      let generator = IdGenerator::random()
+      fallback_generator_slot.val = Some(generator)
+      generator
+    }
+  }
+}
+
 // A deterministic generator based on splitmix64, useful for tests and demos.
 
 ///|

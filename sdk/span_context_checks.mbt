@@ -53,3 +53,14 @@ fn has_live_valid_ids(context : @api.SpanContext) -> Bool {
   has_live_nonzero_byte(trace_id, 16) &&
   has_live_nonzero_byte(span_id, 8)
 }
+
+// Whether an ID returned by an `IdGenerator` can be used as-is. A custom
+// generator is expected to return exactly 16 trace-ID bytes or 8 span-ID
+// bytes, and the serialized form must contain a nonzero byte. The SDK checks
+// the live bytes rather than trusting the generator, so a malformed or
+// all-zero ID never produces an invalid SpanContext.
+
+///|
+fn generated_id_is_valid(bytes : Array[Int32], count : Int32) -> Bool {
+  bytes.length() == count && has_live_nonzero_byte(bytes, count)
+}
