@@ -75,6 +75,36 @@ test "context_baggage_header_keeps_properties_after_extraction" {
 }
 
 ///|
+test "context_baggage_header_sorts_small_entry_lists" {
+  let context = @context.Context::root()
+    .with_baggage_entry("zebra", "1", properties=[("p", "z")])
+    .with_baggage_entry("alpha", "2")
+    .with_baggage_entry("middle", "3")
+  assert_eq(
+    @propagation.context_baggage_header(context),
+    Some("alpha=2,middle=3,zebra=1;p=z"),
+  )
+}
+
+///|
+test "context_baggage_header_sorts_large_entry_lists" {
+  let keys : Array[String] = [
+    "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p",
+    "q", "aa",
+  ]
+  let mut context = @context.Context::root()
+  for key in keys {
+    context = context.with_value(key, "1")
+  }
+  assert_eq(
+    @propagation.context_baggage_header(context),
+    Some(
+      "aa=1,b=1,c=1,d=1,e=1,f=1,g=1,h=1,i=1,j=1,k=1,l=1,m=1,n=1,o=1,p=1,q=1",
+    ),
+  )
+}
+
+///|
 test "extract_context_preserves_baggage_properties_with_traceparent" {
   let carrier = @propagation.TextMapCarrier::new()
   carrier.set(

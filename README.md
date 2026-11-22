@@ -727,7 +727,9 @@ remove both trace headers from a reused carrier when the context has no valid
 span, so an old trace parent cannot leak into an outgoing request that only
 carries baggage. The same rule applies to baggage: `inject_baggage` (and the
 baggage propagator) removes a stale `baggage` header from a reused carrier when
-the context carries no visible member. Baggage parsing and formatting enforce
+the context carries no visible member. When a context is injected, its members
+are emitted in lexicographic key order so the header is deterministic;
+properties stay attached to their member. Baggage parsing and formatting enforce
 the W3C limits of 64 members and 8192 bytes; excess members are dropped whole.
 
 ## Configuration reference

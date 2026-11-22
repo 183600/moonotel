@@ -996,6 +996,36 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
   format_baggage_entries(converted)
 }
 
+///|
+fn compare_baggage_keys(a : String, b : String) -> Int32 {
+  let a_len = a.length()
+  let b_len = b.length()
+  let limit = if a_len < b_len {
+    a_len
+  } else {
+    b_len
+  }
+  let mut i = 0
+  while i < limit {
+    let a_code = a.unsafe_get(i).to_int()
+    let b_code = b.unsafe_get(i).to_int()
+    if a_code < b_code {
+      return -1
+    }
+    if a_code > b_code {
+      return 1
+    }
+    i = i + 1
+  }
+  if a_len < b_len {
+    -1
+  } else if a_len > b_len {
+    1
+  } else {
+    0
+  }
+}
+
 // Format the baggage of `context` as a `baggage` header value, or `None` when
 // the context carries no (valid) baggage. Keys are emitted in sorted order for
 // a deterministic header. Baggage properties stored in the context are
@@ -1019,13 +1049,14 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
   // generic sort.
   let entry_count = entries.length()
   if entry_count > 16 {
-    entries.sort_by(fn(a, b) { a.key.compare(b.key) })
+    entries.sort_by(fn(a, b) { compare_baggage_keys(a.key, b.key) })
   } else if entry_count > 1 {
     let mut i = 1
     while i < entry_count {
       let current = entries.unsafe_get(i)
       let mut j = i
-      while j > 0 && current.key.compare(entries.unsafe_get(j - 1).key) < 0 {
+      while j > 0 &&
+        compare_baggage_keys(current.key, entries.unsafe_get(j - 1).key) < 0 {
         entries.unsafe_set(j, entries.unsafe_get(j - 1))
         j = j - 1
       }
