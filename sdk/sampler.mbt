@@ -194,11 +194,15 @@ pub fn Sampler::record_only() -> Sampler {
 ///|
 pub fn Sampler::always_record(root : Sampler) -> Sampler {
   Sampler::new("AlwaysRecord{" + root.description() + "}", fn(parameters) {
-    let decision = root.should_sample_parameters(parameters)
-    if !decision.is_recorded && !decision.is_sampled {
-      sampling_decision_record_only()
+    if root.shutdown_called.val {
+      sampling_decision_drop()
     } else {
-      decision
+      let decision = root.should_sample_parameters(parameters)
+      if !decision.is_recorded && !decision.is_sampled {
+        sampling_decision_record_only()
+      } else {
+        decision
+      }
     }
   }).with_shutdown(fn() { root.shutdown() })
 }
@@ -271,26 +275,37 @@ pub fn Sampler::parent_based(
     local_not_sampled.description() +
     "}"
   Sampler::new(description, fn(parameters) {
-    match parameters.parent {
-      Some(ctx) =>
-        if has_live_valid_ids(ctx) {
-          let sampled = (ctx.trace_flags() & 1) != 0
-          let delegate = if ctx.is_remote() {
-            if sampled {
-              remote_sampled
+    if root.shutdown_called.val {
+      sampling_decision_drop()
+    } else {
+      match parameters.parent {
+        Some(ctx) =>
+          if has_live_valid_ids(ctx) {
+            let sampled = (ctx.trace_flags() & 1) != 0
+            let delegate = if ctx.is_remote() {
+              if sampled {
+                remote_sampled
+              } else {
+                remote_not_sampled
+              }
+            } else if sampled {
+              local_sampled
             } else {
-              remote_not_sampled
+              local_not_sampled
             }
-          } else if sampled {
-            local_sampled
+            if delegate.shutdown_called.val {
+              sampling_decision_drop()
+            } else {
+              delegate.should_sample_parameters({
+                ..parameters,
+                parent: Some(ctx),
+              })
+            }
           } else {
-            local_not_sampled
+            root.should_sample_parameters({ ..parameters, parent: None, })
           }
-          delegate.should_sample_parameters({ ..parameters, parent: Some(ctx), })
-        } else {
-          root.should_sample_parameters({ ..parameters, parent: None, })
-        }
-      None => root.should_sample_parameters(parameters)
+        None => root.should_sample_parameters(parameters)
+      }
     }
   }).with_shutdown(fn() {
     root.shutdown()

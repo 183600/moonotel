@@ -54,3 +54,33 @@ test "a shut-down sampler drops further decisions" {
   assert_false(after.is_sampled)
   assert_eq(calls.val, 1)
 }
+
+///|
+test "a decorator drops when its delegate is shut down directly" {
+  let root_calls = Ref(0)
+  let root = counting_sampler(root_calls)
+  let always_record = @sdk.Sampler::always_record(root)
+  assert_true(always_record.should_sample(None, Array::make(16, 1)).is_sampled)
+  root.shutdown()
+  let recorded = always_record.should_sample(None, Array::make(16, 1))
+  assert_false(recorded.is_recorded)
+  assert_false(recorded.is_sampled)
+
+  let delegate_calls = Ref(0)
+  let delegate = counting_sampler(delegate_calls)
+  let parent_based = @sdk.Sampler::parent_based(
+    @sdk.Sampler::always_on(),
+    local_parent_sampled=delegate,
+  )
+  let trace_id = Array::make(16, 1)
+  let parent = @api.span_context(
+    trace_id,
+    Array::make(8, 2),
+    @api.TRACE_FLAGS_SAMPLED,
+  )
+  assert_true(parent_based.should_sample(Some(parent), trace_id).is_sampled)
+  delegate.shutdown()
+  let sampled = parent_based.should_sample(Some(parent), trace_id)
+  assert_false(sampled.is_recorded)
+  assert_false(sampled.is_sampled)
+}
