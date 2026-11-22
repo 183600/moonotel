@@ -1132,6 +1132,9 @@ pub fn OtlpHttpExporter::export_spans_http(
     // add headers, and that must not mutate the exporter's reusable snapshot
     // or the headers of later attempts.
     let response = (self.transport)(url, headers.copy(), body)
+    if response.body.length() > self.max_response_size {
+      return response_size_limit_failure(self.max_response_size)
+    }
     if response.status_code == 200 {
       if json {
         return decode_export_response_json(

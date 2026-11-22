@@ -76,3 +76,52 @@ test "exporter accepts a response at the configured limit" {
   )
   assert_true(exporter.export_spans([test_span()]).is_success())
 }
+
+///|
+test "exporter applies the response size limit to retryable error bodies" {
+  let calls : Ref[Int] = Ref(0)
+  let transport : @otlp.Transport = fn(_url, _headers, _body) {
+    calls.val = calls.val + 1
+    { status_code: 503, body: b"ab", }
+  }
+  let exporter = @otlp.OtlpHttpExporter::new(
+    @otlp.OtlpHttpConfig::new(
+      endpoint="http://collector:4318",
+      max_retries=2,
+    ),
+    transport,
+    max_response_size=1,
+  )
+  let result = exporter.export_spans([test_span()])
+  match result {
+    @sdk.ExportFailure(message) => assert_true(message.contains("1-byte"))
+    @sdk.ExportSuccess => abort("expected a response size-limit failure")
+  }
+  assert_eq(calls.val, 1)
+}
+
+///|
+test "exporter keeps an in-limit error body status failure" {
+  let calls : Ref[Int] = Ref(0)
+  let transport : @otlp.Transport = fn(_url, _headers, _body) {
+    calls.val = calls.val + 1
+    { status_code: 400, body: b"ab", }
+  }
+  let exporter = @otlp.OtlpHttpExporter::new(
+    @otlp.OtlpHttpConfig::new(
+      endpoint="http://collector:4318",
+      max_retries=0,
+    ),
+    transport,
+    max_response_size=2,
+  )
+  let result = exporter.export_spans([test_span()])
+  match result {
+    @sdk.ExportFailure(message) => {
+      assert_true(message.contains("400"))
+      assert_false(message.contains("byte"))
+    }
+    @sdk.ExportSuccess => abort("expected an HTTP status failure")
+  }
+  assert_eq(calls.val, 1)
+}
