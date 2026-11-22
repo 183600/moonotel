@@ -731,7 +731,8 @@ fn retry_backoff_millis(attempt : Int32) -> Int32 {
 
 // A response read under the configured size limit. The body is only kept for
 // HTTP 200 responses, since other statuses are classified from the headers
-// alone and never decoded.
+// alone and never decoded, but every response body is still read under the
+// limit so an oversized error body cannot bypass it.
 
 ///|
 priv enum LimitedHttpResponse {
@@ -742,7 +743,8 @@ priv enum LimitedHttpResponse {
 
 // POST `body` and read at most `max_response_size` response bytes. Reading
 // through the streaming client keeps the limit effective before the whole
-// body (including a gzip-expanded body) has been buffered.
+// body (including a gzip-expanded body) has been buffered, for both successful
+// and error responses.
 
 ///|
 async fn post_with_response_limit(
@@ -755,9 +757,6 @@ async fn post_with_response_limit(
   defer client.close()
   client.write(body)
   let response = client.end_request()
-  if response.code != 200 {
-    return WithoutBody(response)
-  }
   let buffer = FixedArray::make(max_response_size, b'\x00')
   let mut total = 0
   while total < max_response_size {
@@ -778,6 +777,9 @@ async fn post_with_response_limit(
     if client.read(extra) > 0 {
       return TooLarge
     }
+  }
+  if response.code != 200 {
+    return WithoutBody(response)
   }
   WithBody(buffer.unsafe_reinterpret_as_bytes()[:total].to_owned())
 }

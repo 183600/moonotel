@@ -654,8 +654,10 @@ by default, matching the OTLP exporter specification. `OtlpHttpExporter::new`,
 value selects the default. The request limit applies to the encoded message
 before gzip compression. The async transport also enforces the response limit
 while reading, after gzip decompression, so an oversized response is not
-buffered in full. `decode_export_response` and
-`decode_export_response_json` accept the same optional `max_size` argument.
+buffered in full. This applies to error responses too: an oversized 4xx/5xx
+body fails as a size-limit error instead of being retried as a transient HTTP
+status. `decode_export_response` and `decode_export_response_json` accept the
+same optional `max_size` argument.
 
 ### Configuration and lifecycle
 
