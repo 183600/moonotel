@@ -276,6 +276,22 @@ test "attribute_value_length_limit_counts_code_points" {
 }
 
 ///|
+test "value_length_limit_leaves_shorter_strings_unchanged" {
+  let span = limit_test_span(
+    @sdk.SpanLimits::new(attribute_value_length_limit=10),
+  )
+  span.set_attribute("short", @sdk.StringValue("abc"))
+  span.set_attribute("empty", @sdk.StringValue(""))
+  span.set_attribute("arr", @sdk.StringArrayValue(["abc", ""]))
+  assert_eq(span.attributes().get("short"), Some(@sdk.StringValue("abc")))
+  assert_eq(span.attributes().get("empty"), Some(@sdk.StringValue("")))
+  assert_eq(
+    span.attributes().get("arr"),
+    Some(@sdk.StringArrayValue(["abc", ""])),
+  )
+}
+
+///|
 test "zero_attribute_value_length_limit_produces_empty_strings" {
   let span = limit_test_span(
     @sdk.SpanLimits::new(attribute_value_length_limit=0),
