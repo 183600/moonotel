@@ -117,6 +117,31 @@ test "sampler_from_env_parentbased_traceidratio_follows_parent" {
 }
 
 ///|
+test "sampler_from_env_parentbased_always_on_follows_parent" {
+  clear_sampler_env()
+  @env.set_env_var("OTEL_TRACES_SAMPLER", "parentbased_always_on")
+  let sampler = @sdk.Sampler::from_env()
+  clear_sampler_env()
+  let sampled_parent = @api.span_context(
+    Array::make(16, 3),
+    Array::make(8, 4),
+    @api.TRACE_FLAGS_SAMPLED,
+  )
+  let unsampled_parent = @api.span_context(
+    Array::make(16, 5),
+    Array::make(8, 6),
+    0,
+  )
+  assert_true(sampler.should_sample(None, env_trace_id(255)).is_sampled)
+  assert_true(
+    sampler.should_sample(Some(sampled_parent), env_trace_id(0)).is_sampled,
+  )
+  assert_false(
+    sampler.should_sample(Some(unsampled_parent), env_trace_id(255)).is_sampled,
+  )
+}
+
+///|
 test "sampler_from_env_unknown_value_falls_back_to_default" {
   clear_sampler_env()
   @env.set_env_var("OTEL_TRACES_SAMPLER", "no_such_sampler")
