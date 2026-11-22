@@ -442,8 +442,9 @@ assert_eq(exporter.exported_spans().length(), 1)
 ## HTTP instrumentation
 
 The instrumentation packages target native and wasm, matching the async HTTP
-stack; the default wasm-gc target skips their bodies. They degrade gracefully:
-when no tracer is available, the wrappers simply forward the request.
+stack; the wasm-gc backend does not support these packages. They degrade
+gracefully: when no tracer is available, the wrappers simply forward the
+request.
 
 Spans created by both wrappers receive the request method and URL/server
 attributes known before the request, so a custom sampler sees them in
@@ -810,12 +811,12 @@ bash scripts/check-hygiene.sh
 ```
 
 The async instrumentation and exporter packages target native and wasm. The
-default wasm-gc target skips their bodies, while `moon check --target native`
-and `moon test --target native` compile and run them (`moon check --target
-wasm` also compiles them). The push/PR workflow `.github/workflows/ci.yml` runs
-both the default and native checks plus `scripts/check-hygiene.sh`, so a green
-CI means the native code was compiled and tested and the repository hygiene
-checks passed.
+default wasm target compiles and tests them, and `moon check --target native` /
+`moon test --target native` cover the native backend; the wasm-gc backend does
+not support these packages. The push/PR workflow `.github/workflows/ci.yml`
+runs both the default and native checks plus `scripts/check-hygiene.sh`, so a
+green CI means both backends were compiled and tested and the repository
+hygiene checks passed.
 
 ## Development
 

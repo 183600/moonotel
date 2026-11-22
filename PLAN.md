@@ -143,17 +143,17 @@ instrumentation/*   -> api, context, propagation, sdk
 这条方向保证核心类型可以在没有网络、没有 async runtime 的目标上编译；
 需要平台能力的包集中在上层，测试替身也只需要替换最外层的 transport。
 
-目标矩阵（默认目标为 wasm-gc）：
+目标矩阵（默认目标为 wasm）：
 
-| 包组 | 默认 wasm-gc | native | wasm | 说明 |
+| 包组 | wasm-gc | native | wasm | 说明 |
 | --- | --- | --- | --- | --- |
 | `api`、`context`、`propagation`、`sdk`、`exporter/otlp`、根包 | 编译并测试 | 编译并测试 | 编译并测试 | 无 I/O 核心与同步导出 |
-| `exporter/otlp_async`、`async_runtime` | 跳过函数体 | 编译并测试 | 编译 | 真实网络与异步调度 |
-| `instrumentation/*` | 跳过函数体 | 编译并测试 | 编译 | 依赖 `moonbitlang/async/http` |
+| `exporter/otlp_async`、`async_runtime` | 不支持 | 编译并测试 | 编译并测试 | 真实网络与异步调度 |
+| `instrumentation/*` | 不支持 | 编译并测试 | 编译并测试 | 依赖 `moonbitlang/async/http` |
 
-`moon check` / `moon test` 验证默认目标；涉及 native+wasm 包时还必须运行
-`moon check --target native` / `moon test --target native`，否则相关函数体
-不会被编译或执行。
+`moon check` / `moon test` 验证默认的 wasm 目标；涉及 native+wasm 包时还必须
+运行 `moon check --target native` / `moon test --target native`，以覆盖 native
+后端。`wasm-gc` 后端不支持这些包。
 
 关键设计决策：
 
@@ -449,8 +449,8 @@ exporter 是单次使用的 sink。`OtlpHttpExporter` 在 `shutdown()` 后拒绝
 
 ## 7. HTTP 埋点
 
-HTTP 埋点面向 native+wasm，默认 wasm-gc 目标跳过相关函数体。没有 tracer 时，
-wrapper 直接转发请求，不改变调用方行为。
+HTTP 埋点面向 native+wasm；默认 wasm 目标会编译并执行相关函数体，wasm-gc
+后端不支持这些包。没有 tracer 时，wrapper 直接转发请求，不改变调用方行为。
 
 服务端 `run_server` 为每个请求提取父上下文，创建 `Server` span，记录方法、路径、
 查询串、服务端地址、客户端地址、网络对端地址等属性，并在 handler 执行期间安装上下文。
@@ -530,8 +530,8 @@ CI 同时运行默认与 native 目标，确保 async 埋点和 exporter 不只�
 - 新增行为先补测试，再同步 README 与本文档；公开 API、环境变量和默认值以
   源码和 README 为准。
 - 读取环境变量的测试必须恢复原值，避免测试顺序影响结果。
-- 涉及 native+wasm 包时同时检查默认目标与 `--target native`；默认 wasm-gc
-  目标会跳过这些包的函数体。
+- 涉及 native+wasm 包时同时检查默认 wasm 目标与 `--target native`；`wasm-gc`
+  后端不支持这些包。
 - 临时脚本和探针写到 `/tmp`，不要提交带 `zz_`、`tmp_`、`scratch`、`dbg` 或
   `probe` 前缀的文件。
 
