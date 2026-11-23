@@ -1048,6 +1048,16 @@ fn effective_request_scheme(
 
 ///|
 fn is_forwarded_ip_literal(text : StringView) -> Bool {
+  let len = text.length()
+  if len == 0 {
+    return false
+  }
+  let first = text.unsafe_get(0).to_int()
+  if first == 0x76 || first == 0x56 {
+    // RFC 7239 `for` allows IPv4 and IPv6 literals only; IPvFuture is valid
+    // in a URI authority but not as a `Forwarded` node identifier.
+    return false
+  }
   if text.find(":") is Some(_) {
     is_bracketed_ip_literal(text)
   } else {
@@ -1085,7 +1095,7 @@ fn parse_forwarded_node(value : String) -> (String, Int32?)? {
       None => return None
     }
     let address = value[1:close].to_owned()
-    if address.length() == 0 || !is_bracketed_ip_literal(address[:]) {
+    if address.length() == 0 || !is_forwarded_ip_literal(address[:]) {
       return None
     }
     let rest = value[close + 1:]
@@ -1117,7 +1127,7 @@ fn parse_forwarded_node(value : String) -> (String, Int32?)? {
       // A bare IPv6 literal without a port is common in X-Forwarded-For. An
       // IPv6 address with a port must use the bracketed form handled above.
       let address = value.to_owned()
-      if !is_bracketed_ip_literal(value) {
+      if !is_forwarded_ip_literal(value) {
         return None
       }
       Some((address, None))

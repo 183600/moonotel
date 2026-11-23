@@ -194,6 +194,16 @@ test "parse_forwarded_node_rejects_unknown_and_malformed_values" {
 }
 
 ///|
+test "parse_forwarded_node_rejects_ipvfuture_literals" {
+  for
+    value in [
+      "v1.a:b:c", "[v1.foo]", "[v1.foo]:80", "[v1.a:b]:80", "[V1.a:b]:80",
+    ] {
+    assert_eq(parse_forwarded_node(value), None)
+  }
+}
+
+///|
 test "effective_forwarded_client_prefers_forwarded_for" {
   assert_eq(
     effective_forwarded_client(
