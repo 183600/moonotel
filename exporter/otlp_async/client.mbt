@@ -860,25 +860,35 @@ async fn post_trace_request_with_headers(
     // map it receives. Hand it a fresh copy for every attempt so the cached
     // exporter headers stay unchanged across retries and concurrent exports.
     let request_headers = headers.copy()
-    let outcome = try {
+    let mut outcome : LimitedHttpResponse? = None
+    let timed_out = try {
       let post = () => {
         post_with_response_limit(url, body, request_headers, max_response_size)
       }
-      Some(
-        if attempt_timeout > 0 {
-          @async.with_timeout(attempt_timeout, post)
-        } else {
-          post()
-        },
-      )
+      if attempt_timeout > 0 {
+        match @async.with_timeout_opt(attempt_timeout, post) {
+          Some(response) => {
+            outcome = Some(response)
+            false
+          }
+          None => true
+        }
+      } else {
+        outcome = Some(post())
+        false
+      }
     } catch {
       error => {
         last_failure = "OTLP request to " +
           url +
           " failed: " +
           error.to_string()
-        None
+        false
       }
+    }
+    if timed_out {
+      last_failure = "OTLP request to " + url + " failed: TimeoutError"
+      return export_timeout_failure(last_failure)
     }
     match outcome {
       Some(WithBody(response_body)) =>
