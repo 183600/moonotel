@@ -84,3 +84,27 @@ test "a decorator drops when its delegate is shut down directly" {
   assert_false(sampled.is_recorded)
   assert_false(sampled.is_sampled)
 }
+
+///|
+test "parent_based keeps using parent delegates after its root is shut down" {
+  let root = @sdk.Sampler::always_on()
+  let sampler = @sdk.Sampler::parent_based(
+    root,
+    local_parent_sampled=@sdk.Sampler::always_on(),
+  )
+  let trace_id = Array::make(16, 1)
+  let parent = @api.span_context(
+    trace_id,
+    Array::make(8, 2),
+    @api.TRACE_FLAGS_SAMPLED,
+  )
+  assert_true(sampler.should_sample(None, trace_id).is_sampled)
+  assert_true(sampler.should_sample(Some(parent), trace_id).is_sampled)
+  root.shutdown()
+  let rootless = sampler.should_sample(None, trace_id)
+  assert_false(rootless.is_recorded)
+  assert_false(rootless.is_sampled)
+  let with_parent = sampler.should_sample(Some(parent), trace_id)
+  assert_true(with_parent.is_recorded)
+  assert_true(with_parent.is_sampled)
+}

@@ -275,37 +275,33 @@ pub fn Sampler::parent_based(
     local_not_sampled.description() +
     "}"
   Sampler::new(description, fn(parameters) {
-    if root.shutdown_called.val {
-      sampling_decision_drop()
-    } else {
-      match parameters.parent {
-        Some(ctx) =>
-          if has_live_valid_ids(ctx) {
-            let sampled = (ctx.trace_flags() & 1) != 0
-            let delegate = if ctx.is_remote() {
-              if sampled {
-                remote_sampled
-              } else {
-                remote_not_sampled
-              }
-            } else if sampled {
-              local_sampled
+    match parameters.parent {
+      Some(ctx) =>
+        if has_live_valid_ids(ctx) {
+          let sampled = (ctx.trace_flags() & 1) != 0
+          let delegate = if ctx.is_remote() {
+            if sampled {
+              remote_sampled
             } else {
-              local_not_sampled
+              remote_not_sampled
             }
-            if delegate.shutdown_called.val {
-              sampling_decision_drop()
-            } else {
-              delegate.should_sample_parameters({
-                ..parameters,
-                parent: Some(ctx),
-              })
-            }
+          } else if sampled {
+            local_sampled
           } else {
-            root.should_sample_parameters({ ..parameters, parent: None, })
+            local_not_sampled
           }
-        None => root.should_sample_parameters(parameters)
-      }
+          if delegate.shutdown_called.val {
+            sampling_decision_drop()
+          } else {
+            delegate.should_sample_parameters({
+              ..parameters,
+              parent: Some(ctx),
+            })
+          }
+        } else {
+          root.should_sample_parameters({ ..parameters, parent: None, })
+        }
+      None => root.should_sample_parameters(parameters)
     }
   }).with_shutdown(fn() {
     root.shutdown()
