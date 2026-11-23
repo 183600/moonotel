@@ -4,7 +4,7 @@ set -euo pipefail
 
 bad="$(
   git ls-files |
-    grep -E '(^|/)(zz_|tmp_|_scratch_|dbg_|probe_)' || true
+    grep -E '(^|/)(zz_|tmp_|scratch|dbg|probe)' || true
 )"
 if [[ -n "$bad" ]]; then
   echo "error: scratch/probe files must not be committed:" >&2
