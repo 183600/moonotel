@@ -150,6 +150,39 @@ test "grouping updates a scope index after adding a new scope" {
 }
 
 ///|
+fn resource_double_bits(resource : Map[String, @sdk.AttributeValue]) -> UInt64 {
+  match resource.get("d") {
+    Some(@sdk.DoubleValue(value)) => value.reinterpret_as_uint64()
+    _ => abort("missing double resource attribute")
+  }
+}
+
+///|
+test "grouping keeps signed zero resource attributes distinct" {
+  let negative : Map[String, @sdk.AttributeValue] = Map([
+    ("d", @sdk.DoubleValue(-0.0)),
+  ])
+  let positive : Map[String, @sdk.AttributeValue] = Map([
+    ("d", @sdk.DoubleValue(0.0)),
+  ])
+  let spans = [
+    grouping_test_span("negative", negative, "s1"),
+    grouping_test_span("positive", positive, "s1"),
+  ]
+  assert_true(!spans_share_one_group(spans, spans[0]))
+  let groups = group_spans(spans)
+  assert_eq(groups.length(), 2)
+  assert_eq(
+    resource_double_bits(groups[0].resource),
+    (-0.0).reinterpret_as_uint64(),
+  )
+  assert_eq(
+    resource_double_bits(groups[1].resource),
+    0.0.reinterpret_as_uint64(),
+  )
+}
+
+///|
 test "resource keys distinguish attribute value types" {
   let values : Array[@sdk.AttributeValue] = [
     @sdk.StringValue("1"),

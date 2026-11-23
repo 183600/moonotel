@@ -504,6 +504,60 @@ fn resource_key(resource : Map[String, @sdk.AttributeValue]) -> String {
 }
 
 ///|
+fn double_bits_equal(left : Double, right : Double) -> Bool {
+  left.reinterpret_as_uint64() == right.reinterpret_as_uint64()
+}
+
+///|
+fn double_arrays_equal(left : Array[Double], right : Array[Double]) -> Bool {
+  if left.length() != right.length() {
+    return false
+  }
+  for i = 0; i < left.length(); i = i + 1 {
+    if !double_bits_equal(left[i], right[i]) {
+      return false
+    }
+  }
+  true
+}
+
+///|
+fn attribute_values_equal(
+  left : @sdk.AttributeValue,
+  right : @sdk.AttributeValue,
+) -> Bool {
+  match (left, right) {
+    (@sdk.StringValue(a), @sdk.StringValue(b)) => a == b
+    (@sdk.BoolValue(a), @sdk.BoolValue(b)) => a == b
+    (@sdk.IntValue(a), @sdk.IntValue(b)) => a == b
+    (@sdk.DoubleValue(a), @sdk.DoubleValue(b)) => double_bits_equal(a, b)
+    (@sdk.StringArrayValue(a), @sdk.StringArrayValue(b)) => a == b
+    (@sdk.BoolArrayValue(a), @sdk.BoolArrayValue(b)) => a == b
+    (@sdk.IntArrayValue(a), @sdk.IntArrayValue(b)) => a == b
+    (@sdk.DoubleArrayValue(a), @sdk.DoubleArrayValue(b)) =>
+      double_arrays_equal(a, b)
+    _ => false
+  }
+}
+
+///|
+fn resources_equal(
+  left : Map[String, @sdk.AttributeValue],
+  right : Map[String, @sdk.AttributeValue],
+) -> Bool {
+  if left.length() != right.length() {
+    return false
+  }
+  for key, value in left {
+    match right.get(key) {
+      Some(other) => if !attribute_values_equal(value, other) { return false }
+      None => return false
+    }
+  }
+  true
+}
+
+///|
 priv struct ScopeGroup {
   scope_name : String
   scope_version : String
@@ -549,7 +603,7 @@ fn spans_share_one_group(
   let shared_resource = first.resource.as_map()
   for i = 1; i < spans.length(); i = i + 1 {
     let data = spans[i]
-    if shared_resource != data.resource.as_map() ||
+    if !resources_equal(shared_resource, data.resource.as_map()) ||
       data.scope_name != first.scope_name ||
       data.scope_version != first.scope_version {
       return false
@@ -644,7 +698,7 @@ fn cached_resource_key(
   cache : Array[(Map[String, @sdk.AttributeValue], String)],
 ) -> String {
   for entry in cache {
-    if entry.0 == resource {
+    if resources_equal(entry.0, resource) {
       return entry.1
     }
   }
@@ -675,7 +729,7 @@ fn group_spans(spans : Array[@sdk.SpanData]) -> Array[ResourceGroup] {
     let data_resource = data.resource.as_map()
     let index = match last_resource {
       Some(resource) =>
-        if resource == data_resource {
+        if resources_equal(resource, data_resource) {
           last_index
         } else {
           if unindexed {
