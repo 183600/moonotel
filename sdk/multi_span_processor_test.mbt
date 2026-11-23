@@ -154,3 +154,14 @@ test "provider_registers_several_processors_at_once" {
   assert_eq(log.val[0], "first:start:root")
   assert_eq(log.val[2], "first:end:root")
 }
+
+///|
+test "multi_span_processor_flushes_a_repeated_child_once" {
+  let log : Ref[Array[String]] = Ref([])
+  let child = composite_probe("repeated", log)
+  let multi = @sdk.MultiSpanProcessor::new(processors=[child, child])
+  multi.force_flush()
+  assert_eq(child.flushes.val, 1)
+  multi.shutdown()
+  assert_eq(child.shutdowns.val, 1)
+}

@@ -186,3 +186,16 @@ test "force_flush_after_shutdown_is_ignored" {
   provider.force_flush()
   assert_eq(processor.flushes.val, 0)
 }
+
+///|
+test "force_flush_calls_a_repeated_processor_once" {
+  let processor = counting_processor()
+  let provider = @sdk.TracerProviderSdk::new(service_name="svc").with_span_processors([
+      processor, processor,
+    ],
+  )
+  provider.force_flush()
+  assert_eq(processor.flushes.val, 1)
+  provider.shutdown()
+  assert_eq(processor.shutdowns.val, 1)
+}

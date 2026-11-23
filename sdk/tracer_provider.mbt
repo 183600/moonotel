@@ -406,6 +406,7 @@ fn TracerProviderSdk::force_flush_processors(
   self : TracerProviderSdk,
   skip : Array[&SpanProcessor]?,
 ) -> Unit {
+  let flushed : Array[&SpanProcessor] = []
   for i, processor in self.processors {
     // A reentrant shutdown may have started while an earlier processor was
     // being flushed; the shutdown sequence drains and closes the remaining
@@ -418,10 +419,12 @@ fn TracerProviderSdk::force_flush_processors(
     // even though the provider's shared shutdown marker is set. Processors that
     // were already shut down must not be called again.
     if !self.processor_shutdowns[i].val &&
+      !processor_in_array(flushed, processor) &&
       !(match skip {
         Some(owner) => processor_in_array(owner, processor)
         None => false
       }) {
+      flushed.push(processor)
       processor.force_flush()
     }
   }

@@ -140,6 +140,7 @@ fn MultiSpanProcessor::force_flush_children(
   self : MultiSpanProcessor,
   skip : Array[&SpanProcessor]?,
 ) -> Unit {
+  let flushed : Array[&SpanProcessor] = []
   for i, processor in self.processors {
     // A child's flush may shut this processor down reentrantly; the outer
     // `shutdown` has already drained and closed the remaining children.
@@ -149,10 +150,12 @@ fn MultiSpanProcessor::force_flush_children(
     // A child added to a copy starts out unshut-down even when the shared
     // shutdown marker was set by another copy, so it can still be flushed.
     if !self.shutdowns[i].val &&
+      !processor_in_array(flushed, processor) &&
       !(match skip {
         Some(owner) => processor_in_array(owner, processor)
         None => false
       }) {
+      flushed.push(processor)
       processor.force_flush()
     }
   }
