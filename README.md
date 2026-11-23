@@ -200,7 +200,7 @@ see [Configuration and lifecycle](#configuration-and-lifecycle).
 console-exporting setup is the shortest end-to-end path:
 
 ```moonbit
-fn main {
+fn main raise {
   let provider = @moonotel.setup(
     service_name="checkout",
     exporters=["console"],
@@ -233,7 +233,7 @@ uses the same environment variables, and drains pending spans when the group
 exits.
 
 ```moonbit
-async fn main {
+async fn main raise {
   @async.with_task_group(group => {
     let provider = @async_runtime.setup(group, service_name="checkout")
     let tracer = provider.get_tracer("checkout")
