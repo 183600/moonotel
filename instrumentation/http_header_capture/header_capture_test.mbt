@@ -158,9 +158,9 @@ test "record_response_with_cookies serializes cookies when no set-cookie header 
     ),
     @http.Cookie::Cookie("theme", "dark"),
   ]
-  @http_header_capture.HeaderCapture::parse(
-    "set-cookie",
-  ).record_response_with_cookies(headers, cookies, span)
+  @http_header_capture.HeaderCapture::parse("set-cookie").record_response_with_cookies(
+    headers, cookies, span,
+  )
   span.end()
   let data = exporter.spans.val[0]
   assert_eq(
@@ -179,12 +179,10 @@ test "record_response_with_cookies keeps an explicit set-cookie header" {
   let headers : @http.Headers = Map([
     (@http.CaseInsensitiveString("Set-Cookie"), "raw=1; Path=/"),
   ])
-  let cookies : Array[@http.Cookie] = [
-    @http.Cookie::Cookie("parsed", "2"),
-  ]
-  @http_header_capture.HeaderCapture::parse(
-    "set-cookie",
-  ).record_response_with_cookies(headers, cookies, span)
+  let cookies : Array[@http.Cookie] = [@http.Cookie::Cookie("parsed", "2")]
+  @http_header_capture.HeaderCapture::parse("set-cookie").record_response_with_cookies(
+    headers, cookies, span,
+  )
   span.end()
   let data = exporter.spans.val[0]
   assert_eq(

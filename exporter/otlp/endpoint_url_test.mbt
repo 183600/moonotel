@@ -74,10 +74,7 @@ test "relative generic endpoint gets the signal path" {
   let with_query = @otlp.OtlpHttpConfig::new(
     endpoint="/base?tenant=acme#section",
   )
-  assert_eq(
-    with_query.traces_url(),
-    "/base/v1/traces?tenant=acme#section",
-  )
+  assert_eq(with_query.traces_url(), "/base/v1/traces?tenant=acme#section")
   assert_eq(with_query.request_url(), "/base/v1/traces?tenant=acme")
 }
 
