@@ -137,7 +137,8 @@ pub fn Sampler::with_shutdown(
   self : Sampler,
   on_shutdown : () -> Unit,
 ) -> Sampler {
-  { ..self, on_shutdown, }
+  let previous = self.on_shutdown
+  { ..self, on_shutdown: fn() { previous(); on_shutdown() }, }
 }
 
 // Release any resource held by a sampler. Calls after the first are no-ops,

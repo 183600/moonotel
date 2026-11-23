@@ -108,3 +108,27 @@ test "parent_based keeps using parent delegates after its root is shut down" {
   assert_true(with_parent.is_recorded)
   assert_true(with_parent.is_sampled)
 }
+
+///|
+test "with_shutdown on a composite keeps delegate forwarding" {
+  let parent_calls = Ref(0)
+  let parent_root_calls = Ref(0)
+  let extra_calls = Ref(0)
+  let parent_root = counting_sampler(parent_root_calls)
+  let parent = @sdk.Sampler::parent_based(parent_root)
+    .with_shutdown(fn() { parent_calls.val = parent_calls.val + 1 })
+    .with_shutdown(fn() { extra_calls.val = extra_calls.val + 1 })
+  parent.shutdown()
+  assert_eq(parent_calls.val, 1)
+  assert_eq(extra_calls.val, 1)
+  assert_eq(parent_root_calls.val, 1)
+
+  let record_calls = Ref(0)
+  let record_root_calls = Ref(0)
+  let record_root = counting_sampler(record_root_calls)
+  let record = @sdk.Sampler::always_record(record_root)
+    .with_shutdown(fn() { record_calls.val = record_calls.val + 1 })
+  record.shutdown()
+  assert_eq(record_calls.val, 1)
+  assert_eq(record_root_calls.val, 1)
+}
