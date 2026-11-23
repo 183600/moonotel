@@ -488,8 +488,9 @@ attributes (`http.request.method`, `url.path`, `url.query`, `server.address`,
 context while the handler runs, and ends the span afterwards.
 When a reverse proxy supplies `Forwarded#host` / `X-Forwarded-Host`, the
 original host is preferred for `server.address` / `server.port`; `url.scheme`
-prefers `Forwarded#proto` / `X-Forwarded-Proto`, falling back to the request
-target and `Host` header. `client.address` / `client.port` prefer the original
+prefers `Forwarded#proto` / `X-Forwarded-Proto`, falling back to the scheme of
+an absolute-form request target and otherwise to `http`.
+`client.address` / `client.port` prefer the original
 client in `Forwarded#for` / `X-Forwarded-For` when it contains an IP literal,
 while `network.peer.address` / `network.peer.port` always describe the
 immediate TCP peer. Malformed forwarded values are ignored. Deployments should
@@ -791,10 +792,6 @@ explicit names: a wildcard also captures headers such as `Authorization` and
   processor before spans are exported; without one the span is still readable
   after `end()` but stays local. `SimpleSpanProcessor` exports immediately and
   `BatchSpanProcessor` buffers until a batch, flush interval or `tick()` fires.
-- **`setup` installed a console exporter instead of OTLP.** The facade and
-  async `setup` need a transport for OTLP. When OTLP is selected without one,
-  they intentionally fall back to the console exporter unless `none` is
-  selected. Use `@async_runtime.setup` for the built-in async transport.
 - **No spans are recorded at all.** Check `OTEL_SDK_DISABLED`: when it is
   `true`, tracers are no-ops. Also check `OTEL_TRACES_SAMPLER`; `always_off`
   drops every root span. A programmatic `record_only` sampler instead keeps
@@ -802,6 +799,11 @@ explicit names: a wildcard also captures headers such as `Authorization` and
 - **Headers or endpoints are ignored.** Signal-specific
   `OTEL_EXPORTER_OTLP_TRACES_*` variables take precedence over the generic
   `OTEL_EXPORTER_OTLP_*` variables. Blank values are treated as unset.
+- **`setup` installed a console exporter instead of OTLP.** The facade
+  `@moonotel.setup` needs a transport for OTLP. When OTLP is selected without
+  one, it intentionally falls back to the console exporter unless `none` is
+  selected. `@async_runtime.setup` uses the built-in async HTTP transport and
+  does not need a transport argument or fall back to console.
 - **A carrier has an old trace header.** Reuse is handled: `inject` removes a
   stale `traceparent`/`tracestate` when the context has no valid span, and
   baggage injection removes a stale `baggage` header when no members are
