@@ -145,6 +145,55 @@ test "disabled capture records nothing" {
 }
 
 ///|
+test "record_response_with_cookies serializes cookies when no set-cookie header exists" {
+  let (span, exporter) = capture_span()
+  let headers : @http.Headers = Map([])
+  let cookies : Array[@http.Cookie] = [
+    @http.Cookie::Cookie(
+      "session",
+      "abc",
+      path="/app",
+      secure=true,
+      http_only=true,
+    ),
+    @http.Cookie::Cookie("theme", "dark"),
+  ]
+  @http_header_capture.HeaderCapture::parse(
+    "set-cookie",
+  ).record_response_with_cookies(headers, cookies, span)
+  span.end()
+  let data = exporter.spans.val[0]
+  assert_eq(
+    data.attributes.get("http.response.header.set-cookie"),
+    Some(
+      @sdk.StringArrayValue([
+        "session=abc; Path=/app; Secure; HttpOnly", "theme=dark",
+      ]),
+    ),
+  )
+}
+
+///|
+test "record_response_with_cookies keeps an explicit set-cookie header" {
+  let (span, exporter) = capture_span()
+  let headers : @http.Headers = Map([
+    (@http.CaseInsensitiveString("Set-Cookie"), "raw=1; Path=/"),
+  ])
+  let cookies : Array[@http.Cookie] = [
+    @http.Cookie::Cookie("parsed", "2"),
+  ]
+  @http_header_capture.HeaderCapture::parse(
+    "set-cookie",
+  ).record_response_with_cookies(headers, cookies, span)
+  span.end()
+  let data = exporter.spans.val[0]
+  assert_eq(
+    data.attributes.get("http.response.header.set-cookie"),
+    Some(@sdk.StringArrayValue(["raw=1; Path=/"])),
+  )
+}
+
+///|
 test "captured header values omit surrounding optional whitespace" {
   let (span, exporter) = capture_span()
   let headers : @http.Headers = Map([
