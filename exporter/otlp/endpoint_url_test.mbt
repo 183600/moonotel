@@ -60,3 +60,29 @@ test "traces endpoint with a trailing slash or path is unchanged" {
     assert_eq(config.traces_url(), url)
   }
 }
+
+// Relative endpoints have no authority that could be mistaken for a path.
+// The signal path is appended to the path component, and a fragment or query
+// stays at the end.
+
+///|
+test "relative generic endpoint gets the signal path" {
+  let config = @otlp.OtlpHttpConfig::new(endpoint="collector:4318/base")
+  assert_eq(config.traces_url(), "collector:4318/base/v1/traces")
+  assert_eq(config.request_url(), "collector:4318/base/v1/traces")
+
+  let with_query = @otlp.OtlpHttpConfig::new(
+    endpoint="/base?tenant=acme#section",
+  )
+  assert_eq(
+    with_query.traces_url(),
+    "/base/v1/traces?tenant=acme#section",
+  )
+  assert_eq(with_query.request_url(), "/base/v1/traces?tenant=acme")
+}
+
+///|
+test "relative generic endpoint already ending in the signal path is unchanged" {
+  let config = @otlp.OtlpHttpConfig::new(endpoint="/v1/traces")
+  assert_eq(config.traces_url(), "/v1/traces")
+}

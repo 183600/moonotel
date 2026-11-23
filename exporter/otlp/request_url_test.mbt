@@ -116,3 +116,28 @@ test "request_url_leaves_non_empty_and_malformed_ports" {
     )
   }
 }
+
+///|
+test "request_url_keeps_a_signal_root_path_query_and_drops_the_fragment" {
+  assert_eq(
+    @otlp.OtlpHttpConfig::new(
+      traces_endpoint="http://collector:4318?tenant=acme#section",
+    ).request_url(),
+    "http://collector:4318/?tenant=acme",
+  )
+  assert_eq(
+    @otlp.OtlpHttpConfig::new(
+      traces_endpoint="//collector:4318?tenant=acme#section",
+    ).request_url(),
+    "http://collector:4318/?tenant=acme",
+  )
+}
+
+///|
+test "request_url_strips_an_empty_port_from_a_network_path_with_a_path" {
+  let config = @otlp.OtlpHttpConfig::new(
+    traces_endpoint="//collector:/custom",
+  )
+  assert_eq(config.traces_url(), "//collector:/custom")
+  assert_eq(config.request_url(), "http://collector/custom")
+}
