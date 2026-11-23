@@ -484,10 +484,7 @@ fn is_ows_code(c : UInt16) -> Bool {
 // are unique per member; later occurrences are ignored.
 
 ///|
-fn has_property_key(
-  properties : Array[(String, String)],
-  key : String,
-) -> Bool {
+fn has_property_key(properties : Array[(String, String)], key : String) -> Bool {
   for existing in properties {
     if existing.0 == key {
       return true
@@ -1000,11 +997,7 @@ pub fn format_baggage(entries : Array[(String, String)]) -> String {
 fn compare_baggage_keys(a : String, b : String) -> Int32 {
   let a_len = a.length()
   let b_len = b.length()
-  let limit = if a_len < b_len {
-    a_len
-  } else {
-    b_len
-  }
+  let limit = if a_len < b_len { a_len } else { b_len }
   let mut i = 0
   while i < limit {
     let a_code = a.unsafe_get(i).to_int()
@@ -1056,7 +1049,7 @@ pub fn context_baggage_header(context : @context.Context) -> String? {
       let current = entries.unsafe_get(i)
       let mut j = i
       while j > 0 &&
-        compare_baggage_keys(current.key, entries.unsafe_get(j - 1).key) < 0 {
+            compare_baggage_keys(current.key, entries.unsafe_get(j - 1).key) < 0 {
         entries.unsafe_set(j, entries.unsafe_get(j - 1))
         j = j - 1
       }

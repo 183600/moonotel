@@ -77,7 +77,7 @@ async test "response size limit applies to retryable error bodies" {
   @async.with_task_group() <| group => {
     let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
     let port = server.addr.port()
-    let requests : Ref[Int] = Ref(0)
+    let requests : Ref[Int32] = Ref(0)
     group.spawn_bg(no_wait=true) <| () => {
       server.run_forever() <| ((_request, body, conn) => {
         let _ = body.read_all()

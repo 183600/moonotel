@@ -3,7 +3,7 @@
 // and a shut-down sampler drops further decisions.
 
 ///|
-fn counting_sampler(calls : Ref[Int]) -> @sdk.Sampler {
+fn counting_sampler(calls : Ref[Int32]) -> @sdk.Sampler {
   @sdk.Sampler::new("CountingSampler", fn(_parameters) {
     @sdk.sampling_decision_record_and_sample()
   }).with_shutdown(fn() { calls.val = calls.val + 1 })
@@ -12,8 +12,9 @@ fn counting_sampler(calls : Ref[Int]) -> @sdk.Sampler {
 ///|
 test "provider shutdown shuts the sampler down once" {
   let calls = Ref(0)
-  let provider = @sdk.TracerProviderSdk::new(service_name="sampler-shutdown")
-    .with_sampler(counting_sampler(calls))
+  let provider = @sdk.TracerProviderSdk::new(service_name="sampler-shutdown").with_sampler(
+    counting_sampler(calls),
+  )
   provider.shutdown()
   assert_eq(calls.val, 1)
   provider.shutdown()
@@ -126,8 +127,9 @@ test "with_shutdown on a composite keeps delegate forwarding" {
   let record_calls = Ref(0)
   let record_root_calls = Ref(0)
   let record_root = counting_sampler(record_root_calls)
-  let record = @sdk.Sampler::always_record(record_root)
-    .with_shutdown(fn() { record_calls.val = record_calls.val + 1 })
+  let record = @sdk.Sampler::always_record(record_root).with_shutdown(fn() {
+    record_calls.val = record_calls.val + 1
+  })
   record.shutdown()
   assert_eq(record_calls.val, 1)
   assert_eq(record_root_calls.val, 1)

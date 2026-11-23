@@ -125,7 +125,7 @@ pub fn Sampler::new(
   description : String,
   sample : (SamplingParameters) -> SamplingDecision,
 ) -> Sampler {
-  { description, sample, on_shutdown: fn() {}, shutdown_called: Ref(false), }
+  { description, sample, on_shutdown: fn() {  }, shutdown_called: Ref(false), }
 }
 
 // Attach a shutdown callback to a sampler. The callback runs at most once when
@@ -138,7 +138,13 @@ pub fn Sampler::with_shutdown(
   on_shutdown : () -> Unit,
 ) -> Sampler {
   let previous = self.on_shutdown
-  { ..self, on_shutdown: fn() { previous(); on_shutdown() }, }
+  {
+    ..self,
+    on_shutdown: fn() {
+      previous()
+      on_shutdown()
+    },
+  }
 }
 
 // Release any resource held by a sampler. Calls after the first are no-ops,

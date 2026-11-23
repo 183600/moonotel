@@ -1049,15 +1049,11 @@ pub async fn post_trace_request(
   max_response_size? : Int32,
 ) -> @sdk.ExportResult {
   let (max_request_size, max_response_size) = normalize_size_limits(
-    max_request_size,
-    max_response_size,
+    max_request_size, max_response_size,
   )
-  export_prepared_trace_body(
-    config,
-    max_request_size,
-    max_response_size,
-    fn() { body },
-  )
+  export_prepared_trace_body(config, max_request_size, max_response_size, fn() {
+    body
+  })
 }
 
 // Encode `spans` with the OTLP/HTTP encoding selected by `config.protocol`.
@@ -1088,15 +1084,11 @@ pub async fn export_spans(
     return @sdk.ExportSuccess
   }
   let (max_request_size, max_response_size) = normalize_size_limits(
-    max_request_size,
-    max_response_size,
+    max_request_size, max_response_size,
   )
-  export_prepared_trace_body(
-    config,
-    max_request_size,
-    max_response_size,
-    fn() { encode_trace_body(config, spans) },
-  )
+  export_prepared_trace_body(config, max_request_size, max_response_size, fn() {
+    encode_trace_body(config, spans)
+  })
 }
 
 // An async span exporter over OTLP/HTTP. Use it with an async flush loop
@@ -1124,8 +1116,7 @@ pub fn OtlpHttpAsyncExporter::new(
   // request headers.
   let config = { ..config, headers: config.headers.copy(), }
   let (max_request_size, max_response_size) = normalize_size_limits(
-    max_request_size,
-    max_response_size,
+    max_request_size, max_response_size,
   )
   {
     config,

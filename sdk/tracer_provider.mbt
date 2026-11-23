@@ -111,7 +111,7 @@ fn exporter_list_selected(
 ///|
 pub fn traces_exporter_enabled(name : String) -> Bool {
   match @env.get_env_var("OTEL_TRACES_EXPORTER") {
-    None => exporter_list_selected([| |], name, true)
+    None => exporter_list_selected([||], name, true)
     Some(value) => exporter_list_selected(value.split(","), name, true)
   }
 }

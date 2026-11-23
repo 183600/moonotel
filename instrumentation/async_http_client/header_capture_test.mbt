@@ -264,7 +264,8 @@ async test "client header capture follows the configured environment" {
     data.attributes.get("http.response.header.set-cookie"),
     Some(
       @sdk.StringArrayValue([
-        "session=abc; Path=/app; Expires=Sun, 06 Nov 1994 08:49:37 GMT; Max-Age=60; Domain=example.com; Secure; HttpOnly; SameSite=Lax", "theme=dark",
+        "session=abc; Path=/app; Expires=Sun, 06 Nov 1994 08:49:37 GMT; Max-Age=60; Domain=example.com; Secure; HttpOnly; SameSite=Lax",
+        "theme=dark",
       ]),
     ),
   )
@@ -275,7 +276,8 @@ async test "client header capture follows the configured environment" {
     data.attributes.get("http.response.header.set-cookie"),
     Some(
       @sdk.StringArrayValue([
-        "session=abc; Path=/app; Expires=Sun, 06 Nov 1994 08:49:37 GMT; Max-Age=60; Domain=example.com; Secure; HttpOnly; SameSite=Lax", "theme=dark",
+        "session=abc; Path=/app; Expires=Sun, 06 Nov 1994 08:49:37 GMT; Max-Age=60; Domain=example.com; Secure; HttpOnly; SameSite=Lax",
+        "theme=dark",
       ]),
     ),
   )

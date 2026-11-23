@@ -14,10 +14,9 @@ fn fallback_all_zero(bytes : Array[Int32]) -> Bool {
 
 ///|
 test "invalid custom trace id falls back to a valid random id" {
-  let generator = @sdk.IdGenerator::new(
-    fn() { Array::make(16, 0) },
-    fn() { @api.bytes_from_hex("00f067aa0ba902b7").unwrap() },
-  )
+  let generator = @sdk.IdGenerator::new(fn() { Array::make(16, 0) }, fn() {
+    @api.bytes_from_hex("00f067aa0ba902b7").unwrap()
+  })
   let provider = @sdk.TracerProviderSdk::new(service_name="fallback")
     .with_sampler(@sdk.Sampler::always_on())
     .with_id_generator(generator)
@@ -57,19 +56,15 @@ test "invalid custom span id falls back to a valid random id" {
   assert_false(fallback_all_zero(context.span_id()))
   // The custom trace ID was usable and the generator did not opt into the
   // random flag, so only the sampled flag is set.
-  assert_eq(
-    context.trace_flags() & @api.TRACE_FLAGS_RANDOM,
-    0,
-  )
+  assert_eq(context.trace_flags() & @api.TRACE_FLAGS_RANDOM, 0)
   span.end()
 }
 
 ///|
 test "malformed custom id lengths fall back to valid random ids" {
-  let generator = @sdk.IdGenerator::new(
-    fn() { Array::make(15, 7) },
-    fn() { Array::make(7, 9) },
-  )
+  let generator = @sdk.IdGenerator::new(fn() { Array::make(15, 7) }, fn() {
+    Array::make(7, 9)
+  })
   let provider = @sdk.TracerProviderSdk::new(service_name="fallback")
     .with_sampler(@sdk.Sampler::always_on())
     .with_id_generator(generator)
@@ -85,10 +80,9 @@ test "malformed custom id lengths fall back to valid random ids" {
 
 ///|
 test "custom ids that serialize to zero fall back to valid random ids" {
-  let generator = @sdk.IdGenerator::new(
-    fn() { Array::make(16, 256) },
-    fn() { Array::make(8, 256) },
-  )
+  let generator = @sdk.IdGenerator::new(fn() { Array::make(16, 256) }, fn() {
+    Array::make(8, 256)
+  })
   let provider = @sdk.TracerProviderSdk::new(service_name="fallback")
     .with_sampler(@sdk.Sampler::always_on())
     .with_id_generator(generator)

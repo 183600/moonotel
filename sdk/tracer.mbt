@@ -112,7 +112,12 @@ pub fn Tracer::start_span(
           "",
         )
       } else {
-        (fallback_id_generator().generate_trace_id(), true, no_parent_span_id, "")
+        (
+          fallback_id_generator().generate_trace_id(),
+          true,
+          no_parent_span_id,
+          "",
+        )
       }
     }
   }
@@ -146,11 +151,7 @@ pub fn Tracer::start_span(
   // preserves its flag; a root span sets it when the trace ID came from a
   // generator that meets the Level 2 randomness requirements. A fallback
   // trace ID always comes from the SDK's random generator.
-  let random_flag = if trace_id_random {
-    @api.TRACE_FLAGS_RANDOM
-  } else {
-    0
-  }
+  let random_flag = if trace_id_random { @api.TRACE_FLAGS_RANDOM } else { 0 }
   let flags = random_flag |
     (if decision.is_sampled && decision.is_recorded {
       @api.TRACE_FLAGS_SAMPLED

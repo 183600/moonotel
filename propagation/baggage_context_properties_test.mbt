@@ -89,8 +89,8 @@ test "context_baggage_header_sorts_small_entry_lists" {
 ///|
 test "context_baggage_header_sorts_large_entry_lists" {
   let keys : Array[String] = [
-    "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p",
-    "q", "aa",
+    "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
+    "aa",
   ]
   let mut context = @context.Context::root()
   for key in keys {
@@ -98,9 +98,7 @@ test "context_baggage_header_sorts_large_entry_lists" {
   }
   assert_eq(
     @propagation.context_baggage_header(context),
-    Some(
-      "aa=1,b=1,c=1,d=1,e=1,f=1,g=1,h=1,i=1,j=1,k=1,l=1,m=1,n=1,o=1,p=1,q=1",
-    ),
+    Some("aa=1,b=1,c=1,d=1,e=1,f=1,g=1,h=1,i=1,j=1,k=1,l=1,m=1,n=1,o=1,p=1,q=1"),
   )
 }
 

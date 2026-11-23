@@ -34,11 +34,7 @@ fn partial_success_failure(
   rejected : Int64,
   message : String,
 ) -> @sdk.ExportResult {
-  let suffix = if message == "" {
-    ""
-  } else {
-    " " + message
-  }
+  let suffix = if message == "" { "" } else { " " + message }
   @sdk.ExportFailure(
     "partial success: rejected " + rejected.to_string() + " span(s)" + suffix,
   )

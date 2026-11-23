@@ -28,8 +28,9 @@ test "sampler cannot mutate the parent context used for the child span" {
     }
     @sdk.sampling_decision_record_and_sample()
   })
-  let provider = @sdk.TracerProviderSdk::new(service_name="parent-isolation")
-    .with_sampler(sampler)
+  let provider = @sdk.TracerProviderSdk::new(service_name="parent-isolation").with_sampler(
+    sampler,
+  )
   let child = provider
     .get_tracer("parent-isolation")
     .start_span("child", parent~)
