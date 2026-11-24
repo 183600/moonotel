@@ -159,7 +159,12 @@ test "provider_registers_several_processors_at_once" {
 test "multi_span_processor_flushes_a_repeated_child_once" {
   let log : Ref[Array[String]] = Ref([])
   let child = composite_probe("repeated", log)
-  let multi = @sdk.MultiSpanProcessor::new(processors=[child, child])
+  // Register the same child object twice. Reusing one trait-object reference
+  // keeps the duplicate detectable on every backend; coercing the value at
+  // each use may allocate a fresh box (for example on wasm-gc), and object
+  // identity is not defined for separate boxes.
+  let shared : &@sdk.SpanProcessor = child
+  let multi = @sdk.MultiSpanProcessor::new(processors=[shared, shared])
   multi.force_flush()
   assert_eq(child.flushes.val, 1)
   multi.shutdown()

@@ -190,8 +190,13 @@ test "force_flush_after_shutdown_is_ignored" {
 ///|
 test "force_flush_calls_a_repeated_processor_once" {
   let processor = counting_processor()
+  // Register the same processor object twice. Reusing one trait-object
+  // reference keeps the duplicate detectable on every backend; coercing the
+  // value at each use may allocate a fresh box (for example on wasm-gc), and
+  // object identity is not defined for separate boxes.
+  let shared : &@sdk.SpanProcessor = processor
   let provider = @sdk.TracerProviderSdk::new(service_name="svc").with_span_processors([
-      processor, processor,
+      shared, shared,
     ],
   )
   provider.force_flush()
