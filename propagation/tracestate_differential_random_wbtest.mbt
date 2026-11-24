@@ -11,7 +11,8 @@ fn probe_next(state : Ref[UInt64]) -> Int32 {
 ///|
 test "probe tracestate differential random" {
   let alphabet : Array[Char] = [
-    'a','b','c','z','0','1','9','_','-','*','/','@','=',' ',',','\t',';','A','Z','.','%','[',']','\\','"','\n','\r','é',
+    'a', 'b', 'c', 'z', '0', '1', '9', '_', '-', '*', '/', '@', '=', ' ', ',', '\t',
+    ';', 'A', 'Z', '.', '%', '[', ']', '\\', '"', '\n', '\r', 'é',
   ]
   let state : Ref[UInt64] = Ref(88172645463325252UL)
   let mut round = 0
@@ -31,7 +32,14 @@ test "probe tracestate differential random" {
       None => None
     }
     if a != b {
-      abort("mismatch: " + s + " fast=" + a.unwrap_or("<None>") + " object=" + b.unwrap_or("<None>"))
+      abort(
+        "mismatch: " +
+        s +
+        " fast=" +
+        a.unwrap_or("<None>") +
+        " object=" +
+        b.unwrap_or("<None>"),
+      )
     }
     round = round + 1
   }
