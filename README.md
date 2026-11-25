@@ -703,6 +703,17 @@ let carrier = @propagation.TextMapCarrier::new()
 let parent = @propagation.extract(carrier)        // SpanContext?
 ```
 
+Every propagator exposes `fields()`, the header names it may read or write.
+The trace context propagator reports `traceparent` and `tracestate`, the baggage
+propagator reports `baggage`, and a composite returns the union in member order
+with duplicates removed case-insensitively. Clear these fields before injecting
+into a reused carrier; custom propagators that do not override `fields()` report
+an empty list. The global propagator exposes the same method:
+
+```moonbit
+let headers = @propagation.global_propagator().fields()
+```
+
 Header names are matched case-insensitively. Repeated `tracestate` and
 `baggage` fields are combined into one comma-separated value before parsing, as
 required for HTTP fields. A duplicated `traceparent` (under any casing) is

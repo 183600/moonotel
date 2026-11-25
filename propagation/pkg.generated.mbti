@@ -89,6 +89,7 @@ pub fn BaggageEntry::to_repr(Self) -> @debug.Repr
 pub struct BaggagePropagator {
 }
 pub fn BaggagePropagator::extract(Self, TextMapCarrier) -> @context.Context
+pub fn BaggagePropagator::fields(Self) -> Array[String]
 pub fn BaggagePropagator::inject(Self, @context.Context, TextMapCarrier) -> Unit
 pub fn BaggagePropagator::new() -> Self
 pub impl TextMapPropagator for BaggagePropagator
@@ -97,6 +98,7 @@ pub struct CompositePropagator {
   propagators : Array[&TextMapPropagator]
 }
 pub fn CompositePropagator::extract(Self, TextMapCarrier) -> @context.Context
+pub fn CompositePropagator::fields(Self) -> Array[String]
 pub fn CompositePropagator::from_env() -> Self
 pub fn CompositePropagator::inject(Self, @context.Context, TextMapCarrier) -> Unit
 pub fn CompositePropagator::length(Self) -> Int32
@@ -127,6 +129,7 @@ pub fn TextMapCarrier::to_map(Self) -> Map[String, String]
 pub struct TraceContextPropagator {
 }
 pub fn TraceContextPropagator::extract(Self, TextMapCarrier) -> @context.Context
+pub fn TraceContextPropagator::fields(Self) -> Array[String]
 pub fn TraceContextPropagator::inject(Self, @context.Context, TextMapCarrier) -> Unit
 pub fn TraceContextPropagator::new() -> Self
 pub impl TextMapPropagator for TraceContextPropagator
@@ -152,4 +155,5 @@ pub fn Tracestate::update(Self, String, String) -> Self
 pub(open) trait TextMapPropagator {
   fn inject(Self, @context.Context, TextMapCarrier) -> Unit
   fn extract(Self, TextMapCarrier) -> @context.Context
+  fn fields(Self) -> Array[String] = _
 }

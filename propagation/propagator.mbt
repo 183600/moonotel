@@ -16,6 +16,17 @@
 pub(open) trait TextMapPropagator {
   fn inject(Self, @context.Context, TextMapCarrier) -> Unit
   fn extract(Self, TextMapCarrier) -> @context.Context
+  // Header names this propagator may write during injection and read during
+  // extraction. Instrumentations can use the list to clear a reused carrier
+  // before injecting. The default is empty so existing custom propagators stay
+  // source compatible.
+  fn fields(Self) -> Array[String] = _
+}
+
+///|
+impl TextMapPropagator with fn fields(self) {
+  let _ = self
+  []
 }
 
 // The W3C Trace Context propagator, handling `traceparent` and `tracestate`.
@@ -61,7 +72,17 @@ pub impl TextMapPropagator for TraceContextPropagator with fn extract(
 }
 
 ///|
-pub extend TraceContextPropagator with TextMapPropagator::{inject, extract}
+pub impl TextMapPropagator for TraceContextPropagator with fn fields(self) {
+  let _ = self
+  [traceparent_header_name(), tracestate_header_name()]
+}
+
+///|
+pub extend TraceContextPropagator with TextMapPropagator::{
+  inject,
+  extract,
+  fields,
+}
 
 // The W3C Baggage propagator, handling the `baggage` header.
 
@@ -92,7 +113,13 @@ pub impl TextMapPropagator for BaggagePropagator with fn extract(self, carrier) 
 }
 
 ///|
-pub extend BaggagePropagator with TextMapPropagator::{inject, extract}
+pub impl TextMapPropagator for BaggagePropagator with fn fields(self) {
+  let _ = self
+  [baggage_header_name()]
+}
+
+///|
+pub extend BaggagePropagator with TextMapPropagator::{inject, extract, fields}
 
 // A propagator that runs a list of propagators in order. Injection writes
 // with every member in list order; extraction folds the contexts returned by
@@ -151,7 +178,27 @@ pub impl TextMapPropagator for CompositePropagator with fn extract(
 }
 
 ///|
-pub extend CompositePropagator with TextMapPropagator::{inject, extract}
+pub impl TextMapPropagator for CompositePropagator with fn fields(self) {
+  let fields : Array[String] = []
+  for propagator in self.propagators {
+    for field in propagator.fields() {
+      let mut seen = false
+      for existing in fields {
+        if ascii_case_insensitive_equal(existing, field) {
+          seen = true
+          break
+        }
+      }
+      if !seen {
+        fields.push(field)
+      }
+    }
+  }
+  fields
+}
+
+///|
+pub extend CompositePropagator with TextMapPropagator::{inject, extract, fields}
 
 // Build a composite propagator from `OTEL_PROPAGATORS`, a comma-separated
 // list of propagator names. Unset or blank values select the default

@@ -293,6 +293,9 @@ Baggage 语义：
 - 复用 carrier 时，如果新上下文没有有效 span 或可见 baggage，注入逻辑会清除
   旧的对应 header，避免旧 trace 或旧 baggage 泄漏。
 - baggage 解析与格式化限制为 64 个成员和 8192 字节，超出部分整项丢弃。
+- `TextMapPropagator::fields()` 返回该 propagator 可能读写的 header 名称；复合
+  propagator 按成员顺序合并并忽略大小写去重，内置实现分别返回
+  `traceparent` / `tracestate` 与 `baggage`。自定义 propagator 未覆盖时返回空列表。
 
 ## 5. SDK 设计
 
