@@ -89,6 +89,35 @@ test "ratio_small_is_deterministic" {
 }
 
 ///|
+test "ratio_nan_is_treated_as_one" {
+  // NaN is not comparable, so the constructor treats it like the
+  // environment-variable fallback and samples every trace.
+  let sampler = @sdk.Sampler::trace_id_ratio_based(
+    0x7FF8000000000000L.reinterpret_as_double(),
+  )
+  assert_eq(sampler.description(), "TraceIdRatioBased{1}")
+  assert_true(
+    sampler.should_sample(None, ratio_trace_id(0xFFFFFFFFFFFFFFFF)).is_sampled,
+  )
+}
+
+///|
+test "ratio_infinities_are_clamped" {
+  let always = @sdk.Sampler::trace_id_ratio_based(
+    0x7FF0000000000000L.reinterpret_as_double(),
+  )
+  let never = @sdk.Sampler::trace_id_ratio_based(
+    0xFFF0000000000000L.reinterpret_as_double(),
+  )
+  assert_eq(always.description(), "TraceIdRatioBased{1}")
+  assert_eq(never.description(), "TraceIdRatioBased{0}")
+  assert_true(
+    always.should_sample(None, ratio_trace_id(0xFFFFFFFFFFFFFFFF)).is_sampled,
+  )
+  assert_false(never.should_sample(None, ratio_trace_id(0)).is_sampled)
+}
+
+///|
 test "ratio_sampler_pads_short_trace_ids_on_the_left" {
   // A short trace ID uses its bytes as the rightmost bytes of the suffix; the
   // missing leading bytes are zero, exactly like the equivalent padded ID.
