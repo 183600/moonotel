@@ -143,3 +143,21 @@ test "double_arrays_with_equal_contents_share_resource_keys" {
   r2.set("a", @sdk.DoubleArrayValue([1.5, -0.0]))
   assert_eq(probe_resource_group_count(r1, r2), 1)
 }
+
+///|
+test "resources_with_same_size_but_different_keys_are_distinct" {
+  let r1 : Map[String, @sdk.AttributeValue] = Map([])
+  r1.set("a", @sdk.IntValue(1))
+  let r2 : Map[String, @sdk.AttributeValue] = Map([])
+  r2.set("b", @sdk.IntValue(1))
+  assert_eq(probe_resource_group_count(r1, r2), 2)
+}
+
+///|
+test "resources_with_the_same_key_but_different_values_are_distinct" {
+  let r1 : Map[String, @sdk.AttributeValue] = Map([])
+  r1.set("a", @sdk.IntValue(1))
+  let r2 : Map[String, @sdk.AttributeValue] = Map([])
+  r2.set("a", @sdk.IntValue(2))
+  assert_eq(probe_resource_group_count(r1, r2), 2)
+}
