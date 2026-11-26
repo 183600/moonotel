@@ -474,12 +474,12 @@ pub fn ResourceAttributes::iter2(
   self : ResourceAttributes,
 ) -> Iter2[String, AttributeValue] {
   let entries = self.raw_map().iter()
-  Iter2::new(fn() {
+  Iter2(Iter(fn() {
     match entries.next() {
       Some((key, value)) => Some((key, copy_attribute_value(value)))
       None => None
     }
-  })
+  }))
 }
 
 // Whether this snapshot stores a value under `key`.
