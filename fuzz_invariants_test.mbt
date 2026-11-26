@@ -226,6 +226,23 @@ test "fuzz_tracestate_normalization_is_stable" {
 }
 
 ///|
+test "fuzz_tracestate_first_class_parser_matches_header_parser" {
+  let rng = FuzzRng::new(0x7AC3_57A7_E000_0001L)
+  let mut i = 0
+  while i < 3000 {
+    let text = random_text(rng, 12)
+    let normalized = @propagation.parse_tracestate(text)
+    let parsed = @propagation.Tracestate::parse(text)
+    match (normalized, parsed) {
+      (Some(header), Some(state)) => assert_eq(state.to_header(), header)
+      (None, None) => ()
+      _ => abort("tracestate parsers disagree on validity")
+    }
+    i = i + 1
+  }
+}
+
+///|
 test "fuzz_traceparent_round_trips" {
   let rng = FuzzRng::new(0x1234_ABCD_5678_9F0FL)
   let mut i = 0
