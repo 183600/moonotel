@@ -165,11 +165,24 @@ import {
 }
 ```
 
-Add `@otlp_async`, `@async_runtime`, `@client` and `@server` from
-`183600/moonotel/exporter/otlp_async`, `183600/moonotel/async_runtime`,
-`183600/moonotel/instrumentation/async_http_client` and
-`183600/moonotel/instrumentation/async_http_server` when you use those
-packages.
+The async runtime and HTTP instrumentation examples use these additional
+packages:
+
+```text
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/socket",
+  "183600/moonotel/async_runtime" @async_runtime,
+  "183600/moonotel/exporter/otlp_async" @otlp_async,
+  "183600/moonotel/instrumentation/async_http_client" @client,
+  "183600/moonotel/instrumentation/async_http_server" @server,
+}
+```
+
+`moonbitlang/async` and `moonbitlang/async/socket` come from the async
+library. Add `moonbitlang/async/http` when you name its types directly. The
+async runtime, real OTLP transport and HTTP instrumentation packages target
+native and wasm.
 
 ### Record a span
 
@@ -185,6 +198,10 @@ span.add_event("retry", attributes={ "attempt": @sdk.IntValue(1) })
 span.set_status(@api.StatusCode::Ok)
 span.end()
 ```
+
+`start_root_span` always starts a new trace. To join an existing trace, pass a
+parent `SpanContext` to `start_span`, or use `start_span_with_context` to read
+it from a `Context`.
 
 Attribute keys must be non-empty, as required by the OpenTelemetry data model.
 An empty key passed to a span, event, link or resource setter is ignored: it is
@@ -235,7 +252,11 @@ exits.
 ```moonbit
 async fn main raise {
   @async.with_task_group(group => {
-    let provider = @async_runtime.setup(group, service_name="checkout")
+    let provider = @async_runtime.setup(
+      group,
+      service_name="checkout",
+      endpoint="http://localhost:4318",
+    )
     let tracer = provider.get_tracer("checkout")
     // Run traced work while the group is alive.
     tracer.with_span("charge-card", fn(span) {
@@ -248,7 +269,9 @@ async fn main raise {
 
 The async setup uses the exporter's own queue by default. Pass `use_batch=true`
 or an explicit `batch` configuration to put a `BatchSpanProcessor` and its
-flush loop in front of it.
+flush loop in front of it. `endpoint` overrides the OTLP URL, and `headers`
+is merged into the environment headers; otherwise the standard
+`OTEL_EXPORTER_OTLP_*` variables apply.
 
 ## Examples
 
@@ -378,6 +401,16 @@ that interleave `attach` / `detach` must pass an explicit `Context` to the code
 they run (the HTTP instrumentation does this) or install a task-aware backend
 with `@context.set_context_storage`.
 
+```moonbit
+let ctx = @context.root().with_baggage(Map([("tenant", "acme")]))
+@context.with_context(ctx, fn() {
+  // Spans created here inherit `ctx` as their ambient base context.
+  tracer.with_span("work", fn(span) {
+    span.set_string_attribute("tenant", "acme")
+  })
+})
+```
+
 An empty baggage update (`with_baggage(Map([]))`, or `without_baggage()`) hides
 every value stored in outer contexts while keeping values added afterwards.
 Baggage names must be non-empty, as required by the OpenTelemetry Baggage API;
@@ -411,6 +444,17 @@ tracer.with_span("checkout", fn(_parent) {
 For work that interleaves with other tasks, pass an explicit `Context` or use
 the context-aware spawn helpers from `@async_runtime` instead of relying on the
 default ambient slot.
+
+To continue a trace received from another service, pass the extracted context
+explicitly:
+
+```moonbit
+let parent = @propagation.extract(carrier) // SpanContext?
+let span = match parent {
+  Some(ctx) => tracer.start_span("handle-request", parent=ctx)
+  None => tracer.start_root_span("handle-request")
+}
+```
 
 ### A custom sampler
 

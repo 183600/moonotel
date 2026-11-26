@@ -277,6 +277,35 @@ fn scoped_base_context(context? : @context.Context) -> @context.Context {
   }
 }
 
+// Start a scoped span and make it the current span. Returns the span and the
+// context that was current before the attach, so the caller can restore it
+// with `@context.detach`.
+
+///|
+fn Tracer::enter_scoped_span(
+  self : Tracer,
+  name : String,
+  context? : @context.Context,
+  kind? : @api.SpanKind,
+  parent? : @api.SpanContext,
+  attributes? : Map[String, AttributeValue],
+  links? : Array[SpanLink],
+  start_time_unix_nano? : Int64,
+) -> (SpanSdk, @context.Context) {
+  let span = self.start_scoped_span(
+    name,
+    context?,
+    kind?,
+    parent?,
+    attributes?,
+    links?,
+    start_time_unix_nano?,
+  )
+  let base = scoped_base_context(context?)
+  let previous = @context.attach(base.with_span(span.context()))
+  (span, previous)
+}
+
 // Run `f` with a new span that becomes the current span for the duration of
 // the call, so spans started inside `f` link to it automatically. When
 // `parent` is omitted the span is a child of the current context's span (or a
@@ -300,7 +329,7 @@ pub fn[X] Tracer::with_span(
   links? : Array[SpanLink],
   start_time_unix_nano? : Int64,
 ) -> X raise {
-  let span = self.start_scoped_span(
+  let (span, previous) = self.enter_scoped_span(
     name,
     context?,
     kind?,
@@ -309,8 +338,6 @@ pub fn[X] Tracer::with_span(
     links?,
     start_time_unix_nano?,
   )
-  let base = scoped_base_context(context?)
-  let previous = @context.attach(base.with_span(span.context()))
   defer @context.detach(previous)
   defer span.end()
   f(span) catch {
@@ -357,7 +384,7 @@ pub async fn[X] Tracer::with_span_async(
   links? : Array[SpanLink],
   start_time_unix_nano? : Int64,
 ) -> X {
-  let span = self.start_scoped_span(
+  let (span, previous) = self.enter_scoped_span(
     name,
     context?,
     kind?,
@@ -366,8 +393,6 @@ pub async fn[X] Tracer::with_span_async(
     links?,
     start_time_unix_nano?,
   )
-  let base = scoped_base_context(context?)
-  let previous = @context.attach(base.with_span(span.context()))
   defer @context.detach(previous)
   defer span.end()
   f(span) catch {

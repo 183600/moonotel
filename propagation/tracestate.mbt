@@ -301,6 +301,28 @@ fn take_members(
   }
 }
 
+// Build a copy whose first member is `key=value`, replacing any existing
+// member with the same key and keeping the remaining order. Adding to a full
+// list drops the right-most member.
+
+///|
+fn Tracestate::prepend_member(
+  self : Tracestate,
+  key : String,
+  value : String,
+) -> Tracestate {
+  let count = self.members.length()
+  let capacity = if count < TRACESTATE_MAX_MEMBERS {
+    count + 1
+  } else {
+    TRACESTATE_MAX_MEMBERS
+  }
+  let members : Array[(String, String)] = Array(capacity~)
+  members.push((key, value))
+  take_members(members, self.members, key)
+  { members: truncate_tracestate_members(members), }
+}
+
 // Add `key=value` at the beginning of the list. When the key is already
 // present its old member is replaced. Adding to a full list drops the
 // right-most member. When the combined header would exceed
@@ -317,16 +339,7 @@ pub fn Tracestate::add(
   if !is_valid_tracestate_member(key[:], value[:]) {
     return self
   }
-  let count = self.members.length()
-  let capacity = if count < TRACESTATE_MAX_MEMBERS {
-    count + 1
-  } else {
-    TRACESTATE_MAX_MEMBERS
-  }
-  let members : Array[(String, String)] = Array(capacity~)
-  members.push((key, value))
-  take_members(members, self.members, key)
-  { members: truncate_tracestate_members(members), }
+  self.prepend_member(key, value)
 }
 
 // Update the value of `key`, moving the member to the beginning of the list.
@@ -346,18 +359,7 @@ pub fn Tracestate::update(
   }
   match self.get(key) {
     None => self
-    Some(_) => {
-      let count = self.members.length()
-      let capacity = if count < TRACESTATE_MAX_MEMBERS {
-        count + 1
-      } else {
-        TRACESTATE_MAX_MEMBERS
-      }
-      let members : Array[(String, String)] = Array(capacity~)
-      members.push((key, value))
-      take_members(members, self.members, key)
-      { members: truncate_tracestate_members(members), }
-    }
+    Some(_) => self.prepend_member(key, value)
   }
 }
 

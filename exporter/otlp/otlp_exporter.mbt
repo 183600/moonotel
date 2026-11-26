@@ -180,13 +180,29 @@ pub fn normalize_size_limit(limit : Int32?, default : Int32) -> Int32 {
   }
 }
 
+// Human-readable size for a configured limit: the named default or the exact
+// byte count for a custom value.
+
 ///|
-pub fn request_size_limit_failure(limit : Int32) -> @sdk.ExportResult {
-  let label = if limit == OTLP_DEFAULT_MAX_REQUEST_SIZE {
-    "64 MiB"
+fn size_limit_label(
+  limit : Int32,
+  default_limit : Int32,
+  default_label : String,
+) -> String {
+  if limit == default_limit {
+    default_label
   } else {
     limit.to_string() + "-byte"
   }
+}
+
+///|
+pub fn request_size_limit_failure(limit : Int32) -> @sdk.ExportResult {
+  let label = size_limit_label(
+    limit,
+    OTLP_DEFAULT_MAX_REQUEST_SIZE,
+    "64 MiB",
+  )
   @sdk.ExportFailure("OTLP request body exceeds the " + label + " limit")
 }
 

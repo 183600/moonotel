@@ -32,7 +32,7 @@ pub fn invalid_span_context() -> SpanContext {
 // (the high nibble becomes "0" and the low nibble is kept).
 
 ///|
-fn serialized_byte(value : Int32) -> Int32 {
+fn serialized_id_byte(value : Int32) -> Int32 {
   if value >= 0 && value < 256 {
     value
   } else {
@@ -49,13 +49,13 @@ fn has_nonzero_byte(bytes : Array[Int32]) -> Bool {
   let len = bytes.length()
   let mut i = 0
   while i + 1 < len {
-    if serialized_byte(bytes.unsafe_get(i)) != 0 ||
-      serialized_byte(bytes.unsafe_get(i + 1)) != 0 {
+    if serialized_id_byte(bytes.unsafe_get(i)) != 0 ||
+      serialized_id_byte(bytes.unsafe_get(i + 1)) != 0 {
       return true
     }
     i = i + 2
   }
-  i < len && serialized_byte(bytes.unsafe_get(i)) != 0
+  i < len && serialized_id_byte(bytes.unsafe_get(i)) != 0
 }
 
 // Create a valid SpanContext with given IDs. `tracestate` is the raw W3C
@@ -103,17 +103,26 @@ pub fn SpanContext::with_tracestate(
   { ..self.copy(), tracestate, }
 }
 
-// Whether this context was received from a remote parent (through a
-// propagator). All-zero contexts and contexts created locally return `false`.
-// A caller can zero an aliased ID array after construction, so the live IDs are
-// revalidated here as well: an unusable context is never reported as remote.
+// Whether the backing ID arrays still describe a usable context. The
+// construction-time validity flag is only a snapshot: a caller can mutate,
+// shorten or grow an aliased array after construction, so remote/derived
+// contexts revalidate the live shape and the all-zero rule.
 
 ///|
-pub fn SpanContext::is_remote(self : SpanContext) -> Bool {
-  self.is_remote &&
+fn SpanContext::has_live_ids(self : SpanContext) -> Bool {
   self.is_valid() &&
   has_nonzero_byte(self.trace_id) &&
   has_nonzero_byte(self.span_id)
+}
+
+// Whether this context was received from a remote parent (through a
+// propagator). All-zero contexts and contexts created locally return `false`.
+// The live IDs are revalidated here as well: an unusable context is never
+// reported as remote.
+
+///|
+pub fn SpanContext::is_remote(self : SpanContext) -> Bool {
+  self.is_remote && self.has_live_ids()
 }
 
 // Derive a copy of this context with the given `is_remote` flag.
@@ -125,10 +134,7 @@ pub fn SpanContext::with_remote(
 ) -> SpanContext {
   {
     ..self.copy(),
-    is_remote: is_remote &&
-    self.is_valid() &&
-    has_nonzero_byte(self.trace_id) &&
-    has_nonzero_byte(self.span_id),
+    is_remote: is_remote && self.has_live_ids(),
   }
 }
 
@@ -541,12 +547,5 @@ pub fn span_context_from_hex(
     !decode_hex_bytes(span_id_hex, 0, span_id, true) {
     return invalid_span_context()
   }
-  {
-    trace_id,
-    span_id,
-    trace_flags,
-    tracestate: "",
-    is_valid: true,
-    is_remote: false,
-  }
+  span_context(trace_id, span_id, trace_flags)
 }

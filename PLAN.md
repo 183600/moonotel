@@ -19,8 +19,11 @@
 | 修改 Context 或 baggage 语义 | `context/context.mbt`、`propagation/baggage.mbt`、`propagation/context_propagation.mbt` |
 | 修改 W3C `traceparent` / `tracestate` | `propagation/w3c_trace_context.mbt`、`propagation/tracestate.mbt` |
 | 修改 span 记录、limits 或 processor | `sdk/span.mbt`、`sdk/span_limits.mbt`、`sdk/simple_span_processor.mbt`、`sdk/batch_span_processor.mbt`、`sdk/multi_span_processor.mbt` |
+| 修改 tracer、scoped span 或父上下文推导 | `sdk/tracer.mbt`、`sdk/tracer_provider.mbt` |
 | 修改 OTLP 编码或响应解析 | `exporter/otlp/encoder.mbt`、`exporter/otlp/json_encoder.mbt`、`exporter/otlp/response_decoder.mbt`、`exporter/otlp/json_response_decoder.mbt` |
+| 修改 async setup、flush 或 spawn | `async_runtime/runtime.mbt`、`async_runtime/exporter.mbt` |
 | 修改 HTTP 埋点 | `instrumentation/async_http_client/`、`instrumentation/async_http_server/`、`instrumentation/http_header_capture/` |
+| 更新用户文档或维护说明 | `README.md`、`PLAN.md`、`sdk/readme_usage_test.mbt` |
 
 ## 目录
 
@@ -270,7 +273,8 @@ Baggage 语义：
   全部值，同时保留之后新增的值；
 - 空名称按 OpenTelemetry Baggage API 的要求忽略；
 - 一次非空更新如果名称全部无效，则上下文保持不变；
-- `with_baggage_entries` 保留成员的输入顺序；重复 key 以最后一次出现为准，并保留该次出现的位置；
+- `with_baggage_entries` 保留成员的输入顺序；重复 key 以最后一次出现为准，
+  并保留该次出现的位置；
 - W3C baggage 属性通过 `BaggageEntry` 携带，与传播包中的 header 类型区分。
 
 ### 4.2 跨任务传播

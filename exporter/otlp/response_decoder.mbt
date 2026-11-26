@@ -11,11 +11,7 @@ const OTLP_MAX_RESPONSE_BODY_BYTES : Int32 = OTLP_DEFAULT_MAX_RESPONSE_SIZE
 
 ///|
 pub fn response_size_limit_failure(limit : Int32) -> @sdk.ExportResult {
-  let label = if limit == OTLP_MAX_RESPONSE_BODY_BYTES {
-    "4 MiB"
-  } else {
-    limit.to_string() + "-byte"
-  }
+  let label = size_limit_label(limit, OTLP_MAX_RESPONSE_BODY_BYTES, "4 MiB")
   @sdk.ExportFailure("OTLP response body exceeds the " + label + " limit")
 }
 
