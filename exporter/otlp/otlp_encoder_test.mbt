@@ -269,6 +269,37 @@ test "encode_span_writes_status_message" {
 }
 
 ///|
+test "encode_span_ignores_status_message_without_error" {
+  let ok : @sdk.SpanData = {
+    ..sample_span(),
+    status: @api.StatusCode::Ok,
+    status_description: "ignored",
+  }
+  let ok_fields = link_test_span_fields(ok)
+  let ok_status = first_of(ok_fields, 15).unwrap()
+  let ok_status_fields = parse_fields(ok_status.payload)
+  assert_true(first_of(ok_status_fields, 2) is None)
+  assert_eq(first_of(ok_status_fields, 3).unwrap().varint, 1)
+  let unset : @sdk.SpanData = {
+    ..sample_span(),
+    status: @api.StatusCode::Unset,
+    status_description: "ignored",
+  }
+  let unset_fields = link_test_span_fields(unset)
+  assert_true(first_of(unset_fields, 15) is None)
+  let error_without_message : @sdk.SpanData = {
+    ..sample_span(),
+    status: @api.StatusCode::Error,
+    status_description: "",
+  }
+  let error_fields = link_test_span_fields(error_without_message)
+  let error_status = first_of(error_fields, 15).unwrap()
+  let error_status_fields = parse_fields(error_status.payload)
+  assert_true(first_of(error_status_fields, 2) is None)
+  assert_eq(first_of(error_status_fields, 3).unwrap().varint, 2)
+}
+
+///|
 fn byte_to_int(value : Byte) -> Int32 {
   value.to_int() & 0xFF
 }

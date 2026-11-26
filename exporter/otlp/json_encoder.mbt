@@ -689,27 +689,24 @@ fn json_write_link(sb : JsonBuf, link : @sdk.SpanLink) -> Unit {
   sb.write_char('}')
 }
 
-// Append the `status` message, omitted for an unset status without a
-// description.
+// Append the `status` message, omitted for an unset status. The Trace API
+// requires the description to be ignored unless the status is Error.
 
 ///|
 fn json_write_status(sb : JsonBuf, data : @sdk.SpanData) -> Unit {
-  if data.status != @api.StatusCode::Unset || data.status_description != "" {
+  if data.status != @api.StatusCode::Unset {
     sb.write_bytes(b",\"status\":{")
     let mut first = true
-    if data.status_description != "" {
+    if data.status == @api.StatusCode::Error && data.status_description != "" {
       sb.write_bytes(b"\"message\":")
       json_write_escaped(sb, data.status_description)
       first = false
     }
-    let code = data.status.otlp_value()
-    if code != 0 {
-      if !first {
-        sb.write_char(',')
-      }
-      sb.write_bytes(b"\"code\":")
-      json_write_int32(sb, code)
+    if !first {
+      sb.write_char(',')
     }
+    sb.write_bytes(b"\"code\":")
+    json_write_int32(sb, data.status.otlp_value())
     sb.write_char('}')
   }
 }

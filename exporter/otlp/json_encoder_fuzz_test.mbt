@@ -203,6 +203,11 @@ fn jf_random_span(rng : JfRng) -> @sdk.SpanData {
   }
   let resource : Map[String, @sdk.AttributeValue] = Map([])
   resource.set("service.name", @sdk.StringValue(jf_random_text(rng, 3)))
+  let status = match rng.below(3) {
+    0 => @api.StatusCode::Unset
+    1 => @api.StatusCode::Ok
+    _ => @api.StatusCode::Error
+  }
   {
     name: jf_random_text(rng, 5),
     span_context: @api.span_context(
@@ -222,7 +227,7 @@ fn jf_random_span(rng : JfRng) -> @sdk.SpanData {
     dropped_attributes_count: rng.below(3),
     dropped_events_count: rng.below(3),
     dropped_links_count: rng.below(3),
-    status: @api.StatusCode::Ok,
+    status,
     status_description: jf_random_text(rng, 3),
     resource: @sdk.ResourceAttributes::new(resource),
     scope_name: jf_random_text(rng, 3),
@@ -468,17 +473,26 @@ fn jf_check_span(json_span : Json, data : @sdk.SpanData) -> Unit raise {
       j = j + 1
     }
   }
-  let status = jf_member(json_span, "status")
-  if data.status_description == "" {
-    // An empty message is not written.
-    assert_false(jf_has_member(status, "message"))
-  } else {
-    assert_eq(jf_string(jf_member(status, "message")), data.status_description)
+  match data.status {
+    @api.StatusCode::Unset => assert_false(jf_has_member(json_span, "status"))
+    @api.StatusCode::Ok => {
+      let status = jf_member(json_span, "status")
+      assert_false(jf_has_member(status, "message"))
+      assert_eq(jf_number(jf_member(status, "code")), 1.0)
+    }
+    @api.StatusCode::Error => {
+      let status = jf_member(json_span, "status")
+      if data.status_description == "" {
+        assert_false(jf_has_member(status, "message"))
+      } else {
+        assert_eq(
+          jf_string(jf_member(status, "message")),
+          data.status_description,
+        )
+      }
+      assert_eq(jf_number(jf_member(status, "code")), 2.0)
+    }
   }
-  assert_eq(
-    jf_number(jf_member(status, "code")),
-    data.status.otlp_value().to_double(),
-  )
 }
 
 ///|

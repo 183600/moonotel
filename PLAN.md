@@ -336,7 +336,9 @@ SDK 提供 `always_on`、`always_off`、`record_only`、`trace_id_ratio_based`
 - 超出限制时增加对应的 dropped 计数；
 - `end()` 之后访问器仍返回快照；
 - HTTP 埋点和 `Tracer::with_span` 使用统一的异常记录语义：`exception` 事件、
-  `error.type` 属性与 `Error` 状态；已经设置为 `Ok` 的状态不会被覆盖。
+  `error.type` 属性与 `Error` 状态；已经设置为 `Ok` 的状态不会被覆盖；
+- 按 Trace API 规则，描述只在 `Error` 时写出；`Ok`/`Unset` 携带的描述会被
+  OTLP 编码器忽略，`Unset` 状态整体省略。
 
 ### 5.4 Processor
 

@@ -191,6 +191,47 @@ test "json_encoder_span_fields" {
 }
 
 ///|
+test "json_encoder_ignores_status_message_without_error" {
+  let ok : @sdk.SpanData = {
+    ..json_test_span(),
+    status: @api.StatusCode::Ok,
+    status_description: "ignored",
+  }
+  let root = encode_json([ok])
+  let span = json_span_of(
+    json_array_value(json_member(root, "resourceSpans"))[0],
+    0,
+  )
+  let ok_status = json_member(span, "status")
+  assert_false(json_has_member(ok_status, "message"))
+  assert_eq(json_number_value(json_member(ok_status, "code")), 1.0)
+  let unset : @sdk.SpanData = {
+    ..json_test_span(),
+    status: @api.StatusCode::Unset,
+    status_description: "ignored",
+  }
+  let unset_root = encode_json([unset])
+  let unset_span = json_span_of(
+    json_array_value(json_member(unset_root, "resourceSpans"))[0],
+    0,
+  )
+  assert_false(json_has_member(unset_span, "status"))
+  let error_without_message : @sdk.SpanData = {
+    ..json_test_span(),
+    status: @api.StatusCode::Error,
+    status_description: "",
+  }
+  let error_root = encode_json([error_without_message])
+  let error_span = json_span_of(
+    json_array_value(json_member(error_root, "resourceSpans"))[0],
+    0,
+  )
+  let error_status = json_member(error_span, "status")
+  assert_false(json_has_member(error_status, "message"))
+  assert_eq(json_number_value(json_member(error_status, "code")), 2.0)
+}
+
+///|
 test "json_encoder_attribute_values" {
   let root = encode_json([json_test_span()])
   let span = json_span_of(

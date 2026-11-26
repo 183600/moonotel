@@ -301,7 +301,9 @@ status description carries the exception message, following the recording-errors
 convention, while `error.type` carries the exception type. The status is left
 alone when the callback already set it to `Ok`, because `Ok` is final under the
 OpenTelemetry status rules. The deferred `end()` and context restore still run
-afterwards.
+afterwards. OTLP encoders also follow the Trace API rule that a description is
+meaningful only for `Error`: descriptions attached to `Ok` or `Unset` are
+ignored, and an `Unset` status is omitted from the wire format.
 
 A `SpanContext` snapshots its validity when it is constructed. The ID views are
 read-only by contract. If an aliased ID array is shortened or zeroed anyway, the

@@ -363,15 +363,15 @@ fn encode_link(writer : ProtoWriter, link : @sdk.SpanLink) -> Unit {
 
 ///|
 fn encode_status(writer : ProtoWriter, data : @sdk.SpanData) -> Unit {
-  if data.status != @api.StatusCode::Unset || data.status_description != "" {
+  // The Trace API requires a status description to be ignored unless the
+  // status is Error, so a manually built SpanData cannot leak one for Ok or
+  // Unset.
+  if data.status != @api.StatusCode::Unset {
     let len_pos = writer.begin_message(15)
-    if data.status_description != "" {
+    if data.status == @api.StatusCode::Error && data.status_description != "" {
       writer.write_string_field(2, data.status_description)
     }
-    let code = data.status.otlp_value()
-    if code != 0 {
-      writer.write_varint_field(3, code.to_uint64())
-    }
+    writer.write_varint_field(3, data.status.otlp_value().to_uint64())
     writer.end_message(len_pos)
   }
 }
