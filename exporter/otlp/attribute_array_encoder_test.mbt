@@ -116,3 +116,30 @@ test "attribute_arrays_with_equal_contents_share_resource_keys" {
   r2.set("a", @sdk.IntArrayValue([1L, 2L]))
   assert_eq(probe_resource_group_count(r1, r2), 1)
 }
+
+///|
+test "double_arrays_with_different_bits_are_distinct_resource_keys" {
+  let r1 : Map[String, @sdk.AttributeValue] = Map([])
+  r1.set("a", @sdk.DoubleArrayValue([-0.0]))
+  let r2 : Map[String, @sdk.AttributeValue] = Map([])
+  r2.set("a", @sdk.DoubleArrayValue([0.0]))
+  assert_eq(probe_resource_group_count(r1, r2), 2)
+}
+
+///|
+test "double_arrays_with_different_lengths_are_distinct_resource_keys" {
+  let r1 : Map[String, @sdk.AttributeValue] = Map([])
+  r1.set("a", @sdk.DoubleArrayValue([1.5]))
+  let r2 : Map[String, @sdk.AttributeValue] = Map([])
+  r2.set("a", @sdk.DoubleArrayValue([1.5, 2.5]))
+  assert_eq(probe_resource_group_count(r1, r2), 2)
+}
+
+///|
+test "double_arrays_with_equal_contents_share_resource_keys" {
+  let r1 : Map[String, @sdk.AttributeValue] = Map([])
+  r1.set("a", @sdk.DoubleArrayValue([1.5, -0.0]))
+  let r2 : Map[String, @sdk.AttributeValue] = Map([])
+  r2.set("a", @sdk.DoubleArrayValue([1.5, -0.0]))
+  assert_eq(probe_resource_group_count(r1, r2), 1)
+}
