@@ -3,6 +3,17 @@
 // for values such as `+5` that the transport accepts and uses.
 
 ///|
+test "parse_content_length rejects values above the Int64 range" {
+  assert_eq(
+    parse_content_length("9223372036854775807"[:]),
+    Some(9223372036854775807L),
+  )
+  assert_eq(parse_content_length("9223372036854775808"[:]), None)
+  assert_eq(parse_content_length("18446744073709551615"[:]), None)
+  assert_eq(parse_content_length("18446744073709551616"[:]), None)
+}
+
+///|
 test "wire_response_headers mirrors lenient content-length parsing" {
   let headers : @http.Headers = Map([
     (@http.CaseInsensitiveString("Content-Length"), "+5"),

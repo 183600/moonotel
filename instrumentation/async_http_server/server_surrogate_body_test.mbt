@@ -102,3 +102,38 @@ async test "server keeps a well-formed surrogate pair in body and headers" {
     )
   }
 }
+
+///|
+async test "server keeps a well-formed pair after an unpaired surrogate" {
+  let low = String::from_array([(0xDC00).unsafe_to_char()])
+  let emoji = "\u{1F600}"
+  let replacement = (0xFFFD).unsafe_to_char().to_string()
+  let exporter : SurrogateBodyExporter = { spans: Ref([]), }
+  let processor : &@sdk.SpanProcessor = @sdk.SimpleSpanProcessor::new(exporter)
+  let provider = @sdk.TracerProviderSdk::new(
+    service_name="server-surrogate-pair-test",
+  ).with_span_processor(processor)
+  let tracer = provider.get_tracer("server-surrogate-pair-test")
+  @async.with_task_group() <| group => {
+    let server = @http.Server(@socket.Addr::parse("127.0.0.1:0"))
+    let port = server.addr.port()
+    group.spawn_bg(no_wait=true) <| () => {
+      @async_http_server.run_server_on(
+        server,
+        call => call.respond(200, body=low + emoji),
+        tracer~,
+      )
+    }
+    let (response, body) = @http.get(
+      "http://127.0.0.1:\{port}/surrogate-pair",
+    )
+    assert_eq(response.code, 200)
+    assert_eq(body.text(), replacement + emoji)
+    @async.sleep(50)
+    assert_eq(exporter.spans.val.length(), 1)
+    assert_eq(
+      exporter.spans.val[0].attributes.get(@sdk.HTTP_RESPONSE_BODY_SIZE),
+      Some(@sdk.IntValue(7)),
+    )
+  }
+}

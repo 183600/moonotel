@@ -47,6 +47,26 @@ test "split_url_host_port parses valid hosts" {
 }
 
 ///|
+test "split_url_host_port accepts percent-encoded ipv6 zone characters" {
+  assert_eq(
+    split_url_host_port("[fe80::1%eth%30]", 80),
+    Some(("[fe80::1%eth%30]", 80)),
+  )
+  assert_eq(
+    split_url_host_port("[fe80::1%eth%30%31]", 80),
+    Some(("[fe80::1%eth%30%31]", 80)),
+  )
+  assert_eq(split_url_host_port("[fe80::1%eth%3G]", 80), None)
+}
+
+///|
+test "split_url_host_port rejects malformed ipvfuture literals" {
+  assert_eq(split_url_host_port("[v123]", 80), None)
+  assert_eq(split_url_host_port("[v1g.a]", 80), None)
+  assert_eq(split_url_host_port("[v1.a%b]", 80), None)
+}
+
+///|
 test "split_url_host_port rejects malformed ipv6 literals" {
   assert_eq(split_url_host_port("[::1", 80), None)
   assert_eq(split_url_host_port("[::1]junk", 80), None)

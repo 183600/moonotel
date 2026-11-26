@@ -26,3 +26,17 @@ test "sanitize_utf16_surrogates replaces unpaired halves around a pair" {
     pair + replacement + "x" + replacement,
   )
 }
+
+///|
+test "sanitize_utf16_surrogates replaces a leading low surrogate" {
+  let low = (0xDC00).unsafe_to_char().to_string()
+  let pair = String::from_array([
+    (0xD83D).unsafe_to_char(),
+    (0xDE00).unsafe_to_char(),
+  ])
+  let replacement = (0xFFFD).unsafe_to_char().to_string()
+  assert_eq(
+    sanitize_utf16_surrogates(low + "x" + pair),
+    replacement + "x" + pair,
+  )
+}

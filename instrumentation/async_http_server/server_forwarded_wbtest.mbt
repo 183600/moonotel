@@ -79,6 +79,23 @@ test "first_header_token_takes_the_original_value" {
     ),
     None,
   )
+  assert_eq(
+    first_header_token(
+      ows_header_map([("X-Forwarded-Host", "\"unterminated")]),
+      "x-forwarded-host",
+    ),
+    None,
+  )
+}
+
+///|
+test "effective_forwarded_client_rejects_a_malformed_x_forwarded_for" {
+  assert_eq(
+    effective_forwarded_client(
+      ows_header_map([("X-Forwarded-For", "\"192.0.2.1")]),
+    ),
+    None,
+  )
 }
 
 ///|
@@ -146,6 +163,15 @@ test "effective_forwarded_host_prefers_forwarded_and_skips_invalid_values" {
     ),
     Some("x.example.com"),
   )
+  assert_eq(
+    effective_forwarded_host(
+      ows_header_map([
+        ("Forwarded", "host=\"\""),
+        ("X-Forwarded-Host", "x.example.com"),
+      ]),
+    ),
+    Some("x.example.com"),
+  )
 }
 
 ///|
@@ -186,7 +212,8 @@ test "parse_forwarded_node_rejects_unknown_and_malformed_values" {
   for
     value in [
       "", "unknown", "_gazonk", "192.0.2.43:", "192.0.2.43:not-a-port", "[2001:db8::1",
-      "[2001:db8::1]junk", "[2001:db8::1]:", "192.0.2.43:80:90", "01.2.3.4", "192.168.001.1:80",
+      "[2001:db8::1]junk", "[2001:db8::1]:", "192.0.2.43:80:90", "[2001:db8::1]:80:90",
+      "[2001:db8::1]:not-a-port", "[2001:db8::1]:65536", "01.2.3.4", "192.168.001.1:80",
       "0x7f.0.0.1", "1.2.3.4:+80", "1.2.3", "[::1%]", "[1:2:3:4:5:6:7:8:9]",
     ] {
     assert_eq(parse_forwarded_node(value), None)
