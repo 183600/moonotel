@@ -54,6 +54,19 @@ test "proto writer fixed fields grow tight buffers" {
 }
 
 ///|
+test "proto writer fixed fields grow tight buffers for long tags" {
+  let fixed32 = ProtoWriter::with_capacity(1)
+  fixed32.write_fixed32_field(16, 0x04030201U)
+  assert_eq(fixed32.to_bytes(), b"\x85\x01\x01\x02\x03\x04")
+  let fixed64 = ProtoWriter::with_capacity(1)
+  fixed64.write_fixed64_field(16, 0x0807060504030201UL)
+  assert_eq(
+    fixed64.to_bytes(),
+    b"\x81\x01\x01\x02\x03\x04\x05\x06\x07\x08",
+  )
+}
+
+///|
 test "proto writer byte arrays cover fast and fallback element paths" {
   let writer = ProtoWriter::with_capacity(1)
   writer.write_bytes(b"")

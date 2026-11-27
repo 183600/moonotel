@@ -22,6 +22,19 @@ test "json_encoder_writes_timestamps_as_unsigned_fixed64_strings" {
 }
 
 ///|
+test "json_encoder_writes_decimal_tails_with_one_leading_digit" {
+  let base = json_test_span()
+  let span : @sdk.SpanData = {
+    ..base,
+    start_time_unix_nano: 10_000_000_000_000_000L,
+    end_time_unix_nano: 9_999L,
+  }
+  let text = @utf8.decode_lossy(@otlp.encode_trace_request_json([span]))
+  assert_true(text.contains("\"startTimeUnixNano\":\"10000000000000000\""))
+  assert_true(text.contains("\"endTimeUnixNano\":\"9999\""))
+}
+
+///|
 test "json_encoder_preserves_negative_zero_doubles" {
   let base = json_test_span()
   let attributes = base.attributes.copy()
