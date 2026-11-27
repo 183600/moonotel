@@ -161,3 +161,57 @@ test "resources_with_the_same_key_but_different_values_are_distinct" {
   r2.set("a", @sdk.IntValue(2))
   assert_eq(probe_resource_group_count(r1, r2), 2)
 }
+
+///|
+test "bool_values_with_equal_flags_share_resource_keys" {
+  let r1 : Map[String, @sdk.AttributeValue] = Map([])
+  r1.set("a", @sdk.BoolValue(true))
+  let r2 : Map[String, @sdk.AttributeValue] = Map([])
+  r2.set("a", @sdk.BoolValue(true))
+  assert_eq(probe_resource_group_count(r1, r2), 1)
+}
+
+///|
+test "bool_values_with_different_flags_are_distinct_resource_keys" {
+  let r1 : Map[String, @sdk.AttributeValue] = Map([])
+  r1.set("a", @sdk.BoolValue(true))
+  let r2 : Map[String, @sdk.AttributeValue] = Map([])
+  r2.set("a", @sdk.BoolValue(false))
+  assert_eq(probe_resource_group_count(r1, r2), 2)
+}
+
+///|
+test "string_arrays_with_equal_contents_share_resource_keys" {
+  let r1 : Map[String, @sdk.AttributeValue] = Map([])
+  r1.set("a", @sdk.StringArrayValue(["ab", "c"]))
+  let r2 : Map[String, @sdk.AttributeValue] = Map([])
+  r2.set("a", @sdk.StringArrayValue(["ab", "c"]))
+  assert_eq(probe_resource_group_count(r1, r2), 1)
+}
+
+///|
+test "string_arrays_with_different_item_boundaries_are_distinct_resource_keys" {
+  let r1 : Map[String, @sdk.AttributeValue] = Map([])
+  r1.set("a", @sdk.StringArrayValue(["ab", "c"]))
+  let r2 : Map[String, @sdk.AttributeValue] = Map([])
+  r2.set("a", @sdk.StringArrayValue(["a", "bc"]))
+  assert_eq(probe_resource_group_count(r1, r2), 2)
+}
+
+///|
+test "bool_arrays_with_equal_contents_share_resource_keys" {
+  let r1 : Map[String, @sdk.AttributeValue] = Map([])
+  r1.set("a", @sdk.BoolArrayValue([true, false]))
+  let r2 : Map[String, @sdk.AttributeValue] = Map([])
+  r2.set("a", @sdk.BoolArrayValue([true, false]))
+  assert_eq(probe_resource_group_count(r1, r2), 1)
+}
+
+///|
+test "bool_arrays_with_different_lengths_are_distinct_resource_keys" {
+  let r1 : Map[String, @sdk.AttributeValue] = Map([])
+  r1.set("a", @sdk.BoolArrayValue([true]))
+  let r2 : Map[String, @sdk.AttributeValue] = Map([])
+  r2.set("a", @sdk.BoolArrayValue([true, false]))
+  assert_eq(probe_resource_group_count(r1, r2), 2)
+}
