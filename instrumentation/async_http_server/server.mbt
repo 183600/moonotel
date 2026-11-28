@@ -1747,14 +1747,27 @@ fn sanitize_wire_header_value(value : String) -> String {
 }
 
 // Whether the transport can use this `Content-Length` value to frame a
-// response. The transport trims the value and parses it leniently, but a
-// negative count cannot describe a body: passing it through would leave the
-// sender waiting for a negative number of bytes and abort when the response
-// ends.
+// response. The transport trims the value and requires one or more ASCII
+// digits; a value with a sign, digit separator or prefix would make
+// `send_response` raise instead of describing a body. The count must also fit
+// in a non-negative `Int64`.
 
 ///|
 fn is_usable_content_length(value : String) -> Bool {
-  try @string.parse_int64(value.trim(), radix=10) >= 0L catch {
+  let value = value.trim()
+  let len = value.length()
+  if len == 0 {
+    return false
+  }
+  let mut i = 0
+  while i < len {
+    let code = value.unsafe_get(i).to_int()
+    if code < 0x30 || code > 0x39 {
+      return false
+    }
+    i = i + 1
+  }
+  try @string.parse_int64(value, radix=10) >= 0L catch {
     _ => false
   }
 }
