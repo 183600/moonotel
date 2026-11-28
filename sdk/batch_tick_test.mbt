@@ -106,7 +106,17 @@ test "timed_flush_respects_batch_size" {
   exported = exporter.names.length()
   processor.on_end(probe_span("s2"))
   assert_true(exporter.names.length() - exported <= 2)
-  assert_eq(exporter.names.length() + processor.queue_size(), 3)
+  // Only two outcomes are possible: the full batch flushed and the third span
+  // is still queued, or an early timed flush already exported all three.
+  let exported_count = exporter.names.length()
+  if exported_count == 2 {
+    assert_eq(processor.queue_size(), 1)
+    assert_true(probe_names_equal(exporter.names, ["s0", "s1"]))
+  } else {
+    assert_eq(exported_count, 3)
+    assert_eq(processor.queue_size(), 0)
+    assert_true(probe_names_equal(exporter.names, ["s0", "s1", "s2"]))
+  }
   wait_millis(5)
   exported = exporter.names.length()
   processor.tick()
