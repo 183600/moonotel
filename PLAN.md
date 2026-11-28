@@ -129,15 +129,16 @@ Collector / backend
 - Instrumentation 只依赖公开 API/SDK，不把 HTTP 细节反向带进核心包。
 - 平台相关能力集中在 `async_runtime`、`exporter/otlp_async` 和 HTTP 埋点包中。
 
-依赖方向（箭头左侧被右侧依赖，反向依赖不允许）：
+依赖方向（箭头由依赖方指向被依赖方，反向依赖不允许；下表只列生产依赖，
+测试与白盒测试可以额外引入其他包）：
 
 ```text
 api
 context             -> api
 propagation         -> api, context
 sdk                 -> api, context
-exporter/otlp       -> api, context, sdk
-exporter/otlp_async -> api, sdk, exporter/otlp
+exporter/otlp       -> api, sdk
+exporter/otlp_async -> sdk, exporter/otlp
 async_runtime       -> context, sdk, exporter/otlp, exporter/otlp_async
 instrumentation/*   -> api, context, propagation, sdk
 根包 facade         -> 上述核心包

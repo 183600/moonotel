@@ -200,6 +200,19 @@ pub impl TextMapPropagator for CompositePropagator with fn fields(self) {
 ///|
 pub extend CompositePropagator with TextMapPropagator::{inject, extract, fields}
 
+// The default propagator set selected when `OTEL_PROPAGATORS` is unset, blank
+// or contains only unsupported names.
+
+///|
+fn default_propagators() -> Array[&TextMapPropagator] {
+  let propagators : Array[&TextMapPropagator] = []
+  let trace_context : &TextMapPropagator = TraceContextPropagator::new()
+  propagators.push(trace_context)
+  let baggage : &TextMapPropagator = BaggagePropagator::new()
+  propagators.push(baggage)
+  propagators
+}
+
 // Build a composite propagator from `OTEL_PROPAGATORS`, a comma-separated
 // list of propagator names. Unset or blank values select the default
 // `tracecontext,baggage`; `none` disables propagation; unknown names are
@@ -222,8 +235,7 @@ pub fn CompositePropagator::from_env() -> CompositePropagator {
     None => ()
   }
   if names.length() == 0 {
-    names.push("tracecontext")
-    names.push("baggage")
+    return CompositePropagator::new(default_propagators())
   }
   let propagators : Array[&TextMapPropagator] = []
   let mut has_trace_context = false
@@ -250,10 +262,7 @@ pub fn CompositePropagator::from_env() -> CompositePropagator {
     // The variable held only unsupported names (for example `b3`). Treat the
     // setting as invalid and keep the documented default instead of silently
     // disabling all propagation.
-    let created : &TextMapPropagator = TraceContextPropagator::new()
-    propagators.push(created)
-    let created : &TextMapPropagator = BaggagePropagator::new()
-    propagators.push(created)
+    return CompositePropagator::new(default_propagators())
   }
   CompositePropagator::new(propagators)
 }

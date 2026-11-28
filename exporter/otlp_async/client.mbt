@@ -39,6 +39,18 @@ fn is_gzip_compression(compression : String) -> Bool {
   @otlp.normalize_enum(compression) == "gzip"
 }
 
+// Headers owned by the HTTP client's body framing and response decompression.
+// Forwarding a configured value for one of them would contradict the request
+// the client actually writes.
+
+///|
+fn is_transport_managed_header(lower : String) -> Bool {
+  match lower {
+    "content-length" | "transfer-encoding" | "accept-encoding" => true
+    _ => false
+  }
+}
+
 ///|
 fn request_headers(
   config : @otlp.OtlpHttpConfig,
@@ -60,17 +72,13 @@ fn request_headers(
     // to the HTTP client. CR/LF in a value would otherwise split the request.
     if @otlp.is_valid_http_header_name(key) &&
       @otlp.is_valid_http_header_value(value) {
-      // The HTTP client owns body framing and response decompression. A
-      // configured `Content-Length` or `Transfer-Encoding` could contradict
+      // A configured `Content-Length` or `Transfer-Encoding` could contradict
       // the bytes actually written and make the collector wait for a body that
       // never arrives (or read past this request). A configured
       // `Accept-Encoding` would disable the client's automatic gzip response
       // decompression, while the OTLP response decoder still expects the
       // decoded bytes. Never forward those transport-managed fields.
-      let lower = key.to_lower()
-      if lower != "content-length" &&
-        lower != "transfer-encoding" &&
-        lower != "accept-encoding" {
+      if !is_transport_managed_header(key.to_lower()) {
         headers.set(@http.CaseInsensitiveString(key), value)
       }
     }

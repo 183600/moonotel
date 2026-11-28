@@ -117,18 +117,13 @@ pub fn HeaderCapture::from_env(variable : String) -> HeaderCapture {
   match header_capture_cache.get(variable) {
     Some((cached_raw, cached_sanitize_raw, capture)) =>
       if cached_raw == raw && cached_sanitize_raw == sanitize_raw {
-        capture
-      } else {
-        let capture = header_capture_from_raw(raw, sanitize_raw)
-        header_capture_cache.set(variable, (raw, sanitize_raw, capture))
-        capture
+        return capture
       }
-    None => {
-      let capture = header_capture_from_raw(raw, sanitize_raw)
-      header_capture_cache.set(variable, (raw, sanitize_raw, capture))
-      capture
-    }
+    None => ()
   }
+  let capture = header_capture_from_raw(raw, sanitize_raw)
+  header_capture_cache.set(variable, (raw, sanitize_raw, capture))
+  capture
 }
 
 // Whether this configuration can capture at least one header.
@@ -138,18 +133,30 @@ pub fn HeaderCapture::is_enabled(self : HeaderCapture) -> Bool {
   self.capture_all || self.names.length() > 0
 }
 
+// Whether `name` belongs to a parsed selection set. Matching is
+// case-insensitive, and `all` selects every name.
+
+///|
+fn header_name_selected(
+  all : Bool,
+  names : Map[String, Bool],
+  name : String,
+) -> Bool {
+  if all {
+    true
+  } else if names.length() == 0 {
+    false
+  } else {
+    names.contains(name.to_lower())
+  }
+}
+
 // Whether `name` is selected by this configuration. Matching is
 // case-insensitive, and `*` selects every name.
 
 ///|
 pub fn HeaderCapture::captures(self : HeaderCapture, name : String) -> Bool {
-  if self.capture_all {
-    true
-  } else if self.names.length() == 0 {
-    false
-  } else {
-    self.names.contains(name.to_lower())
-  }
+  header_name_selected(self.capture_all, self.names, name)
 }
 
 // Whether the value of `name` must be replaced with `[REDACTED]`. Matching is
@@ -157,13 +164,7 @@ pub fn HeaderCapture::captures(self : HeaderCapture, name : String) -> Bool {
 
 ///|
 pub fn HeaderCapture::sanitizes(self : HeaderCapture, name : String) -> Bool {
-  if self.sanitize_all {
-    true
-  } else if self.sanitize_names.length() == 0 {
-    false
-  } else {
-    self.sanitize_names.contains(name.to_lower())
-  }
+  header_name_selected(self.sanitize_all, self.sanitize_names, name)
 }
 
 // Trim HTTP optional whitespace (SP / HTAB) from both ends of a header value.
@@ -255,8 +256,9 @@ fn record_set_cookie_headers(
     None => ()
   }
   let values : Array[String] = []
+  let redact = capture.sanitizes("set-cookie")
   for cookie in cookies {
-    if capture.sanitizes("set-cookie") {
+    if redact {
       values.push("[REDACTED]")
     } else {
       values.push(set_cookie_header_value(cookie))

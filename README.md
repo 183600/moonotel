@@ -30,12 +30,12 @@ HTTP transport and HTTP instrumentation target native and wasm.
 
 ## Integration paths
 
-| Path | Use it when | Entry point |
-| --- | --- | --- |
-| Direct SDK | You want to own the provider, processors and exporter wiring | `@sdk.TracerProviderSdk` |
-| Facade setup | You want a process-wide provider with environment-based defaults | `@moonotel.setup` |
-| Async runtime | Native/wasm code should export from a background task | `@async_runtime.setup` |
-| HTTP instrumentation | Requests should be traced automatically | `@server.run_server` / `@client.request` |
+| Path | Best for | Entry point | You control |
+| --- | --- | --- | --- |
+| Direct SDK | Tests, custom processors, or a provider wired by hand | `@sdk.TracerProviderSdk` | Provider, processors and exporter |
+| Facade setup | A process-wide provider with environment-based defaults | `@moonotel.setup` | Transport, exporter selection and batching |
+| Async runtime | Native/wasm code that should export from a background task | `@async_runtime.setup` | Task group, exporter queue and batching |
+| HTTP instrumentation | Automatic client/server spans around `moonbitlang/async/http` | `@server.run_server` / `@client.request` | Tracer, handlers and captured headers |
 
 ## Quick start
 
@@ -912,6 +912,21 @@ explicit names: a wildcard also captures headers such as `Authorization` and
   stale `traceparent`/`tracestate` when the context has no valid span, and
   baggage injection removes a stale `baggage` header when no members are
   visible.
+- **OTLP export reports an unsupported compression.** The synchronous
+  `exporter/otlp` exporter supports only `none`; use `exporter/otlp_async` for
+  gzip or set the compression variable to `none`.
+- **OTLP export times out while retrying.** The async timeout is one budget for
+  every attempt and wait, not a per-attempt deadline. Raise
+  `OTEL_EXPORTER_OTLP_TIMEOUT` (or the traces-specific variable), lower the
+  retry count, or check the collector's `Retry-After` response.
+- **A trace unexpectedly restarts.** Extraction ignores a duplicated
+  `traceparent` and any header with invalid or all-zero IDs. Check that proxies
+  do not append a second `traceparent` and that span IDs are not mutated after
+  creation.
+- **Captured headers are missing.** Header capture reads the direction-specific
+  `OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_*` variable when the
+  instrumentation is configured. A header selected for sanitization is still
+  recorded, with its value replaced by `[REDACTED]`.
 
 ## Testing and CI
 

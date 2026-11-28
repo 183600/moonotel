@@ -49,6 +49,19 @@ fn context_or_current(context : @context.Context?) -> @context.Context {
   }
 }
 
+// Run `f` with `carried` installed as the ambient context and restore the
+// previous context when `f` finishes.
+
+///|
+async fn[X] with_attached_context(
+  carried : @context.Context,
+  f : async () -> X,
+) -> X {
+  let previous = @context.attach(carried)
+  defer @context.detach(previous)
+  f()
+}
+
 // Spawn a background task that starts with `context` (the current context
 // when omitted) installed as the ambient context, and restores the previous
 // context when it finishes. Use this instead of `TaskGroup::spawn_bg` to
@@ -64,11 +77,7 @@ pub fn[G] spawn_bg(
 ) -> Unit {
   let carried = context_or_current(context)
   group.spawn_bg(
-    () => {
-      let previous = @context.attach(carried)
-      defer @context.detach(previous)
-      f()
-    },
+    () => with_attached_context(carried, f),
     no_wait?,
     allow_failure?,
   )
@@ -88,15 +97,7 @@ pub fn[G, X] spawn(
   allow_failure? : Bool,
 ) -> @async.Task[X] {
   let carried = context_or_current(context)
-  group.spawn(
-    () => {
-      let previous = @context.attach(carried)
-      defer @context.detach(previous)
-      f()
-    },
-    no_wait?,
-    allow_failure?,
-  )
+  group.spawn(() => with_attached_context(carried, f), no_wait?, allow_failure?)
 }
 
 // Normalize an optional programmatic endpoint override. Blank values are
