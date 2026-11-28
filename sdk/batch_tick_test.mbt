@@ -94,13 +94,23 @@ test "timed_flush_respects_batch_size" {
     max_export_batch_size=2,
     flush_interval_millis=1,
   )
+  // The 1ms interval may elapse between calls, so a timed flush can happen
+  // during `on_end` instead of only on the final `tick`. Either way each flush
+  // must export at most one batch, and no span may be lost or duplicated.
+  let mut exported = exporter.names.length()
   processor.on_end(probe_span("s0"))
+  assert_true(exporter.names.length() - exported <= 2)
+  exported = exporter.names.length()
   processor.on_end(probe_span("s1"))
+  assert_true(exporter.names.length() - exported <= 2)
+  exported = exporter.names.length()
   processor.on_end(probe_span("s2"))
-  assert_eq(processor.queue_size(), 1)
-  assert_true(probe_names_equal(exporter.names, ["s0", "s1"]))
+  assert_true(exporter.names.length() - exported <= 2)
+  assert_eq(exporter.names.length() + processor.queue_size(), 3)
   wait_millis(5)
+  exported = exporter.names.length()
   processor.tick()
+  assert_true(exporter.names.length() - exported <= 2)
   assert_eq(processor.queue_size(), 0)
   assert_true(probe_names_equal(exporter.names, ["s0", "s1", "s2"]))
 }

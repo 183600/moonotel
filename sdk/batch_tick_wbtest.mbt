@@ -42,3 +42,32 @@ test "tick does not flush when the last flush time is in the future" {
   assert_eq(processor.queue_size(), 1)
   assert_eq(exporter.span_count(), 0)
 }
+
+///|
+test "timed_flush_exports_one_batch_at_a_time" {
+  let exporter = InMemorySpanExporter::new()
+  let processor = BatchSpanProcessor::new(
+    exporter,
+    max_queue_size=8,
+    max_export_batch_size=2,
+    flush_interval_millis=60000,
+  )
+  // Queue directly so the batch-full path does not fire before `tick`.
+  for index = 0; index < 5; index = index + 1 {
+    processor.push_span(tick_probe_span("s\{index}"))
+  }
+  assert_eq(processor.queue_size(), 5)
+  // Pretend the scheduled interval elapsed, then run the timed flush.
+  processor.last_flush_time_millis = 0UL
+  processor.tick()
+  assert_eq(processor.queue_size(), 3)
+  assert_eq(exporter.span_count(), 2)
+  processor.last_flush_time_millis = 0UL
+  processor.tick()
+  assert_eq(processor.queue_size(), 1)
+  assert_eq(exporter.span_count(), 4)
+  processor.last_flush_time_millis = 0UL
+  processor.tick()
+  assert_eq(processor.queue_size(), 0)
+  assert_eq(exporter.span_count(), 5)
+}
