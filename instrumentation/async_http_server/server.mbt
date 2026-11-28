@@ -1858,7 +1858,9 @@ fn wire_response_headers(
 // `http.response.body.size` on the SERVER span. 5xx responses set the span
 // status to `Error`. The body, when present, is written before the response
 // is ended. When the request carried `Connection: close`, the connection is
-// closed after the response, as required by HTTP/1.1.
+// closed after the response, as required by HTTP/1.1. A request has exactly
+// one final response, so calls after the first successful `respond` are
+// ignored.
 
 ///|
 pub async fn ServerCall::respond(
@@ -1868,6 +1870,13 @@ pub async fn ServerCall::respond(
   body? : String,
   headers? : Map[String, String],
 ) -> Unit {
+  // A request has exactly one final response. A second `respond` must not put
+  // another response head on the wire, where it would be read as the response
+  // to the next request on a keep-alive connection. Keep the first response
+  // (and the span attributes it recorded) instead of corrupting the stream.
+  if self.responded {
+    return
+  }
   let extra_headers : @http.Headers = match headers {
     Some(values) =>
       Map([], capacity=map_capacity_for_entries(values.length() + 1))

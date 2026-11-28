@@ -587,9 +587,11 @@ them.
 - `set_route` records `http.route` and renames the span to `METHOD route`; an
   empty or blank route is ignored because no route was matched.
 - `respond` records `http.response.status_code` and marks 5xx spans as `Error`.
-  A negative or malformed response `Content-Length` is dropped so the transport
-  can add valid chunked or zero-length framing instead of aborting the
-  connection task. A `Content-Length` supplied for a 1xx, 204, or successful
+  A request has exactly one final response, so calls after the first successful
+  `respond` are ignored. A negative or malformed response `Content-Length` is
+  dropped so the transport can add valid chunked or zero-length framing
+  instead of aborting the connection task. A `Content-Length` supplied for a
+  1xx, 204, or successful
   (2xx) CONNECT response is also dropped because RFC 9110 forbids it on those
   statuses.
 - Handler exceptions are recorded as `exception` events and re-raised.
