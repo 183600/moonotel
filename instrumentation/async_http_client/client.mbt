@@ -965,13 +965,27 @@ fn sanitize_wire_header_value(value : String) -> String {
   sb.to_string()
 }
 
-// Whether the transport can use this `Content-Length` value. The transport
-// parses the trimmed value and writes the header; a malformed or negative
-// count cannot frame the body.
+// Whether the transport can use this `Content-Length` value. HTTP defines the
+// field value as one or more ASCII digits, so signs, digit separators and
+// other prefixes are malformed even though the transport's integer parser
+// accepts them. The count must also fit in a non-negative `Int64`.
 
 ///|
 fn is_usable_content_length(value : String) -> Bool {
-  try @string.parse_int64(value.trim(), radix=10) >= 0L catch {
+  let value = value.trim()
+  let len = value.length()
+  if len == 0 {
+    return false
+  }
+  let mut i = 0
+  while i < len {
+    let code = value.unsafe_get(i).to_int()
+    if code < 0x30 || code > 0x39 {
+      return false
+    }
+    i = i + 1
+  }
+  try @string.parse_int64(value, radix=10) >= 0L catch {
     _ => false
   }
 }

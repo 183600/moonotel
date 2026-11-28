@@ -53,3 +53,33 @@ test "wire_request_headers_ignores_an_unusable_content_length" {
     Some("chunked"),
   )
 }
+
+///|
+test "wire_request_headers_rejects_content_length_values_without_digits_only" {
+  for value in ["+5", "-0", "1_0", "0x5", ""] {
+    let headers : @http.Headers = Map([
+      (@http.CaseInsensitiveString("Content-Length"), value),
+    ])
+    let wire = wire_request_headers(headers, 3)
+    assert_eq(wire.get(@http.CaseInsensitiveString("content-length")), None)
+    assert_eq(
+      wire.get(@http.CaseInsensitiveString("transfer-encoding")),
+      Some("chunked"),
+    )
+  }
+}
+
+///|
+test "wire_request_headers_accepts_trimmed_digit_content_length" {
+  for value in ["5", " 5 ", "05", "0"] {
+    let headers : @http.Headers = Map([
+      (@http.CaseInsensitiveString("Content-Length"), value),
+    ])
+    let wire = wire_request_headers(headers, 3)
+    assert_eq(
+      wire.get(@http.CaseInsensitiveString("content-length")),
+      Some(value),
+    )
+    assert_eq(wire.get(@http.CaseInsensitiveString("transfer-encoding")), None)
+  }
+}
