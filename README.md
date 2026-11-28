@@ -37,12 +37,49 @@ HTTP transport and HTTP instrumentation target native and wasm.
 | Async runtime | Native/wasm code should export from a background task | `@async_runtime.setup` |
 | HTTP instrumentation | Requests should be traced automatically | `@server.run_server` / `@client.request` |
 
+## Quick start
+
+The fastest way to see a span is the facade with the console exporter:
+
+```moonbit
+fn main raise {
+  let provider = @moonotel.setup(service_name="demo", exporters=["console"])
+  provider.get_tracer("demo").with_span("hello", fn(span) {
+    span.set_string_attribute("greeting", "hello")
+  })
+  provider.shutdown()
+}
+```
+
+For OTLP/HTTP, use `@async_runtime.setup` inside a task group. It owns the
+background exporter and drains pending spans when the group exits:
+
+```moonbit
+async fn main raise {
+  @async.with_task_group(group => {
+    let provider = @async_runtime.setup(
+      group,
+      service_name="checkout",
+      endpoint="http://localhost:4318",
+    )
+    provider.get_tracer("checkout").with_span("charge-card", fn(span) {
+      span.set_string_attribute("payment.provider", "acme")
+    })
+  })
+}
+```
+
+Both snippets assume the imports shown in [Getting started](#getting-started).
+The direct SDK path, custom processors, and the full configuration surface are
+described below.
+
 ## Contents
 
 **Overview**
 
 - [Scope](#scope)
 - [Integration paths](#integration-paths)
+- [Quick start](#quick-start)
 - [Request lifecycle](#request-lifecycle)
 
 **Using moonotel**
@@ -271,7 +308,11 @@ The async setup uses the exporter's own queue by default. Pass `use_batch=true`
 or an explicit `batch` configuration to put a `BatchSpanProcessor` and its
 flush loop in front of it. `endpoint` overrides the OTLP URL, and `headers`
 is merged into the environment headers; otherwise the standard
-`OTEL_EXPORTER_OTLP_*` variables apply.
+`OTEL_EXPORTER_OTLP_*` variables apply. The wire format defaults to
+`http/protobuf`; set `OTEL_EXPORTER_OTLP_PROTOCOL=http/json` for JSON and
+`OTEL_EXPORTER_OTLP_COMPRESSION=gzip` for compressed request bodies. Pass
+`install_global=false` when several providers coexist in one process, or when
+a test must not disturb the process-wide provider.
 
 ## Examples
 
@@ -726,6 +767,12 @@ when it is used: a negative timeout falls back to 10s, blank
 protocol/compression values select `http/protobuf` / `none`, blank or
 whitespace-only endpoints are treated as unset, and surrounding whitespace is
 stripped before the export URL is built.
+
+`OtlpHttpConfig::with_endpoint_override` applies a blank-aware endpoint
+override and returns a new config; a non-blank value also clears the
+signal-specific `traces_endpoint` so the request goes to the supplied base URL.
+`OtlpHttpConfig::with_headers` merges headers case-insensitively and likewise
+returns a new config, leaving the original unchanged.
 
 Exporters are single-use sinks. `OtlpHttpExporter` rejects every batch after
 `shutdown()` — including an empty one — with

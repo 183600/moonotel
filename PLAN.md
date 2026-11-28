@@ -416,6 +416,22 @@ OTLP 编码器为 protobuf 和 JSON 各自实现，响应解析器分别处理�
 - 程序化配置与直接组装公开字段的配置使用同一套归一化逻辑：空白 endpoint 视为
   未设置，空白 protocol/compression 回退到默认值，负数 timeout/retries 有明确
   含义。
+- `OtlpHttpConfig::with_endpoint_override` 与 `with_headers` 返回新配置：前者
+  在非空时替换 base endpoint 并清除 `traces_endpoint`，后者按名称大小写不敏感
+  地合并 headers。
+
+配置来源按以下顺序生效（从高到低）：
+
+| 优先级 | 来源 | 典型写法 | 行为 |
+| --- | --- | --- | --- |
+| 1 | 显式参数 | `setup(endpoint=..., headers=...)` | 覆盖环境值；空白 endpoint 视为未设置 |
+| 2 | signal-specific 环境变量 | `OTEL_EXPORTER_OTLP_TRACES_*` | 覆盖对应的通用变量 |
+| 3 | 通用环境变量 | `OTEL_EXPORTER_OTLP_*` | 提供 endpoint、headers、protocol、compression、timeout |
+| 4 | 内置默认值 | `http://localhost:4318`、`http/protobuf`、`none`、10s | 仅在上述来源都未提供有效值时使用 |
+
+显式 `headers` 与环境 headers 合并而不是整体替换：同名 header 按大小写不敏感
+覆盖，其余环境 header 保留。显式非空 `endpoint` 会同时清除环境中的
+`traces_endpoint`，确保请求发送到调用方指定的 base URL。
 
 ### 6.3 请求、重试与超时
 
@@ -527,6 +543,14 @@ moon check --target native
 moon test --target native
 bash scripts/check-hygiene.sh
 ```
+
+按改动范围选择最低检查集：
+
+| 改动范围 | 至少运行 |
+| --- | --- |
+| 任意源码或文档 | `moon check`、`moon test` |
+| `async_runtime`、`exporter/otlp_async`、`instrumentation/*`、`examples/*` | 追加 `moon check --target native`、`moon test --target native` |
+| 提交或发起 PR 前 | 上述全部，再加 `bash scripts/check-hygiene.sh` |
 
 CI 同时运行默认与 native 目标，确保 async 埋点和 exporter 不只是被声明，而是
 真正编译和测试过。hygiene 脚本阻止临时探针文件与脚手架占位符进入仓库。

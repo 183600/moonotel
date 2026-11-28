@@ -101,7 +101,9 @@ pub fn[G, X] spawn(
 
 // Normalize an optional programmatic endpoint override. Blank values are
 // unset, and surrounding whitespace is not part of the URL, matching the
-// environment-variable path and `OtlpHttpConfig::new`.
+// environment-variable path and `OtlpHttpConfig::new`. `setup` applies the
+// same rule through `OtlpHttpConfig::with_endpoint_override`; this helper
+// keeps the normalization contract directly testable.
 
 ///|
 fn normalized_endpoint_override(endpoint : String?) -> String? {
@@ -198,21 +200,13 @@ pub fn[G] setup(
   batch? : @sdk.BatchConfig,
   install_global? : Bool,
 ) -> @sdk.TracerProviderSdk {
-  let base = @otlp.OtlpHttpConfig::from_env()
-  // Mirror `OtlpHttpConfig::new`: a blank programmatic endpoint is treated as
-  // unset, so it neither replaces the environment endpoint nor suppresses an
-  // environment traces endpoint.
-  let endpoint_override = normalized_endpoint_override(endpoint)
-  let config : @otlp.OtlpHttpConfig = {
-    ..base,
-    endpoint: endpoint_override.unwrap_or(base.endpoint),
-    traces_endpoint: match endpoint_override {
-      Some(_) => None
-      None => base.traces_endpoint
-    },
-  }
+  // A blank programmatic endpoint is treated as unset, so it neither replaces
+  // the environment endpoint nor suppresses an environment traces endpoint.
   // Programmatic headers override same-named environment headers but do not
   // discard the other headers configured through the environment.
+  let config = @otlp.OtlpHttpConfig::from_env().with_endpoint_override(
+    endpoint?=normalized_endpoint_override(endpoint),
+  )
   let config = match headers {
     Some(values) => config.with_headers(values)
     None => config

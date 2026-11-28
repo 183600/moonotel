@@ -59,7 +59,7 @@ pub const OTLP_HTTP_JSON_PROTOCOL : String = "http/json"
 // https://opentelemetry.io/docs/specs/otel/protocol/exporter/#user-agent
 
 ///|
-fn default_user_agent() -> String {
+pub fn default_user_agent() -> String {
   "OTel-OTLP-Exporter-MoonBit/" + @sdk.SDK_VERSION
 }
 
@@ -109,12 +109,14 @@ pub fn content_type_for_protocol(protocol : String) -> String {
 // are trimmed so that values such as `" HTTP/JSON "` are accepted as well.
 
 ///|
-fn normalize_enum(value : String) -> String {
+pub fn normalize_enum(value : String) -> String {
   value.trim().to_owned().to_lower()
 }
 
+// Whether `protocol` selects the OTLP/JSON mapping.
+
 ///|
-fn is_json_protocol(protocol : String) -> Bool {
+pub fn is_json_protocol(protocol : String) -> Bool {
   normalize_enum(protocol) == OTLP_HTTP_JSON_PROTOCOL
 }
 
@@ -123,7 +125,7 @@ fn is_json_protocol(protocol : String) -> Bool {
 // and the environment-variable path even when the config was built directly.
 
 ///|
-fn effective_protocol(protocol : String) -> String {
+pub fn effective_protocol(protocol : String) -> String {
   let normalized = normalize_enum(protocol)
   if normalized == "" {
     OTLP_HTTP_PROTOBUF_PROTOCOL
@@ -136,7 +138,7 @@ fn effective_protocol(protocol : String) -> String {
 // means `none`; any other unsupported value is rejected at export time.
 
 ///|
-fn effective_compression(compression : String) -> String {
+pub fn effective_compression(compression : String) -> String {
   let normalized = normalize_enum(compression)
   if normalized == "" {
     "none"
@@ -353,6 +355,24 @@ pub fn OtlpHttpConfig::new(
   }
 }
 
+// Apply a programmatic base-endpoint override to this configuration. A blank
+// value is treated as unset, so it neither replaces the configured endpoint
+// nor suppresses a signal-specific `traces_endpoint`. A non-blank value
+// replaces the base endpoint and clears `traces_endpoint`, because the caller
+// asked to send to that base URL rather than to the environment's full trace
+// URL. The original config is unchanged.
+
+///|
+pub fn OtlpHttpConfig::with_endpoint_override(
+  self : OtlpHttpConfig,
+  endpoint? : String,
+) -> OtlpHttpConfig {
+  match non_blank_trimmed(endpoint.unwrap_or("")) {
+    Some(value) => { ..self, endpoint: value, traces_endpoint: None }
+    None => self
+  }
+}
+
 // Merge `headers` into this configuration's headers, returning a new config.
 // HTTP header names are case-insensitive, so an override replaces any existing
 // header with the same spelling regardless of casing. The original config is
@@ -369,9 +389,10 @@ pub fn OtlpHttpConfig::with_headers(
   { ..self, headers: merged, }
 }
 
-///|
 // Reverse table: the 0-15 value of each ASCII hex digit, -1 for every other
 // code unit below 128.
+
+///|
 let hex_value : FixedArray[Int32] = build_hex_value()
 
 ///|
@@ -391,9 +412,11 @@ fn build_hex_value() -> FixedArray[Int32] {
   table
 }
 
+// Value of one ASCII hex digit (0-15), or -1 for any other code unit. Shared
+// by header percent-decoding and JSON response parsing.
+
 ///|
-fn hex_digit_value(c : Char) -> Int32 {
-  let code = c.to_int()
+fn hex_nibble_value(code : Int32) -> Int32 {
   if code >= 0 && code < 128 {
     hex_value.unsafe_get(code)
   } else {
@@ -416,8 +439,8 @@ fn decode_header_value(value : StringView) -> String {
   while i < len {
     let c = value.unsafe_get(i).unsafe_to_char()
     if c == '%' && i + 2 < len {
-      let hi = hex_digit_value(value.unsafe_get(i + 1).unsafe_to_char())
-      let lo = hex_digit_value(value.unsafe_get(i + 2).unsafe_to_char())
+      let hi = hex_nibble_value(value.unsafe_get(i + 1).to_int())
+      let lo = hex_nibble_value(value.unsafe_get(i + 2).to_int())
       if hi >= 0 && lo >= 0 {
         bytes.push((hi * 16 + lo).to_byte())
         i = i + 3

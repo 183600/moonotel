@@ -7,12 +7,17 @@
 // spans are skipped rather than serialized, and a link whose IDs are no longer
 // representable is emitted without IDs but keeps its attributes and tracestate.
 
+// Wire byte for one element of an ID array, shared with the protobuf writer.
+// In-range values are used as-is; out-of-range values are converted exactly
+// like `@api.bytes_to_hex` (the high nibble becomes "0" and the low nibble is
+// kept), so the protobuf, JSON and traceparent encodings of the same
+// SpanContext stay identical.
+
 ///|
 fn serialized_id_byte(value : Int32) -> Int32 {
   if value >= 0 && value < 256 {
     value
   } else {
-    // The hex/OTLP serializers keep the low nibble of an out-of-range element.
     value & 0x0F
   }
 }

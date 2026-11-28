@@ -355,20 +355,6 @@ fn ProtoWriter::write_bytes(self : ProtoWriter, value : Bytes) -> Unit {
   self.len = self.len + len
 }
 
-// Wire byte for an element of an ID array. In-range values are used as-is;
-// out-of-range values are converted exactly like `@api.bytes_to_hex` (the
-// high nibble becomes "0" and the low nibble is kept), so the protobuf,
-// JSON and traceparent encodings of the same SpanContext stay identical.
-
-///|
-fn wire_byte(value : Int32) -> Int32 {
-  if value >= 0 && value < 256 {
-    value
-  } else {
-    value & 0x0F
-  }
-}
-
 // Write a length-delimited bytes field from an array of byte values. Values
 // outside 0..255 are normalized like `@api.bytes_to_hex` rather than masked to
 // their low eight bits.
@@ -400,17 +386,17 @@ fn ProtoWriter::write_bytes_from_int_array(
     } else {
       buf.unsafe_write_uint32_le(
         pos,
-        (wire_byte(v0) |
-        (wire_byte(v1) << 8) |
-        (wire_byte(v2) << 16) |
-        (wire_byte(v3) << 24)).reinterpret_as_uint(),
+        (serialized_id_byte(v0) |
+        (serialized_id_byte(v1) << 8) |
+        (serialized_id_byte(v2) << 16) |
+        (serialized_id_byte(v3) << 24)).reinterpret_as_uint(),
       )
     }
     pos = pos + 4
     i = i + 4
   }
   while i < len {
-    buf.unsafe_set(pos, wire_byte(values.unsafe_get(i)).to_byte())
+    buf.unsafe_set(pos, serialized_id_byte(values.unsafe_get(i)).to_byte())
     pos = pos + 1
     i = i + 1
   }

@@ -31,58 +31,12 @@ fn map_capacity_for_entries(entries : Int32) -> Int32 {
   }
 }
 
-// Enum-valued configuration (protocol and compression) is matched
-// case-insensitively, as required for the OTEL_EXPORTER_OTLP_* variables.
-
-///|
-fn normalize_enum(value : String) -> String {
-  value.trim().to_owned().to_lower()
-}
-
-///|
-fn is_json_protocol(protocol : String) -> Bool {
-  normalize_enum(protocol) == @otlp.OTLP_HTTP_JSON_PROTOCOL
-}
-
-// Default `User-Agent` header value, following the OTLP exporter
-// specification (`OTel-OTLP-Exporter-<Language>/<Version>`).
-
-///|
-fn default_user_agent() -> String {
-  "OTel-OTLP-Exporter-MoonBit/" + @sdk.SDK_VERSION
-}
+// Compression names are matched case-insensitively, like every other
+// OTEL_EXPORTER_OTLP_* enum value.
 
 ///|
 fn is_gzip_compression(compression : String) -> Bool {
-  normalize_enum(compression) == "gzip"
-}
-
-// The protocol actually used for an export. A blank programmatic value falls
-// back to `http/protobuf`, matching `OtlpHttpConfig::new` and the sync
-// exporter even when the config was built directly instead of with the
-// constructor.
-
-///|
-fn effective_protocol(protocol : String) -> String {
-  let normalized = normalize_enum(protocol)
-  if normalized == "" {
-    @otlp.OTLP_HTTP_PROTOBUF_PROTOCOL
-  } else {
-    normalized
-  }
-}
-
-// The compression actually used for an export. A blank programmatic value
-// means `none`; any other unsupported value is rejected by the caller.
-
-///|
-fn effective_compression(compression : String) -> String {
-  let normalized = normalize_enum(compression)
-  if normalized == "" {
-    "none"
-  } else {
-    normalized
-  }
+  @otlp.normalize_enum(compression) == "gzip"
 }
 
 ///|
@@ -96,7 +50,10 @@ fn request_headers(
   )
   // Install the default `User-Agent` first: a configured one below replaces
   // it case-insensitively.
-  headers.set(@http.CaseInsensitiveString("user-agent"), default_user_agent())
+  headers.set(
+    @http.CaseInsensitiveString("user-agent"),
+    @otlp.default_user_agent(),
+  )
   for key, value in config.headers {
     // A config assembled directly from the public fields has not passed
     // through the constructor, so validate again before forwarding a header
@@ -801,7 +758,7 @@ async fn post_trace_request_with_headers(
   headers : Map[@http.CaseInsensitiveString, String],
   max_response_size : Int32,
 ) -> @sdk.ExportResult {
-  let json = is_json_protocol(config.protocol)
+  let json = @otlp.is_json_protocol(config.protocol)
   let url = config.request_url()
   let max_retries = if config.max_retries < 0 { 0 } else { config.max_retries }
   let timeout = config.effective_timeout_millis()
@@ -945,12 +902,12 @@ fn prepare_trace_body(
   max_request_size : Int32,
   encode : () -> Bytes,
 ) -> PreparedTraceBody {
-  if !@otlp.is_supported_protocol(effective_protocol(config.protocol)) {
+  if !@otlp.is_supported_protocol(@otlp.effective_protocol(config.protocol)) {
     return Rejected(
       @sdk.ExportFailure("unsupported OTLP protocol: " + config.protocol),
     )
   }
-  let compression = effective_compression(config.compression)
+  let compression = @otlp.effective_compression(config.compression)
   let gzip = compression == "gzip"
   if !gzip && compression != "none" {
     return Rejected(
@@ -1073,7 +1030,7 @@ fn encode_trace_body(
   config : @otlp.OtlpHttpConfig,
   spans : Array[@sdk.SpanData],
 ) -> Bytes {
-  if is_json_protocol(config.protocol) {
+  if @otlp.is_json_protocol(config.protocol) {
     @otlp.encode_trace_request_json(spans)
   } else {
     @otlp.encode_trace_request(spans)

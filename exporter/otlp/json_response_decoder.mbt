@@ -23,19 +23,6 @@ fn json_skip_ws(text : String, start : Int32) -> Int32 {
   pos
 }
 
-///|
-fn json_hex_nibble(code : Int32) -> Int32 {
-  if code >= 0x30 && code <= 0x39 {
-    code - 0x30
-  } else if code >= 0x41 && code <= 0x46 {
-    code - 0x37
-  } else if code >= 0x61 && code <= 0x66 {
-    code - 0x57
-  } else {
-    -1
-  }
-}
-
 // Compare a plain JSON string body (without escapes) to `expected`.
 
 ///|
@@ -217,10 +204,10 @@ fn json_parse_string_at(text : String, start : Int32) -> (String, Int32)? {
       if pos + 4 >= len {
         return None
       }
-      let h0 = json_hex_nibble(text.unsafe_get(pos + 1).to_int())
-      let h1 = json_hex_nibble(text.unsafe_get(pos + 2).to_int())
-      let h2 = json_hex_nibble(text.unsafe_get(pos + 3).to_int())
-      let h3 = json_hex_nibble(text.unsafe_get(pos + 4).to_int())
+      let h0 = hex_nibble_value(text.unsafe_get(pos + 1).to_int())
+      let h1 = hex_nibble_value(text.unsafe_get(pos + 2).to_int())
+      let h2 = hex_nibble_value(text.unsafe_get(pos + 3).to_int())
+      let h3 = hex_nibble_value(text.unsafe_get(pos + 4).to_int())
       if h0 < 0 || h1 < 0 || h2 < 0 || h3 < 0 {
         return None
       }
@@ -231,10 +218,10 @@ fn json_parse_string_at(text : String, start : Int32) -> (String, Int32)? {
         pos + 5 < len &&
         text.unsafe_get(pos).to_int() == 0x5C &&
         text.unsafe_get(pos + 1).to_int() == 0x75 {
-        let l0 = json_hex_nibble(text.unsafe_get(pos + 2).to_int())
-        let l1 = json_hex_nibble(text.unsafe_get(pos + 3).to_int())
-        let l2 = json_hex_nibble(text.unsafe_get(pos + 4).to_int())
-        let l3 = json_hex_nibble(text.unsafe_get(pos + 5).to_int())
+        let l0 = hex_nibble_value(text.unsafe_get(pos + 2).to_int())
+        let l1 = hex_nibble_value(text.unsafe_get(pos + 3).to_int())
+        let l2 = hex_nibble_value(text.unsafe_get(pos + 4).to_int())
+        let l3 = hex_nibble_value(text.unsafe_get(pos + 5).to_int())
         if l0 >= 0 && l1 >= 0 && l2 >= 0 && l3 >= 0 {
           let low = l0 * 4096 + l1 * 256 + l2 * 16 + l3
           if low >= 0xDC00 && low <= 0xDFFF {

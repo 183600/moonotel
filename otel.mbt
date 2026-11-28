@@ -215,36 +215,18 @@ fn console_span_processor() -> &@sdk.SpanProcessor {
 }
 
 // Build the OTLP configuration from the environment, applying the
-// programmatic endpoint and header overrides. A blank endpoint is unset, so it
-// neither replaces the environment endpoint nor suppresses an environment
-// traces endpoint. Programmatic headers replace same-named environment
-// headers case-insensitively but keep the other environment headers.
+// programmatic endpoint and header overrides. Programmatic headers replace
+// same-named environment headers case-insensitively but keep the other
+// environment headers.
 
 ///|
 fn otlp_config_with_overrides(
   endpoint? : String,
   headers? : Map[String, String],
 ) -> @otlp.OtlpHttpConfig {
-  let base = @otlp.OtlpHttpConfig::from_env()
-  let endpoint_override = match endpoint {
-    Some(value) => {
-      let value = value.trim().to_owned()
-      if value == "" {
-        None
-      } else {
-        Some(value)
-      }
-    }
-    None => None
-  }
-  let config : @otlp.OtlpHttpConfig = {
-    ..base,
-    endpoint: endpoint_override.unwrap_or(base.endpoint),
-    traces_endpoint: match endpoint_override {
-      Some(_) => None
-      None => base.traces_endpoint
-    },
-  }
+  let config = @otlp.OtlpHttpConfig::from_env().with_endpoint_override(
+    endpoint?,
+  )
   match headers {
     Some(values) => config.with_headers(values)
     None => config
